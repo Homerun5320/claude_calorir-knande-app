@@ -116,7 +116,9 @@ function DialogPanel({
         )}
       >
         {showClose && (
-          <IconButton icon={X} aria-label="Stäng" size="sm" variant="secondary" onClick={onClose} noTooltip className="absolute right-3 top-3" />
+          <div className="absolute right-3 top-3 z-10">
+            <IconButton icon={X} aria-label="Stäng" size="sm" variant="secondary" onClick={onClose} noTooltip />
+          </div>
         )}
         {icon !== undefined && (
           <div

@@ -98,10 +98,11 @@ export function Card({
   const mergedStyle: CSSProperties | undefined = tone ? toneVars(tone, { ...TONED_BACKGROUND, ...style }) : style
 
   // I länkar och knappar får rubriker inte vara h-element – använd span med samma stil.
+  // Huvudet byggs av span-element så att det är giltigt även inuti en <button>.
   const header = hasHeader ? (
-    <div className="mb-3 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        {eyebrow !== undefined && <div className={cx('eyebrow mb-1', tone && 'text-(--tone-ink)')}>{eyebrow}</div>}
+    <span className="mb-3 flex items-start justify-between gap-3">
+      <span className="block min-w-0">
+        {eyebrow !== undefined && <span className={cx('eyebrow mb-1 block', tone && 'text-(--tone-ink)')}>{eyebrow}</span>}
         {title !== undefined &&
           (clickable ? (
             <span id={titleId} className="block font-display text-[1.1875rem] font-semibold leading-snug tracking-tight">
@@ -112,9 +113,9 @@ export function Card({
               {title}
             </TitleTag>
           ))}
-      </div>
-      {action !== undefined && <div className="-my-1 flex shrink-0 items-center gap-1">{action}</div>}
-    </div>
+      </span>
+      {action !== undefined && <span className="-my-1 flex shrink-0 items-center gap-1">{action}</span>}
+    </span>
   ) : null
 
   if (to !== undefined) {

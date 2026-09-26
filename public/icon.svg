@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    Lagom – appikon. Midnattssolen vilar på horisonten över en granskogsgrön kvadrat,
+    och speglar sig i sjön: varken upp eller ner. Lagom.
+
+    Byggd på ett 512-rutnät med få, fylliga former så att den håller från 48 till 512 px
+    (favicon.svg är en förenklad variant för 16–32 px).
+
+    scripts/generate-icons.mjs läser id:na nedan:
+      #lagom-bg   – bakgrunden (hörnradien tas bort för fullfyllda ikoner)
+      #lagom-mark – märket (skalas ned till säkra zonen för maskable-ikonen)
+  -->
+  <title>Lagom</title>
+  <defs>
+    <linearGradient id="lagom-bg-fill" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#266c52"/>
+      <stop offset="1" stop-color="#174736"/>
+    </linearGradient>
+    <radialGradient id="lagom-glow" cx="256" cy="266" r="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5cf6b" stop-opacity="0.42"/>
+      <stop offset="0.5" stop-color="#f5cf6b" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#f5cf6b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lagom-sun" x1="0" y1="148" x2="0" y2="268" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8da86"/>
+      <stop offset="1" stop-color="#e6a91a"/>
+    </linearGradient>
+    <clipPath id="lagom-sky">
+      <rect x="0" y="0" width="512" height="268"/>
+    </clipPath>
+  </defs>
+
+  <rect id="lagom-bg" width="512" height="512" rx="114" fill="url(#lagom-bg-fill)"/>
+
+  <g id="lagom-mark">
+    <!-- Solens sken över horisonten. -->
+    <circle cx="256" cy="266" r="200" fill="url(#lagom-glow)" clip-path="url(#lagom-sky)"/>
+    <!-- Midnattssolen: bara övre halvan syns ovanför horisonten. -->
+    <circle cx="256" cy="266" r="118" fill="url(#lagom-sun)" clip-path="url(#lagom-sky)"/>
+    <!-- En tunn ljusare kant överst på solen. -->
+    <path d="M174 188 A113 113 0 0 1 338 188" fill="none" stroke="#fbe6a6" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+    <!-- Horisonten. -->
+    <rect x="92" y="254" width="328" height="28" rx="14" fill="#f6f3ec"/>
+    <!-- Solens spegling i sjön, allt kortare mot betraktaren. -->
+    <rect x="156" y="316" width="200" height="22" rx="11" fill="#f5cf6b" opacity="0.85"/>
+    <rect x="206" y="370" width="100" height="20" rx="10" fill="#f5cf6b" opacity="0.5"/>
+  </g>
+</svg>

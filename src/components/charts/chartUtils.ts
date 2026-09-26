@@ -11,7 +11,7 @@
  *
  * Färger anges alltid som CSS-variabler (t.ex. `var(--lg-gran)`) så att mörkt läge fungerar automatiskt.
  */
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { ISODate } from '../../types'
 import { addDays, diffDays, formatDayShort, fromISODate, isoWeek, MONTHS_SHORT, toISODate, weekdayIndex } from '../../lib/dates'
 import { formatNumber } from '../../lib/format'
@@ -505,4 +505,37 @@ export function useElementWidth<T extends HTMLElement = HTMLDivElement>(fallback
     return () => ro.disconnect()
   }, [])
   return [ref, width > 0 ? width : fallback]
+}
+
+/**
+ * Mät ett element som kan monteras och avmonteras (t.ex. en tooltip) via en callback-ref.
+ * Storleken uppdateras före målning, så placeringen blir rätt redan första gången.
+ */
+export function useMeasuredSize<T extends HTMLElement = HTMLDivElement>(): [
+  (el: T | null) => void,
+  { width: number; height: number } | null,
+] {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  const observer = useRef<ResizeObserver | null>(null)
+  const update = useCallback((width: number, height: number) => {
+    setSize((prev) => (prev && Math.abs(prev.width - width) < 0.5 && Math.abs(prev.height - height) < 0.5 ? prev : { width, height }))
+  }, [])
+  const ref = useCallback(
+    (el: T | null) => {
+      observer.current?.disconnect()
+      observer.current = null
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      update(r.width, r.height)
+      if (typeof ResizeObserver === 'undefined') return
+      const ro = new ResizeObserver((entries) => {
+        const box = entries[0]?.borderBoxSize?.[0]
+        if (box) update(box.inlineSize, box.blockSize)
+      })
+      ro.observe(el)
+      observer.current = ro
+    },
+    [update],
+  )
+  return [ref, size]
 }

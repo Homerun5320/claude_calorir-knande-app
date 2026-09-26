@@ -31,6 +31,7 @@ import {
   TOOLTIP_CLASS,
   tooltipPlacement,
   useElementWidth,
+  useMeasuredSize,
   type CurveType,
   type Point,
 } from './chartUtils'
@@ -161,6 +162,7 @@ export function LineChart({
   const gradId = useSvgId('lc-grad')
   const [active, setActive] = useState<number | null>(null)
   const [viaKeyboard, setViaKeyboard] = useState(false)
+  const [tooltipRef, tooltipSize] = useMeasuredSize<HTMLDivElement>()
 
   const model = useMemo(() => {
     // --- Datum ---------------------------------------------------------------
@@ -218,7 +220,7 @@ export function LineChart({
     if (formatValue) return formatValue
     const step = model?.step ?? 1
     const dec = step >= 10 ? 0 : Math.min(2, decimalsForStep(step) + 1)
-    return (v: number) => `${formatNumber(v, dec)}${unit ? ` ${unit}` : ''}`
+    return (v: number) => `${formatNumber(v, dec)}${unit ? `\u00a0${unit}` : ''}`
   }, [formatValue, unit, model?.step])
 
   const layout = useMemo(() => {
@@ -268,9 +270,7 @@ export function LineChart({
   const activeDate = active !== null ? dateList[active] : undefined
   const activeX = activeDate ? xOf(activeDate) : 0
   const rows = activeDate
-    ? visible
-        .map((m) => ({ m, v: m.byDate.get(activeDate) }))
-        .filter((r): r is { m: PlottedSeries; v: number } => r.v !== undefined)
+    ? visible.map((m) => ({ m, v: m.byDate.get(activeDate) })).filter((r): r is { m: PlottedSeries; v: number } => r.v !== undefined)
     : []
   const bandAt = (d: ISODate) => {
     if (!band) return undefined
@@ -280,7 +280,7 @@ export function LineChart({
   }
   const activeBand = activeDate ? bandAt(activeDate) : undefined
   const activeYs = rows.map((r) => ys(r.v))
-  const estHeight = 30 + (rows.length + (activeBand ? 1 : 0)) * 22
+  const estHeight = tooltipSize?.height ?? 34 + (rows.length + (activeBand ? 1 : 0)) * 24
   const minY = activeYs.length ? Math.min(...activeYs) : top
   const maxY = activeYs.length ? Math.max(...activeYs) : top
   const tooltipTop = minY - estHeight - 14 >= 0 ? minY - estHeight - 14 : Math.min(height - estHeight, maxY + 14)
@@ -346,7 +346,7 @@ export function LineChart({
   const goalVisible = goalY !== null && goalY >= top - 1 && goalY <= bottom + 1
 
   return (
-    <figure className={`relative m-0 ${className}`}>
+    <figure className={`relative ${className}`}>
       <div
         ref={ref}
         className="relative select-none"
@@ -357,7 +357,14 @@ export function LineChart({
         onKeyDown={onKeyDown}
         onBlur={() => viaKeyboard && setActive(null)}
       >
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={autoSummary} className="block overflow-visible">
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={autoSummary}
+          className="block overflow-visible"
+        >
           <defs>
             <clipPath id={clipId}>
               <rect x={left - 6} y={top - 8} width={right - left + 12} height={bottom - top + 16} />
@@ -546,6 +553,7 @@ export function LineChart({
 
         {activeDate && (rows.length > 0 || activeBand) && (
           <div
+            ref={tooltipRef}
             className={TOOLTIP_CLASS}
             style={{ left: place.left, top: Math.max(0, tooltipTop), transform: `translateX(${place.translate})` }}
             aria-hidden="true"
@@ -560,7 +568,10 @@ export function LineChart({
             ))}
             {activeBand && band?.label && (
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="inline-block h-2.5 w-3.5 self-center rounded-[3px] opacity-30" style={{ background: band.color ?? 'var(--lg-gran)' }} />
+                <span
+                  className="inline-block h-2.5 w-3.5 self-center rounded-[3px] opacity-30"
+                  style={{ background: band.color ?? 'var(--lg-gran)' }}
+                />
                 <span className="text-[12px] font-semibold text-ink tabular-nums">
                   {fmt(activeBand.l)}–{fmt(activeBand.u)}
                 </span>
@@ -593,40 +604,53 @@ export function LineChart({
         </figcaption>
       )}
 
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Datum</th>
-            {visible.map((m) => (
-              <th key={m.s.id} scope="col">
-                {m.s.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dateList.map((d) => (
-            <tr key={d}>
-              <th scope="row">{formatDayLong(d)}</th>
-              {visible.map((m) => {
-                const v = m.byDate.get(d)
-                return <td key={m.s.id}>{v === undefined ? '–' : fmt(v)}</td>
-              })}
+      {/* sr-only på en omslutande div – tabeller ignorerar width: 1px och skulle annars ge sidled-scroll */}
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Datum</th>
+              {visible.map((m) => (
+                <th key={m.s.id} scope="col">
+                  {m.s.label}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {dateList.map((d) => (
+              <tr key={d}>
+                <th scope="row">{formatDayLong(d)}</th>
+                {visible.map((m) => {
+                  const v = m.byDate.get(d)
+                  return <td key={m.s.id}>{v === undefined ? '–' : fmt(v)}</td>
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   )
 }
 
 /** Kort linjenyckel (eller punkt) i seriens färg för tooltip och teckenförklaring. */
 function LineKey({ color, dashed, dot }: { color: string; dashed?: boolean; dot?: boolean }) {
-  if (dot) return <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full" style={{ background: color }} aria-hidden="true" />
+  if (dot)
+    return <span className="inline-block h-2 w-2 shrink-0 self-center rounded-full" style={{ background: color }} aria-hidden="true" />
   return (
     <svg width="14" height="4" viewBox="0 0 14 4" className="shrink-0 self-center" aria-hidden="true">
-      <line x1="1" x2="13" y1="2" y2="2" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={dashed ? '2 3' : undefined} />
+      <line
+        x1="1"
+        x2="13"
+        y1="2"
+        y2="2"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={dashed ? '2 3' : undefined}
+      />
     </svg>
   )
 }

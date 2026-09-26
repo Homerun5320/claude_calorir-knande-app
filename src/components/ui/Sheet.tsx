@@ -159,13 +159,13 @@ export function useMediaQuery(query: string): boolean {
   )
 }
 
-/** Mörk, suddig bakgrund bakom modaler. Färgen kommer från skuggtoken (fungerar i båda teman). */
+/** Dämpad, suddig bakgrund bakom modaler (skuggtoken i ljust läge, nattskog i mörkt). */
 export function ModalBackdrop({ onClick }: { onClick?: () => void }) {
   return (
     <motion.div
       aria-hidden
       data-testid="modal-backdrop"
-      className="absolute inset-0 bg-(--lg-shadow-c) backdrop-blur-[6px]"
+      className="absolute inset-0 bg-(--lg-shadow-c) backdrop-blur-[6px] dark:bg-[color-mix(in_oklab,var(--lg-bg)_62%,transparent)]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

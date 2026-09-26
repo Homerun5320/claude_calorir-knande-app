@@ -104,7 +104,7 @@ describe('tickStep / niceDomain / niceTicks', () => {
     expect(decimalsForStep(0.05)).toBe(2)
     expect(decimalsForStep(500)).toBe(0)
     expect(formatTicks([0, 0.5, 1])).toEqual(['0', '0,5', '1'])
-    expect(formatTicks([0, 1000, 2000])).toEqual(['0', '1 000', '2 000'])
+    expect(formatTicks([0, 1000, 2000])).toEqual(['0', '1\u00a0000', '2\u00a0000'])
   })
 })
 
@@ -203,10 +203,14 @@ describe('monoton kubisk kurva', () => {
     expect(linearPath(p)).toBe('M0,0L10,5')
     expect(stepPath(p)).toBe('M0,0H10V5')
     expect(areaPath(p, 20, 'linear')).toBe('M0,0L10,5L10,20L0,20Z')
-    const band = bandPath(p, [
-      { x: 0, y: 10 },
-      { x: 10, y: 15 },
-    ], 'linear')
+    const band = bandPath(
+      p,
+      [
+        { x: 0, y: 10 },
+        { x: 10, y: 15 },
+      ],
+      'linear',
+    )
     expect(band).toBe('M0,0L10,5L10,15L0,10Z')
   })
 })

@@ -202,7 +202,6 @@ export function Button(props: ButtonProps) {
     to: _to,
     ...rest
   } = props
-  void _to
   return (
     <motion.button
       type={type}

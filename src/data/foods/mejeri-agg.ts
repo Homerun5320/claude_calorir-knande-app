@@ -2,8 +2,11 @@
  * Mejeri, ost och ägg.
  *
  * Värden per 100 g ätlig del, baserade på Livsmedelsverkets livsmedelsdatabas och typiska
- * svenska förpackningsuppgifter. Svensk mjölk, fil och yoghurt (naturell) berikas med
- * vitamin D (ca 1 µg/100 g sedan 2018); lättare mjölk även med vitamin A.
+ * svenska förpackningsuppgifter. Sedan 2018 ska mjölk med högst 3 % fett berikas med
+ * vitamin D (0,95–1,1 µg/100 g) och fil, yoghurt och andra syrade mjölkprodukter med högst
+ * 3 % fett – både naturella och smaksatta – med 0,75–1,1 µg/100 g (LIVSFS 2018:5).
+ * Keso, kvarg, skyr, ost, grädde, gårdsmjölk och yoghurt över 3 % fett berikas inte.
+ * Lättare mjölk berikas dessutom med vitamin A.
  * Hårdost räknas som naturligt laktosfri (< 0,01 g laktos/100 g).
  */
 import { defineFoods, type FoodSeed } from './define'
@@ -211,7 +214,7 @@ const mjolk: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 36, prot: 3.4, carb: 4.4, fat: 0.5, fiber: 0, sugar: 4.4, addedSugar: 0, satFat: 0.3, salt: 0.1,
     n: {
-      cholesterol: 2, vitA: 10, vitC: 1, riboflavin: 0.16, folate: 6, vitB12: 0.3,
+      cholesterol: 2, vitA: 10, vitD: 0.9, vitC: 1, riboflavin: 0.16, folate: 6, vitB12: 0.3,
       calcium: 115, iron: 0.05, magnesium: 11, potassium: 150, phosphorus: 90, zinc: 0.4,
     },
     portions: [['glas', '1 glas (2 dl)', 206]],
@@ -308,7 +311,7 @@ const filYoghurt: FoodSeed[] = [
     name: 'Filmjölk med smak, sötad (t.ex. vanilj, jordgubb)',
     cat: 'mejeri',
     kcal: 80, prot: 3.0, carb: 11.5, fat: 2.5, fiber: 0.2, sugar: 11, addedSugar: 6.5, satFat: 1.6, salt: 0.1,
-    n: { vitC: 1, folate: 8, vitB12: 0.3, calcium: 105, iron: 0.05, potassium: 140, phosphorus: 85 },
+    n: { vitD: 0.9, vitC: 1, riboflavin: 0.15, folate: 8, vitB12: 0.3, calcium: 105, iron: 0.05, magnesium: 10, potassium: 140, phosphorus: 85, zinc: 0.35 },
     portions: FIL_PORTIONS,
     density: 1.04, liquid: true,
     tags: ['vegetarisk', 'glutenfri'],
@@ -353,7 +356,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 52, prot: 3.3, carb: 4.0, fat: 2.5, fiber: 0, sugar: 4.0, addedSugar: 0, satFat: 1.6, salt: 0.1,
     n: {
-      cholesterol: 8, vitA: 30, vitC: 1, riboflavin: 0.17, folate: 10, vitB12: 0.35,
+      cholesterol: 8, vitA: 30, vitD: 1.0, vitC: 1, riboflavin: 0.17, folate: 10, vitB12: 0.35,
       calcium: 115, iron: 0.03, magnesium: 11, potassium: 150, phosphorus: 95, zinc: 0.4,
     },
     portions: [['glas', '1 glas (2 dl)', 206], ['liten', '1 liten flaska (2,5 dl)', 258]],
@@ -479,7 +482,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 83, prot: 3.2, carb: 13, fat: 2.0, fiber: 0, sugar: 12.5, addedSugar: 8.0, satFat: 1.3, salt: 0.1,
     n: {
-      cholesterol: 7, vitA: 25, vitC: 0, riboflavin: 0.16, folate: 10, vitB12: 0.3,
+      cholesterol: 7, vitA: 25, vitD: 0.9, vitC: 0, riboflavin: 0.16, folate: 10, vitB12: 0.3,
       calcium: 110, iron: 0.05, magnesium: 11, potassium: 145, phosphorus: 90, zinc: 0.4, iodine: 10,
     },
     portions: YOGHURT_PORTIONS,
@@ -494,7 +497,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 86, prot: 3.0, carb: 13.8, fat: 2.0, fiber: 0.3, sugar: 13, addedSugar: 8.5, satFat: 1.3, salt: 0.1,
     n: {
-      cholesterol: 7, vitA: 25, vitC: 1, riboflavin: 0.15, folate: 9, vitB12: 0.3,
+      cholesterol: 7, vitA: 25, vitD: 0.9, vitC: 1, riboflavin: 0.15, folate: 9, vitB12: 0.3,
       calcium: 105, iron: 0.1, magnesium: 11, potassium: 150, phosphorus: 85, zinc: 0.4, iodine: 9,
     },
     portions: YOGHURT_PORTIONS,
@@ -509,7 +512,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 44, prot: 3.8, carb: 6.0, fat: 0.4, fiber: 0.3, sugar: 5.5, addedSugar: 0.5, satFat: 0.25, salt: 0.1,
     n: {
-      cholesterol: 2, vitC: 1, riboflavin: 0.18, folate: 10, vitB12: 0.35,
+      cholesterol: 2, vitD: 0.9, vitC: 1, riboflavin: 0.18, folate: 10, vitB12: 0.35,
       calcium: 125, iron: 0.1, magnesium: 12, potassium: 165, phosphorus: 100, zinc: 0.5,
     },
     portions: YOGHURT_PORTIONS,
@@ -524,7 +527,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 60, prot: 10, carb: 4.0, fat: 0.5, fiber: 0, sugar: 4.0, addedSugar: 0, satFat: 0.3, salt: 0.1,
     n: {
-      cholesterol: 2, vitC: 0, riboflavin: 0.22, folate: 12, vitB12: 0.5,
+      cholesterol: 2, vitD: 0.9, vitC: 0, riboflavin: 0.22, folate: 12, vitB12: 0.5,
       calcium: 120, iron: 0.05, magnesium: 12, potassium: 160, phosphorus: 150, zinc: 0.6, selenium: 5,
     },
     portions: [['portion', '1 portion (2 dl)', 210], ['forp', '1 bägare (200 g)', 200]],
@@ -539,7 +542,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 66, prot: 10, carb: 6.0, fat: 0.3, fiber: 0.2, sugar: 5.0, addedSugar: 1.0, satFat: 0.2, salt: 0.1,
     n: {
-      cholesterol: 1, vitD: 0, vitC: 1, riboflavin: 0.2, folate: 10, vitB12: 0.5,
+      cholesterol: 1, vitD: 0.9, vitC: 1, riboflavin: 0.2, folate: 10, vitB12: 0.5,
       calcium: 115, iron: 0.1, magnesium: 12, potassium: 155, phosphorus: 145, zinc: 0.6,
     },
     portions: [['portion', '1 portion (2 dl)', 210], ['forp', '1 bägare (200 g)', 200]],
@@ -554,7 +557,7 @@ const filYoghurt: FoodSeed[] = [
     cat: 'mejeri',
     kcal: 73, prot: 2.9, carb: 12, fat: 1.5, fiber: 0.2, sugar: 11.5, addedSugar: 7.5, satFat: 1.0, salt: 0.1,
     n: {
-      cholesterol: 5, vitC: 1, riboflavin: 0.15, folate: 8, vitB12: 0.3,
+      cholesterol: 5, vitD: 0.9, vitC: 1, riboflavin: 0.15, folate: 8, vitB12: 0.3,
       calcium: 100, iron: 0.05, magnesium: 10, potassium: 140, phosphorus: 80, zinc: 0.35,
     },
     portions: [['glas', '1 glas (2 dl)', 208], ['flaska', '1 liten flaska (2,5 dl)', 260]],
@@ -658,7 +661,7 @@ const filYoghurt: FoodSeed[] = [
   {
     id: 'cottage-cheese-4',
     name: 'Cottage cheese 4 % fett (keso)',
-    cat: 'mejeri',
+    cat: 'ost',
     kcal: 97, prot: 12.5, carb: 2.8, fat: 4.0, fiber: 0, sugar: 2.8, addedSugar: 0, satFat: 2.5, salt: 0.9,
     n: {
       monoFat: 1.0, polyFat: 0.15, cholesterol: 15,
@@ -668,13 +671,13 @@ const filYoghurt: FoodSeed[] = [
     portions: [['portion', '1 portion (1 dl)', 95], ['forp', '1 förpackning (250 g)', 250], ['klick', '1 klick (2 msk)', 30]],
     density: 0.95,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['keso', 'cottage cheese', 'cottagecheese', 'keso naturell', 'kesoost', 'keso 4%', 'kottage cheese'],
+    syn: ['keso', 'cottage cheese', 'cottage', 'cottagecheese', 'keso naturell', 'kesoost', 'keso 4%', 'kottage cheese', 'kesso', 'grynost'],
     co2e: 3.5,
   },
   {
     id: 'cottage-cheese-1-5',
     name: 'Cottage cheese 1,5 % fett (lätt keso)',
-    cat: 'mejeri',
+    cat: 'ost',
     kcal: 78, prot: 13, carb: 2.8, fat: 1.5, fiber: 0, sugar: 2.8, addedSugar: 0, satFat: 0.95, salt: 0.9,
     n: {
       cholesterol: 6, vitA: 15, vitD: 0.02, vitC: 0, riboflavin: 0.18, folate: 12, vitB12: 0.5,
@@ -743,6 +746,54 @@ const gradde: FoodSeed[] = [
     co2e: 2.3,
   },
   {
+    id: 'matlagningsgradde-laktosfri-15',
+    name: 'Matlagningsgrädde laktosfri 15 % fett',
+    cat: 'mejeri',
+    kcal: 161, prot: 3.0, carb: 4.0, fat: 15, fiber: 0, sugar: 4.0, addedSugar: 0, satFat: 9.8, salt: 0.1,
+    n: {
+      monoFat: 4.0, polyFat: 0.5, cholesterol: 45,
+      vitA: 140, vitD: 0.15, vitC: 1, riboflavin: 0.15, folate: 5, vitB12: 0.35,
+      calcium: 100, iron: 0.03, magnesium: 10, potassium: 130, phosphorus: 85, zinc: 0.35,
+    },
+    portions: [['forp', '1 förpackning (2,5 dl)', 253], ['halv-dl', '1/2 dl i såsen', 51]],
+    density: 1.01, liquid: true,
+    tags: ['vegetarisk', 'glutenfri', 'laktosfri'],
+    syn: ['laktosfri matgrädde', 'laktosfri matlagningsgrädde', 'laktosfri grädde till sås', 'matlagningsgrädde laktosfri'],
+    co2e: 2.3,
+  },
+  {
+    id: 'matlagningsgradde-13',
+    name: 'Matlagningsgrädde 13 % fett',
+    cat: 'mejeri',
+    kcal: 146, prot: 3.1, carb: 4.2, fat: 13, fiber: 0, sugar: 4.0, addedSugar: 0, satFat: 8.5, salt: 0.1,
+    n: {
+      monoFat: 3.4, polyFat: 0.45, cholesterol: 40,
+      vitA: 120, vitD: 0.13, vitE: 0.3, vitC: 1, riboflavin: 0.15, vitB6: 0.04, folate: 5, vitB12: 0.35,
+      calcium: 100, iron: 0.03, magnesium: 10, potassium: 130, phosphorus: 85, zinc: 0.35,
+    },
+    portions: [['forp', '1 förpackning (2,5 dl)', 253], ['halv-dl', '1/2 dl i såsen', 51], ['forp-5', '1 förpackning (5 dl)', 505]],
+    density: 1.01, liquid: true,
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['matgrädde', 'matlagningsgrädde', 'grädde 13%', 'matlagningsgrädde 13', 'grädde till sås'],
+    co2e: 2.1,
+  },
+  {
+    id: 'mellangradde-27',
+    name: 'Mellangrädde 27 % fett',
+    cat: 'mejeri',
+    kcal: 266, prot: 2.5, carb: 3.3, fat: 27, fiber: 0, sugar: 3.3, addedSugar: 0, satFat: 17.5, salt: 0.1,
+    n: {
+      monoFat: 7.1, polyFat: 0.9, cholesterol: 80,
+      vitA: 250, vitD: 0.25, vitE: 0.65, vitC: 1, riboflavin: 0.13, vitB6: 0.03, folate: 4, vitB12: 0.3,
+      calcium: 85, iron: 0.03, magnesium: 8, potassium: 110, phosphorus: 70, zinc: 0.3,
+    },
+    portions: [['forp', '1 förpackning (5 dl)', 500], ['halv-dl', '1/2 dl i såsen', 50]],
+    density: 1.0, liquid: true,
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['mellangrädde', 'grädde 27%', 'mellan grädde', 'gräddmellan'],
+    co2e: 3.5,
+  },
+  {
     id: 'kaffegradde-12',
     name: 'Kaffegrädde 12 % fett',
     cat: 'mejeri',
@@ -771,7 +822,7 @@ const gradde: FoodSeed[] = [
     portions: [['klick', '1 klick (1 msk)', 15], ['burk', '1 burk (2 dl)', 200]],
     density: 1.0,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['creme fraiche', 'crème fraîche', 'cremefraiche', 'fraiche', 'kräm fräsch', 'creme fresh'],
+    syn: ['creme fraiche', 'crème fraîche', 'cremefraiche', 'fraiche', 'kräm fräsch', 'creme fresh', 'creme fraich', 'syrad grädde'],
     co2e: 4.2,
   },
   {
@@ -787,7 +838,7 @@ const gradde: FoodSeed[] = [
     portions: [['klick', '1 klick (1 msk)', 15], ['burk', '1 burk (2 dl)', 200]],
     density: 1.0,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['lätt crème fraiche', 'lätt creme fraiche', 'creme fraiche 15%', 'light crème fraiche'],
+    syn: ['lätt crème fraiche', 'lätt creme fraiche', 'creme fraiche 15%', 'light crème fraiche', 'syrad grädde lätt', 'lätt syrad grädde'],
     co2e: 2.3,
   },
   {
@@ -869,8 +920,10 @@ const gradde: FoodSeed[] = [
     portions: [['burk', '1 burk (397 g)', 397]],
     density: 1.3,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['sötad kondenserad mjölk', 'kondensmjölk', 'condensed milk', 'kondenserad mjölk'],
+    syn: ['sötad kondenserad mjölk', 'kondensmjölk', 'condensed milk', 'kondenserad mjölk', 'kondenserad mjölk sötad'],
     co2e: 3.0,
+    kostrad: {},
+    note: 'Räknas inte mot kostrådet om mejeriprodukter – drygt hälften är tillsatt socker.',
   },
   {
     id: 'kondenserad-mjolk-osotad',
@@ -921,7 +974,7 @@ const ost: FoodSeed[] = [
     portions: HARD_CHEESE_PORTIONS,
     density: 0.4,
     tags: ['vegetarisk', 'glutenfri', 'laktosfri', 'svensk'],
-    syn: ['ost', 'hushållsost', 'smörgåsost', 'mild ost', 'hushallsost', 'gul ost'],
+    syn: ['ost', 'hushållsost', 'smörgåsost', 'mild ost', 'hushallsost', 'gul ost', 'ostskiva', 'skivad ost', 'hårdost', 'ost 26%'],
     co2e: 8.8,
   },
   {
@@ -1289,7 +1342,7 @@ const ost: FoodSeed[] = [
     id: 'salladsost',
     name: 'Salladsost (vitost av komjölk)',
     cat: 'ost',
-    kcal: 260, prot: 14, carb: 1.5, fat: 22, fiber: 0, sugar: 1.5, satFat: 14.5, salt: 2.7,
+    kcal: 262, prot: 15, carb: 1.0, fat: 22, fiber: 0, sugar: 1.0, satFat: 14.5, salt: 2.8,
     n: {
       cholesterol: 65, vitA: 180, vitD: 0.2, vitC: 0, riboflavin: 0.3, folate: 15, vitB12: 1.0,
       calcium: 350, iron: 0.2, magnesium: 15, potassium: 100, phosphorus: 300,
@@ -1493,33 +1546,65 @@ const ost: FoodSeed[] = [
   },
   {
     id: 'mesost',
-    name: 'Mesost (brunost)',
+    name: 'Mesost 17 % fett (brunost)',
     cat: 'ost',
-    kcal: 388, prot: 10, carb: 42, fat: 20, fiber: 0, sugar: 40, addedSugar: 0, satFat: 13, salt: 1.0,
+    kcal: 377, prot: 9.0, carb: 47, fat: 17, fiber: 0, sugar: 45, satFat: 11, salt: 0.7,
     n: {
-      cholesterol: 60, vitA: 200, vitD: 0.2, vitC: 0, riboflavin: 1.0, folate: 5, vitB12: 1.8,
-      calcium: 400, iron: 0.3, magnesium: 60, potassium: 1100, phosphorus: 450,
+      cholesterol: 50, vitA: 170, vitD: 0.15, vitC: 0, riboflavin: 1.0, folate: 5, vitB12: 1.8,
+      calcium: 400, iron: 5.0, magnesium: 60, potassium: 1100, phosphorus: 450,
     },
     portions: [['skiva', '1 skiva (osthyvel)', 10], ['bit', '1 bit (25 g)', 25]],
     tags: ['vegetarisk', 'glutenfri', 'svensk', 'klassiker'],
-    syn: ['brunost', 'mysost', 'messost', 'mese', 'getmesost', 'mesost skivad'],
+    syn: ['mesost', 'brunost', 'mysost', 'messost', 'mese', 'mesost skivad', 'fjällbrynt mesost', 'mesost 17%'],
     co2e: 3.0,
-    note: 'Vassleost. Sockerarterna är mjölkens egen laktos och galaktos. Fetthalten varierar mellan märken.',
+    note: 'Vassleost av svensk typ. Sockerarterna kommer främst från vasslens laktos. Svensk mesost är ofta järnberikad (ca 5 mg/100 g).',
+  },
+  {
+    id: 'mesost-gudbrandsdalen-29',
+    name: 'Mesost Gudbrandsdalen 29 % fett (norsk brunost)',
+    cat: 'ost',
+    kcal: 445, prot: 10, carb: 36, fat: 29, fiber: 0, sugar: 36, satFat: 18.5, salt: 1.0,
+    n: {
+      cholesterol: 85, vitA: 290, vitD: 0.3, vitC: 0, riboflavin: 1.1, folate: 5, vitB12: 1.9,
+      calcium: 400, iron: 0.3, magnesium: 50, potassium: 1000, phosphorus: 450,
+    },
+    portions: [['skiva', '1 skiva (osthyvel)', 10], ['bit', '1 bit (25 g)', 25]],
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['gudbrandsdalsost', 'gudbrandsdalen', 'norsk brunost', 'brunost', 'geitost', 'getmesost', 'mesost fet'],
+    co2e: 4.0,
+    note: 'Norsk brunost av vassle, grädde och getmjölk. Fetare och inte järnberikad som svensk mesost.',
   },
   {
     id: 'messmor',
-    name: 'Messmör',
+    name: 'Messmör (ca 5 % fett)',
     cat: 'ost',
-    kcal: 256, prot: 9.0, carb: 46, fat: 4.0, fiber: 0, sugar: 44, satFat: 2.6, salt: 0.8,
+    kcal: 270, prot: 7.0, carb: 47, fat: 6.0, fiber: 0, sugar: 45, satFat: 3.9, salt: 0.7,
     n: {
-      cholesterol: 12, vitD: 0.05, vitC: 0, riboflavin: 1.2, folate: 5, vitB12: 1.5,
-      calcium: 400, iron: 0.4, magnesium: 60, potassium: 1400, phosphorus: 400,
+      cholesterol: 18, vitD: 0.05, vitC: 0, riboflavin: 1.2, folate: 5, vitB12: 1.5,
+      calcium: 400, iron: 5.0, magnesium: 60, potassium: 1400, phosphorus: 400,
     },
-    portions: [['portion', '1 portion på smörgås (15 g)', 15]],
+    portions: [['portion', '1 portion på smörgås (15 g)', 15], ['tsk', '1 tsk (7 g)', 7]],
+    density: 1.3,
     tags: ['vegetarisk', 'glutenfri', 'svensk', 'klassiker'],
-    syn: ['mesmör', 'messmor', 'mesost bredbar', 'bredbar mesost', 'mese', 'prim'],
+    syn: ['mesmör', 'messmor', 'mesost bredbar', 'bredbar mesost', 'mese', 'prim', 'messmör original'],
     co2e: 2.5,
-    note: 'Bredbar vassleost. Mycket kalium.',
+    note: 'Bredbar vassleost. Mycket kalium. Svenskt messmör är järnberikat (ca 5 mg/100 g).',
+  },
+  {
+    id: 'messmor-latt-2',
+    name: 'Messmör lätt 2 % fett',
+    cat: 'ost',
+    kcal: 240, prot: 7.4, carb: 48, fat: 2.0, fiber: 0, sugar: 46, satFat: 1.3, salt: 0.7,
+    n: {
+      cholesterol: 6, vitC: 0, riboflavin: 1.2, folate: 5, vitB12: 1.5,
+      calcium: 400, iron: 5.0, magnesium: 60, potassium: 1400, phosphorus: 400,
+    },
+    portions: [['portion', '1 portion på smörgås (15 g)', 15], ['tsk', '1 tsk (7 g)', 7]],
+    density: 1.3,
+    tags: ['vegetarisk', 'glutenfri', 'svensk'],
+    syn: ['lätt messmör', 'messmör lätt', 'messmör natur', 'mesmör lätt', 'mager messmör'],
+    co2e: 2.3,
+    note: 'Järnberikat (ca 5 mg/100 g).',
   },
   {
     id: 'ricotta',
@@ -1612,7 +1697,7 @@ const agg: FoodSeed[] = [
       ['st-stort', '1 stort ägg (L)', 60],
     ],
     tags: ['vegetarisk', 'glutenfri', 'laktosfri', 'svensk'],
-    syn: ['kokt ägg', 'hårdkokt ägg', 'löskokt ägg', 'ägghalva', 'ägghalvor', 'agg kokt', 'ägg kokt'],
+    syn: ['kokt ägg', 'hårdkokt ägg', 'löskokt ägg', 'mjukkokt ägg', 'pocherat ägg', 'ägghalva', 'ägghalvor', 'agg kokt', 'ägg kokt', 'frukostägg'],
     co2e: 1.6,
   },
   {
