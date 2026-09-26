@@ -66,7 +66,7 @@ const MealCard = memo(function MealCard({ meal, name, today, summary, copyCount,
               <span className="truncate font-display text-[1.0625rem] leading-tight font-semibold tracking-tight text-ink">{name}</span>
               {!empty && !mindful && <EnergyValue kcal={summary.kcal} className="ml-auto text-sm font-semibold text-ink-2" />}
             </span>
-            <span className={`mt-0.5 block truncate text-[0.8125rem] ${empty ? 'text-ink-3 italic' : 'text-ink-2'}`}>{namesText}</span>
+            <span className={`mt-0.5 block truncate text-[0.8125rem] ${empty ? 'text-ink-3' : 'text-ink-2'}`}>{namesText}</span>
           </span>
         </Link>
         <Link

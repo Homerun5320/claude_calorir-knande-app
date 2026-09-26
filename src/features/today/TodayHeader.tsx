@@ -35,7 +35,8 @@ function FoodDayChip({ foodDay, onLandscape }: { foodDay: HeaderFoodDay; onLands
 }
 
 export const TodayHeader = memo(function TodayHeader({ today }: { today: ISODate }) {
-  const now = useClock(60_000)
+  // Hälsningen byter bara vid några få klockslag – var femte minut räcker gott.
+  const now = useClock(5 * 60_000)
   const name = useProfileStore((s) => s.profile?.name)
   const seasonal = useProfileStore((s) => s.settings.seasonalTheme)
   const foodDay = useMemo(() => headerFoodDay(today), [today])
@@ -53,8 +54,8 @@ export const TodayHeader = memo(function TodayHeader({ today }: { today: ISODate
   }
 
   return (
-    <header>
-      <SeasonalHeader date={today} height={212} className="lg:mt-4 lg:rounded-[1.75rem]">
+    <header className="lg:px-4 lg:pt-4">
+      <SeasonalHeader date={today} height={212} className="lg:rounded-[1.75rem]">
         <p className="text-[0.9375rem] font-medium text-ink-2">{dateText}</p>
         <h1 className="mt-0.5 font-display text-[2rem] leading-[1.1] font-semibold tracking-tight text-balance text-ink sm:text-[2.375rem]">
           {hello}

@@ -5,7 +5,7 @@
  * veckans staplar och snitt, vilka kostråd som lyfts fram och vilka sammanhangskort
  * (fasta, träning, koffein, alkohol) som ska visas.
  */
-import type { DayMeta, DiaryEntry, ExerciseEntry, ISODate, MealId, WeightEntry } from '../../types'
+import type { DayMeta, DiaryEntry, ExerciseEntry, GoalType, ISODate, LifeStage, MealId, WeightEntry } from '../../types'
 import { capitalize, diffDays, formatDayLong, greeting, isoWeek } from '../../lib/dates'
 import { dailyBudget, entryKcal, totals } from '../../lib/diary'
 import { weightTrend } from '../../lib/energy'
@@ -49,7 +49,8 @@ export function headerFoodDay(today: ISODate, withinDays = 10): HeaderFoodDay | 
   const special = todays.find((d) => !d.weekly)
   if (special) {
     const ongoing = special.date !== today
-    return { day: special, when: ongoing ? 'pagar' : 'idag', text: ongoing ? `${special.name} pågår` : `${special.name} idag` }
+    if (ongoing) return { day: special, when: 'pagar', text: `${special.name} pågår` }
+    return { day: special, when: 'idag', text: special.endDate ? `${special.name} börjar idag` : `${special.name} idag` }
   }
   const next = upcomingFoodDays(today, 4).find((d) => d.date > today && diffDays(today, d.date) <= withinDays)
   if (next) {
@@ -375,4 +376,19 @@ export const PLATE_MEALS: readonly MealId[] = ['lunch', 'middag']
 /** Poster från dagens huvudmåltider (lunch och middag). */
 export function mainMealEntries(entries: readonly DiaryEntry[]): DiaryEntry[] {
   return entries.filter((e) => PLATE_MEALS.includes(e.meal))
+}
+
+/**
+ * Åt vilket håll en viktförändring räknas som "i linje med målet" (visas mjukt grönt).
+ * Ingen riktning alls vid graviditet, amning eller under 18 år – där ska viktnedgång aldrig
+ * uppmuntras – och inte heller när målet är att behålla vikten.
+ */
+export function weightGoodDirection(
+  goal: GoalType | undefined,
+  lifeStage: LifeStage | undefined,
+  age: number | undefined,
+): 'up' | 'down' | undefined {
+  if (!goal || goal === 'behalla') return undefined
+  if ((lifeStage && lifeStage !== 'ingen') || (age !== undefined && age < 18)) return undefined
+  return goal === 'ga_ner' ? 'down' : 'up'
 }

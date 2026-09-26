@@ -1,0 +1,210 @@
+/**
+ * Röktester för sidorna i flödet "Lägg till mat": de renderar utan fel, visar rätt innehåll och
+ * de viktigaste interaktionerna fungerar.
+ */
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import AddFoodPage from './AddFoodPage'
+import FoodDetailPage from './FoodDetailPage'
+import CustomFoodPage from './CustomFoodPage'
+import ScanPage from './ScanPage'
+import { DialogHost } from '../../components/ui/Dialog'
+import { useBasketStore } from './basketStore'
+import { useDiaryStore } from '../../stores/diaryStore'
+import { useFoodStore } from '../../stores/foodStore'
+import { useProfileStore } from '../../stores/profileStore'
+import { useToastStore } from '../../components/ui/toast'
+import { loadBuiltinCatalog } from '../../lib/foodRepo'
+import { bulle, offBar } from './testFoods'
+
+function renderAt(path: string) {
+  const router = createMemoryRouter(
+    [
+      { path: '/', element: <div>Hem</div> },
+      { path: '/lagg-till', element: <AddFoodPage /> },
+      { path: '/skanna', element: <ScanPage /> },
+      { path: '/livsmedel/:id', element: <FoodDetailPage /> },
+      { path: '/livsmedel/:id/redigera', element: <CustomFoodPage /> },
+      { path: '/nytt-livsmedel', element: <CustomFoodPage /> },
+      { path: '/dagbok/:date', element: <div>Dagbok</div> },
+    ],
+    { initialEntries: [path] },
+  )
+  const utils = render(
+    <>
+      <RouterProvider router={router} />
+      <DialogHost />
+    </>,
+  )
+  return { router, ...utils }
+}
+
+beforeAll(async () => {
+  // Livsmedelsverkets fil finns inte i testmiljön – katalogen blir Lagoms egna livsmedel.
+  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'))
+  await loadBuiltinCatalog()
+})
+
+beforeEach(() => {
+  useDiaryStore.setState({ entries: {} })
+  useFoodStore.setState({ usage: {}, cachedFoods: {}, customFoods: {}, favorites: [], templates: [], recipes: {} })
+  useBasketStore.setState({ items: [] })
+  useToastStore.setState({ toasts: [] })
+  useProfileStore.setState((s) => ({ settings: { ...s.settings, mindfulMode: false, energyUnit: 'kcal' } }))
+})
+
+describe('AddFoodPage', () => {
+  it('visar sök, genvägar och tomma listor', () => {
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    expect(screen.getByRole('heading', { level: 1, name: 'Lägg till' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Frukost' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Skanna streckkod')).toBeInTheDocument()
+    expect(screen.getByText('Här hamnar det du äter')).toBeInTheDocument()
+  })
+
+  it('söker lokalt, lägger i korgen och lägger till allt', async () => {
+    const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-01-15')
+    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle' } })
+    const row = await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }, { timeout: 3000 })
+    fireEvent.click(row)
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
+    await waitFor(() => expect(useBasketStore.getState().items).toHaveLength(1))
+    const bar = await screen.findByRole('button', { name: /Visa korgen: 1 livsmedel/ })
+    expect(bar).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till' }))
+    await waitFor(() => expect(useDiaryStore.getState().entries['2026-01-15']).toHaveLength(1))
+    expect(useBasketStore.getState().items).toHaveLength(0)
+    expect(router.state.location.pathname).toBe('/dagbok/2026-01-15')
+  })
+
+  it('snabbknappen lägger till direkt med förvald mängd', async () => {
+    renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    const plus = await screen.findByRole('button', { name: /^Lägg till Kanelbulle, bageri direkt/ }, { timeout: 3000 })
+    fireEvent.click(plus)
+    const [entry] = useDiaryStore.getState().entries['2026-09-26']
+    expect(entry).toMatchObject({ kind: 'food', meal: 'fika', amount: 1 })
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Tillagt i Fika')
+  })
+
+  it('visar senaste och förslag för måltiden', () => {
+    useFoodStore.setState({
+      usage: { [bulle.id]: { count: 5, lastUsed: Date.now(), lastAmount: 2, lastUnit: 'portion:st', meals: { fika: 5 } } },
+      customFoods: { [bulle.id]: bulle },
+    })
+    renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
+    expect(screen.getByText(/Brukar du äta till fika/)).toBeInTheDocument()
+    const chip = screen.getByRole('button', { name: /Kanelbulle, 2 × 1 st \(medel\).*Lägg i korgen/ })
+    fireEvent.click(chip)
+    expect(useBasketStore.getState().items[0]).toMatchObject({ amount: 2, unit: 'portion:st', origin: 'suggestion' })
+    fireEvent.click(chip)
+    expect(useBasketStore.getState().items).toHaveLength(0)
+  })
+
+  it('kan kopiera måltiden från igår', () => {
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Gröt', nutrients: { kcal: 300 }, date: '2026-09-25', meal: 'frukost' })
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    fireEvent.click(screen.getByRole('button', { name: /Kopiera frukost från/ }))
+    expect(useDiaryStore.getState().entries['2026-09-26']).toHaveLength(1)
+  })
+})
+
+describe('FoodDetailPage', () => {
+  it('visar ursprung, portionsväljare och näringsinnehåll', async () => {
+    renderAt('/livsmedel/lagom%3Akanelbulle-bageri?maltid=fika&datum=2026-09-26')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Kanelbulle, bageri' }, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByText(/Lagoms svenska databas/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Tallriksmodellen' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Klimatavtryck' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till i Fika' }))
+    expect(useDiaryStore.getState().entries['2026-09-26']).toHaveLength(1)
+  })
+
+  it('visar Open Food Facts som användarbidrag', async () => {
+    useFoodStore.setState({ cachedFoods: { [offBar.id]: { ...offBar, extra: { nutriscore: 'c', nova: 4 } } } })
+    renderAt(`/livsmedel/${encodeURIComponent(offBar.id)}`)
+    expect(await screen.findByText(/användarbidrag, kontrollera mot förpackningen/)).toBeInTheDocument()
+    expect(screen.getByText('Nutri-Score C')).toBeInTheDocument()
+    expect(screen.getByText(/NOVA 4/)).toBeInTheDocument()
+  })
+
+  it('säger till när livsmedlet inte finns', async () => {
+    renderAt('/livsmedel/lagom%3Afinns-inte')
+    expect(await screen.findByText('Livsmedlet hittades inte', undefined, { timeout: 3000 })).toBeInTheDocument()
+  })
+})
+
+describe('CustomFoodPage', () => {
+  it('sparar ett nytt livsmedel per portion', async () => {
+    const { router } = renderAt('/nytt-livsmedel?streckkod=7310865000637&namn=Proteinbar')
+    expect(screen.getByLabelText('Namn')).toHaveValue('Proteinbar')
+    expect(screen.getByLabelText(/Streckkod/)).toHaveValue('7310865000637')
+    fireEvent.click(screen.getByRole('radio', { name: 'Per portion' }))
+    fireEvent.change(screen.getByLabelText('Portionens vikt'), { target: { value: '55' } })
+    fireEvent.change(screen.getByLabelText('Energi'), { target: { value: '209' } })
+    fireEvent.change(screen.getByLabelText('Protein'), { target: { value: '16,5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Spara livsmedlet' }))
+    const saved = Object.values(useFoodStore.getState().customFoods)
+    expect(saved).toHaveLength(1)
+    expect(saved[0].id).toMatch(/^custom:/)
+    expect(saved[0].nutrients.kcal).toBeCloseTo(380, 0)
+    expect(saved[0].nutrients.protein).toBeCloseTo(30)
+    expect(saved[0].portions[0]).toMatchObject({ grams: 55 })
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/livsmedel/${encodeURIComponent(saved[0].id)}`))
+  })
+
+  it('kräver namn och energi', () => {
+    renderAt('/nytt-livsmedel')
+    fireEvent.click(screen.getByRole('button', { name: 'Spara livsmedlet' }))
+    expect(screen.getByText('Ge livsmedlet ett namn.')).toBeInTheDocument()
+    expect(Object.keys(useFoodStore.getState().customFoods)).toHaveLength(0)
+  })
+
+  it('varnar när energin inte stämmer med makronäringsämnena', () => {
+    renderAt('/nytt-livsmedel?namn=Test')
+    fireEvent.change(screen.getByLabelText('Energi'), { target: { value: '800' } })
+    fireEvent.change(screen.getByLabelText('Protein'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Kolhydrater'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Fett'), { target: { value: '5' } })
+    expect(screen.getByText(/Energin stämmer inte med makronäringsämnena/)).toBeInTheDocument()
+  })
+
+  it('redigerar ett eget livsmedel', async () => {
+    const own = { ...bulle, id: 'custom:bulle', source: 'custom' as const, name: 'Mormors bulle' }
+    useFoodStore.setState({ customFoods: { [own.id]: own } })
+    renderAt(`/livsmedel/${encodeURIComponent(own.id)}/redigera`)
+    expect(screen.getByRole('heading', { level: 1, name: 'Redigera livsmedel' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Namn'), { target: { value: 'Mormors kanelbulle' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Spara ändringar' }))
+    expect(useFoodStore.getState().customFoods[own.id].name).toBe('Mormors kanelbulle')
+    expect(useFoodStore.getState().customFoods[own.id].nutrients.kcal).toBeCloseTo(345)
+  })
+})
+
+describe('ScanPage', () => {
+  it('erbjuder manuell inmatning när kameran inte finns', async () => {
+    renderAt('/skanna?maltid=frukost&datum=2026-09-26')
+    expect(await screen.findByText('Kameran stöds inte här')).toBeInTheDocument()
+    const input = screen.getByLabelText(/Streckkod \(EAN\)/)
+    fireEvent.change(input, { target: { value: '7310865000632' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sök produkten' }))
+    expect(await screen.findByText(/Streckkoden ser inte ut att stämma/)).toBeInTheDocument()
+  })
+
+  it('hittar sparade produkter offline via streckkod', async () => {
+    useFoodStore.setState({ cachedFoods: { [offBar.id]: offBar } })
+    renderAt('/skanna?maltid=frukost&datum=2026-09-26')
+    const input = await screen.findByLabelText(/Streckkod \(EAN\)/)
+    fireEvent.change(input, { target: { value: '7310865000637' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sök produkten' }))
+    })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Proteinbar')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
+    expect(useBasketStore.getState().items[0]).toMatchObject({ unit: 'portion:serving', origin: 'scan' })
+  })
+})

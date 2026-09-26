@@ -41,7 +41,7 @@ export const DayRingCard = memo(function DayRingCard({ today, targets, mindful, 
       padding="lg"
       eyebrow="Dagsringen"
       aria-label="Dagsringen"
-      action={<SectionLink to="/dagbok">Dagbok</SectionLink>}
+      action={<SectionLink to="/insikter" label="Näring och trender i Insikter">Näring</SectionLink>}
     >
       <div className={wide ? 'grid grid-cols-[auto_1fr] items-center gap-8' : 'flex flex-col items-center'}>
         <div className="flex flex-col items-center">
