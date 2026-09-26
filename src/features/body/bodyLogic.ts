@@ -4,8 +4,8 @@
  *
  * Allt här är rena funktioner utan React – lätta att testa (se bodyLogic.test.ts).
  */
-import type { DiaryEntry, GoalType, ISODate, LifeStage, MeasurementEntry, WeightEntry } from '../../types'
-import { addDays, capitalize, diffDays, fromISODate, MONTHS, toISODate } from '../../lib/dates'
+import type { DiaryEntry, GoalType, ISODate, LifeStage, MeasurementEntry, Profile, WeightEntry } from '../../types'
+import { addDays, ageFromBirthYear, capitalize, diffDays, fromISODate, MONTHS, toISODate } from '../../lib/dates'
 import { projectGoalDate, slopePerDay, weightTrend, type TrendPoint } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 import { totals } from '../../lib/diary'

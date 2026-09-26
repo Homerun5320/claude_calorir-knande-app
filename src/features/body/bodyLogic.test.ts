@@ -3,6 +3,7 @@ import type { DiaryEntry, MeasurementEntry, WeightEntry } from '../../types'
 import {
   adaptiveNeeds,
   adaptiveProgress,
+  bodyOverview,
   chartWindow,
   compareTdeeText,
   directionOf,
@@ -331,5 +332,40 @@ describe('adaptiv förbrukning – underlag', () => {
     expect(compareTdeeText(2300, 2250)).toMatch(/nära/)
     expect(compareTdeeText(2500, 2200)).toMatch(/mer energi/)
     expect(compareTdeeText(1900, 2200)).toMatch(/mindre energi/)
+  })
+})
+
+describe('bodyOverview', () => {
+  const profile = {
+    goal: 'ga_ner' as const,
+    targetWeightKg: 80,
+    lifeStage: 'ingen' as const,
+    birthYear: 1990,
+    startWeightKg: 86,
+    createdAt: new Date(2026, 5, 1, 12).getTime(),
+  }
+
+  it('samlar trend, takt, prognos och framsteg', () => {
+    const weights = linearWeights('2026-06-01', 100, 86, -0.05, 2)
+    const o = bodyOverview(weights, profile, '2026-09-09')
+    expect(o.latest?.date).toBe('2026-09-07')
+    expect(o.points[o.points.length - 1].date).toBe('2026-09-09')
+    expect(o.trendKg).toBeLessThan(82)
+    expect(o.change7).toBeLessThan(0)
+    expect(o.rate?.kgPerWeek).toBeLessThan(0)
+    expect(o.status.kind).toBe('projected')
+    expect(o.progress).toBeGreaterThan(0.5)
+    expect(o.progress).toBeLessThan(1)
+    expect(o.startDate).toBe('2026-06-01')
+    expect(o.daysSinceLast).toBe(2)
+    expect(o.good).toBe('down')
+  })
+
+  it('klarar sig utan vägningar och utan profil', () => {
+    const o = bodyOverview([], null, '2026-09-26')
+    expect(o.latest).toBeUndefined()
+    expect(o.trendKg).toBeUndefined()
+    expect(o.status).toEqual({ kind: 'none' })
+    expect(o.progress).toBeUndefined()
   })
 })
