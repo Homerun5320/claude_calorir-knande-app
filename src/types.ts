@@ -224,7 +224,10 @@ export interface DayMeta {
   hunger?: number
   sleepHours?: number
   steps?: number
-  /** Dagen markerad som komplett registrerad (används av adaptiv TDEE). */
+  /**
+   * Dagen markerad som komplett registrerad. Räcker de klara dagarna (≥ 14 på 4 veckor) bygger
+   * den adaptiva förbrukningen bara på dem (`adaptiveIntake`); Idag räknar in dagen i veckosnittet.
+   */
   complete?: boolean
 }
 

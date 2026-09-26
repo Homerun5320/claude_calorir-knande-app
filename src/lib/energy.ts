@@ -295,6 +295,29 @@ export function estimateAdaptiveTdee(
   }
 }
 
+/**
+ * Välj vilka dagars intag den adaptiva skattningen ska bygga på. Har användaren markerat
+ * minst 14 dagar i fönstret som klara (med rimligt intag) används bara de – då vet vi att
+ * loggningen är komplett och skattningen blir säkrare. Annars används alla loggade dagar.
+ */
+export function adaptiveIntake(
+  intakeByDay: Readonly<Record<ISODate, number>>,
+  isComplete: (date: ISODate) => boolean,
+  today: ISODate = todayISO(),
+  windowDays = 28,
+): Record<ISODate, number> {
+  const start = addDays(today, -(windowDays - 1))
+  const end = addDays(today, -1)
+  const complete: Record<ISODate, number> = {}
+  let n = 0
+  for (const [d, kcal] of Object.entries(intakeByDay)) {
+    if (!isComplete(d)) continue
+    complete[d] = kcal
+    if (d >= start && d <= end && kcal >= 800) n++
+  }
+  return n >= 14 ? complete : { ...intakeByDay }
+}
+
 /** Uppskattat datum då målvikten nås med nuvarande trend, eller null om trenden går åt fel håll. */
 export function projectGoalDate(currentTrendKg: number, weeklyChangeKg: number, targetKg: number, today: ISODate = todayISO()): ISODate | null {
   const remaining = targetKg - currentTrendKg

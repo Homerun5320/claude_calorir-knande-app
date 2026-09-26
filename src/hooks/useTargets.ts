@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { useBodyStore, latestWeight } from '../stores/bodyStore'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useProfileStore } from '../stores/profileStore'
-import { computeEnergy, computeTargets, estimateAdaptiveTdee, type AdaptiveEstimate, type EnergyBreakdown } from '../lib/energy'
+import { adaptiveIntake, computeEnergy, computeTargets, estimateAdaptiveTdee, type AdaptiveEstimate, type EnergyBreakdown } from '../lib/energy'
 import { totals } from '../lib/diary'
 import { todayISO } from '../lib/dates'
-import type { DiaryEntry, ISODate, Targets } from '../types'
+import type { DayMeta, DiaryEntry, ISODate, Targets } from '../types'
 
 export interface TargetsInfo {
   targets: Targets
@@ -16,6 +16,7 @@ export interface TargetsInfo {
 }
 
 const NO_ENTRIES: Record<ISODate, DiaryEntry[]> = {}
+const NO_DAYS: Record<ISODate, DayMeta> = {}
 
 const FALLBACK: Targets = {
   kcal: 2000,
@@ -39,6 +40,7 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
   // Hela dagboken behövs bara för adaptiv förbrukning – annars prenumererar vi inte på den
   // (varje ny post skulle annars räkna om målen och rendera om alla som använder kroken).
   const entries = useDiaryStore((s) => (adaptiveTargets ? s.entries : NO_ENTRIES))
+  const days = useDiaryStore((s) => (adaptiveTargets ? s.days : NO_DAYS))
 
   return useMemo(() => {
     if (!profile) return { targets: { ...FALLBACK, ...targetOverrides }, energy: null, adaptive: null, weightKg: null }
@@ -47,7 +49,7 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
     if (adaptiveTargets) {
       const intake: Record<ISODate, number> = {}
       for (const [d, list] of Object.entries(entries)) intake[d] = totals(list).kcal ?? 0
-      adaptive = estimateAdaptiveTdee(intake, weights, today)
+      adaptive = estimateAdaptiveTdee(adaptiveIntake(intake, (d) => days[d]?.complete === true, today), weights, today)
     }
     const opts = { today, adaptiveTdee: adaptive?.tdee }
     return {
@@ -56,5 +58,5 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
       adaptive,
       weightKg,
     }
-  }, [profile, targetOverrides, adaptiveTargets, weights, entries, today])
+  }, [profile, targetOverrides, adaptiveTargets, weights, entries, days, today])
 }

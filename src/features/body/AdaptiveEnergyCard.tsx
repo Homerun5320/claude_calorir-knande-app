@@ -8,7 +8,7 @@ import { Activity, Info } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge, Card, ProgressBar, Switch, toast } from '../../components/ui'
 import { EnergyValue, useEnergyFormatter } from '../../components/domain'
-import { computeEnergy, estimateAdaptiveTdee, KCAL_PER_KG } from '../../lib/energy'
+import { adaptiveIntake, computeEnergy, estimateAdaptiveTdee, KCAL_PER_KG } from '../../lib/energy'
 import { plural } from '../../lib/format'
 import { useTargets } from '../../hooks/useTargets'
 import { useBodyStore } from '../../stores/bodyStore'
@@ -34,11 +34,13 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
   const kcalOverride = useProfileStore((s) => s.settings.targetOverrides.kcal)
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const entries = useDiaryStore((s) => s.entries)
+  const days = useDiaryStore((s) => s.days)
   const weights = useBodyStore((s) => s.weights)
   const { targets } = useTargets(today)
   const fmtEnergy = useEnergyFormatter()
 
-  const intake = useMemo(() => intakeByDay(entries), [entries])
+  // Samma urval som useTargets: räcker de klarmarkerade dagarna används bara de.
+  const intake = useMemo(() => adaptiveIntake(intakeByDay(entries), (d) => days[d]?.complete === true, today), [entries, days, today])
   const estimate = useMemo(() => estimateAdaptiveTdee(intake, weights, today), [intake, weights, today])
   const progress = useMemo(() => adaptiveProgress(intake, weights, today), [intake, weights, today])
   const formulaTdee = useMemo(() => {

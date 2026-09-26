@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bmrMifflin, computeEnergy, computeTargets, estimateAdaptiveTdee, projectGoalDate, weightTrend } from './energy'
+import { adaptiveIntake, bmrMifflin, computeEnergy, computeTargets, estimateAdaptiveTdee, projectGoalDate, weightTrend } from './energy'
 import { gramsFor, availableUnits, formatAmount } from './units'
 import { addDays, isoWeek, relativeDayLabel, startOfWeek, diffDays } from './dates'
 import { formatNumber, parseSwedishNumber, formatNutrient } from './format'
@@ -135,5 +135,30 @@ describe('näring', () => {
   it('energifördelning', () => {
     const d = energyDistribution({ protein: 25, carbs: 50, fat: 11.1 })
     expect(Math.round(d.protein + d.carbs + d.fat)).toBe(100)
+  })
+})
+
+describe('adaptiveIntake', () => {
+  const today = '2026-09-27'
+  const intake: Record<string, number> = {}
+  for (let i = 1; i <= 20; i++) intake[addDays(today, -i)] = 2000 + i
+
+  it('använder alla dagar när för få är markerade som klara', () => {
+    const out = adaptiveIntake(intake, (d) => d === addDays(today, -1), today)
+    expect(Object.keys(out)).toHaveLength(20)
+  })
+
+  it('använder bara klara dagar när de räcker (≥ 14)', () => {
+    const complete = new Set(Array.from({ length: 15 }, (_, i) => addDays(today, -(i + 1))))
+    const out = adaptiveIntake(intake, (d) => complete.has(d), today)
+    expect(Object.keys(out).sort()).toEqual([...complete].sort())
+  })
+
+  it('räknar inte klara dagar med orimligt lågt intag', () => {
+    const low = { ...intake }
+    const complete = new Set(Array.from({ length: 14 }, (_, i) => addDays(today, -(i + 1))))
+    low[addDays(today, -1)] = 300
+    const out = adaptiveIntake(low, (d) => complete.has(d), today)
+    expect(Object.keys(out)).toHaveLength(20)
   })
 })
