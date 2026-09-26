@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { Suspense, useEffect } from 'react'
 import { LogoMark, Wordmark } from './Logo'
 import { ToastViewport } from '../ui/toast'
+import { DialogHost } from '../ui/Dialog'
 import { useProfileStore } from '../../stores/profileStore'
 import { mealForTime } from '../../lib/meals'
 import { useTheme } from '../../hooks/useTheme'
@@ -108,6 +109,7 @@ export function AppShell() {
         </nav>
       )}
       <ToastViewport />
+      <DialogHost />
     </div>
   )
 }
