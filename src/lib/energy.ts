@@ -310,10 +310,13 @@ export function bmi(weightKg: number, heightCm: number): number {
   return weightKg / (m * m)
 }
 
-/** BMI-klassning enligt WHO (vuxna). */
+/**
+ * BMI-klassning enligt WHO (vuxna). Tonen är aldrig 'bad' (rött) – Lagom visar inga
+ * larmande färger kring kroppen; typen behåller 'bad' för bakåtkompatibilitet.
+ */
 export function bmiCategory(v: number): { label: string; tone: 'good' | 'warn' | 'bad' } {
   if (v < 18.5) return { label: 'Undervikt', tone: 'warn' }
   if (v < 25) return { label: 'Normalvikt', tone: 'good' }
   if (v < 30) return { label: 'Övervikt', tone: 'warn' }
-  return { label: 'Fetma', tone: 'bad' }
+  return { label: 'Fetma', tone: 'warn' }
 }

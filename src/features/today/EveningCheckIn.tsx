@@ -8,6 +8,7 @@ import { CircleCheck, RotateCcw } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Confetti } from '../../components/signature'
 import { Button, Card, toast } from '../../components/ui'
+import { DAY_SCALES, type ScaleDef, type ScaleKey } from '../../lib/dayMeta'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DayMeta, ISODate } from '../../types'
 import { useClock } from './hooks'
@@ -15,49 +16,7 @@ import { showEveningCheckIn } from './todayLogic'
 
 const EMPTY_META: DayMeta = {}
 
-type ScaleKey = 'mood' | 'energy' | 'hunger'
-
-interface ScaleDef {
-  key: ScaleKey
-  label: string
-  options: ReadonlyArray<{ emoji: string; word: string }>
-}
-
-const SCALES: readonly ScaleDef[] = [
-  {
-    key: 'mood',
-    label: 'Humör',
-    options: [
-      { emoji: '😞', word: 'Tungt' },
-      { emoji: '😕', word: 'Sådär' },
-      { emoji: '😐', word: 'Okej' },
-      { emoji: '🙂', word: 'Bra' },
-      { emoji: '😄', word: 'Toppen' },
-    ],
-  },
-  {
-    key: 'energy',
-    label: 'Energi',
-    options: [
-      { emoji: '🪫', word: 'Helt slut' },
-      { emoji: '😴', word: 'Trött' },
-      { emoji: '😐', word: 'Okej' },
-      { emoji: '🙂', word: 'Pigg' },
-      { emoji: '⚡', word: 'Full av energi' },
-    ],
-  },
-  {
-    key: 'hunger',
-    label: 'Hunger',
-    options: [
-      { emoji: '😌', word: 'Knappt hungrig' },
-      { emoji: '🙂', word: 'Lite hungrig' },
-      { emoji: '😊', word: 'Lagom' },
-      { emoji: '😋', word: 'Ganska hungrig' },
-      { emoji: '🍽️', word: 'Mycket hungrig' },
-    ],
-  },
-]
+const SCALES = DAY_SCALES
 
 function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | undefined; onChange: (v: number | undefined) => void }) {
   const labelId = useId()

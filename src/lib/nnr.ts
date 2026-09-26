@@ -662,6 +662,11 @@ export const MIN_COVERAGE = 0.5
  * som ligger lågt eller över UL. Ämnen som uppnås tas inte med – förutom B12 vid vegankost, där
  * tillskott rekommenderas oavsett.
  */
+/** Gemen första bokstav men behåll resten ("Vitamin C" → "vitamin C", inte "vitamin c"). */
+function lowerFirst(name: string): string {
+  return name.charAt(0).toLocaleLowerCase('sv-SE') + name.slice(1)
+}
+
 export function nutrientsToWatch(input: WatchInput): WatchItem[] {
   const { sex, age, lifeStage, diet, averages, coverage } = input
   const refs = input.refs ?? referenceIntakes({ sex, age, lifeStage, weightKg: input.weightKg, kcal: input.kcal })
@@ -769,7 +774,7 @@ export function nutrientsToWatch(input: WatchInput): WatchItem[] {
         status,
         percent,
         priority: 3,
-        reason: `Du får i genomsnitt ${percent !== undefined ? Math.round(percent) : '–'} % av rekommendationen för ${NUTRIENTS[key].name.toLowerCase()}.`,
+        reason: `Du får i genomsnitt ${percent !== undefined ? Math.round(percent) : '–'} % av rekommendationen för ${lowerFirst(NUTRIENTS[key].name)}.`,
       })
     }
   }

@@ -1,0 +1,393 @@
+/**
+ * Inställningar → Data och säkerhetskopia (GDPR: dataportabilitet och rätten att radera).
+ * All data ligger lokalt – säkerhetskopian är användarens enda "moln".
+ */
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  CircleCheck,
+  CloudOff,
+  Download,
+  FileBraces,
+  FileSpreadsheet,
+  HardDrive,
+  Merge,
+  Replace,
+  ShieldCheck,
+  Sparkles,
+  Trash,
+  TriangleAlert,
+  Upload,
+} from 'lucide-react'
+import { Badge, Button, Card, Dialog, ProgressBar, Sheet, TextField, confirmDialog, toast } from '../../../components/ui'
+import {
+  BackupError,
+  backupFilename,
+  createBackup,
+  diaryToCsv,
+  downloadFile,
+  parseBackup,
+  requestPersistentStorage,
+  restoreBackup,
+  storageEstimate,
+  summarizeBackup,
+  wipeAllData,
+  type BackupFile,
+  type ImportSummary,
+} from '../../../lib/backup'
+import { clearDemoFlag, isDemoData } from '../../../lib/demo'
+import { formatDayLong, relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
+import { formatNumber, plural } from '../../../lib/format'
+import { useDiaryStore } from '../../../stores/diaryStore'
+import { clearLastBackup, markBackupNow, useLastBackup } from '../backupStatus'
+import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
+
+function exportBackup() {
+  try {
+    const backup = createBackup()
+    downloadFile(backupFilename(), JSON.stringify(backup, null, 1))
+    markBackupNow()
+    toast('Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.', { tone: 'success' })
+  } catch {
+    toast('Säkerhetskopian kunde inte skapas. Försök igen.', { tone: 'error' })
+  }
+}
+
+function lastBackupText(ms: number | null): string {
+  if (ms === null) return 'Ingen säkerhetskopia gjord på den här enheten ännu.'
+  const date = toISODate(new Date(ms))
+  const label = relativeDayLabel(date)
+  return `Senaste säkerhetskopian: ${label === 'Idag' || label === 'Igår' ? label.toLocaleLowerCase('sv-SE') : label}.`
+}
+
+/** Starta om från välkomstflödet efter radering. */
+function resetAfterWipe() {
+  clearDemoFlag()
+  clearLastBackup()
+  try {
+    sessionStorage.removeItem('lagom-onboarding')
+  } catch {
+    /* ignorera */
+  }
+}
+
+export function DataSection() {
+  const navigate = useNavigate()
+  const lastBackup = useLastBackup()
+  const hasDiary = useDiaryStore((s) => Object.values(s.entries).some((l) => l.length > 0))
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<{ backup: BackupFile; summary: ImportSummary; fileName: string } | null>(null)
+  const [demo, setDemo] = useState(isDemoData)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // samma fil ska kunna väljas igen
+    if (!file) return
+    try {
+      const backup = parseBackup(await file.text())
+      setPending({ backup, summary: summarizeBackup(backup), fileName: file.name })
+    } catch (err) {
+      toast(err instanceof BackupError ? err.message : 'Filen kunde inte läsas.', { tone: 'error' })
+    }
+  }
+
+  const doImport = async (mode: 'merge' | 'replace') => {
+    if (!pending) return
+    if (mode === 'replace') {
+      const ok = await confirmDialog({
+        title: 'Ersätta all data?',
+        message: 'Allt som finns i appen nu ersätts med innehållet i säkerhetskopian. Tips: exportera en säkerhetskopia av nuvarande data först.',
+        confirmLabel: 'Ersätt allt',
+        tone: 'danger',
+        icon: Replace,
+      })
+      if (!ok) return
+    }
+    try {
+      restoreBackup(pending.backup, mode)
+      if (mode === 'replace') {
+        clearDemoFlag()
+        setDemo(false)
+      }
+      setPending(null)
+      toast(mode === 'merge' ? 'Säkerhetskopian är ihopslagen med din data' : 'Säkerhetskopian är återställd', { tone: 'success' })
+    } catch {
+      toast('Importen misslyckades. Ingen data har ändrats.', { tone: 'error' })
+    }
+  }
+
+  const exportCsv = () => {
+    const csv = diaryToCsv(useDiaryStore.getState().entries)
+    downloadFile(`lagom-dagbok-${todayISO()}.csv`, csv, 'text/csv')
+    toast('Dagboken är exporterad som CSV', { tone: 'success' })
+  }
+
+  const clearDemo = async () => {
+    const ok = await confirmDialog({
+      title: 'Rensa exempeldatan?',
+      message: 'Exempelveckan tas bort och du får börja om med dina egna uppgifter.',
+      confirmLabel: 'Rensa och börja om',
+      tone: 'danger',
+    })
+    if (!ok) return
+    wipeAllData()
+    resetAfterWipe()
+    navigate('/valkommen', { replace: true })
+  }
+
+  const startDelete = async () => {
+    const ok = await confirmDialog({
+      title: 'Radera all data?',
+      message: 'Dagbok, vikt, recept, egna livsmedel, fasta och inställningar raderas från den här enheten. Det går inte att ångra.',
+      confirmLabel: 'Fortsätt',
+      tone: 'danger',
+      icon: TriangleAlert,
+    })
+    if (ok) {
+      setTyped('')
+      setDeleteOpen(true)
+    }
+  }
+
+  const confirmDelete = () => {
+    if (!isDeleteConfirmed(typed)) return
+    wipeAllData()
+    resetAfterWipe()
+    setDeleteOpen(false)
+    toast('All data är raderad från enheten')
+    navigate('/valkommen', { replace: true })
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {demo && (
+        <Card tone="sol" eyebrow="Exempeldata" title="Du tittar på en exempelvecka">
+          <p className="mb-3 text-[0.9375rem] leading-relaxed text-ink-2">Allt i dagboken just nu är påhittat, så att du kan utforska Lagom. Rensa när du vill börja på riktigt.</p>
+          <Button variant="secondary" iconLeft={Sparkles} onClick={clearDemo}>
+            Rensa exempeldata och börja om
+          </Button>
+        </Card>
+      )}
+
+      <Card eyebrow="Säkerhetskopia" title="Spara och återställ">
+        <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
+          En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny telefon
+          eller återställa om något händer.
+        </p>
+        <p className="mt-2 text-[0.8125rem] text-ink-3" aria-live="polite">
+          {lastBackupText(lastBackup)}
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+          <Button iconLeft={Download} onClick={exportBackup}>
+            Exportera (JSON)
+          </Button>
+          <Button variant="secondary" iconLeft={Upload} onClick={() => fileRef.current?.click()}>
+            Importera
+          </Button>
+        </div>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" tabIndex={-1} aria-hidden onChange={onFile} />
+      </Card>
+
+      <Card eyebrow="Export" title="Dagboken i Excel">
+        <p className="-mt-1 mb-4 text-[0.9375rem] leading-relaxed text-ink-2">
+          Alla poster med datum, måltid, mängd och näringsvärden. Semikolon och decimalkomma – öppnas direkt i svenska Excel och Numbers.
+        </p>
+        <Button variant="secondary" iconLeft={FileSpreadsheet} onClick={exportCsv} disabled={!hasDiary}>
+          Exportera dagbok som CSV
+        </Button>
+        {!hasDiary && <p className="mt-2 text-[0.8125rem] text-ink-3">Dagboken är tom än så länge.</p>}
+      </Card>
+
+      <StorageCard />
+
+      <Card eyebrow="Integritet" title="Din data är din">
+        <ul className="flex flex-col gap-3 text-[0.9375rem] leading-relaxed text-ink-2">
+          <li className="flex gap-3">
+            <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
+            <span>Allt sparas lokalt i den här webbläsaren. Lagom har ingen server, inga konton, ingen reklam och ingen spårning.</span>
+          </li>
+          <li className="flex gap-3">
+            <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
+            <span>
+              Inget skickas någonstans – förutom när du själv söker eller skannar en streckkod. Då skickas bara sökordet eller streckkoden till Open Food
+              Facts.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <FileBraces aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
+            <span>Du kan när som helst ta med dig all data (export) eller radera den – så som GDPR ger dig rätt till.</span>
+          </li>
+        </ul>
+      </Card>
+
+      <section aria-labelledby="radera-rubrik" className="rounded-card p-4 ring-1 ring-inset ring-lingon/30 sm:p-5">
+        <h2 id="radera-rubrik" className="font-display text-[1.1875rem] font-semibold tracking-tight text-ink">
+          Radera all data
+        </h2>
+        <p className="mb-4 mt-1 text-[0.9375rem] leading-relaxed text-ink-2">Tar bort allt från den här enheten. Exportera gärna en säkerhetskopia först.</p>
+        <Button variant="danger" iconLeft={Trash} onClick={startDelete}>
+          Radera all data
+        </Button>
+      </section>
+
+      <Sheet
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title="Importera säkerhetskopia"
+        description={pending ? `${pending.fileName} · skapad ${formatDayLong(toISODate(new Date(pending.backup.exportedAt)))}` : undefined}
+        footer={
+          <div className="flex flex-col gap-2">
+            <Button fullWidth iconLeft={Merge} onClick={() => doImport('merge')}>
+              Slå ihop med min data
+            </Button>
+            <Button fullWidth variant="outline" iconLeft={Replace} onClick={() => doImport('replace')}>
+              Ersätt allt
+            </Button>
+          </div>
+        }
+      >
+        {pending && <ImportSummaryList summary={pending.summary} />}
+        <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-3">
+          <strong className="font-semibold text-ink-2">Slå ihop</strong> behåller det du har och lägger till det som saknas.{' '}
+          <strong className="font-semibold text-ink-2">Ersätt allt</strong> gör appen till en exakt kopia av säkerhetskopian.
+        </p>
+      </Sheet>
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Sista steget"
+        description={`Skriv ${DELETE_WORD} för att bekräfta att all data ska raderas.`}
+        icon={Trash}
+        tone="lingon"
+        role="alertdialog"
+        footer={
+          <div className="flex w-full flex-col gap-2">
+            <Button variant="danger" fullWidth onClick={confirmDelete} disabled={!isDeleteConfirmed(typed)}>
+              Radera allt
+            </Button>
+            <Button variant="ghost" fullWidth onClick={exportBackup} iconLeft={Download}>
+              Exportera säkerhetskopia först
+            </Button>
+          </div>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            confirmDelete()
+          }}
+        >
+          <TextField
+            label={`Skriv ${DELETE_WORD}`}
+            labelHidden
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder={DELETE_WORD}
+          />
+        </form>
+      </Dialog>
+    </div>
+  )
+}
+
+function ImportSummaryList({ summary }: { summary: ImportSummary }) {
+  const rows: Array<[string, string]> = [
+    ['Dagbok', `${plural(summary.days, 'dag', 'dagar')} · ${plural(summary.entries, 'post', 'poster')}`],
+    ['Vikt', plural(summary.weights, 'vägning', 'vägningar')],
+    ['Egna livsmedel', formatNumber(summary.customFoods)],
+    ['Recept', formatNumber(summary.recipes)],
+  ]
+  return (
+    <dl className="flex flex-col rounded-2xl bg-surface-2 px-4 py-1">
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-0">
+          <dt className="text-[0.9375rem] text-ink-2">{k}</dt>
+          <dd className="text-[0.9375rem] font-semibold tabular-nums text-ink">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function StorageCard() {
+  const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null | undefined>(undefined)
+  const [persisted, setPersisted] = useState<boolean | null>(null)
+  const [asking, setAsking] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void storageEstimate().then((e) => alive && setEstimate(e))
+    try {
+      const p = navigator.storage?.persisted?.()
+      if (p) void p.then((v) => alive && setPersisted(v), () => alive && setPersisted(null))
+    } catch {
+      /* stöds inte */
+    }
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const protect = async () => {
+    setAsking(true)
+    const ok = await requestPersistentStorage()
+    setAsking(false)
+    setPersisted(ok)
+    toast(ok ? 'Datan är nu skyddad mot automatisk rensning' : 'Webbläsaren sa nej just nu. Lägg till Lagom på hemskärmen – då brukar det gå.', {
+      tone: ok ? 'success' : 'default',
+    })
+  }
+
+  return (
+    <Card eyebrow="Lagring" title="På den här enheten">
+      {estimate === undefined ? (
+        <div className="h-10 animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Läser lagring" />
+      ) : estimate ? (
+        <ProgressBar
+          value={estimate.usage}
+          max={Math.max(estimate.quota, 1)}
+          size="sm"
+          label={
+            <span className="flex items-center gap-1.5">
+              <HardDrive aria-hidden className="size-4 text-ink-3" />
+              Använt utrymme
+            </span>
+          }
+          valueLabel={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
+          valueText={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
+        />
+      ) : (
+        <p className="text-[0.9375rem] text-ink-2">Webbläsaren visar inte hur mycket utrymme som används.</p>
+      )}
+
+      <div className="mt-4 flex flex-col items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
+            Skydd mot automatisk rensning
+            {persisted && (
+              <Badge tone="good" icon={CircleCheck}>
+                På
+              </Badge>
+            )}
+          </div>
+          <p className="mt-0.5 text-[0.8125rem] leading-snug text-ink-3">
+            {persisted
+              ? 'Webbläsaren rensar inte Lagoms data även om det blir ont om utrymme.'
+              : 'Utan skydd kan webbläsaren i sällsynta fall rensa data när enheten får ont om utrymme.'}
+          </p>
+        </div>
+        {!persisted && (
+          <Button size="sm" variant="soft" onClick={protect} loading={asking}>
+            Skydda min data
+          </Button>
+        )}
+      </div>
+    </Card>
+  )
+}

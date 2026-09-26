@@ -7,6 +7,7 @@ import {
   chartWindow,
   compareTdeeText,
   directionOf,
+  formatSigned,
   formatSignedKg,
   goalDateLabel,
   goalProgress,
@@ -15,6 +16,7 @@ import {
   groupWeightsByMonth,
   hasAnyMeasure,
   intakeByDay,
+  joinSv,
   latestMeasure,
   measurementRows,
   measureSeries,
@@ -47,6 +49,8 @@ describe('formatSignedKg', () => {
     expect(formatSignedKg(-0.04)).toBe('±0 kg')
     expect(formatSignedKg(-1.5, 1, 'cm')).toBe('−1,5 cm')
     expect(formatSignedKg(Number.NaN)).toBe('–')
+    expect(formatSigned(-0.354, 2)).toBe('−0,35')
+    expect(formatSigned(0.001, 2)).toBe('±0')
   })
 })
 
@@ -326,6 +330,12 @@ describe('adaptiv förbrukning – underlag', () => {
     expect(adaptiveNeeds({ loggedDays: 20, weighIns: 5, spanDays: 6, ready: false })).toEqual([
       'vägningar utspridda över minst två veckor',
     ])
+  })
+
+  it('räknar upp på svenska', () => {
+    expect(joinSv([])).toBe('')
+    expect(joinSv(['a'])).toBe('a')
+    expect(joinSv(['a', 'b', 'c'])).toBe('a, b och c')
   })
 
   it('jämför förbrukning med formeln utan att döma', () => {

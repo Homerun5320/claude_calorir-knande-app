@@ -10,16 +10,9 @@ import { formatDuration, formatEnergy, formatNumber } from '../../lib/format'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { ExerciseEntry, ISODate } from '../../types'
 
-/**
- * Lägg tillbaka en borttagen träningspost med samma id och ordning (ångra).
- * Butiken saknar `restoreExercise`, så vi gör det här med `setState`.
- */
+/** Lägg tillbaka en borttagen träningspost med samma id och ordning (ångra). */
 export function restoreExercise(entry: ExerciseEntry): void {
-  const s = useDiaryStore.getState()
-  const list = s.exercise[entry.date] ?? []
-  if (list.some((x) => x.id === entry.id)) return
-  const next = [...list, entry].sort((a, b) => a.createdAt - b.createdAt)
-  useDiaryStore.setState({ exercise: { ...s.exercise, [entry.date]: next } })
+  useDiaryStore.getState().restoreExercise(entry)
 }
 
 export interface ExerciseSectionProps {

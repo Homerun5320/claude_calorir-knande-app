@@ -34,7 +34,10 @@ interface DiaryState {
 
   addExercise: (e: NewExerciseEntry) => ExerciseEntry
   updateExercise: (date: ISODate, id: string, patch: Partial<ExerciseEntry>) => void
+  /** Tar bort och returnerar träningsposten (för ångra). */
   removeExercise: (date: ISODate, id: string) => ExerciseEntry | undefined
+  /** Återställ en borttagen träningspost med samma id och ordning (ångra). */
+  restoreExercise: (entry: ExerciseEntry) => void
 
   setDayMeta: (date: ISODate, patch: Partial<DayMeta>) => void
   clearDiary: () => void
@@ -135,8 +138,17 @@ export const useDiaryStore = create<DiaryState>()(
         const list = get().exercise[date]
         const found = list?.find((x) => x.id === id)
         if (!list || !found) return undefined
-        set({ exercise: { ...get().exercise, [date]: list.filter((x) => x.id !== id) } })
+        const next = list.filter((x) => x.id !== id)
+        const exercise = { ...get().exercise }
+        if (next.length) exercise[date] = next
+        else delete exercise[date]
+        set({ exercise })
         return found
+      },
+      restoreExercise: (entry) => {
+        if (get().exercise[entry.date]?.some((x) => x.id === entry.id)) return
+        const list = [...(get().exercise[entry.date] ?? []), entry].sort((a, b) => a.createdAt - b.createdAt)
+        set({ exercise: { ...get().exercise, [entry.date]: list } })
       },
 
       setDayMeta: (date, patch) => set({ days: { ...get().days, [date]: { ...get().days[date], ...patch } } }),

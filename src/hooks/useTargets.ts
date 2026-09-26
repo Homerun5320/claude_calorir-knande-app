@@ -5,7 +5,7 @@ import { useProfileStore } from '../stores/profileStore'
 import { computeEnergy, computeTargets, estimateAdaptiveTdee, type AdaptiveEstimate, type EnergyBreakdown } from '../lib/energy'
 import { totals } from '../lib/diary'
 import { todayISO } from '../lib/dates'
-import type { ISODate, Targets } from '../types'
+import type { DiaryEntry, ISODate, Targets } from '../types'
 
 export interface TargetsInfo {
   targets: Targets
@@ -14,6 +14,8 @@ export interface TargetsInfo {
   /** Vikten som målen baseras på. */
   weightKg: number | null
 }
+
+const NO_ENTRIES: Record<ISODate, DiaryEntry[]> = {}
 
 const FALLBACK: Targets = {
   kcal: 2000,
@@ -31,25 +33,28 @@ const FALLBACK: Targets = {
 /** Beräknade dagsmål (med användarens egna överskrivningar och ev. adaptiv förbrukning). */
 export function useTargets(today: ISODate = todayISO()): TargetsInfo {
   const profile = useProfileStore((s) => s.profile)
-  const settings = useProfileStore((s) => s.settings)
+  const targetOverrides = useProfileStore((s) => s.settings.targetOverrides)
+  const adaptiveTargets = useProfileStore((s) => s.settings.adaptiveTargets)
   const weights = useBodyStore((s) => s.weights)
-  const entries = useDiaryStore((s) => s.entries)
+  // Hela dagboken behövs bara för adaptiv förbrukning – annars prenumererar vi inte på den
+  // (varje ny post skulle annars räkna om målen och rendera om alla som använder kroken).
+  const entries = useDiaryStore((s) => (adaptiveTargets ? s.entries : NO_ENTRIES))
 
   return useMemo(() => {
-    if (!profile) return { targets: { ...FALLBACK, ...settings.targetOverrides }, energy: null, adaptive: null, weightKg: null }
+    if (!profile) return { targets: { ...FALLBACK, ...targetOverrides }, energy: null, adaptive: null, weightKg: null }
     const weightKg = latestWeight(weights)?.kg ?? profile.startWeightKg
     let adaptive: AdaptiveEstimate | null = null
-    if (settings.adaptiveTargets) {
+    if (adaptiveTargets) {
       const intake: Record<ISODate, number> = {}
       for (const [d, list] of Object.entries(entries)) intake[d] = totals(list).kcal ?? 0
       adaptive = estimateAdaptiveTdee(intake, weights, today)
     }
     const opts = { today, adaptiveTdee: adaptive?.tdee }
     return {
-      targets: computeTargets(profile, weightKg, settings.targetOverrides, opts),
+      targets: computeTargets(profile, weightKg, targetOverrides, opts),
       energy: computeEnergy(profile, weightKg, opts),
       adaptive,
       weightKg,
     }
-  }, [profile, settings.targetOverrides, settings.adaptiveTargets, weights, entries, today])
+  }, [profile, targetOverrides, adaptiveTargets, weights, entries, today])
 }

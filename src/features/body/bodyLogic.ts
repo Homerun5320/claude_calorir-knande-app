@@ -35,10 +35,16 @@ export function directionOf(change: number, threshold = 0.05): 'up' | 'down' | '
  * `unit` kan bytas, t.ex. till "cm".
  */
 export function formatSignedKg(kg: number, decimals = 1, unit = 'kg'): string {
-  if (!Number.isFinite(kg)) return '–'
-  const rounded = Number(kg.toFixed(decimals))
-  if (rounded === 0) return `±0 ${unit}`
-  return `${rounded > 0 ? '+' : '−'}${formatNumber(Math.abs(rounded), decimals)} ${unit}`
+  const s = formatSigned(kg, decimals)
+  return s === '–' ? s : `${s} ${unit}`
+}
+
+/** Tal med tecken utan enhet: "−0,4", "+1,3" eller "±0". */
+export function formatSigned(value: number, decimals = 1): string {
+  if (!Number.isFinite(value)) return '–'
+  const rounded = Number(value.toFixed(decimals))
+  if (rounded === 0) return '±0'
+  return `${rounded > 0 ? '+' : '−'}${formatNumber(Math.abs(rounded), decimals)}`
 }
 
 /**
@@ -523,6 +529,12 @@ export function adaptiveNeeds(p: AdaptiveProgress): string[] {
   if (w > 0) out.push(`${w} ${w === 1 ? 'vägning' : 'vägningar'} till`)
   if (p.spanDays < r.minSpanDays && w <= 0) out.push('vägningar utspridda över minst två veckor')
   return out
+}
+
+/** "a, b och c" */
+export function joinSv(items: readonly string[]): string {
+  if (items.length <= 1) return items.join('')
+  return `${items.slice(0, -1).join(', ')} och ${items[items.length - 1]}`
 }
 
 /** Svensk etikett för säkerheten i skattningen. */
