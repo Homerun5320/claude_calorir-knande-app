@@ -68,7 +68,8 @@ const router = createHashRouter([
           { path: 'dagbok', element: <DiaryPage /> },
           { path: 'dagbok/:date', element: <DiaryPage /> },
           // Sidor som bara skapar nytt spärras efter provperioden (se AccessGate) – allt annat är öppet.
-          { path: 'lagg-till', element: <AccessGate action="mat"><AddFoodPage /></AccessGate> },
+          // Flikarna med egen data (Mina livsmedel, sparade måltider) går alltid att öppna.
+          { path: 'lagg-till', element: <AccessGate action="mat" browseTabs={['mina', 'maltider']}><AddFoodPage /></AccessGate> },
           { path: 'skanna', element: <AccessGate action="skanna"><ScanPage /></AccessGate> },
           { path: 'livsmedel/:id', element: <FoodDetailPage /> },
           { path: 'nytt-livsmedel', element: <AccessGate action="livsmedel"><CustomFoodPage /></AccessGate> },

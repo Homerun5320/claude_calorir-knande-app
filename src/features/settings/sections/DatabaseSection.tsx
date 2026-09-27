@@ -110,7 +110,7 @@ function UserFoodsCard() {
       title="Dina livsmedel"
       footer="Onlinelivsmedel sparas i appen när du loggar dem, så att de fungerar även utan uppkoppling."
     >
-      <ListRow leading="🥫" title="Egna livsmedel" value={formatNumber(customCount)} dense />
+      <ListRow leading="🥫" title="Egna livsmedel" value={formatNumber(customCount)} to="/lagg-till?flik=mina" dense />
       <ListRow leading="🍲" title="Egna recept" value={formatNumber(recipeCount)} to="/recept" dense />
       <ListRow leading="🔎" title="Sparade från Open Food Facts" value={formatNumber(stats.openfoodfacts)} dense />
       <ListRow leading="🏛️" title="Sparade från Livsmedelsverket" value={formatNumber(stats.livsmedelsverket)} dense />

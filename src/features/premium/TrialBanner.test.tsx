@@ -156,9 +156,12 @@ describe('exempeldata', () => {
     expect(screen.getByText('prov')).toBeInTheDocument()
   })
 
-  it('en profil från en tidigare version räknar provperioden från när profilen skapades', async () => {
+  it('en profil från en tidigare version (utan provstart) får hela provperioden från nu – spärras inte direkt', async () => {
     useProfileStore.setState({ profile: { ...PROFILE, createdAt: Date.now() - 30 * DAY }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true } })
     inRouter(<TrialProbe />)
-    await waitFor(() => expect(screen.getByText('utgangen')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('prov')).toBeInTheDocument())
+    const started = useLicenseStore.getState().trialStartedAt
+    expect(started).not.toBeNull()
+    expect(Date.now() - (started as number)).toBeLessThan(60_000)
   })
 })

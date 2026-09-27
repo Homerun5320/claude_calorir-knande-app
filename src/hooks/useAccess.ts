@@ -12,7 +12,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { COMMERCE_MODE, LICENSE_PUBLIC_KEY, TRIAL_DAYS, planById, type Plan } from '../config/commerce'
 import { verifyLicense, type LicenseCheck, type LicensePayload } from '../lib/license'
-import { isDemoData } from '../lib/demoFlag'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useProfileStore } from '../stores/profileStore'
 
@@ -157,7 +156,6 @@ export function useAccess(): AccessInfo {
   const licenseKey = useLicenseStore((s) => s.licenseKey)
   const trialStartedAt = useLicenseStore((s) => s.trialStartedAt)
   const onboardingDone = useProfileStore((s) => s.settings.onboardingDone)
-  const profileCreatedAt = useProfileStore((s) => s.profile?.createdAt)
   const ensureTrialStarted = useLicenseStore((s) => s.ensureTrialStarted)
   const version = useSyncExternalStore(subscribeChecks, () => checkVersion)
   const [now, setNow] = useState(() => Date.now())
@@ -166,13 +164,13 @@ export function useAccess(): AccessInfo {
     if (licenseKey && !checks.has(licenseKey)) void verifyLicenseCached(licenseKey)
   }, [licenseKey])
 
-  // Provperioden startar när profilen skapas (även för profiler från tidigare versioner).
-  // Exempeldatans profil är bakdaterad – då räknas provperioden från nu, inte från exemplets start.
+  // Provperioden startar när profilen skapas (välkomstflödet anropar ensureTrialStarted).
+  // Profiler som skapades innan appen fick provperiod – och exempeldatans bakdaterade profil –
+  // får hela provperioden räknad från nu, så att ingen spärras direkt efter en uppdatering.
   useEffect(() => {
     if (!onboardingDone || trialStartedAt !== null) return
-    const created = profileCreatedAt && profileCreatedAt > 0 && profileCreatedAt <= Date.now() && !isDemoData() ? profileCreatedAt : Date.now()
-    ensureTrialStarted(created)
-  }, [onboardingDone, trialStartedAt, profileCreatedAt, ensureTrialStarted])
+    ensureTrialStarted(Date.now())
+  }, [onboardingDone, trialStartedAt, ensureTrialStarted])
 
   // En sparad provstart i framtiden rättas till nu (se accessStatus) – annars skulle man kunna
   // ställa fram klockan, skapa profilen och sedan ställa tillbaka klockan för en längre provperiod.

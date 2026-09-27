@@ -8,7 +8,7 @@
  *   recept). När provperioden är slut visas en förklarande sida i stället.
  */
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, KeyRound, Leaf, Sprout } from 'lucide-react'
 import { Button, Dialog, PageHeader } from '../../components/ui'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
@@ -96,9 +96,17 @@ export function AccessBlockedPage({ action, status }: { action?: BlockedAction; 
   )
 }
 
-/** Visar sidan bara om ny loggning är tillåten – annars en lugn förklaring. */
-export function AccessGate({ children, action }: { children: ReactNode; action?: BlockedAction }) {
+/**
+ * Visar sidan bara om ny loggning är tillåten – annars en lugn förklaring.
+ *
+ * `browseTabs`: flikar (`?flik=…`) som visar användarens egen data, t.ex. Mina livsmedel och
+ * sparade måltider. De är alltid öppna så att datan går att se, ändra och ta bort även efter
+ * provperioden – själva loggningen därifrån stoppas ändå av `requireAccess`.
+ */
+export function AccessGate({ children, action, browseTabs }: { children: ReactNode; action?: BlockedAction; browseTabs?: readonly string[] }) {
   const { canLog, status } = useAccess()
-  if (!canLog) return <AccessBlockedPage action={action} status={status} />
+  const [params] = useSearchParams()
+  const browsing = browseTabs?.includes(params.get('flik') ?? '') ?? false
+  if (!canLog && !browsing) return <AccessBlockedPage action={action} status={status} />
   return <>{children}</>
 }

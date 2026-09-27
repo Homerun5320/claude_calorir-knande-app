@@ -113,6 +113,8 @@ Servern kontrollerar vid varje nytt köp (resultatet cachas i tio minuter) att p
 
 **Settings → Payments → Payment methods:** slå på **Kort**, **Apple Pay/Google Pay**, **Klarna** och **Swish** (om Swish finns i listan för ditt konto). Serverfunktionen anger inga betalsätt själv – Stripe Checkout visar de som är påslagna och passar kunden. Checkout visas på svenska.
 
+**Adaptive Pricing** (*Settings → Payments → Adaptive Pricing*, lokala valutor) bör vara **av**: priset ska visas och betalas i kronor inklusive moms, precis som i appen, och servern godkänner bara köp i SEK. Gör ett testköp och kontrollera att licensen levereras om du ändå slår på det.
+
 Om en betalning dröjer svarar servern att den inte är klar ännu, och appen frågar igen en stund senare. Med webhooken (steg 7) utfärdas licensen dessutom automatiskt när betalningen blir klar.
 
 ### 4. Moms
@@ -154,7 +156,7 @@ LICENSE_PRIVATE_KEY=… VITE_LICENSE_PUBLIC_KEY=… node scripts/issue-license.m
 | `VITE_LICENSE_PUBLIC_KEY` | `MFkwEwYH…` | Publik nyckel från steg 5 |
 | `VITE_SUPPORT_EMAIL` | `hej@lagom-appen.se` | Visas vid köp och i felmeddelanden |
 | `VITE_SELLER_NAME` | `Lagom AB` | Säljarens namn (krävs enligt distansavtalslagen) |
-| `VITE_API_BASE` | *(tom)* | Bara om funktionerna ligger på en annan adress än appen |
+| `VITE_API_BASE` | *(tom)* | Bara om funktionerna ligger på en annan adress än appen. Lägg då också till adressen i `connect-src` i `netlify.toml`, annars stoppar CSP:n anropen. |
 
 **Serverfunktionerna** (scope *Functions*, markera som hemliga om din plan har det):
 

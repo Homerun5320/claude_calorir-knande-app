@@ -89,6 +89,37 @@ describe('Sheet och bakåtknappen', () => {
     expect((window.history.state as { key?: string }).key).toBe('start')
   })
 
+  it('det dolda steget bakåt flyttar inte sidan (webbläsarens rullningsåterställning)', async () => {
+    // Webbläsaren återställer rullningen som sidans post hade när markören lades till. Har sidan
+    // ändrats under arket (t.ex. ett köp som visar tackkortet högst upp) ska den stå kvar.
+    const user = userEvent.setup()
+    let y = 0
+    const own = Object.getOwnPropertyDescriptor(window, 'scrollY')
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => y })
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const raf = window.requestAnimationFrame.bind(window)
+    // Simulera återställningen: den sker direkt efter popstate, före nästa bildruta.
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) =>
+      raf((t) => {
+        if (String(cb).includes('scrollTo')) y = 971
+        cb(t)
+      }),
+    )
+    try {
+      render(<SheetHarness />)
+      await user.click(screen.getByRole('button', { name: 'Öppna' }))
+      y = 0 // sidan har flyttats upp medan arket var öppet
+      await user.click(screen.getByRole('button', { name: 'Stäng' }))
+      await settle()
+      await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 0))
+      expect(markers()).toHaveLength(0)
+    } finally {
+      rafSpy.mockRestore()
+      scrollTo.mockRestore()
+      if (own) Object.defineProperty(window, 'scrollY', own)
+    }
+  })
+
   it('döljer markörstegen för andra popstate-lyssnare (routern) men inte riktiga navigeringar', async () => {
     const user = userEvent.setup()
     const routerLike = vi.fn()

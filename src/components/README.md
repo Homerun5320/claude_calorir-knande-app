@@ -843,7 +843,7 @@ alltid. Bara NY loggning kräver en licens.
 - `hasLoggingAccess()`, `useAccessGateStore` (dialogens tillstånd), `BLOCKED_ACTION_TEXT`
 
 ### `src/features/premium/AccessGate.tsx`
-- `<AccessGate action>` – omsluter sidor som bara skapar nytt (/lagg-till, /skanna, /nytt-livsmedel, /recept/nytt)
+- `<AccessGate action browseTabs?>` – omsluter sidor som bara skapar nytt (/lagg-till, /skanna, /nytt-livsmedel, /recept/nytt). `browseTabs` = `?flik=`-värden med egen data som alltid är öppna (/lagg-till?flik=mina och ?flik=maltider) – loggningen därifrån spärras ändå av `requireAccess`
 - `<AccessSync />`, `<AccessBlockedDialog />` – monteras i AppShell
 
 ### `src/features/premium/premiumLogic.ts`

@@ -2,7 +2,7 @@
  * Spärren efter provperioden: ny loggning stoppas lugnt (med vägar till priser och export),
  * men att titta, ändra och ta bort fungerar alltid. Under provperioden och med licens är allt öppet.
  */
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -184,7 +184,7 @@ function renderApp(path: string) {
         element: <AppShell />,
         children: [
           { index: true, element: <h1>Idag</h1> },
-          { path: 'lagg-till', element: <AccessGate action="mat"><h1>Sök mat</h1></AccessGate> },
+          { path: 'lagg-till', element: <AccessGate action="mat" browseTabs={['mina', 'maltider']}><h1>Sök mat</h1></AccessGate> },
           { path: 'premium', element: <h1>Priser</h1> },
           { path: 'installningar/data', element: <h1>Data</h1> },
           { path: 'installningar/licens', element: <h1>Licens</h1> },
@@ -212,6 +212,19 @@ describe('AccessGate och dialogen', () => {
     expect(screen.getByText(/Allt du redan har loggat finns kvar/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Exportera min data' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/installningar/data'))
+  })
+
+  it('egen data (Mina livsmedel, sparade måltider) går att se även efter provperioden', async () => {
+    expireTrial()
+    renderApp('/lagg-till?flik=mina')
+    expect(await screen.findByRole('heading', { name: 'Sök mat' })).toBeInTheDocument()
+    cleanup()
+    renderApp('/lagg-till?flik=maltider')
+    expect(await screen.findByRole('heading', { name: 'Sök mat' })).toBeInTheDocument()
+    cleanup()
+    // Andra flikar (sök, senaste) är fortfarande spärrade.
+    renderApp('/lagg-till?flik=senaste')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Provperioden är slut' })).toBeInTheDocument()
   })
 
   it('+-knappen öppnar dialogen med vägar till priser och export', async () => {
