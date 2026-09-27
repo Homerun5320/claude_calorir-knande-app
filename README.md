@@ -8,7 +8,7 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för
 
 | Problem i vanliga kaloriappar | Så gör Lagom |
 | --- | --- |
-| Crowdsourcade databaser med dubbletter och 15–30 % fel | Kurerad svensk databas baserad på Livsmedelsverkets värden, med automatisk kvalitetskontroll. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
+| Crowdsourcade databaser med dubbletter och 15–30 % fel | Kurerad svensk databas med 1 181 livsmedel baserad på Livsmedelsverkets värden. Varje fil är oberoende faktagranskad, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
 | Okända näringsvärden visas som 0 | Okänt visas som "–", och appen visar hur fullständiga näringsdata är. |
 | Betalvägg för streckkoder, makromål och export | Allt är gratis. Streckkodsläsaren, alla näringsämnen, recept, export och insikter ingår. |
 | Reklam och uppsäljning | Ingen reklam, inga konton, inga prenumerationer. |
@@ -26,11 +26,21 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för
 - **Idag**: dagsringen (kcal kvar med makrofärger), makron, måltider, vatten, dagens tallrik, veckoöversikt, tips och svensk matkalender (t.ex. Kanelbullens dag).
 - **Dagbok**: måltider (frukost, lunch, fika, middag, kvällsmat, mellanmål) med redigering, flytta/kopiera, mallar, anteckningar och mående.
 - **Lägg till**: sök, streckkodsläsare (Open Food Facts), snabbregistrering, egna livsmedel och portionsväljare med svenska mått.
-- **Recept**: egna recept med tillagad vikt och svenska klassiker.
+- **Recept**: egna recept med tillagad vikt och 35 svenska klassiker.
 - **Vikt & mått**: trendvikt, prognos för måldatum, BMI och midja/längd-kvot samt adaptiv förbrukning.
 - **Insikter**: näring mot NNR 2023, Livsmedelsverkets kostråd, Tallriksmodellen, klimatavtryck (kg CO2e) och mönster.
 - **Träning, dryck och fasta**: aktiviteter med MET-värden (längdskidor, innebandy, padel …), vatten, koffein, alkohol i standardglas och en fastetimer.
 - **Inställningar**: mål, måltider, tema, medvetet läge samt export/import och radering.
+
+## Kvalitet
+
+- 1 132 automatiska tester (vitest), bland annat en säkerhetsmatris som prövar 40 000 slumpade profiler mot reglerna för kalorimål.
+- Granskad ur fem perspektiv: funktionstest i webbläsare, kodgranskning, design och svensk text, tillgänglighet (WCAG 2.2 AA) samt näringslära och säkerhet.
+- Fungerar från 320 px mobilbredd till stor skärm, i ljust och mörkt läge.
+
+## Prova utan att mata in något
+
+Välj **Utforska med exempeldata** på välkomstskärmen. Då fylls appen med två veckor av en påhittad användares svenska vardagsmat. Exempeldata kan rensas under Inställningar → Data.
 
 ## Utveckling
 
