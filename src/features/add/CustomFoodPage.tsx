@@ -32,6 +32,7 @@ import {
 import { CATEGORY_META } from '../../components/domain'
 import { useFood } from '../../hooks/useFood'
 import { useFoodStore } from '../../stores/foodStore'
+import { requireAccess } from '../premium/requireAccess'
 import { useProfileStore } from '../../stores/profileStore'
 import { NUTRIENTS, KJ_PER_KCAL } from '../../lib/nutrients'
 import { formatEnergy, formatNumber } from '../../lib/format'
@@ -188,6 +189,9 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
       })
       return
     }
+    // Ett nytt livsmedel (även en kopia via "Redigera" på ett inbyggt) är ny loggning och spärras
+    // efter provperioden precis som Nytt livsmedel. Att ändra ett eget livsmedel går alltid.
+    if (mode !== 'edit' && !requireAccess('livsmedel')) return
     savedRef.current = true
     if (mode === 'edit' && source) {
       const { id: _id, createdAt: _c, ...patch } = draftToFood(draft, { id: source.id, createdAt: source.createdAt, from: source })

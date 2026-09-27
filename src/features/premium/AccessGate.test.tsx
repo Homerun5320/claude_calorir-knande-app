@@ -7,7 +7,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppShell } from '../../components/layout/AppShell'
-import { currentAccess, resetLicenseChecks } from '../../hooks/useAccess'
+import { currentAccess, resetLicenseChecks, useAccess } from '../../hooks/useAccess'
 import { todayISO } from '../../lib/dates'
 import { createTestLicense } from '../../lib/license'
 import { useBodyStore } from '../../stores/bodyStore'
@@ -103,6 +103,27 @@ describe('requireAccess', () => {
     expect(hasLoggingAccess()).toBe(false)
     await activateLicense(createTestLicense('livstid', undefined))
     expect(requireAccess('mat')).toBe(true)
+  })
+})
+
+describe('provperiodens start kan inte flyttas fram', () => {
+  it('en sparad start i framtiden rättas till nu – att ställa tillbaka klockan förlänger inte provperioden', async () => {
+    // Klockan stod ett år fram när profilen skapades och har sedan ställts tillbaka.
+    useLicenseStore.setState({ trialStartedAt: Date.now() + 365 * DAY })
+    const { result } = renderHook(() => useAccess())
+    await waitFor(() => expect(useLicenseStore.getState().trialStartedAt).toBeLessThanOrEqual(Date.now()))
+    expect(result.current.status).toMatchObject({ kind: 'prov', daysLeft: 14 })
+    // Fjorton dagar senare är provperioden slut, som för alla andra.
+    expect(currentAccess(Date.now() + 15 * DAY).status.kind).toBe('utgangen')
+  })
+
+  it('att slutföra välkomstflödet igen eller rensa exempeldata startar inte om provperioden', () => {
+    const start = Date.now() - 20 * DAY
+    useLicenseStore.setState({ trialStartedAt: start })
+    useLicenseStore.getState().ensureTrialStarted()
+    useLicenseStore.getState().ensureTrialStarted(Date.now() + DAY)
+    expect(useLicenseStore.getState().trialStartedAt).toBe(start)
+    expect(hasLoggingAccess()).toBe(false)
   })
 })
 

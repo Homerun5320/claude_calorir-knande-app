@@ -214,6 +214,22 @@ function createModalHistory(win: Window): ModalHistory {
 
   // --- popstate --------------------------------------------------------------
 
+  /**
+   * Steg mellan en sida och dess markörer ska inte heller flytta sidan. Webbläsaren återställer
+   * annars rullningen som sidans post hade när markören lades till – t.ex. efter ett köp i ett ark
+   * som ändrade sidan under det (då hamnade man mitt på sidan i stället för vid tackkortet).
+   * Återställningen sker direkt efter popstate, så läget före händelsen läggs tillbaka i nästa
+   * bildruta (requestAnimationFrame körs före ritningen).
+   */
+  function keepScroll() {
+    const x = win.scrollX
+    const y = win.scrollY
+    if (typeof win.requestAnimationFrame !== 'function') return
+    win.requestAnimationFrame(() => {
+      if (win.scrollX !== x || win.scrollY !== y) win.scrollTo(x, y)
+    })
+  }
+
   function onPopState(e: PopStateEvent) {
     const prev = current
     const landed = snapshot()
@@ -238,7 +254,10 @@ function createModalHistory(win: Window): ModalHistory {
     // Samma post för routern (bara markören skiljer): dölj händelsen så att routern inte
     // navigerar och inga blockerare frågas. Våra egna steg döljs alltid.
     const sameEntry = prev.key === landed.key && prev.idx === landed.idx && prev.href === landed.href
-    if (own || sameEntry || withinPage) e.stopImmediatePropagation()
+    if (own || sameEntry || withinPage) {
+      e.stopImmediatePropagation()
+      keepScroll()
+    }
 
     if (!own) {
       // Bakåt (eller en navigering): stäng modaler vars post inte längre finns, översta först.

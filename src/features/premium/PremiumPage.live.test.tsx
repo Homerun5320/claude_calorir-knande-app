@@ -67,6 +67,18 @@ describe('PremiumPage i skarpt läge', () => {
     expect(useLicenseStore.getState().licenseKey).toBeNull()
   })
 
+  it('utan samtycke om ångerrätten anropas inte betaltjänsten', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Välj årslicens' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Köp årslicens' })
+    fireEvent.click(within(sheet).getByRole('button', { name: /Gå till betalning · 299\skr/ }))
+    expect(await within(sheet).findByText(/Kryssa i rutan för att fortsätta/)).toBeInTheDocument()
+    expect(within(sheet).getByText(/varav moms 25/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(redirectTo).not.toHaveBeenCalled()
+  })
+
   it('serverfel visas i arket och köpet kan göras om', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}', { status: 500 }))
     renderPage()

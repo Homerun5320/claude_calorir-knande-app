@@ -2,8 +2,25 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import { checkCommerceBuild } from './scripts/commerce-guard.ts'
+
+/**
+ * Stoppar `vite build` om betalningens inställningar skulle ge en app med gratis testlicenser
+ * (skarpt läge utan giltig publik nyckel) eller en hemlighet i en VITE_-variabel.
+ */
+function commerceGuard(): Plugin {
+  return {
+    name: 'lagom-commerce-guard',
+    apply: 'build',
+    configResolved(config) {
+      const { errors, warnings } = checkCommerceBuild(config.env as Record<string, string | undefined>)
+      for (const w of warnings) config.logger.warn(`Lagom: ${w}`)
+      if (errors.length > 0) throw new Error(`Lagom kan inte byggas:\n- ${errors.join('\n- ')}`)
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,6 +29,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   plugins: [
+    commerceGuard(),
     react(),
     tailwindcss(),
     VitePWA({

@@ -53,6 +53,24 @@ describe('licensnycklar', () => {
     expect(await verifyLicense(key, { publicKey: 'x', mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'testlicens' })
   })
 
+  it('förfalskade testlicenser och osignerade nycklar godtas aldrig i skarpt läge', async () => {
+    const { pub } = await keyPair()
+    const enc = (o: object) => base64UrlEncode(new TextEncoder().encode(JSON.stringify(o)))
+    const base = { v: 1, id: 'x', plan: 'livstid', iat: 1 }
+    // Testflaggan i alla former (även "false" som text) → testlicens, aldrig giltig i skarpt läge.
+    for (const test of [true, 1, 'true', 'false']) {
+      const key = `LAGOM1.${enc({ ...base, test })}.test`
+      expect(await verifyLicense(key, { publicKey: pub, mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'testlicens' })
+    }
+    // Utan testflagga krävs en giltig signatur – i båda lägena.
+    for (const mode of ['live', 'test'] as const) {
+      for (const sig of ['test', '', 'AAAA', base64UrlEncode(new Uint8Array(64))]) {
+        const res = await verifyLicense(`LAGOM1.${enc({ ...base, test: false })}.${sig}`, { publicKey: pub, mode, now: NOW })
+        expect(res.ok).toBe(false)
+      }
+    }
+  })
+
   it('skräp underkänns som format', async () => {
     expect(await verifyLicense('hej', { publicKey: '', mode: 'test' })).toEqual({ ok: false, reason: 'format' })
     expect(decodeLicense('LAGOM1.@@@.x')).toBeNull()
@@ -80,6 +98,10 @@ describe('tillgång', () => {
     })
     expect(s.kind).toBe('licensierad')
     expect(canLog(s)).toBe(true)
+  })
+  it('en provstart i framtiden (klockan ställd framåt vid start) ger aldrig mer än provperiodens dagar', () => {
+    const s = accessStatus({ trialStartedAt: NOW + 365 * DAY, license: null, now: NOW, trialDays: 14 })
+    expect(s).toMatchObject({ kind: 'prov', daysLeft: 14, endsAt: NOW + 14 * DAY })
   })
   it('utgången licens efter provperioden', () => {
     const s = accessStatus({ trialStartedAt: NOW - 400 * DAY, license: { ok: false, reason: 'utgangen' }, now: NOW })

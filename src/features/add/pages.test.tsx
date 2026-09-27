@@ -2,7 +2,7 @@
  * Röktester för sidorna i flödet "Lägg till mat": de renderar utan fel, visar rätt innehåll och
  * de viktigaste interaktionerna fungerar.
  */
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
 import AddFoodPage, { searchAnnouncement } from './AddFoodPage'
@@ -16,6 +16,8 @@ import { useBasketStore } from './basketStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
+import { useLicenseStore } from '../../stores/licenseStore'
+import { useAccessGateStore } from '../premium/requireAccess'
 import { useToastStore } from '../../components/ui/toast'
 import { loadBuiltinCatalog } from '../../lib/foodRepo'
 import { bulle, offBar } from './testFoods'
@@ -227,6 +229,34 @@ describe('CustomFoodPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Spara ändringar' }))
     expect(useFoodStore.getState().customFoods[own.id].name).toBe('Mormors kanelbulle')
     expect(useFoodStore.getState().customFoods[own.id].nutrients.kcal).toBeCloseTo(345)
+  })
+})
+
+describe('CustomFoodPage efter provperioden', () => {
+  beforeEach(() => {
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, onboardingDone: true } }))
+    useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * 86_400_000, licenseKey: null, activatedAt: null })
+  })
+  afterEach(() => {
+    useLicenseStore.getState().resetLicenseState()
+    useAccessGateStore.setState({ blocked: null })
+  })
+
+  it('en kopia av ett inbyggt livsmedel (via Redigera) spärras som ett nytt livsmedel', async () => {
+    renderAt('/livsmedel/lagom%3Akanelbulle-bageri/redigera')
+    fireEvent.click(await screen.findByRole('button', { name: 'Spara livsmedlet' }))
+    expect(Object.keys(useFoodStore.getState().customFoods)).toHaveLength(0)
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'livsmedel' })
+  })
+
+  it('att ändra ett eget livsmedel går alltid', () => {
+    const own = { ...bulle, id: 'custom:bulle', source: 'custom' as const, name: 'Mormors bulle' }
+    useFoodStore.setState({ customFoods: { [own.id]: own } })
+    renderAt(`/livsmedel/${encodeURIComponent(own.id)}/redigera`)
+    fireEvent.change(screen.getByLabelText('Namn'), { target: { value: 'Mormors kanelbulle' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Spara ändringar' }))
+    expect(useFoodStore.getState().customFoods[own.id].name).toBe('Mormors kanelbulle')
+    expect(useAccessGateStore.getState().blocked).toBeNull()
   })
 })
 

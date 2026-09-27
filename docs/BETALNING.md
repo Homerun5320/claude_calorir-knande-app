@@ -68,6 +68,7 @@ Den här guiden beskriver hur betalningen sätts upp med **Stripe** (kort, Klarn
 | `netlify.toml` | Bygge, `/api/*`, säkerhetsheaders (CSP) och cache |
 | `scripts/generate-license-keys.mjs` | Skapar nyckelparet för licenser |
 | `scripts/issue-license.mjs` | Utfärdar en licens manuellt |
+| `scripts/commerce-guard.ts` | Byggkontroll (via `vite.config.ts`): stoppar skarpa byggen utan giltig publik nyckel och hemligheter i `VITE_`-variabler |
 | `.env.example` | Alla miljövariabler med förklaringar |
 
 ---
@@ -75,6 +76,8 @@ Den här guiden beskriver hur betalningen sätts upp med **Stripe** (kort, Klarn
 ## Testläge utan betalning
 
 Så länge `VITE_COMMERCE_MODE` inte är `live` (eller `VITE_LICENSE_PUBLIC_KEY` saknas) körs appen i **testläge**: köpknappen ger direkt en osignerad testlicens och ingen server behövs. Testlicenser godtas aldrig av en app som är byggd i skarpt läge.
+
+Ett bygge (`vite build`) med `VITE_COMMERCE_MODE=live` men utan en giltig publik nyckel **stoppas** i stället för att tyst bli testläge med gratis testlicenser. Bygget stoppas också om `live` är felstavat eller om en `VITE_`-variabel ser ut att innehålla en hemlighet (`sk_…`, `rk_…`, `whsec_…` eller den privata licensnyckeln) – allt i `VITE_`-variabler byggs in i appen och syns för alla. Kontrollen finns i `scripts/commerce-guard.ts`.
 
 ---
 
@@ -288,8 +291,11 @@ Kör skriptet på din egen dator och rensa terminalhistoriken efteråt om du kli
 
 Medvetna avvägningar för en app utan konton där all data stannar på enheten:
 
-- **Provperioden** lagras lokalt. Den som rensar webbplatsdata kan starta om den. Det är priset för att inte kräva konto eller skicka något om användaren till en server. Den **betalda licensen** kan däremot inte förfalskas.
-- **Licenser kan inte spärras.** En nyckel som delas vidare fungerar även hos andra. Utan konton finns ingen bra motåtgärd; en framtida version kan bygga in en spärrlista.
+- **Provperioden** lagras lokalt. Den som rensar webbplatsdata (eller använder privat läge där inget sparas) kan starta om den. Det är priset för att inte kräva konto eller skicka något om användaren till en server. Den **betalda licensen** kan däremot inte förfalskas. Inom appen går provperioden inte att förlänga: radering, exempeldata, ett nytt välkomstflöde och återställning av en säkerhetskopia behåller alltid den tidigaste starten, och en start i framtiden (klockan ställd framåt när profilen skapades) rättas till nu.
+- **Klockan.** Provperioden och årslicensen räknas mot enhetens klocka. Den som ställer tillbaka klockan får också dagboken på fel datum, så det är ingen praktisk väg runt spärren.
+- **Spärren finns i appen.** Allt ligger lokalt, så den som ändrar i webbläsarens lagring (eller redigerar en säkerhetskopia och läser in den) kan lägga in data utan licens. Import och export spärras medvetet aldrig – användarens data ska alltid gå att flytta.
+- **Licenser kan inte spärras.** En nyckel som delas vidare fungerar även hos andra, och en återbetald eller bestriden betalning drar inte tillbaka nyckeln (`/api/verify-purchase` lämnar också ut den igen för samma köp). Utan konton finns ingen bra motåtgärd; en framtida version kan bygga in en spärrlista.
+- **Testköp och skarpa licenser måste ha olika nyckelpar.** Signerar servern med det skarpa nyckelparet medan `STRIPE_SECRET_KEY` är en testnyckel, blir köp med Stripes testkort (4242 …) giltiga licenser i den skarpa appen. Använd därför ett eget testnyckelpar för förhandsversioner och Stripes testläge, och skapa det skarpa paret först när du går live (se checklistan).
 - **Nyckelparet kan inte bytas** utan att sålda licenser slutar fungera (se steg 5).
 - **Begränsningen av antal anrop** i funktionerna gäller per funktionsinstans och är ett enkelt skydd. Netlifys *Rate limiting* ger ett hårdare.
 - **Ingen egen databas.** Köpen finns i Stripe och licensnycklarna i betalningarnas metadata.
