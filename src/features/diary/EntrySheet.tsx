@@ -3,11 +3,12 @@
  *
  * - Livsmedel: mängd och enhet med PortionPicker.
  * - Snabbregistrering: namn, energi och makron (tomt fält = okänt, aldrig 0).
- * - Båda: måltid (chips), klockslag, anteckning, "Flytta till annan dag", "Kopiera till idag"
- *   och "Ta bort" (med Ångra).
+ * - Båda: måltid (chips), klockslag, anteckning, "Visa näringsvärden" (livsmedel), "Flytta till annan dag",
+ *   "Kopiera till idag" och "Ta bort" (med Ångra).
  */
 import { useState } from 'react'
-import { ArrowRightLeft, Clock, Copy, CopyPlus, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRightLeft, Clock, Copy, CopyPlus, Info, Trash2 } from 'lucide-react'
 import { Button, Chip, NumberField, Sheet, TextField, cx, toast } from '../../components/ui'
 import { MEAL_META } from '../../components/domain'
 import { PortionPicker, type PortionSelection } from '../../components/domain/PortionPicker'
@@ -92,6 +93,7 @@ const QUICK_LABELS: Record<QuickEditKey, string> = {
 
 function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }: EditorProps) {
   const updateEntry = useDiaryStore((s) => s.updateEntry)
+  const navigate = useNavigate()
   const [mode, setMode] = useState<'edit' | 'move'>('edit')
   const [meal, setMeal] = useState<MealId>(entry.meal)
   const [time, setTime] = useState(entry.time ?? '')
@@ -140,6 +142,14 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
         action: { label: 'Ångra', onClick: () => useDiaryStore.getState().restoreEntry(removed) },
       })
     }
+  }
+
+  /** Livsmedlets detaljsida (/livsmedel/:id) – där kan man också lägga till det igen. */
+  const showFood = () => {
+    if (entry.kind !== 'food') return
+    onClose()
+    const q = new URLSearchParams({ maltid: entry.meal, datum: entry.date })
+    navigate(`/livsmedel/${encodeURIComponent(entry.food.id)}?${q}`)
   }
 
   const copyToToday = () => {
@@ -262,6 +272,7 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
           </div>
 
           <ul className="-mx-2 flex flex-col border-t border-line/70 pt-3">
+            {entry.kind === 'food' && <EntryAction icon={Info} label="Visa näringsvärden" onClick={showFood} />}
             <EntryAction icon={ArrowRightLeft} label="Flytta till annan dag" onClick={() => setMode('move')} />
             <EntryAction icon={isToday ? CopyPlus : Copy} label={isToday ? 'Lägg till igen' : 'Kopiera till idag'} onClick={copyToToday} />
             <EntryAction icon={Trash2} label="Ta bort" tone="danger" onClick={remove} />

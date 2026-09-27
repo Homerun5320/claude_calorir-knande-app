@@ -27,14 +27,22 @@ export function PageFallback() {
   )
 }
 
+/** Datumet i dagboken (/dagbok/2026-09-20) så att "+" lägger till på dagen man tittar på. */
+const DIARY_DATE = /^\/dagbok\/(\d{4}-\d{2}-\d{2})$/
+
 function AddButton({ className = '' }: { className?: string }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const meals = useProfileStore((s) => s.settings.meals)
+  const add = () => {
+    const date = DIARY_DATE.exec(pathname)?.[1]
+    navigate(`/lagg-till?maltid=${mealForTime(meals)}${date ? `&datum=${date}` : ''}`)
+  }
   return (
     <motion.button
       type="button"
       whileTap={{ scale: 0.92 }}
-      onClick={() => navigate(`/lagg-till?maltid=${mealForTime(meals)}`)}
+      onClick={add}
       className={`grid place-items-center rounded-full bg-gran text-on-gran shadow-[var(--shadow-float)] ${className}`}
       aria-label="Lägg till mat"
     >

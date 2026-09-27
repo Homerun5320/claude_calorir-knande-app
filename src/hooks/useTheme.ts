@@ -9,6 +9,12 @@ import { useProfileStore } from '../stores/profileStore'
 export function useTheme() {
   const theme = useProfileStore((s) => s.settings.theme)
   useEffect(() => {
+    // Skriptet i index.html läser valet före första renderingen (ingen blinkning vid start).
+    try {
+      localStorage.setItem('lagom-theme', theme)
+    } catch {
+      // Privat läge eller blockerad lagring – temat sätts ändå när butiken har lästs in.
+    }
     const root = document.documentElement
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => {

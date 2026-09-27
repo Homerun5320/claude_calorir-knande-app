@@ -292,6 +292,11 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - interface `NutrientTableProps`
 - `NutrientTable(`
 
+### `src/components/domain/PortionPicker.tsx` (importera direkt, inte via `domain/index`)
+- interface `PortionSelection` – `{ amount, unit, grams }`
+- interface `PortionPickerProps` – `food`, `initialAmount`, `initialUnit`, `onConfirm(amount, unit, grams)`, `confirmLabel`, `showNutrients`, `onChange`, `hideActions`, `secondaryLabel`/`onSecondary`, `busy`, `autoFocus`
+- `PortionPicker(` – sätter startvärdet en gång; ge `key={food.id}` om livsmedlet kan bytas
+
 ### `src/components/domain/WaterGlasses.tsx`
 - interface `WaterGlassesProps`
 - `formatLiters(ml: number): string`
@@ -391,6 +396,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/lib/dates.ts`
 - `toISODate(d: Date): ISODate`
 - `fromISODate(s: ISODate): Date`
+- `isValidISODate(value: string | null | undefined): value is ISODate` – giltig kalenderdag (t.ex. från adressen)
 - `todayISO(now: Date = new Date()): ISODate`
 - `addDays(date: ISODate, days: number): ISODate`
 - `diffDays(a: ISODate, b: ISODate): number`
@@ -411,6 +417,11 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `greeting(now: Date = new Date()): string`
 - `nowTime(now: Date = new Date()): string`
 - `ageFromBirthYear(birthYear: number, today: ISODate = todayISO()): number`
+
+### `src/lib/dayMeta.ts`
+- type `ScaleKey` – `'mood' | 'energy' | 'hunger'`
+- interface `ScaleDef`
+- const `DAY_SCALES` – humör, energi och hunger (1–5 med emoji och ord), delas av Idag och Dagbok
 
 ### `src/lib/diary.ts`
 - `entryNutrients(e: DiaryEntry): Nutrients`
@@ -439,6 +450,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `slopePerDay(points: ReadonlyArray<{ x: number; y: number }>): number`
 - interface `AdaptiveEstimate`
 - `estimateAdaptiveTdee(`
+- `adaptiveIntake(intakeByDay, isComplete: (date) => boolean, today?, windowDays = 28): Record<ISODate, number>` – bara klarmarkerade dagar när de räcker (≥ 14)
 - `projectGoalDate(currentTrendKg: number, weeklyChangeKg: number, targetKg: number, today: ISODate = todayISO()): ISODate | null`
 - `bmi(weightKg: number, heightCm: number): number`
 - `bmiCategory(v: number): { label: string; tone: 'good' | 'warn' | 'bad' }`
@@ -783,7 +795,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/stores/diaryStore.ts`
 - type `NewDiaryEntry`
 - type `NewExerciseEntry`
-- const `useDiaryStore`
+- const `useDiaryStore` – bl.a. `removeEntry`/`restoreEntry` och `removeExercise`/`restoreExercise` för ångra
 
 ### `src/stores/fastingStore.ts`
 - interface `FastRecord`

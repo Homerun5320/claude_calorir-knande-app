@@ -68,7 +68,7 @@ export default function RecipeDetailPage() {
   if (loading) return <DetailSkeleton />
   if (!recipe) {
     return (
-      <div className="px-4 pt-safe">
+      <div className="px-4">
         <PageHeader backTo="/recept" backLabel="Till recepten" title="Receptet hittades inte" />
         <div className="card">
           <EmptyState
@@ -202,7 +202,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
         }
 
   return (
-    <div className="px-4 pt-safe pb-10">
+    <div className="px-4 pb-10">
       <PageHeader
         back
         eyebrow={builtin ? 'Svensk klassiker' : 'Mitt recept'}

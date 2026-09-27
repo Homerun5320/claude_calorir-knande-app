@@ -69,7 +69,7 @@ export default function RecipesPage() {
   const searching = deferredQuery.trim() !== ''
 
   return (
-    <div className="px-4 pt-safe pb-24">
+    <div className="px-4 pb-24">
       <PageHeader
         back
         eyebrow="Kokbok"

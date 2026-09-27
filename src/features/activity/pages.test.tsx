@@ -95,7 +95,7 @@ describe('Träning', () => {
     expect(screen.getByRole('button', { name: /^Ändra Yoga/ })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Ta bort Yoga' }))
-    expect(useDiaryStore.getState().exercise[date]).toHaveLength(0)
+    expect(useDiaryStore.getState().exercise[date] ?? []).toHaveLength(0)
     act(() => lastToast()?.action?.onClick())
     expect(useDiaryStore.getState().exercise[date]).toHaveLength(1)
   })

@@ -208,18 +208,12 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
   ) : undefined
 
   return (
-    <div
-      {...(onDetails ? longPress.handlers : {})}
-      className={cx(
-        'select-none [-webkit-touch-callout:none]',
-        // Medvetet läge: dölj energikolumnen i raden (FoodRow saknar egen inställning för det).
-        mindful && '[&>div>button:first-child>span:last-child]:hidden',
-      )}
-    >
+    <div {...(onDetails ? longPress.handlers : {})} className="select-none [-webkit-touch-callout:none]">
       <FoodRow
         {...row}
         kcal={mindful ? undefined : row.kcal}
         showMacros={!mindful}
+        hideEnergy={mindful}
         compact={compact}
         badge={badge}
         onClick={() => {

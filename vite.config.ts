@@ -52,6 +52,10 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Livsmedelsdatabasen och streckkodsläsaren är avsiktligt stora, lazy-laddade chunkar.
+    chunkSizeWarningLimit: 900,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

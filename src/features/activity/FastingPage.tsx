@@ -69,7 +69,7 @@ export default function FastingPage() {
   }
 
   return (
-    <div className="px-4 pt-safe pb-8">
+    <div className="px-4 pb-8">
       <PageHeader title="Fasta" subtitle="Periodisk fasta i din egen takt – om det passar dig." />
 
       <div className="flex flex-col gap-4">

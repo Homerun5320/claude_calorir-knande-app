@@ -40,12 +40,14 @@ export interface FoodRowProps extends FoodRowData {
   actionLabel?: string
   /** Innehåll längst till höger, t.ex. en "+"-knapp. Ligger utanför radens klickyta. */
   trailing?: ReactNode
-  /** Liten etikett efter namnet, t.ex. ett Nyckelhålet-märke eller "Recept". */
+  /** Liten etikett under namnet (före märke/mängd), t.ex. ett Nyckelhålet-märke eller "Recept". */
   badge?: ReactNode
   /** Visa makroprickar. Standard true. */
   showMacros?: boolean
   /** Tätare rad (mindre ikon). */
   compact?: boolean
+  /** Dölj energi- och makrokolumnen helt (medvetet läge). */
+  hideEnergy?: boolean
   className?: string
 }
 
@@ -131,6 +133,7 @@ export function FoodRow({
   badge,
   showMacros = true,
   compact = false,
+  hideEnergy = false,
   className = '',
 }: FoodRowProps) {
   const [imageFailed, setImageFailed] = useState(false)
@@ -138,7 +141,7 @@ export function FoodRow({
   const subtitle = [brand, amountText].filter(Boolean).join(' · ')
   const m3: FoodRowMacros = macros ?? {}
   const knownMacros = MACRO_DOTS.filter((m) => m3[m.key] !== undefined && Number.isFinite(m3[m.key]))
-  const hasMacros = showMacros && knownMacros.length > 0
+  const hasMacros = !hideEnergy && showMacros && knownMacros.length > 0
   const iconSize = compact ? 'sm' : 'md'
   const imageBox = compact ? 'h-9 w-9 rounded-xl' : 'h-11 w-11 rounded-[0.9rem]'
 
@@ -157,35 +160,42 @@ export function FoodRow({
         <CategoryIcon category={category} emoji={emoji} size={iconSize} />
       )}
       <span className="min-w-0 flex-1">
-        <span className="flex items-start gap-1.5">
-          <span
-            className={`line-clamp-2 break-words font-medium leading-snug text-ink [hyphens:auto] ${compact ? 'text-sm' : 'text-[0.95rem]'}`}
-            lang="sv"
-          >
-            {name}
-          </span>
-          {badge && <span className="mt-0.5 shrink-0">{badge}</span>}
+        <span
+          className={`line-clamp-2 break-words font-medium leading-snug text-ink [hyphens:auto] ${compact ? 'text-sm' : 'text-[0.95rem]'}`}
+          lang="sv"
+        >
+          {name}
         </span>
-        {subtitle && <span className="mt-0.5 block truncate text-xs text-ink-3">{subtitle}</span>}
-      </span>
-      <span className="flex shrink-0 flex-col items-end self-center pl-1 text-right">
-        <span className="text-sm font-semibold text-ink">
-          {kcal !== undefined ? <EnergyValue kcal={kcal} /> : <span className="text-ink-3">–</span>}
-        </span>
-        {hasMacros && (
-          <span className="mt-0.5 inline-flex items-center gap-1.5 text-[10.5px] text-ink-3 tabular-nums" aria-hidden="true">
-            {knownMacros.map((m) => {
-              const v = m3[m.key] ?? 0
-              return (
-                <span key={m.key} className="inline-flex items-center gap-[3px]" title={m.label}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
-                  {formatNumber(v, v < 10 ? 1 : 0)}
-                </span>
-              )
-            })}
+        {/* Etiketten ligger på raden under namnet – bredvid namnet blev det för trångt i 375 px. */}
+        {badge ? (
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">{badge}</span>
+            {subtitle && <span className="min-w-0 truncate text-xs text-ink-3">{subtitle}</span>}
           </span>
+        ) : (
+          subtitle && <span className="mt-0.5 block truncate text-xs text-ink-3">{subtitle}</span>
         )}
       </span>
+      {!hideEnergy && (
+        <span className="flex shrink-0 flex-col items-end self-center pl-1 text-right">
+          <span className="text-sm font-semibold text-ink">
+            {kcal !== undefined ? <EnergyValue kcal={kcal} /> : <span className="text-ink-3">–</span>}
+          </span>
+          {hasMacros && (
+            <span className="mt-0.5 inline-flex items-center gap-1.5 text-[10.5px] text-ink-3 tabular-nums" aria-hidden="true">
+              {knownMacros.map((m) => {
+                const v = m3[m.key] ?? 0
+                return (
+                  <span key={m.key} className="inline-flex items-center gap-[3px]" title={m.label}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
+                    {formatNumber(v, v < 10 ? 1 : 0)}
+                  </span>
+                )
+              })}
+            </span>
+          )}
+        </span>
+      )}
     </>
   )
 
@@ -194,7 +204,7 @@ export function FoodRow({
     [
       name,
       subtitle,
-      kcal !== undefined ? formatKcal(kcal) : undefined,
+      kcal !== undefined && !hideEnergy ? formatKcal(kcal) : undefined,
       hasMacros ? knownMacros.map((m) => `${m.label.toLowerCase()} ${formatNumber(m3[m.key], 1)} g`).join(', ') : undefined,
     ]
       .filter(Boolean)

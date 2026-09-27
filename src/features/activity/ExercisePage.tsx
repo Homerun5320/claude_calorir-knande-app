@@ -71,7 +71,7 @@ export default function ExercisePage() {
   const isToday = date === today
 
   return (
-    <div className="px-4 pt-safe pb-8">
+    <div className="px-4 pb-8">
       <PageHeader title="Träning" compactTitle={`Träning · ${relativeDayLabel(date, today)}`} subtitle="Rörelse i alla former räknas – räknat ärligt, netto utöver vila.">
         <div className="card rounded-[1.75rem] px-1 py-1.5">
           <DateNavigator date={date} onChange={goTo} today={today} maxFutureDays={0} />

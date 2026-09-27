@@ -40,7 +40,7 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 - Typsnitt: `font-display` (Fraunces) för rubriker och stora siffror, klassen `display-num` för stora tal, `eyebrow` för små etiketter i versaler. Brödtext Inter.
 - Kort: klassen `card` (rundad 1.5rem, mjuk skugga) + `p-4`/`p-5`. Knappar/chips rundade (`rounded-2xl`/`rounded-full`).
 - Ikoner: `lucide-react`. Animationer: `motion/react` (sparsamt, fjädrande; respektera reducerad rörelse).
-- Mobil först (375 px), innehåll max `max-w-3xl`. Tryckytor minst 44 px. Sidor har `px-4 pt-safe` och inleds med rubrik.
+- Mobil först (375 px), innehåll max `max-w-3xl`. Tryckytor minst 44 px. Sidor har `px-4` och inleds med `PageHeader` (som hanterar safe area – lägg inte till `pt-safe` utöver den).
 - Tillgänglighet: semantiska element, `aria-label` på ikonknappar, etiketter på fält, synlig fokus.
 
 ## Ton

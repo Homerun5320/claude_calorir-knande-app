@@ -6,7 +6,7 @@
 import type { DiaryEntry, ExerciseEntry, FoodEntry, ISODate, MealConfig, MealId, MealTemplate, Nutrients } from '../../types'
 import type { NewDiaryEntry } from '../../stores/diaryStore'
 import { MEAL_IDS } from '../../types'
-import { addDays, diffDays, formatDayLong, formatDayShort, fromISODate, relativeDayLabel, toISODate } from '../../lib/dates'
+import { addDays, diffDays, formatDayLong, formatDayShort, relativeDayLabel } from '../../lib/dates'
 import { entryNutrients, totals } from '../../lib/diary'
 import { formatEnergy, formatNumber, formatDuration } from '../../lib/format'
 import { mealForTime, MEAL_EMOJI } from '../../lib/meals'
@@ -20,11 +20,8 @@ import { summarizeRing, mindfulLabel, type RingStatus } from '../../components/s
 /** Hur långt fram man kan planera i dagboken. */
 export const MAX_FUTURE_DAYS = 14
 
-/** true för en giltig kalenderdag 'YYYY-MM-DD' (t.ex. inte '2026-02-30'). */
-export function isValidISODate(value: string | null | undefined): value is ISODate {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  return toISODate(fromISODate(value)) === value
-}
+/** 'YYYY-MM-DD' och ett giltigt kalenderdatum – definierad i lib/dates. */
+export { isValidISODate } from '../../lib/dates'
 
 export type DayKind = 'past' | 'today' | 'future'
 

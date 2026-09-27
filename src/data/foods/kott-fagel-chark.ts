@@ -65,7 +65,7 @@ const notkott: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (125 g)', 125], ['forp', '1 förpackning (500 g)', 500], ['forp-800', '1 förpackning (800 g)', 800]],
     tags: [...KOTT],
-    syn: ['nötfärs', 'köttfärs', 'färs', 'notfars', 'nötfärs 10%', 'svensk nötfärs', 'malet nötkött', 'köttfärs nöt'],
+    syn: ['nötfärs', 'köttfärs', 'färs', 'notfars', 'nötfärs 10%', 'svensk nötfärs', 'malet nötkött', 'köttfärs nöt', 'nöt färs', 'notfärs'],
     co2e: 28,
   },
   {
@@ -433,7 +433,7 @@ const flask: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (125 g)', 125], ['forp', '1 förpackning (500 g)', 500], ['forp-800', '1 förpackning (800 g)', 800]],
     tags: [...KOTT],
-    syn: ['blandfärs', 'blandfars', 'köttfärs', 'färs', 'nöt- och fläskfärs', 'blandad färs'],
+    syn: ['blandfärs', 'blandfars', 'köttfärs', 'färs', 'nöt- och fläskfärs', 'blandad färs', 'blanfärs', 'blandfärs 50/50'],
     co2e: 16,
     note: 'Hälften nötfärs och hälften fläskfärs, ca 15 % fett. Fetthalten varierar mellan ca 10 och 20 %.',
   },
@@ -452,6 +452,24 @@ const flask: FoodSeed[] = [
     syn: ['stekt blandfärs', 'blandfärs stekt', 'stekt köttfärs', 'köttfärssås kött'],
     co2e: 22,
     note: TILLAGAD,
+  },
+  {
+    id: 'hamburgerbiff-fryst',
+    name: 'Hamburgerbiff, fryst (nöt och fläsk), ostekt',
+    cat: 'rott_kott',
+    kcal: 240, prot: 15, carb: 4, fat: 18, fiber: 0, sugar: 1, satFat: 8.5, salt: 1.5,
+    n: {
+      monoFat: 7.5, polyFat: 1.0, cholesterol: 60,
+      vitD: 0.3, thiamin: 0.2, niacin: 4.0, folate: 5, vitB12: 1.5,
+      calcium: 15, iron: 1.8, potassium: 250, phosphorus: 150, zinc: 3.5,
+    },
+    portions: [['st', '1 hamburgare (90 g)', 90], ['stor', '1 stor hamburgare (150 g)', 150], ['forp', '1 förpackning (6 × 90 g)', 540]],
+    syn: ['hamburgare', 'frysta hamburgare', 'hamburgare fryst', 'hamburgerbiffar', 'burgarbiff', 'burgare', 'färdiga hamburgare', 'hamburgerbiff'],
+    co2e: 16,
+    kostrad: { rottKott: 70 },
+    note:
+      'Färdigformade frysta biffar med salt och kryddor. Vägs ostekta – vid stekning försvinner ca 20 % av vikten. ' +
+      'Bröd och dressing räknas separat.',
   },
   {
     id: 'flaskfars-ra',
@@ -813,7 +831,7 @@ const vilt: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (150 g)', 150], ['stek', '1 älgstek (ca 1,5 kg)', 1500]],
     tags: VILT,
-    syn: ['älg', 'älgkött', 'algstek', 'älgstek', 'älginnanlår', 'älgytterfilé', 'viltkött', 'moose', 'tjälknöl'],
+    syn: ['älg', 'älgkött', 'algstek', 'älgstek', 'älginnanlår', 'älgytterfilé', 'viltkött', 'moose', 'älgskav', 'viltskav', 'älgfilé', 'algkott'],
     co2e: 1,
   },
   {
@@ -828,7 +846,7 @@ const vilt: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (100 g)', 100], ['skiva', '1 skiva (ca 30 g)', 30]],
     tags: VILT,
-    syn: ['älgstek', 'stekt älg', 'ugnsstekt älg', 'älg', 'viltstek', 'tjälknöl'],
+    syn: ['älgstek', 'stekt älg', 'ugnsstekt älg', 'älg', 'viltstek', 'älgstek ugnsstekt'],
     co2e: 1.4,
     note: TILLAGAD,
   },
@@ -973,6 +991,24 @@ const vilt: FoodSeed[] = [
     syn: ['vildsvin', 'vildsvinskött', 'vildsvinsfilé', 'vildsvinsstek', 'vildgris', 'wild boar'],
     co2e: 1,
   },
+  {
+    id: 'tjalknol',
+    name: 'Tjälknöl av älg (saltad ugnsstekt älgstek)',
+    cat: 'chark',
+    kcal: 132, prot: 28, carb: 0.5, fat: 2, fiber: 0, sugar: 0.5, satFat: 0.8, salt: 1.8,
+    n: {
+      monoFat: 0.55, polyFat: 0.4, omega3: 0.1, cholesterol: 75,
+      thiamin: 0.08, riboflavin: 0.33, niacin: 5.5, vitB6: 0.38, folate: 5, vitB12: 3.8,
+      calcium: 7, iron: 4.2, magnesium: 27, potassium: 330, phosphorus: 230, zinc: 4.7,
+    },
+    portions: [['portion', '1 portion (100 g)', 100], ['skiva', '1 skiva (ca 20 g)', 20]],
+    tags: ['glutenfri', 'laktosfri', 'klassiker', 'svensk'],
+    syn: ['tjälknöl', 'tjälknul', 'tjalknol', 'tjälknöl älg', 'saltad älgstek', 'älgstek saltad', 'lakad älgstek'],
+    co2e: 1.4,
+    note:
+      'Fryst älgstek som långsamstekts i ugnen och sedan lagts i saltlake. ' +
+      'Görs även på nötstek – då blir fetthalten och klimatavtrycket betydligt högre.',
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -1007,7 +1043,7 @@ const fagel: FoodSeed[] = [
     },
     portions: [['st', '1 filé (ca 95 g)', 95], ['portion', '1 portion (125 g)', 125]],
     tags: ['glutenfri', 'laktosfri'],
-    syn: ['stekt kyckling', 'grillad kycklingfilé', 'kycklingfilé stekt', 'ugnsstekt kycklingfilé', 'kyckling'],
+    syn: ['stekt kyckling', 'grillad kycklingfilé', 'kycklingfilé stekt', 'ugnsstekt kycklingfilé', 'kyckling', 'kycklingbröst stekt', 'tillagad kycklingfilé', 'kokt kycklingfilé', 'kycklingfile stekt'],
     co2e: 4,
     note: TILLAGAD,
   },
@@ -1043,6 +1079,22 @@ const fagel: FoodSeed[] = [
     note: TILLAGAD,
   },
   {
+    id: 'kyckling-hel-ra',
+    name: 'Kyckling, hel, rå (kött och skinn, ätlig del)',
+    cat: 'fagel',
+    kcal: 184, prot: 19, carb: 0, fat: 12, fiber: 0, sugar: 0, satFat: 3.3, salt: 0.18,
+    n: {
+      monoFat: 5.0, polyFat: 2.5, omega3: 0.2, cholesterol: 80,
+      vitA: 30, vitD: 0.3, vitE: 0.3, thiamin: 0.07, riboflavin: 0.15, niacin: 7.5, vitB6: 0.4, folate: 7, vitB12: 0.4,
+      calcium: 10, iron: 0.8, magnesium: 21, potassium: 250, phosphorus: 170, zinc: 1.5, selenium: 12, iodine: 2,
+    },
+    portions: [['portion', '1 portion (150 g)', 150], ['hel', '1 hel kyckling ca 1,2 kg, ätlig del (ca 800 g)', 800]],
+    tags: ['glutenfri', 'laktosfri'],
+    syn: ['hel kyckling', 'kyckling hel', 'färsk kyckling', 'hel kyckling rå', 'kyckling med skinn rå', 'kycklingkött', 'kyckling att ugnssteka'],
+    co2e: 3,
+    note: 'Vägs rå utan ben. En hel kyckling på ca 1,2 kg ger ca 800 g kött och skinn.',
+  },
+  {
     id: 'grillkyckling-med-skinn',
     name: 'Grillkyckling, med skinn (ätlig del)',
     cat: 'fagel',
@@ -1058,7 +1110,7 @@ const fagel: FoodSeed[] = [
       ['hel', '1 hel kyckling, ätlig del (ca 650 g)', 650],
     ],
     tags: ['glutenfri', 'laktosfri'],
-    syn: ['grillkyckling', 'grillad kyckling', 'hel kyckling', 'helgrillad kyckling', 'kyckling med skinn', 'rotisserie'],
+    syn: ['grillkyckling', 'grillad kyckling', 'helgrillad kyckling', 'kyckling med skinn', 'rotisserie', 'grillkykling', 'kyckling grillad', 'färdiggrillad kyckling', 'hel grillad kyckling'],
     co2e: 4,
     note: 'Färdiggrillad kyckling från butik, kryddad och saltad.',
   },
@@ -1329,7 +1381,7 @@ const chark: FoodSeed[] = [
     },
     portions: [['skiva', '1 skiva (ca 35 g)', 35], ['forp', '1 förpackning (400 g)', 400]],
     tags: ['glutenfri', 'laktosfri', 'svensk'],
-    syn: ['rimmat fläsk', 'rimmat sidfläsk', 'saltat fläsk', 'sidfläsk rimmat', 'fläsk', 'rimmat'],
+    syn: ['rimmat fläsk', 'rimmat sidfläsk', 'saltat fläsk', 'sidfläsk rimmat', 'fläsk', 'rimmat', 'rimmat flask', 'pancetta', 'fläsk till ärtsoppa'],
     co2e: 5,
   },
   {
@@ -1492,7 +1544,7 @@ const chark: FoodSeed[] = [
     kcal: 233, prot: 21, carb: 0, fat: 16.5, fiber: 0, sugar: 0, satFat: 5.8, salt: 1.8,
     n: {
       monoFat: 7.4, polyFat: 1.9, omega3: 0.15, cholesterol: 90,
-      vitD: 0.4, vitC: 0, thiamin: 0.4, riboflavin: 0.2, niacin: 3.5, vitB6: 0.25, folate: 2, vitB12: 0.8,
+      vitD: 0.4, thiamin: 0.4, riboflavin: 0.2, niacin: 3.5, vitB6: 0.25, folate: 2, vitB12: 0.8,
       calcium: 15, iron: 1.0, magnesium: 16, potassium: 150, phosphorus: 150, zinc: 2.8, selenium: 12,
     },
     portions: [['portion', '1 portion, ätlig del (ca 175 g)', 175], ['hel', '1 hel fläsklägg, ätlig del (ca 550 g)', 550]],
@@ -1689,8 +1741,69 @@ const chark: FoodSeed[] = [
       calcium: 13, iron: 1.4, magnesium: 20, potassium: 370, phosphorus: 230, zinc: 3.2,
     },
     portions: [['skiva', '1 skiva (ca 5 g)', 5], ['smorgas', '1 smörgås (3 skivor)', 15], ['forp', '1 förpackning (80 g)', 80]],
-    syn: ['salami', 'salamikorv', 'salamipålägg', 'milanosalami', 'italiensk salami', 'pepperoni'],
+    syn: ['salami', 'salamikorv', 'salamipålägg', 'milanosalami', 'italiensk salami', 'salamiskivor', 'salamie'],
     co2e: 9,
+  },
+  {
+    id: 'pepperoni',
+    name: 'Pepperoni (korv), skivad',
+    cat: 'chark',
+    kcal: 468, prot: 22, carb: 1.5, fat: 41.5, fiber: 0, sugar: 1, satFat: 15.5, salt: 4.3,
+    n: {
+      monoFat: 19, polyFat: 4.5, omega3: 0.3, cholesterol: 95,
+      vitD: 0.5, thiamin: 0.5, riboflavin: 0.25, niacin: 5.0, vitB6: 0.3, folate: 3, vitB12: 1.5,
+      calcium: 15, iron: 1.4, magnesium: 18, potassium: 320, phosphorus: 200, zinc: 2.8,
+    },
+    portions: [['skiva', '1 skiva (ca 2 g)', 2], ['pizza', 'Topping till 1 pizza (ca 30 g)', 30], ['forp', '1 förpackning (80 g)', 80]],
+    syn: ['pepperoni', 'pepperonikorv', 'pepperoniskivor', 'pizzasalami', 'pepperonisalami', 'peperonikorv'],
+    co2e: 9,
+    note: 'Kryddig, lufttorkad salami, ofta som pizzatopping. Inte samma sak som "peperoni" (inlagd paprika) på pizzamenyer.',
+  },
+  {
+    id: 'mortadella',
+    name: 'Mortadella',
+    cat: 'chark',
+    kcal: 302, prot: 15.5, carb: 1.5, fat: 26, fiber: 0, sugar: 1, satFat: 9.5, salt: 2.5,
+    n: {
+      monoFat: 11.5, polyFat: 3.0, omega3: 0.2, cholesterol: 60,
+      vitD: 0.4, thiamin: 0.15, riboflavin: 0.15, niacin: 2.7, vitB6: 0.13, folate: 3, vitB12: 1.4,
+      calcium: 18, iron: 1.4, magnesium: 16, potassium: 160, phosphorus: 97, zinc: 2.1, selenium: 22,
+    },
+    portions: PALAGG_PORTIONS(10, 100),
+    syn: ['mortadella', 'mortadela', 'mortadella bologna', 'bologna', 'italiensk korvpålägg'],
+    co2e: 6,
+  },
+  {
+    id: 'salsiccia-ra',
+    name: 'Salsiccia, rå (italiensk färskkorv)',
+    cat: 'chark',
+    kcal: 257, prot: 16, carb: 1, fat: 21, fiber: 0, sugar: 0.5, satFat: 7.5, salt: 1.8,
+    n: {
+      monoFat: 9.5, polyFat: 2.5, omega3: 0.2, cholesterol: 65,
+      vitD: 0.4, thiamin: 0.5, riboflavin: 0.18, niacin: 4.0, vitB6: 0.3, folate: 3, vitB12: 0.7,
+      calcium: 12, iron: 1.0, magnesium: 18, potassium: 280, phosphorus: 160, zinc: 2.0, selenium: 10,
+    },
+    portions: [['st', '1 salsiccia (ca 75 g)', 75], ['forp', '1 förpackning (300 g)', 300]],
+    syn: ['salsiccia', 'salsicca', 'salsicia', 'salciccia', 'italiensk korv', 'färskkorv', 'salsicciakorv', 'salsiccia till pasta'],
+    co2e: 5.5,
+    note: 'Färsk korv av grisfärs med salt, fänkål och vitlök. Vägs rå – steks eller smulas ner i pastasåser.',
+  },
+  {
+    id: 'kebabkott',
+    name: 'Kebabkött, fryst, stekfärdigt',
+    cat: 'chark',
+    kcal: 252, prot: 15.5, carb: 4.5, fat: 19, fiber: 0.5, sugar: 1.5, satFat: 8, salt: 2.2,
+    n: {
+      monoFat: 7.8, polyFat: 1.6, cholesterol: 60,
+      vitD: 0.2, niacin: 4.0, folate: 5, vitB12: 1.2,
+      calcium: 20, iron: 1.8, potassium: 250, phosphorus: 150, zinc: 3.0,
+    },
+    portions: [['portion', '1 portion (125 g)', 125], ['forp', '1 förpackning (400 g)', 400]],
+    syn: ['kebab', 'kebabkött', 'kebabkott', 'kebab kött', 'döner', 'dönerkött', 'gyros', 'kebabskav', 'kebabstrimlor'],
+    co2e: 12,
+    note:
+      'Skivat, förstekt och kryddat kebabkött (ofta nöt, lamm och/eller kyckling) att värma i stekpanna. ' +
+      'Varierar mycket mellan märken – ca 240–360 kcal/100 g. Bröd, sås och grönsaker räknas separat.',
   },
   {
     id: 'medwurst',
@@ -1734,7 +1847,7 @@ const chark: FoodSeed[] = [
     portions: [['st', '1 korv (ca 60 g)', 60], ['forp', '1 förpackning (400 g)', 400]],
     syn: ['kycklingkorv', 'kyckling korv', 'grillkorv kyckling', 'fågelkorv', 'kalkonkorv'],
     co2e: 4,
-    note: 'Korv av kyckling är också bearbetat kött (chark) och räknas här in i kostrådet om rött kött och chark.',
+    note: 'Korv av kyckling är också chark och räknas enligt Livsmedelsverket in i rådet om rött kött och chark.',
   },
 
   // --- Pastej, blodpudding och sylta -----------------------------------------
@@ -1773,18 +1886,20 @@ const chark: FoodSeed[] = [
     id: 'blodpudding',
     name: 'Blodpudding',
     cat: 'chark',
-    kcal: 196, prot: 8, carb: 25, fat: 6.5, fiber: 2.5, sugar: 5, addedSugar: 4, satFat: 2.4, salt: 1.1,
+    kcal: 202, prot: 12, carb: 17.5, fat: 9, fiber: 2, sugar: 4.5, addedSugar: 3.5, satFat: 3.3, salt: 1.2,
     n: {
-      monoFat: 2.9, polyFat: 0.8,
+      monoFat: 4.0, polyFat: 1.0,
       thiamin: 0.1, folate: 10, vitB12: 0.5,
-      calcium: 20, iron: 18, magnesium: 30, potassium: 150, phosphorus: 100, zinc: 1.2,
+      calcium: 20, iron: 17, magnesium: 30, potassium: 170, phosphorus: 150, zinc: 2.0,
     },
     portions: [['portion', '1 portion (4 skivor, ca 160 g)', 160], ['skiva', '1 skiva (ca 40 g)', 40]],
     tags: ['laktosfri', 'klassiker', 'svensk'],
     syn: ['blodpudding', 'blodpuding', 'blod pudding', 'blodkorv', 'blodpudding med lingon'],
     co2e: 3,
     plate: { veg: 0, carb: 0.3, protein: 0.7 },
-    note: 'Blod, rågmjöl, fläskfett och sirap. Mycket järnrik – järnhalten varierar mellan märken (ca 10–25 mg/100 g).',
+    note:
+      'Blod, rågmjöl, fläskfett och sirap, ca 10 % fett (varierar ca 5–19 % mellan märken). ' +
+      'Mycket järnrik – järnhalten varierar mellan märken (ca 10–25 mg/100 g).',
   },
   {
     id: 'sylta-pressylta',
@@ -1800,6 +1915,22 @@ const chark: FoodSeed[] = [
     tags: ['glutenfri', 'laktosfri', 'klassiker', 'svensk'],
     syn: ['sylta', 'pressylta', 'julsylta', 'grissylta', 'fläsksylta'],
     co2e: 4,
+  },
+  {
+    id: 'rullsylta',
+    name: 'Rullsylta',
+    cat: 'chark',
+    kcal: 216, prot: 16, carb: 1, fat: 16.5, fiber: 0, sugar: 0.5, satFat: 6.0, salt: 1.6,
+    n: {
+      monoFat: 7.4, polyFat: 1.9, omega3: 0.15, cholesterol: 70,
+      vitD: 0.4, thiamin: 0.4, riboflavin: 0.18, niacin: 3.5, vitB6: 0.25, folate: 2, vitB12: 0.7,
+      calcium: 10, iron: 0.9, magnesium: 16, potassium: 220, phosphorus: 150, zinc: 2.0, selenium: 10,
+    },
+    portions: [['skiva', '1 skiva (ca 12 g)', 12], ['smorgas', '1 smörgås (3 skivor, ca 36 g)', 36], ['portion', '1 portion på julbordet (ca 50 g)', 50]],
+    tags: ['glutenfri', 'laktosfri', 'klassiker', 'svensk'],
+    syn: ['rullsylta', 'rulsylta', 'rull sylta', 'rullad sylta', 'fläskrulle', 'julbord', 'rullsylta pålägg'],
+    co2e: 5,
+    note: 'Rimmat sidfläsk som rullats med kryddpeppar och lök, kokats och pressats. Serveras tunt skivad.',
   },
   {
     id: 'kalvsylta',
@@ -1830,6 +1961,7 @@ const chark: FoodSeed[] = [
     tags: ['glutenfri', 'laktosfri'],
     syn: ['kycklingpålägg', 'kyckling pålägg', 'rökt kyckling', 'kycklingbröst pålägg', 'kycklingskivor', 'grillad kyckling pålägg'],
     co2e: 4,
+    note: 'Rökt och saltat fågelkött räknas som chark i Livsmedelsverkets råd om rött kött och chark.',
   },
   {
     id: 'kalkonpalagg',
@@ -1845,6 +1977,7 @@ const chark: FoodSeed[] = [
     tags: ['glutenfri', 'laktosfri'],
     syn: ['kalkonpålägg', 'kalkon pålägg', 'rökt kalkon', 'kalkonbröst pålägg', 'kalkonskivor'],
     co2e: 5,
+    note: 'Rökt och saltat fågelkött räknas som chark i Livsmedelsverkets råd om rött kött och chark.',
   },
 ]
 
@@ -1867,7 +2000,7 @@ const kottbullar: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (8 st, ca 160 g)', 160], ['st', '1 köttbulle (ca 20 g)', 20]],
     tags: ['klassiker', 'svensk'],
-    syn: ['köttbullar', 'köttbulle', 'kottbullar', 'hemgjorda köttbullar', 'mammas köttbullar', 'swedish meatballs'],
+    syn: ['köttbullar', 'köttbulle', 'kottbullar', 'hemgjorda köttbullar', 'mammas köttbullar', 'swedish meatballs', 'köttbular', 'hemlagade köttbullar'],
     co2e: 14,
     plate: KOTTBULLE_PLATE,
     kostrad: { rottKott: 80 },
@@ -1902,7 +2035,7 @@ const kottbullar: FoodSeed[] = [
     kcal: 185, prot: 14, carb: 5, fat: 12, fiber: 0.3, sugar: 1, satFat: 4.5, salt: 1.1,
     n: {
       monoFat: 5.0, polyFat: 1.4,
-      vitD: 0.3, vitC: 0, folate: 6, vitB12: 0.8,
+      vitD: 0.3, folate: 6, vitB12: 0.8,
       calcium: 25, iron: 1.0, potassium: 250, zinc: 2.2,
     },
     portions: [['portion', '1 portion i soppa (10 st, ca 100 g)', 100], ['st', '1 frikadell (ca 10 g)', 10]],

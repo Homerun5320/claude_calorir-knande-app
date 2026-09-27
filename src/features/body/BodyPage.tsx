@@ -54,7 +54,7 @@ function BodyContent() {
   const targetKg = profile?.targetWeightKg
 
   return (
-    <div className="px-4 pt-safe pb-8">
+    <div className="px-4 pb-8">
       <PageHeader
         back
         title="Vikt & mått"

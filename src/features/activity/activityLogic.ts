@@ -37,13 +37,8 @@ export const STEPS_ACTIVITY_ID = 'steg'
 /** Minst så här många muskelstärkande pass per vecka (Folkhälsomyndigheten). */
 export const WEEKLY_STRENGTH_GOAL = 2
 
-/** 'YYYY-MM-DD' och ett giltigt kalenderdatum. */
-export function isValidISODate(s: string | null | undefined): s is ISODate {
-  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
-  const [y, m, d] = s.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
-}
+/** 'YYYY-MM-DD' och ett giltigt kalenderdatum – definierad i lib/dates. */
+export { isValidISODate } from '../../lib/dates'
 
 /** Veckans sju dagar (måndag–söndag) för veckan som innehåller datumet. */
 export function weekOf(date: ISODate): ISODate[] {

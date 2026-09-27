@@ -25,7 +25,7 @@ export default function DrinksPage() {
   const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
 
   return (
-    <div className="px-4 pt-safe pb-8">
+    <div className="px-4 pb-8">
       <PageHeader eyebrow={formatDayLong(today, today)} title="Dryck" subtitle="Vatten, kaffe och alkohol – i lugn och ro, utan pekpinnar." />
 
       <div className="flex flex-col gap-4">

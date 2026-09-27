@@ -17,6 +17,12 @@ export function fromISODate(s: ISODate): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1)
 }
 
+/** true för en giltig kalenderdag 'YYYY-MM-DD' (t.ex. inte '2026-02-30') – använd för datum från adressen. */
+export function isValidISODate(value: string | null | undefined): value is ISODate {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  return toISODate(fromISODate(value)) === value
+}
+
 export function todayISO(now: Date = new Date()): ISODate {
   return toISODate(now)
 }

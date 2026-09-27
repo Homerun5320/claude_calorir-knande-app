@@ -136,7 +136,7 @@ function InsightsContent() {
   const empty = data.summary.loggedDays === 0 && tab !== 'monster'
 
   return (
-    <div className="px-4 pt-safe pb-8">
+    <div className="px-4 pb-8">
       <PageHeader
         eyebrow="Trender och mönster"
         title="Insikter"

@@ -4,8 +4,9 @@
  * Värden per 100 g ätlig del, baserade på Livsmedelsverkets livsmedelsdatabas (bakverk, godis,
  * glass, sylt) och typiska svenska förpackningsuppgifter. Hembakat är beräknat från klassiska
  * svenska recept (t.ex. kladdkaka, sockerkaka, chokladbollar). Vitaminer och mineraler i
- * sammansatta bakverk är uppskattade utifrån ingredienserna – svenskt matfett (margarin) är
- * berikat med vitamin D, vilket syns i bageribakverk.
+ * sammansatta bakverk är uppskattade utifrån ingredienserna. Margarin i konsumentförpackning är
+ * berikat med vitamin D (20 µg/100 g), men bagerimargarin och mjölk som används industriellt
+ * är det oftast inte – därför är vitamin D i bageribakverk och färdiga desserter försiktigt satt.
  *
  * Märkesnamn anges bara där värdena följer förpackningen. Annars används ett generiskt namn
  * ("typ Singoalla") och märket som sökord.
@@ -37,7 +38,7 @@ const bullar: FoodSeed[] = [
       ['liten', '1 liten (ca 40 g)', 40],
     ],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['kanelbulle', 'bulle', 'kanelsnäcka', 'kanelsnurra', 'fikabröd', 'kaffebröd', 'kanel bulle', 'kannelbulle', 'kanelbullar', 'bullar', 'fika'],
+    syn: ['kanelbulle', 'bulle', 'kanelsnäcka', 'kanelsnurra', 'fikabröd', 'kaffebröd', 'kanel bulle', 'kannelbulle', 'kanelbullar', 'bullar', 'fika', 'vetelängd', 'kanellängd', 'vetekrans', 'kanelknut', 'konditoribulle'],
     co2e: 1.6,
   },
   {
@@ -116,10 +117,10 @@ const bullar: FoodSeed[] = [
     id: 'semla',
     name: 'Semla',
     cat: 'bakverk',
-    kcal: 320, prot: 5.5, carb: 34, fat: 17.5, fiber: 1.6, sugar: 17, addedSugar: 14, satFat: 9.5, salt: 0.3,
+    kcal: 330, prot: 5.2, carb: 38, fat: 18, fiber: 1.5, sugar: 17, addedSugar: 14, satFat: 7.3, salt: 0.3,
     n: {
-      monoFat: 5.5, polyFat: 1.5, cholesterol: 45,
-      vitA: 150, vitD: 0.4, vitE: 1.8, vitC: 0, thiamin: 0.08, riboflavin: 0.14, niacin: 0.8, folate: 18, vitB12: 0.15,
+      monoFat: 7, polyFat: 2, cholesterol: 45,
+      vitA: 150, vitD: 0.4, vitE: 2.3, vitC: 0, thiamin: 0.08, riboflavin: 0.14, niacin: 0.8, folate: 18, vitB12: 0.15,
       calcium: 55, iron: 0.8, magnesium: 30, potassium: 140, phosphorus: 90, zinc: 0.6,
     },
     portions: [
@@ -128,7 +129,8 @@ const bullar: FoodSeed[] = [
       ['stor', '1 stor semla (ca 170 g)', 170],
     ],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['fastlagsbulle', 'semlor', 'hetvägg', 'fettisdagsbulle', 'semmel', 'semla med mandelmassa', 'fettisdagen', 'semmla'],
+    syn: ['fastlagsbulle', 'semlor', 'hetvägg', 'fettisdagsbulle', 'semmel', 'semla med mandelmassa', 'fettisdagen', 'semmla', 'semmelbulle', 'fastlagsbullar'],
+    note: 'Näringsvärden enligt Livsmedelsverket (vetebulle fylld med mandelmassa och vispad grädde).',
     co2e: 2.4,
   },
   {
@@ -150,7 +152,7 @@ const bullar: FoodSeed[] = [
     id: 'croissant-smor',
     name: 'Croissant',
     cat: 'bakverk',
-    kcal: 410, prot: 8, carb: 45, fat: 21, fiber: 2.5, sugar: 7, addedSugar: 6, satFat: 13, salt: 1.0,
+    kcal: 410, prot: 8, carb: 45, fat: 21, fiber: 2.5, sugar: 10, addedSugar: 8, satFat: 13, salt: 1.1,
     n: {
       monoFat: 5.5, polyFat: 1.2, cholesterol: 65,
       vitA: 250, vitD: 0.4, vitE: 0.8, vitC: 0, thiamin: 0.15, riboflavin: 0.15, niacin: 1.5, vitB6: 0.06,
@@ -164,6 +166,25 @@ const bullar: FoodSeed[] = [
     tags: ['vegetarisk'],
     syn: ['croissant', 'smörcroissant', 'croisant', 'crossiant', 'kruassang', 'croissanter', 'frukostcroissant'],
     co2e: 2.8,
+  },
+  {
+    id: 'chokladcroissant',
+    name: 'Chokladcroissant (pain au chocolat)',
+    cat: 'bakverk',
+    kcal: 420, prot: 7.5, carb: 46, fat: 22, fiber: 3, sugar: 14, addedSugar: 13, satFat: 13.5, salt: 0.9,
+    n: {
+      monoFat: 5.5, polyFat: 1.1, cholesterol: 55, caffeine: 6,
+      vitA: 220, vitD: 0.4, vitE: 0.8, vitC: 0, thiamin: 0.13, riboflavin: 0.14, niacin: 1.3, vitB6: 0.05,
+      folate: 27, vitB12: 0.2,
+      calcium: 40, iron: 1.5, magnesium: 30, potassium: 150, phosphorus: 100, zinc: 0.8, selenium: 5,
+    },
+    portions: [
+      ['st', '1 st (ca 70 g)', 70],
+      ['mini', '1 mini (ca 30 g)', 30],
+    ],
+    tags: ['vegetarisk'],
+    syn: ['pain au chocolat', 'chokladbröd', 'croissant med choklad', 'chocolatine', 'chokladcrossiant', 'choklad croissant', 'chokladcroisant'],
+    co2e: 3.0,
   },
   {
     id: 'minibulle-kanel-forpackad',
@@ -207,7 +228,7 @@ const kakorTartor: FoodSeed[] = [
       ['liten', '1 liten (ca 20 g)', 20],
     ],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['chokladbollar', 'havreboll', 'havrebollar', 'kokosboll', 'kokosbollar', 'chokladbol', 'choklad boll', 'mumsboll'],
+    syn: ['chokladbollar', 'havreboll', 'havrebollar', 'kokosboll', 'kokosbollar', 'chokladbol', 'choklad boll', 'mumsboll', 'delicatoboll', 'delicato boll', 'chokladbolle', 'chockladboll'],
     co2e: 3.0,
   },
   {
@@ -397,7 +418,7 @@ const kakorTartor: FoodSeed[] = [
     id: 'cheesecake',
     name: 'Cheesecake (amerikansk, med kexbotten)',
     cat: 'bakverk',
-    kcal: 330, prot: 6, carb: 25, fat: 23, fiber: 0.5, sugar: 18, addedSugar: 15, satFat: 13, salt: 0.5,
+    kcal: 330, prot: 6, carb: 25, fat: 23, fiber: 0.5, sugar: 21, addedSugar: 17, satFat: 12, salt: 0.5,
     n: {
       monoFat: 6, polyFat: 1.2, cholesterol: 90,
       vitA: 230, vitD: 0.4, vitE: 0.8, vitC: 0.3, riboflavin: 0.18, folate: 12, vitB12: 0.35,
@@ -484,6 +505,25 @@ const kakorTartor: FoodSeed[] = [
     co2e: 2.0,
   },
   {
+    id: 'vaniljhjartan',
+    name: 'Vaniljhjärtan',
+    cat: 'bakverk',
+    kcal: 400, prot: 5.5, carb: 38, fat: 25, fiber: 1, sugar: 13, addedSugar: 12, satFat: 15.5, salt: 0.3,
+    n: {
+      monoFat: 6.5, polyFat: 1.2, cholesterol: 130,
+      vitA: 220, vitD: 0.8, vitE: 0.8, vitC: 0.2, thiamin: 0.06, riboflavin: 0.1, niacin: 0.6, folate: 15, vitB12: 0.3,
+      calcium: 40, iron: 0.6, magnesium: 10, potassium: 80, phosphorus: 70, zinc: 0.4,
+    },
+    portions: [
+      ['st', '1 st (ca 45 g)', 45],
+      ['stor', '1 stor, bageri (ca 65 g)', 65],
+    ],
+    tags: ['vegetarisk', 'klassiker', 'svensk'],
+    syn: ['vaniljhjärta', 'vaniljhjartan', 'vanilj hjärtan', 'vaniljhjärtat', 'mördegshjärtan', 'vaniljhjärtan med florsocker', 'vaniljhjärtor'],
+    co2e: 2.4,
+    note: 'Beräknad på klassiskt recept: mördeg med smör, fylld med vaniljkräm.',
+  },
+  {
     id: 'dammsugare',
     name: 'Dammsugare (punschrulle)',
     cat: 'bakverk',
@@ -559,7 +599,7 @@ const kakorTartor: FoodSeed[] = [
     },
     portions: [['bit', '1 bit (ca 60 g)', 60]],
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['daimtårta', 'dajmtårta', 'ikea tårta', 'mandeltårta med daim', 'daim tårta', 'almondy'],
+    syn: ['daimtårta', 'dajmtårta', 'ikea tårta', 'mandeltårta med daim', 'daim tårta', 'almondy', 'almondy daim', 'mandeltårta', 'frystårta'],
     co2e: 3.0,
   },
   {
@@ -614,7 +654,7 @@ const kakorTartor: FoodSeed[] = [
     kcal: 380, prot: 5.5, carb: 48, fat: 18, fiber: 1.3, sugar: 27, addedSugar: 25, satFat: 5, salt: 0.6,
     n: {
       monoFat: 8, polyFat: 4, omega3: 0.9, cholesterol: 50,
-      vitA: 60, vitD: 0.8, vitE: 3, vitC: 0.5, thiamin: 0.07, riboflavin: 0.12, folate: 15, vitB12: 0.2,
+      vitA: 60, vitD: 0.4, vitE: 3, vitC: 0.5, thiamin: 0.07, riboflavin: 0.12, folate: 15, vitB12: 0.2,
       calcium: 60, iron: 0.8, magnesium: 12, potassium: 100, phosphorus: 100, zinc: 0.4,
     },
     portions: [
@@ -633,7 +673,7 @@ const kakorTartor: FoodSeed[] = [
     kcal: 410, prot: 5.5, carb: 49, fat: 21, fiber: 2.5, sugar: 30, addedSugar: 28, satFat: 6.5, salt: 0.55,
     n: {
       monoFat: 9, polyFat: 4.5, omega3: 1.0, cholesterol: 50, caffeine: 6,
-      vitA: 60, vitD: 0.8, vitE: 3, vitC: 0, thiamin: 0.06, riboflavin: 0.12, folate: 15, vitB12: 0.2,
+      vitA: 60, vitD: 0.4, vitE: 3, vitC: 0, thiamin: 0.06, riboflavin: 0.12, folate: 15, vitB12: 0.2,
       calcium: 50, iron: 1.6, magnesium: 40, potassium: 200, phosphorus: 110, zinc: 0.7,
     },
     portions: [
@@ -663,7 +703,7 @@ const kakorTartor: FoodSeed[] = [
     id: 'kokostoppar',
     name: 'Kokostoppar',
     cat: 'bakverk',
-    kcal: 500, prot: 6, carb: 35, fat: 36, fiber: 5, sugar: 33, addedSugar: 31, satFat: 30, salt: 0.1,
+    kcal: 500, prot: 6, carb: 35, fat: 36, fiber: 6.5, sugar: 33, addedSugar: 31, satFat: 30, salt: 0.1,
     n: {
       monoFat: 2.5, polyFat: 0.8, cholesterol: 60,
       vitA: 60, vitD: 0.4, vitE: 0.5, vitC: 0, riboflavin: 0.1, folate: 10, vitB12: 0.2,
@@ -719,15 +759,30 @@ const smakakorKex: FoodSeed[] = [
     id: 'drommar',
     name: 'Drömmar',
     cat: 'bakverk',
-    kcal: 510, prot: 4.5, carb: 60, fat: 28, fiber: 1.5, sugar: 27, addedSugar: 26, satFat: 12, salt: 0.2,
+    kcal: 495, prot: 4.5, carb: 63, fat: 24.5, fiber: 1.5, sugar: 32, addedSugar: 31, satFat: 12, salt: 0.2,
     n: {
-      monoFat: 10, polyFat: 4.5, omega3: 1.2, cholesterol: 30,
+      monoFat: 8, polyFat: 3.5, omega3: 0.9, cholesterol: 30,
       vitA: 150, vitD: 0.2, vitE: 3, vitC: 0, thiamin: 0.06, riboflavin: 0.03, niacin: 0.6, folate: 10, vitB12: 0,
       calcium: 12, iron: 0.6, magnesium: 10, potassium: 65, phosphorus: 45, zinc: 0.3,
     },
     portions: [['st', '1 st (ca 10 g)', 10]],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
     syn: ['dröm', 'drommar', 'drömkakor', 'hjorthornssaltkakor', 'sju sorters kakor'],
+  },
+  {
+    id: 'kolasnittar',
+    name: 'Kolasnittar',
+    cat: 'bakverk',
+    kcal: 490, prot: 4.6, carb: 62, fat: 24.3, fiber: 1.3, sugar: 31, addedSugar: 30, satFat: 15.3, salt: 0.65,
+    n: {
+      monoFat: 6.3, polyFat: 1.2, cholesterol: 63,
+      vitA: 200, vitD: 0.25, vitE: 0.8, vitC: 0, thiamin: 0.05, riboflavin: 0.03, niacin: 0.6, folate: 8, vitB12: 0.05,
+      calcium: 25, iron: 0.6, magnesium: 10, potassium: 60, phosphorus: 45, zinc: 0.3,
+    },
+    portions: [['st', '1 st (ca 10 g)', 10]],
+    tags: ['vegetarisk', 'klassiker', 'svensk'],
+    syn: ['kolasnitt', 'kolakakor', 'kolakaka', 'sirapssnittar', 'chokladsnittar', 'snittar', 'kola snittar', 'kolasnitter'],
+    note: 'Beräknad på klassiskt recept med smör, socker, sirap och vetemjöl.',
   },
   {
     id: 'havreflarn',
@@ -761,9 +816,9 @@ const smakakorKex: FoodSeed[] = [
     id: 'finska-pinnar',
     name: 'Finska pinnar',
     cat: 'bakverk',
-    kcal: 520, prot: 6.5, carb: 55, fat: 30, fiber: 2, sugar: 20, addedSugar: 19, satFat: 17, salt: 0.3,
+    kcal: 520, prot: 6.5, carb: 50, fat: 32, fiber: 2.2, sugar: 15, addedSugar: 14, satFat: 18, salt: 0.3,
     n: {
-      monoFat: 8.5, polyFat: 2.5, cholesterol: 75,
+      monoFat: 9.5, polyFat: 2.5, cholesterol: 75,
       vitA: 270, vitD: 0.3, vitE: 2, vitC: 0, thiamin: 0.08, riboflavin: 0.06, niacin: 1, folate: 15, vitB12: 0.05,
       calcium: 35, iron: 1, magnesium: 30, potassium: 110, phosphorus: 80, zinc: 0.6,
     },
@@ -837,7 +892,7 @@ const smakakorKex: FoodSeed[] = [
     cat: 'bakverk',
     kcal: 480, prot: 7, carb: 62, fat: 21, fiber: 3.5, sugar: 16, addedSugar: 15, satFat: 9.5, salt: 1.1,
     n: {
-      monoFat: 8, polyFat: 2.5, wholegrain: 20,
+      monoFat: 8, polyFat: 2.5, wholegrain: 16,
       vitD: 0, vitE: 1.5, vitC: 0, thiamin: 0.1, riboflavin: 0.06, niacin: 1.5, folate: 15, vitB12: 0,
       calcium: 40, iron: 2, magnesium: 45, potassium: 170, phosphorus: 120, zinc: 0.8,
     },
@@ -851,7 +906,7 @@ const smakakorKex: FoodSeed[] = [
     cat: 'bakverk',
     kcal: 495, prot: 6.5, carb: 62, fat: 24, fiber: 3, sugar: 29, addedSugar: 26, satFat: 12.5, salt: 0.9,
     n: {
-      monoFat: 8.5, polyFat: 2.2, wholegrain: 15,
+      monoFat: 8.5, polyFat: 2.2, wholegrain: 12,
       vitD: 0, vitE: 1.2, vitC: 0, thiamin: 0.08, riboflavin: 0.1, folate: 12, vitB12: 0.1,
       calcium: 70, iron: 1.8, magnesium: 45, potassium: 200, phosphorus: 120, zinc: 0.8,
     },
@@ -1003,8 +1058,27 @@ const choklad: FoodSeed[] = [
       ['mini', '1 minibit (ca 10 g)', 10],
     ],
     tags: ['vegetarisk'],
-    syn: ['japp', 'mars', 'milky way', 'chokladbar', 'nougatbar', 'kolabar', 'snickers', 'twix', 'bounty'],
+    syn: ['japp', 'mars', 'milky way', 'chokladbar', 'nougatbar', 'kolabar', 'twix', 'marabou japp', 'jap'],
     co2e: 3.2,
+  },
+  {
+    id: 'chokladbar-jordnotter',
+    name: 'Chokladbar med jordnötter och kola (typ Snickers)',
+    cat: 'sotsaker',
+    kcal: 490, prot: 8.7, carb: 60, fat: 23, fiber: 2, sugar: 51, addedSugar: 48, satFat: 7.6, salt: 0.52,
+    n: {
+      monoFat: 10, polyFat: 4,
+      vitE: 2.5, vitC: 0, niacin: 3, folate: 20, vitB12: 0.2,
+      calcium: 100, iron: 0.8, magnesium: 50, potassium: 320, phosphorus: 170, zinc: 1.1,
+    },
+    portions: [
+      ['st', '1 bar (50 g)', 50],
+      ['mini', '1 minibit (ca 15 g)', 15],
+    ],
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['snickers', 'snikers', 'snickersbar', 'jordnötsbar', 'chokladbar med jordnötter', 'jordnötschoklad', 'peanut bar', 'snickers mini'],
+    co2e: 3.5,
+    note: 'Makronäringsämnen enligt typisk förpackningsuppgift för Snickers.',
   },
   {
     id: 'choklad-kolafyllning',
@@ -1143,6 +1217,25 @@ const choklad: FoodSeed[] = [
     syn: ['is choklad', 'ischokladbit', 'kokoschoklad', 'julgodis', 'ischoklad form'],
     co2e: 3.5,
   },
+  {
+    id: 'chokladtryffel',
+    name: 'Chokladtryffel, hemgjord',
+    cat: 'sotsaker',
+    kcal: 510, prot: 5, carb: 26, fat: 42, fiber: 5.5, sugar: 23, addedSugar: 22, satFat: 26, salt: 0.1,
+    n: {
+      monoFat: 11, polyFat: 1.3, cholesterol: 60, caffeine: 50,
+      vitA: 180, vitD: 0.3, vitE: 0.8, vitC: 0, riboflavin: 0.1, folate: 10, vitB12: 0.1,
+      calcium: 50, iron: 7, magnesium: 150, potassium: 480, phosphorus: 200, zinc: 2.2,
+    },
+    portions: [
+      ['st', '1 tryffel (ca 12 g)', 12],
+      ['tre', '3 tryfflar (ca 36 g)', 36],
+    ],
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['tryffel', 'tryfflar', 'chokladtryfflar', 'chokladtryffel', 'truffle', 'julgodis', 'ganache', 'kakaotryffel', 'tryffelkulor'],
+    co2e: 4.5,
+    note: 'Beräknad på mörk choklad, vispgrädde och smör, rullad i kakao.',
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -1238,6 +1331,20 @@ const godis: FoodSeed[] = [
     co2e: 2.5,
   },
   {
+    id: 'graddbulle',
+    name: 'Gräddbulle (skum med chokladöverdrag, typ Mums-Mums)',
+    cat: 'sotsaker',
+    kcal: 393, prot: 4.4, carb: 65, fat: 13, sugar: 55, addedSugar: 54, satFat: 12,
+    portions: [
+      ['st', '1 st (ca 20 g)', 20],
+      ['stor', '1 stor, bageri (ca 35 g)', 35],
+      ['forp', '1 förpackning (4 st, ca 80 g)', 80],
+    ],
+    syn: ['mums-mums', 'mumsmums', 'mums mums', 'gräddbullar', 'graddbulle', 'skumboll', 'skumbollar', 'kokosmums', 'cloetta mums-mums', 'delicato gräddbulle'],
+    co2e: 2.0,
+    note: 'Makronäringsämnen enligt förpackningsuppgift för Mums-Mums.',
+  },
+  {
     id: 'ahlgrens-bilar',
     name: 'Ahlgrens bilar',
     brand: 'Cloetta',
@@ -1305,13 +1412,13 @@ const godis: FoodSeed[] = [
   },
   {
     id: 'knack',
-    name: 'Knäck',
+    name: 'Knäck (med mandel)',
     cat: 'sotsaker',
-    kcal: 460, prot: 2.5, carb: 70, fat: 19, fiber: 0.5, sugar: 55, addedSugar: 50, satFat: 11, salt: 0.1,
+    kcal: 480, prot: 3, carb: 68, fat: 21.5, fiber: 1, sugar: 60, addedSugar: 59, satFat: 11, salt: 0.1,
     n: {
-      cholesterol: 50,
-      vitA: 170, vitD: 0.2, vitC: 0, folate: 3, vitB12: 0.1,
-      calcium: 40, iron: 0.3, potassium: 100,
+      monoFat: 7, polyFat: 2, cholesterol: 45,
+      vitA: 150, vitD: 0.2, vitE: 2.5, vitC: 0, folate: 3, vitB12: 0.1,
+      calcium: 45, iron: 0.5, magnesium: 25, potassium: 110,
     },
     portions: [['st', '1 st (ca 8 g)', 8]],
     tags: ['vegetarisk', 'glutenfri', 'klassiker', 'svensk'],
@@ -1772,7 +1879,7 @@ const glass: FoodSeed[] = [
       vitD: 0, vitC: 0, folate: 0, vitB12: 0,
       calcium: 2, iron: 0.05, potassium: 20,
     },
-    portions: [['st', '1 st (ca 45 g)', 45]],
+    portions: [['st', '1 st (ca 50 g)', 50]],
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['piggelin', 'isglass', 'saftis', 'isglasspinne', 'fruktis', 'glasspinne', 'päronglass', 'igloo', 'isglas', 'gb piggelin'],
   },
@@ -1909,7 +2016,7 @@ const desserter: FoodSeed[] = [
     cat: 'glass_dessert',
     kcal: 125, prot: 3, carb: 20, fat: 3.5, fiber: 0.3, sugar: 12, addedSugar: 8, satFat: 2.3, salt: 0.1,
     n: {
-      vitD: 0.3, vitC: 1, folate: 3, vitB12: 0.25,
+      vitD: 0.1, vitC: 1, folate: 3, vitB12: 0.25,
       calcium: 90, iron: 0.1, magnesium: 10, potassium: 120, phosphorus: 70,
     },
     portions: [['bagare', '1 bägare (ca 175 g)', 175]],
@@ -1939,7 +2046,7 @@ const desserter: FoodSeed[] = [
     cat: 'glass_dessert',
     kcal: 115, prot: 3.2, carb: 18, fat: 3.2, fiber: 0.8, sugar: 14, addedSugar: 9, satFat: 2, salt: 0.15,
     n: {
-      vitD: 0.5, vitC: 0, folate: 4, vitB12: 0.3,
+      vitD: 0.1, vitC: 0, folate: 4, vitB12: 0.3,
       calcium: 100, iron: 0.5, magnesium: 20, potassium: 180, phosphorus: 90, zinc: 0.4,
     },
     portions: [['bagare', '1 bägare (ca 125 g)', 125]],
@@ -2145,6 +2252,25 @@ const snacks: FoodSeed[] = [
     syn: ['sourcream chips', 'sourcream and onion', 'sour cream chips', 'sourcreamchips', 'olw sourcream', 'dillchips', 'gräddfilschips'],
   },
   {
+    id: 'chips-pressade',
+    name: 'Chips, pressade i rör (typ Pringles)',
+    cat: 'snacks',
+    kcal: 534, prot: 5.9, carb: 56, fat: 31, fiber: 3.5, sugar: 1.5, satFat: 6.6, salt: 1.1,
+    n: {
+      vitD: 0, vitC: 0, vitB12: 0,
+      potassium: 500,
+    },
+    portions: [
+      ['skal', '1 skål (ca 30 g)', 30],
+      ['handfull', '1 handfull (ca 15 g)', 15],
+      ['litet-ror', '1 litet rör (ca 40 g)', 40],
+      ['ror', '1 rör (ca 165 g)', 165],
+    ],
+    tags: ['vegetarisk'],
+    syn: ['pringles', 'pringels', 'rörchips', 'chips i rör', 'staplade chips', 'pressade chips', 'pringles original'],
+    note: 'Makronäringsämnen enligt förpackningsuppgift för Pringles Original.',
+  },
+  {
     id: 'tortillachips',
     name: 'Tortillachips',
     cat: 'snacks',
@@ -2178,6 +2304,24 @@ const snacks: FoodSeed[] = [
     ],
     tags: ['vegetarisk'],
     syn: ['cheez doodles', 'ostkrokar', 'ostbagar', 'olw ostbågar', 'ost bågar', 'cheese doodles', 'ostringar', 'ostpuffar', 'majskrokar'],
+  },
+  {
+    id: 'jordnotsringar',
+    name: 'Jordnötsringar (jordnötsbågar)',
+    cat: 'snacks',
+    kcal: 510, prot: 12, carb: 53, fat: 27, fiber: 3.5, sugar: 4, addedSugar: 3, salt: 1.3,
+    n: {
+      vitD: 0, vitC: 0, niacin: 4, folate: 25, vitB12: 0,
+      magnesium: 70, potassium: 300, phosphorus: 170, iron: 1.2, zinc: 1.2,
+    },
+    portions: [
+      ['skal', '1 skål (ca 25 g)', 25],
+      ['handfull', '1 handfull (ca 10 g)', 10],
+      ['pase', '1 påse (ca 250 g)', 250],
+    ],
+    tags: ['vegetarisk'],
+    syn: ['jordnötsringar', 'jordnötsbågar', 'olw jordnötsringar', 'jordnötsringar olw', 'jordnotsringar', 'nötringar', 'peanut rings', 'jordnötsbågar olw'],
+    note: 'Andelen mättat fett varierar med vilken olja som används – se förpackningen.',
   },
   {
     id: 'popcorn-micro',
@@ -2319,6 +2463,25 @@ const snacks: FoodSeed[] = [
     syn: ['nakd', 'nötbar', 'dadelbar', 'fruktbar', 'raw bar', 'nöt och fruktbar', 'larabar', 'rawbar'],
     kostrad: { notter: 40 },
     note: 'Sötad med dadlar – inget tillsatt socker, men sockret räknas ändå in i sockerarterna.',
+  },
+  {
+    id: 'energiboll',
+    name: 'Energiboll (dadlar, mandel och kakao)',
+    cat: 'snacks',
+    kcal: 400, prot: 9, carb: 43, fat: 19, fiber: 9.5, sugar: 41, addedSugar: 0, satFat: 3.5, salt: 0.02,
+    n: {
+      monoFat: 11, polyFat: 3.5, caffeine: 8,
+      vitD: 0, vitE: 8, vitC: 0, thiamin: 0.08, riboflavin: 0.35, niacin: 1.8, vitB6: 0.15, folate: 20, vitB12: 0,
+      calcium: 90, iron: 1.8, magnesium: 110, potassium: 650, phosphorus: 190, zinc: 1.3,
+    },
+    portions: [
+      ['st', '1 st (ca 25 g)', 25],
+      ['liten', '1 liten (ca 15 g)', 15],
+    ],
+    tags: ['vegan', 'laktosfri'],
+    syn: ['energibollar', 'dadelbollar', 'dadelboll', 'nyttiga chokladbollar', 'rawboll', 'rawbollar', 'raw balls', 'bliss balls', 'energy balls', 'proteinbollar', 'dadelgodis'],
+    kostrad: { notter: 30 },
+    note: 'Beräknad på 2 delar dadlar, 1 del mandel samt kakao och kokos. Sötad med dadlar – inget tillsatt socker, men sockret räknas ändå in i sockerarterna.',
   },
 ]
 

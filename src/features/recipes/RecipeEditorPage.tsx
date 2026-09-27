@@ -63,7 +63,7 @@ function EditExisting({ id }: { id: string }) {
   const recipe = useFoodStore((s) => findRecipe(s.recipes, id))
   if (!recipe) {
     return (
-      <div className="px-4 pt-safe">
+      <div className="px-4">
         <PageHeader backTo="/recept" backLabel="Till recepten" title="Receptet hittades inte" />
         <div className="card">
           <EmptyState
@@ -96,7 +96,7 @@ function BuiltinNotEditable({ id }: { id: string }) {
     navigate(`/recept/${encodeURIComponent(own.id)}/redigera`, { replace: true })
   }
   return (
-    <div className="px-4 pt-safe">
+    <div className="px-4">
       <PageHeader back title="Redigera klassiker" />
       <div className="card">
         <EmptyState
@@ -251,7 +251,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
       : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.3, delay: 0.04 * i, ease: [0.22, 1, 0.36, 1] as const } }
 
   return (
-    <div className="px-4 pt-safe pb-10">
+    <div className="px-4 pb-10">
       <PageHeader
         back
         backLabel="Avbryt"

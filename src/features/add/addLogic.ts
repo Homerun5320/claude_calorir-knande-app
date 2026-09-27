@@ -9,7 +9,7 @@ import { MEAL_IDS } from '../../types'
 import type { FoodUsage } from '../../stores/foodStore'
 import { KJ_PER_KCAL, nutrientsForGrams, sumNutrients } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
-import { fromISODate } from '../../lib/dates'
+import { isValidISODate } from '../../lib/dates'
 import { mealForTime } from '../../lib/meals'
 import { foodKostrad, KOSTRAD_TARGETS } from '../../lib/kostrad'
 import { normalizeBarcode } from '../../lib/openFoodFacts'
@@ -28,14 +28,8 @@ export const ADD_TAB_LABELS: Record<AddTab, string> = {
   maltider: 'Måltider',
 }
 
-/** true för en giltig kalenderdag 'YYYY-MM-DD'. */
-export function isISODate(value: string | null | undefined): value is ISODate {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const d = fromISODate(value)
-  if (Number.isNaN(d.getTime())) return false
-  const [y, m, day] = value.split('-').map(Number)
-  return d.getFullYear() === y && d.getMonth() + 1 === m && d.getDate() === day
-}
+/** true för en giltig kalenderdag 'YYYY-MM-DD' – samma som `isValidISODate` i lib/dates. */
+export const isISODate = isValidISODate
 
 export function isMealId(value: string | null | undefined): value is MealId {
   return !!value && (MEAL_IDS as readonly string[]).includes(value)
