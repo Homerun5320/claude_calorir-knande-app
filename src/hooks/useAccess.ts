@@ -176,8 +176,10 @@ export function useAccess(): AccessInfo {
 
   // En sparad provstart i framtiden rättas till nu (se accessStatus) – annars skulle man kunna
   // ställa fram klockan, skapa profilen och sedan ställa tillbaka klockan för en längre provperiod.
+  // (`now` i beroendena: kontrollera igen när appen återfår fokus.)
   useEffect(() => {
-    if (trialStartedAt !== null && trialStartedAt > now) ensureTrialStarted(now)
+    const t = Date.now()
+    if (trialStartedAt !== null && trialStartedAt > t) ensureTrialStarted(t)
   }, [trialStartedAt, now, ensureTrialStarted])
 
   // Uppdatera "dagar kvar" när appen återfår fokus och en gång i timmen.
