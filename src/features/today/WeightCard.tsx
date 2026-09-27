@@ -18,6 +18,7 @@ import { SwitchToMaintainButton } from '../body/parts'
 import { CareNote } from './CareNote'
 import { SectionLink } from './SectionLink'
 import { weightCaution, weightGoodDirection, weightSnapshot, type WeightCaution } from './todayLogic'
+import { requireAccess } from '../premium/requireAccess'
 
 const MIN_KG = 20
 const MAX_KG = 400
@@ -77,12 +78,17 @@ export const WeightCard = memo(function WeightCard({ today, goalPause = null }: 
   const valid = value !== undefined && value >= MIN_KG && value <= MAX_KG
 
   const openSheet = () => {
+    if (!requireAccess('vikt')) return
     setValue(snap?.latest.kg ?? startWeight)
     setOpen(true)
   }
 
   const save = () => {
     if (!valid || value === undefined) return
+    if (!requireAccess('vikt')) {
+      setOpen(false)
+      return
+    }
     const { weights: current, logWeight } = useBodyStore.getState()
     const previous = current.find((w) => w.date === today)
     const entry = logWeight(today, Math.round(value * 10) / 10)

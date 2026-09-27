@@ -19,6 +19,7 @@ import type { DiaryEntry, ISODate, MealConfig, MealId } from '../../types'
 import { visibleMeals } from '../diary/diaryLogic'
 import { focusAfterRender } from '../diary/focus'
 import { copyableCount, EMPTY_MEAL_HINTS, mealNamesText, newEntryIds, summarizeMeal, type MealSummary } from './todayLogic'
+import { requireAccess } from '../premium/requireAccess'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
 
@@ -28,6 +29,7 @@ const EMPTY_ENTRIES: DiaryEntry[] = []
  * jämföra före/efter.
  */
 function copyYesterdayMeal(today: ISODate, meal: MealId, mealLabel: string): boolean {
+  if (!requireAccess('kopiera')) return false
   const store = useDiaryStore.getState()
   const before = store.entries[today]
   const count = store.copyMeal(addDays(today, -1), meal, today, meal)

@@ -10,6 +10,8 @@ import { mealForTime } from '../../lib/meals'
 import { downloadBackup } from '../../lib/backup'
 import { useTheme } from '../../hooks/useTheme'
 import { useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
+import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGate'
+import { requireAccess } from '../../features/premium/requireAccess'
 
 interface NavItem {
   to: string
@@ -22,7 +24,7 @@ interface NavItem {
 }
 
 /** Sidor man når via "Mer" – fliken markeras på dem också. */
-const MORE_SECTIONS = ['/vikt', '/recept', '/traning', '/dryck', '/fasta', '/matkalender', '/installningar', '/om'] as const
+const MORE_SECTIONS = ['/vikt', '/recept', '/traning', '/dryck', '/fasta', '/matkalender', '/installningar', '/om', '/premium', '/tack'] as const
 
 const TABS: readonly NavItem[] = [
   { to: '/', label: 'Idag', icon: Sun, end: true },
@@ -66,6 +68,8 @@ const ROUTE_TITLES: ReadonlyArray<[RegExp, string]> = [
   [/^\/matkalender/, 'Matkalender'],
   [/^\/installningar/, 'Inställningar'],
   [/^\/valkommen/, 'Välkommen'],
+  [/^\/premium/, 'Lagom Premium'],
+  [/^\/tack/, 'Tack för ditt köp'],
 ]
 
 /** Dokumenttitel för en sökväg, t.ex. "Vikt & mått – Lagom". */
@@ -102,6 +106,8 @@ function AddButton({ className = '', withLabel = false }: { className?: string; 
   const { pathname } = useLocation()
   const meals = useProfileStore((s) => s.settings.meals)
   const add = () => {
+    // Efter provperioden: förklara lugnt i stället för att öppna en sida som inte går att använda.
+    if (!requireAccess('mat')) return
     const date = DIARY_DATE.exec(pathname)?.[1]
     navigate(`/lagg-till?maltid=${mealForTime(meals)}${date ? `&datum=${date}` : ''}`)
   }
@@ -266,6 +272,8 @@ export function AppShell() {
       )}
       <ToastViewport />
       <DialogHost />
+      <AccessSync />
+      <AccessBlockedDialog />
     </div>
   )
 }

@@ -1,0 +1,70 @@
+# Lagom på Netlify: webbappen (dist/) och betalningens serverfunktioner (netlify/functions).
+# Steg för steg, miljövariabler och testning: docs/BETALNING.md
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Appen anropar /api/create-checkout, /api/verify-purchase och Stripe anropar /api/stripe-webhook.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# Säkerhetsheaders för hela webbplatsen.
+# CSP: bara egna filer + Open Food Facts (streckkoder och produktbilder) och Livsmedelsverkets API.
+# Stripe Checkout öppnas som en vanlig sidnavigering (window.location) och behöver inget undantag
+# för skript eller ramar; form-action tillåter ändå checkout.stripe.com om ett formulär används.
+# Hashen i script-src är temaskriptet i index.html – ändras skriptet måste hashen uppdateras
+# (testet netlify/tests/netlify-toml.test.ts säger till och skriver ut den nya hashen).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-L6OVhd+4Tx0rQrzOi9YoAEzRKluqtmr6bI5iJ1jVy6w='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.openfoodfacts.org; font-src 'self' data:; connect-src 'self' https://*.openfoodfacts.org https://dataportal.livsmedelsverket.se; media-src 'self' blob: mediastream:; worker-src 'self'; manifest-src 'self'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; upgrade-insecure-requests"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Strict-Transport-Security = "max-age=31536000"
+
+# Filer med hash i namnet ändras aldrig – cacha dem ett år.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Startsidan, service workern och manifestet ska alltid kontrolleras, så att uppdateringar når ut.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/registerSW.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Content-Type = "application/manifest+json; charset=utf-8"

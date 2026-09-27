@@ -23,6 +23,7 @@ import { TrendInfoCard } from './TrendInfoCard'
 import { WeightChartCard } from './WeightChartCard'
 import { MindfulHero, WeightHero } from './WeightHero'
 import { WeightHistory } from './WeightHistory'
+import { requireAccess } from '../premium/requireAccess'
 
 export default function BodyPage() {
   const hydrated = useHydrated()
@@ -44,6 +45,7 @@ function BodyContent() {
   const [measureOpen, setMeasureOpen] = useState(false)
   const [measureKey, setMeasureKey] = useState(0)
   const openMeasure = () => {
+    if (!requireAccess('matt')) return
     setMeasureKey((k) => k + 1)
     setMeasureOpen(true)
   }

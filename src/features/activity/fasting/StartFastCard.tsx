@@ -9,6 +9,7 @@ import { useFastingStore } from '../../../stores/fastingStore'
 import type { ISODate } from '../../../types'
 import { dayAndTime, DEFAULT_PROTOCOL_ID, FASTING_PROTOCOLS, protocolById, type FastingProtocol } from '../fastingLogic'
 import { useNow } from '../hooks'
+import { requireAccess } from '../../premium/requireAccess'
 
 export interface StartFastCardProps {
   protocolId: string
@@ -22,6 +23,7 @@ export const StartFastCard = memo(function StartFastCard({ protocolId, onProtoco
   const protocol = protocolById(protocolId) ?? (protocolById(DEFAULT_PROTOCOL_ID) as FastingProtocol)
 
   const start = () => {
+    if (!requireAccess('fasta')) return
     useFastingStore.getState().startFast(protocol.fastHours, protocol.id)
     toast(`Fastan har börjat – ${protocol.id}`, { tone: 'success' })
   }

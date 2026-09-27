@@ -7,6 +7,9 @@ import { useDiaryStore } from '../stores/diaryStore'
 import { useFastingStore } from '../stores/fastingStore'
 import { useFoodStore } from '../stores/foodStore'
 import { useProfileStore, DEFAULT_SETTINGS } from '../stores/profileStore'
+import { useLicenseStore } from '../stores/licenseStore'
+import { COMMERCE_MODE } from '../config/commerce'
+import { decodeLicense } from './license'
 import type { DiaryEntry, ISODate, MealConfig } from '../types'
 import { entryNutrients } from './diary'
 import { NUTRIENTS, type NutrientKey } from './nutrients'
@@ -28,6 +31,11 @@ export interface BackupFile {
     food: Pick<ReturnType<typeof useFoodStore.getState>, 'customFoods' | 'recipes' | 'cachedFoods' | 'favorites' | 'usage' | 'templates'>
     body: Pick<ReturnType<typeof useBodyStore.getState>, 'weights' | 'measurements'>
     fasting: Pick<ReturnType<typeof useFastingStore.getState>, 'active' | 'history'>
+    /**
+     * Licens och provperiod (saknas i äldre säkerhetskopior). Vid återställning gäller alltid den
+     * tidigaste provstarten och en giltig licens på enheten behålls.
+     */
+    license?: BackupLicense
   }
   /**
    * Vad som rättades eller hoppades över när filen lästes in (sätts av `parseBackup`, sparas
@@ -36,12 +44,19 @@ export interface BackupFile {
   repairs?: BackupRepairs
 }
 
+export interface BackupLicense {
+  licenseKey: string | null
+  /** När provperioden började (epoch-ms). */
+  trialStartedAt: number | null
+}
+
 export function createBackup(): BackupFile {
   const p = useProfileStore.getState()
   const d = useDiaryStore.getState()
   const f = useFoodStore.getState()
   const b = useBodyStore.getState()
   const fa = useFastingStore.getState()
+  const li = useLicenseStore.getState()
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -60,6 +75,7 @@ export function createBackup(): BackupFile {
       },
       body: { weights: b.weights, measurements: b.measurements },
       fasting: { active: fa.active, history: fa.history },
+      license: { licenseKey: li.licenseKey, trialStartedAt: li.trialStartedAt },
     },
   }
 }
@@ -137,6 +153,8 @@ export function summarizeBackup(b: BackupFile): ImportSummary {
  */
 export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   const { profile, diary, food, body, fasting } = b.data
+  // Licens och provperiod: samma regler för båda lägena (förläng aldrig en provperiod).
+  restoreLicense(b.data.license)
   if (mode === 'replace') {
     useProfileStore.setState({ profile: profile.profile ?? null, settings: { ...DEFAULT_SETTINGS, ...(profile.settings ?? {}) } })
     useDiaryStore.setState({ entries: diary.entries ?? {}, water: diary.water ?? {}, exercise: diary.exercise ?? {}, days: diary.days ?? {} })
@@ -194,13 +212,67 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   useFastingStore.setState({ history: mergeById(fa.history, fasting?.history) })
 }
 
-/** Radera ALL data på enheten. */
-export function wipeAllData(): void {
+/**
+ * Hur bra en licensnyckel ser ut utan att verifiera signaturen (det görs när appen använder den):
+ * -1 = saknas eller oläsbar, 0 = utgången eller testlicens i skarpt läge, annars utgångstiden
+ * (Infinity för livstid).
+ */
+export function licenseRank(key: string | null | undefined, now: number = Date.now()): number {
+  if (!key) return -1
+  const payload = decodeLicense(key)
+  if (!payload) return -1
+  if (payload.test && COMMERCE_MODE !== 'test') return 0
+  if (payload.exp === undefined) return Number.POSITIVE_INFINITY
+  return payload.exp * 1000 > now ? payload.exp * 1000 : 0
+}
+
+/**
+ * Slå ihop licens och provperiod från en säkerhetskopia med enhetens:
+ * - Den TIDIGASTE provstarten gäller – en återställning kan aldrig förlänga provperioden.
+ * - En giltig licens på enheten behålls. Kopians licens används bara om enheten saknar en giltig.
+ */
+export function mergeLicense(
+  local: BackupLicense,
+  incoming: BackupLicense | undefined,
+  now: number = Date.now(),
+): BackupLicense {
+  if (!incoming) return local
+  const starts = [local.trialStartedAt, incoming.trialStartedAt].filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+  // En provstart i framtiden (fel klocka eller ändrad fil) räknas som nu.
+  const trialStartedAt = starts.length > 0 ? Math.min(now, ...starts) : null
+  const localRank = licenseRank(local.licenseKey, now)
+  const incomingRank = licenseRank(incoming.licenseKey, now)
+  const licenseKey = localRank > 0 || incomingRank <= localRank ? local.licenseKey : incoming.licenseKey
+  return { licenseKey, trialStartedAt }
+}
+
+function restoreLicense(incoming: BackupLicense | undefined): void {
+  if (!incoming) return
+  const li = useLicenseStore.getState()
+  const merged = mergeLicense({ licenseKey: li.licenseKey, trialStartedAt: li.trialStartedAt }, incoming)
+  const patch: Partial<ReturnType<typeof useLicenseStore.getState>> = {}
+  if (merged.trialStartedAt !== li.trialStartedAt) patch.trialStartedAt = merged.trialStartedAt
+  if (merged.licenseKey !== li.licenseKey) {
+    patch.licenseKey = merged.licenseKey
+    patch.activatedAt = merged.licenseKey ? Date.now() : null
+  }
+  if (Object.keys(patch).length > 0) useLicenseStore.setState(patch)
+}
+
+/**
+ * Radera ALL data på enheten.
+ *
+ * Provperiodens start finns alltid kvar – annars skulle radering starta om provperioden.
+ * Licensen behålls också, om inte användaren uttryckligen väljer att ta bort den
+ * (`removeLicense`).
+ */
+export function wipeAllData(opts: { removeLicense?: boolean } = {}): void {
   useDiaryStore.getState().clearDiary()
   useFoodStore.getState().clearFoods()
   useBodyStore.getState().clearBody()
   useFastingStore.getState().clearFasting()
   useProfileStore.getState().resetProfile()
+  if (opts.removeLicense) useLicenseStore.getState().clearLicense()
 }
 
 const CSV_NUTRIENTS: NutrientKey[] = ['kcal', 'protein', 'carbs', 'sugars', 'fiber', 'fat', 'satFat', 'salt', 'alcohol']

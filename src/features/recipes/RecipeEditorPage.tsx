@@ -51,6 +51,7 @@ import {
 import { useRecipe } from './useRecipes'
 import { RecipeEmoji } from './components'
 import { AmountSheet, IngredientRow, IngredientSearch, type IngredientSearchHandle, type PickerState } from './IngredientPicker'
+import { requireAccess } from '../premium/requireAccess'
 
 export default function RecipeEditorPage() {
   const { id } = useParams()
@@ -89,7 +90,7 @@ function BuiltinNotEditable({ id }: { id: string }) {
   const saveRecipe = useFoodStore((s) => s.saveRecipe)
   const { recipe, loading } = useRecipe(id)
   const copy = () => {
-    if (!recipe) return
+    if (!recipe || !requireAccess('recept')) return
     const own = copyRecipe(recipe)
     saveRecipe(own)
     toast('Kopierat till Mina recept', { tone: 'success' })

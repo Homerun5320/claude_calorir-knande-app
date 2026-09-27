@@ -5,6 +5,7 @@
  * API (se docs/BETALNING.md):
  *   POST /api/create-checkout  { plan: 'ar' | 'livstid', consent?: true } → { url }
  *   POST /api/verify-purchase  { sessionId: 'cs_…' }                       → { licenseKey, plan, issuedAt, expiresAt }
+ *                              (202 { status: 'pending', pending: true } medan betalningen pågår)
  *   POST /api/stripe-webhook   (anropas av Stripe)                         → { received: true }
  * Fel: { code, error } där `error` är ett svenskt meddelande som kan visas direkt.
  */
@@ -254,7 +255,8 @@ function stripeFailure(e: unknown, log: Logger, headers: Record<string, string>,
 
 const VERIFY_ERRORS: Record<FulfillCode, { status: number; message: string }> = {
   'hittades-inte': { status: 404, message: 'Vi hittade inget köp med det id:t. Har du betalat? Kontakta supporten så hjälper vi dig.' },
-  'ej-betald': { status: 409, message: 'Betalningen är inte klar ännu. Vänta en liten stund och försök igen.' },
+  // 202 + pending: appen väntar en stund och frågar igen (t.ex. Klarna eller Swish som dröjer).
+  'ej-betald': { status: 202, message: 'Betalningen är inte klar ännu. Vänta en liten stund och försök igen.' },
   avbruten: { status: 410, message: 'Köpet avbröts eller hann gå ut. Inga pengar har dragits.' },
   'okant-kop': { status: 422, message: 'Köpet gäller inte en Lagom-licens. Kontakta supporten om du tror att det är fel.' },
   utgangen: { status: 410, message: 'Licensen från det här köpet har gått ut. Du kan köpa en ny på köpsidan.' },
@@ -290,6 +292,7 @@ export async function handleVerifyPurchase(req: Request, deps: HandlerDeps): Pro
   const result = await fulfillSession(sessionId, { cfg, fetch: deps.fetch, now, log })
   if (!result.ok) {
     const e = VERIFY_ERRORS[result.code]
+    if (result.code === 'ej-betald') return json(e.status, { code: result.code, error: e.message, status: 'pending', pending: true }, h)
     return errorResponse(e.status, result.code, e.message, h)
   }
   const out: VerifyPurchaseResponse = {

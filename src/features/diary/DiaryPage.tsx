@@ -52,6 +52,7 @@ import { addFoodLink, firstAddFoodLink, focusAfterClose } from './focus'
 import { MealSection } from './MealSection'
 import { CopyMealSheet, SaveTemplateDialog, type MealSource } from './MealSheets'
 import { shareOrCopy } from './share'
+import { requireAccess } from '../premium/requireAccess'
 
 export default function DiaryPage() {
   const { date: param } = useParams<{ date?: string }>()
@@ -217,7 +218,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
           icon: Plus,
           onSelect: () => {
             setMealMenuOpen(false)
-            navigate(addFoodHref(menuMeal, date))
+            if (requireAccess('mat')) navigate(addFoodHref(menuMeal, date))
           },
         },
         {
@@ -229,6 +230,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
           disabled: menuEntries.length === 0,
           onSelect: () => {
             setMealMenuOpen(false)
+            if (!requireAccess('kopiera')) return
             setCopySource({ date, meal: menuMeal })
             setCopyOpen(true)
           },
@@ -259,6 +261,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
 
   const copyDayToToday = () => {
     setDayMenuOpen(false)
+    if (!requireAccess('kopiera')) return
     const store = useDiaryStore.getState()
     const before = store.entries[today]
     const n = store.copyDay(date, today)
@@ -305,7 +308,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
       icon: Plus,
       onSelect: () => {
         setDayMenuOpen(false)
-        navigate(addFoodHref(defaultMeal, date))
+        if (requireAccess('mat')) navigate(addFoodHref(defaultMeal, date))
       },
     },
     ...(date !== today

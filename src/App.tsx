@@ -5,6 +5,7 @@ import { AppShell, PageFallback } from './components/layout/AppShell'
 import { RouteError } from './components/layout/RouteError'
 import { useHydrated } from './stores/hydration'
 import { useProfileStore } from './stores/profileStore'
+import { AccessGate } from './features/premium/AccessGate'
 
 const TodayPage = lazy(() => import('./features/today/TodayPage'))
 const DiaryPage = lazy(() => import('./features/diary/DiaryPage'))
@@ -25,6 +26,15 @@ const AboutPage = lazy(() => import('./features/more/AboutPage'))
 const FoodCalendarPage = lazy(() => import('./features/more/FoodCalendarPage'))
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'))
 const OnboardingPage = lazy(() => import('./features/onboarding/OnboardingPage'))
+const PremiumPage = lazy(() => import('./features/premium/PremiumPage'))
+const ThankYouPage = lazy(() => import('./features/premium/ThankYouPage'))
+
+/** Sidor som nås utan profil: välkomstflödet, Om Lagom, köpsidan och tacksidan efter betalning. */
+const OPEN_PATHS = ['/valkommen', '/om', '/premium', '/tack'] as const
+
+function isOpenPath(pathname: string): boolean {
+  return OPEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+}
 
 /** Skickar nya användare till välkomstflödet. */
 function Gate({ children }: { children: React.ReactNode }) {
@@ -32,7 +42,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   const onboardingDone = useProfileStore((s) => s.settings.onboardingDone)
   const { pathname } = useLocation()
   if (!hydrated) return <PageFallback />
-  if (!onboardingDone && !pathname.startsWith('/valkommen') && !pathname.startsWith('/om')) {
+  if (!onboardingDone && !isOpenPath(pathname)) {
     return <Navigate to="/valkommen" replace />
   }
   return <>{children}</>
@@ -57,13 +67,14 @@ const router = createHashRouter([
           { index: true, element: <TodayPage /> },
           { path: 'dagbok', element: <DiaryPage /> },
           { path: 'dagbok/:date', element: <DiaryPage /> },
-          { path: 'lagg-till', element: <AddFoodPage /> },
-          { path: 'skanna', element: <ScanPage /> },
+          // Sidor som bara skapar nytt spärras efter provperioden (se AccessGate) – allt annat är öppet.
+          { path: 'lagg-till', element: <AccessGate action="mat"><AddFoodPage /></AccessGate> },
+          { path: 'skanna', element: <AccessGate action="skanna"><ScanPage /></AccessGate> },
           { path: 'livsmedel/:id', element: <FoodDetailPage /> },
-          { path: 'nytt-livsmedel', element: <CustomFoodPage /> },
+          { path: 'nytt-livsmedel', element: <AccessGate action="livsmedel"><CustomFoodPage /></AccessGate> },
           { path: 'livsmedel/:id/redigera', element: <CustomFoodPage /> },
           { path: 'recept', element: <RecipesPage /> },
-          { path: 'recept/nytt', element: <RecipeEditorPage /> },
+          { path: 'recept/nytt', element: <AccessGate action="recept"><RecipeEditorPage /></AccessGate> },
           { path: 'recept/:id', element: <RecipeDetailPage /> },
           { path: 'recept/:id/redigera', element: <RecipeEditorPage /> },
           { path: 'vikt', element: <BodyPage /> },
@@ -77,6 +88,8 @@ const router = createHashRouter([
           { path: 'installningar', element: <SettingsPage /> },
           { path: 'installningar/:section', element: <SettingsPage /> },
           { path: 'valkommen', element: <OnboardingPage /> },
+          { path: 'premium', element: <PremiumPage /> },
+          { path: 'tack', element: <ThankYouPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },

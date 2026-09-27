@@ -54,6 +54,7 @@ import { VOLUME_ML, gramsFor } from './units'
 import { fromISODate, isValidISODate } from './dates'
 import { uid } from './id'
 import { plural } from './format'
+import { decodeLicense, normalizeLicenseKey } from './license'
 
 // ---------------------------------------------------------------------------
 // Rapport
@@ -949,6 +950,24 @@ export interface SanitizedBackupData {
   }
   body: { weights: WeightEntry[]; measurements: MeasurementEntry[] }
   fasting: { active: { start: number; targetHours: number; protocol: string } | null; history: FastRecord[] }
+  /** Licens och provperiod – saknas i säkerhetskopior från äldre versioner. */
+  license?: { licenseKey: string | null; trialStartedAt: number | null }
+}
+
+/**
+ * Licensavsnittet: en läsbar licensnyckel (signaturen kontrolleras när appen använder den) och en
+ * provstart som aldrig ligger i framtiden. Allt annat blir null.
+ */
+export function sanitizeLicense(raw: unknown, now: number): SanitizedBackupData['license'] {
+  if (!isObj(raw)) return undefined
+  let licenseKey: string | null = null
+  if (typeof raw.licenseKey === 'string' && raw.licenseKey.length <= 4096) {
+    const key = normalizeLicenseKey(raw.licenseKey)
+    if (decodeLicense(key)) licenseKey = key
+  }
+  const start = raw.trialStartedAt
+  const trialStartedAt = typeof start === 'number' && Number.isFinite(start) && start > 0 ? Math.min(start, now) : null
+  return { licenseKey, trialStartedAt }
 }
 
 /** Livsmedel i ett objekt med id som nycklar – nyckeln blir alltid livsmedlets eget id. */
@@ -1087,6 +1106,9 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
   }
   measurements.sort((x, y) => x.date.localeCompare(y.date))
 
+  // Licens och provperiod (saknas i äldre säkerhetskopior)
+  const license = sanitizeLicense(data.license, now)
+
   // Fasta (saknas i äldre säkerhetskopior)
   const fa = section(data.fasting)
   const active = sanitizeActiveFast(fa.active, ctx)
@@ -1103,6 +1125,7 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
       food: { customFoods, recipes, cachedFoods, favorites, usage, templates },
       body: { weights, measurements },
       fasting: { active, history },
+      ...(license ? { license } : {}),
     },
     repairs,
   }

@@ -11,6 +11,7 @@ import { useFoodStore } from '../../stores/foodStore'
 import type { DiaryEntry, ISODate, MealConfig, MealId } from '../../types'
 import { dayPhrase, mealLabel, newEntryIds, suggestTemplateName, targetPhrase, templateItems } from './diaryLogic'
 import { TargetPicker, type Target } from './TargetPicker'
+import { requireAccess } from '../premium/requireAccess'
 
 export interface MealSource {
   date: ISODate
@@ -64,6 +65,10 @@ function CopyMealInner({ source, open, onClose, today, meals, allMeals }: CopyMe
   const count = entries.length
 
   const copy = () => {
+    if (!requireAccess('kopiera')) {
+      onClose()
+      return
+    }
     const store = useDiaryStore.getState()
     const before = store.entries[target.date]
     const n = store.copyMeal(source.date, source.meal, target.date, target.meal)

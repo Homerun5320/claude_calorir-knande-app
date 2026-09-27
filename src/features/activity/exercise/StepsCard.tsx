@@ -12,6 +12,7 @@ import { useDiaryStore, type NewExerciseEntry } from '../../../stores/diaryStore
 import { ACTIVITY_LEVELS, type ExerciseEntry, type ISODate } from '../../../types'
 import { estimateSteps, STEPS_ACTIVITY_ID, STEPS_MET } from '../activityLogic'
 import type { BodyBasics } from '../hooks'
+import { requireAccess } from '../../premium/requireAccess'
 
 export interface StepsCardProps {
   date: ISODate
@@ -52,6 +53,7 @@ export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basi
       store.updateExercise(date, existing.id, payload)
       toast('Stegaktiviteten är uppdaterad', { tone: 'success' })
     } else {
+      if (!requireAccess('traning')) return
       const entry = store.addExercise(payload)
       toast('Stegen är tillagda som aktivitet', {
         tone: 'success',

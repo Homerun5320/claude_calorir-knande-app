@@ -58,6 +58,7 @@ import {
 } from './recipeLogic'
 import { servingNounFor, useIsFavoriteRecipe, useRecipe } from './useRecipes'
 import { LogRecipeSheet, RecipeEmoji, TagBadges } from './components'
+import { requireAccess } from '../premium/requireAccess'
 
 /** Redigeraren går tillbaka hit efter "Spara" i stället för att lägga en ny sida i historiken. */
 const EDIT_STATE = { fromDetail: true }
@@ -165,6 +166,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
   }
 
   const onCopy = () => {
+    if (!requireAccess('recept')) return
     const own = copyRecipe(recipe)
     saveRecipe(own)
     navigate(`/recept/${encodeURIComponent(own.id)}`)
@@ -242,7 +244,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
           </div>
         )}
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <Button size="lg" iconLeft={Plus} onClick={() => setLogOpen(true)} fullWidth>
+          <Button size="lg" iconLeft={Plus} onClick={() => requireAccess('mat') && setLogOpen(true)} fullWidth>
             Logga en portion
           </Button>
           {builtin ? (

@@ -11,6 +11,7 @@ import { useBodyStore } from '../../stores/bodyStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { round1 } from './bodyLogic'
+import { requireAccess } from '../premium/requireAccess'
 
 export const MIN_KG = 20
 export const MAX_KG = 400
@@ -43,6 +44,7 @@ export function LogWeightCard({ today, first, hideNumbers = false }: LogWeightCa
   const save = (e?: FormEvent) => {
     e?.preventDefault()
     if (!valid || kg === undefined) return
+    if (!requireAccess('vikt')) return
     const store = useBodyStore.getState()
     const previous = store.weights.find((w) => w.date === date)
     const entry = store.logWeight(date, round1(kg), note.trim() || undefined)

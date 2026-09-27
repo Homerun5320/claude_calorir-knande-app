@@ -22,6 +22,7 @@ import { FastingWeekCard } from './fasting/FastingWeekCard'
 import { FastTimerCard } from './fasting/FastTimerCard'
 import { StartFastCard } from './fasting/StartFastCard'
 import { StartTimeSheet } from './fasting/StartTimeSheet'
+import { requireAccess } from '../premium/requireAccess'
 
 interface SheetState {
   open: boolean
@@ -62,6 +63,10 @@ export default function FastingPage() {
       store.startFast(store.active.targetHours, store.active.protocol, startMs)
       toast('Starttiden är ändrad', { tone: 'success' })
     } else if (protocol) {
+      if (!requireAccess('fasta')) {
+        closeSheet()
+        return
+      }
       store.startFast(protocol.fastHours, protocol.id, startMs)
       toast(`Fastan har börjat – ${protocol.id}`, { tone: 'success' })
     }

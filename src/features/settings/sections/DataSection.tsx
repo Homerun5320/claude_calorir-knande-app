@@ -30,16 +30,18 @@ import {
   requestPersistentStorage,
   storageEstimate,
   summarizeBackup,
-  wipeAllData,
   type BackupFile,
   type ImportSummary,
 } from '../../../lib/backup'
-import { clearDemoFlag, isDemoData } from '../../../lib/demo'
+import { clearDemoFlag } from '../../../lib/demoFlag'
+import { useDemoData } from '../../../hooks/useDemoData'
+import { useLicenseStore } from '../../../stores/licenseStore'
 import { useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
-import { clearLastBackup, markBackupNow, useLastBackup } from '../backupStatus'
+import { markBackupNow, useLastBackup } from '../backupStatus'
+import { wipeAndReset } from '../wipe'
 import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
@@ -61,17 +63,6 @@ function lastBackupText(ms: number | null): string {
   return `Senaste säkerhetskopian: ${label === 'Idag' || label === 'Igår' ? label.toLocaleLowerCase('sv-SE') : label}.`
 }
 
-/** Starta om från välkomstflödet efter radering. */
-function resetAfterWipe() {
-  clearDemoFlag()
-  clearLastBackup()
-  try {
-    sessionStorage.removeItem('lagom-onboarding')
-  } catch {
-    /* ignorera */
-  }
-}
-
 export function DataSection() {
   const navigate = useNavigate()
   const lastBackup = useLastBackup()
@@ -80,9 +71,11 @@ export function DataSection() {
   const memoryOnly = useMemoryOnlyStorage()
   const fileRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<{ backup: BackupFile; summary: ImportSummary; fileName: string } | null>(null)
-  const [demo, setDemo] = useState(isDemoData)
+  const demo = useDemoData()
+  const hasLicense = useLicenseStore((s) => s.licenseKey !== null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [typed, setTyped] = useState('')
+  const [removeLicense, setRemoveLicense] = useState(false)
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -111,10 +104,7 @@ export function DataSection() {
     try {
       // Rullar tillbaka allt om något går fel, så att felmeddelandet nedan stämmer.
       restoreBackupSafely(pending.backup, mode)
-      if (mode === 'replace') {
-        clearDemoFlag()
-        setDemo(false)
-      }
+      if (mode === 'replace') clearDemoFlag()
       setPending(null)
       toast(mode === 'merge' ? 'Säkerhetskopian är ihopslagen med din data' : 'Säkerhetskopian är återställd', { tone: 'success' })
     } catch {
@@ -136,29 +126,29 @@ export function DataSection() {
       tone: 'danger',
     })
     if (!ok) return
-    wipeAllData()
-    resetAfterWipe()
+    wipeAndReset()
     navigate('/valkommen', { replace: true })
   }
 
   const startDelete = async () => {
     const ok = await confirmDialog({
       title: 'Radera all data?',
-      message: 'Dagbok, vikt, recept, egna livsmedel, fasta och inställningar raderas från den här enheten. Det går inte att ångra.',
+      message:
+        'Dagbok, vikt, recept, egna livsmedel, fasta och inställningar raderas från den här enheten. Det går inte att ångra. Provperioden startar inte om, och en licens finns kvar om du inte väljer annat.',
       confirmLabel: 'Fortsätt',
       tone: 'danger',
       icon: TriangleAlert,
     })
     if (ok) {
       setTyped('')
+      setRemoveLicense(false)
       setDeleteOpen(true)
     }
   }
 
   const confirmDelete = () => {
     if (!isDeleteConfirmed(typed)) return
-    wipeAllData()
-    resetAfterWipe()
+    wipeAndReset({ removeLicense })
     setDeleteOpen(false)
     toast('All data är raderad från enheten')
     navigate('/valkommen', { replace: true })
@@ -211,13 +201,13 @@ export function DataSection() {
         <ul className="flex flex-col gap-3 text-[0.9375rem] leading-relaxed text-ink-2">
           <li className="flex gap-3">
             <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
-            <span>Allt sparas lokalt i den här webbläsaren. Lagom har ingen server, inga konton, ingen reklam och ingen spårning.</span>
+            <span>Allt sparas lokalt i den här webbläsaren. Lagom har inga konton, ingen reklam och ingen spårning – din dagbok finns inte på någon server.</span>
           </li>
           <li className="flex gap-3">
             <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
             <span>
-              Inget skickas någonstans – förutom när du själv söker eller skannar en streckkod. Då skickas bara sökordet eller streckkoden till Open Food
-              Facts.
+              Inget skickas någonstans – förutom när du själv söker eller skannar en streckkod (då skickas bara sökordet eller streckkoden till Open Food
+              Facts) och när du köper en licens (betalningen sköts av Stripe).
             </span>
           </li>
           <li className="flex gap-3">
@@ -295,6 +285,20 @@ export function DataSection() {
             spellCheck={false}
             placeholder={DELETE_WORD}
           />
+          {hasLicense && (
+            <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 rounded-2xl bg-surface-2 p-3 text-left text-[0.875rem] leading-snug text-ink">
+              <input
+                type="checkbox"
+                checked={removeLicense}
+                onChange={(e) => setRemoveLicense(e.target.checked)}
+                className="mt-0.5 size-5 shrink-0 cursor-pointer accent-gran"
+              />
+              <span>
+                Ta även bort licensen från den här enheten
+                <span className="mt-0.5 block text-[0.8125rem] text-ink-3">Spara licensnyckeln först om du vill kunna aktivera igen.</span>
+              </span>
+            </label>
+          )}
         </form>
       </Dialog>
     </div>

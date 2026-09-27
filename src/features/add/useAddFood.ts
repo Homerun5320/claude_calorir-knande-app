@@ -9,6 +9,9 @@
  *    användningsstatistiken och offlinekopian, så att ett ångrat tillägg inte lever kvar i
  *    "Senaste" eller i förslagen.
  *
+ * Efter provperioden (utan licens) läggs inget till: `requireAccess` visar en lugn förklaring och
+ * funktionerna returnerar null/[] – precis som när inget kunde läggas till.
+ *
  * ```ts
  * const { addFood, addQuick } = useAddFood()
  * addFood(food, 2, 'dl', { date, meal: 'frukost' })
@@ -27,6 +30,7 @@ import { getBuiltinCatalog } from '../../lib/foodRepo'
 import { uid } from '../../lib/id'
 import { toast } from '../../components/ui/toast'
 import { countLabel } from './addLogic'
+import { requireAccess } from '../premium/requireAccess'
 
 export interface AddTarget {
   date: ISODate
@@ -183,6 +187,7 @@ export function useAddFood(): UseAddFoodResult {
     }
 
     const addMany: UseAddFoodResult['addMany'] = (items, target, opts) => {
+      if (items.length > 0 && !requireAccess('mat')) return []
       const valid: AddItem[] = []
       const drafts: NewDiaryEntry[] = []
       for (const item of items) {
@@ -206,6 +211,7 @@ export function useAddFood(): UseAddFoodResult {
 
     return {
       addFood: (food, amount, unit, target, opts) => {
+        if (!requireAccess('mat')) return null
         const draft = toEntry({ food, amount, unit }, target)
         if (!draft) {
           toast('Mängden kunde inte räknas om till gram – välj en annan enhet.', { tone: 'error' })
@@ -226,6 +232,7 @@ export function useAddFood(): UseAddFoodResult {
           if (typeof v === 'number' && Number.isFinite(v) && v >= 0) clean[k as keyof Nutrients] = v
         }
         if (clean.kcal === undefined) return null
+        if (!requireAccess('snabb')) return null
         const entry = useDiaryStore.getState().addEntry({
           kind: 'quick',
           name: name.trim() || 'Snabbregistrering',

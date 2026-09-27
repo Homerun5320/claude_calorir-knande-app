@@ -13,7 +13,7 @@ import { Download, KeyRound, Leaf, Sprout } from 'lucide-react'
 import { Button, Dialog, PageHeader } from '../../components/ui'
 import { PLANS } from '../../config/commerce'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
-import { BLOCKED_ACTION_TEXT, useAccessGateStore, type BlockedAction } from './accessGate'
+import { BLOCKED_ACTION_TEXT, useAccessGateStore, type BlockedAction } from './requireAccess'
 import { formatPrice } from './premiumLogic'
 
 /** Håller tillgången uppdaterad (licensverifiering, provstart). Renderar inget. */

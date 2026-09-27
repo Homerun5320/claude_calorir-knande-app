@@ -31,6 +31,7 @@ import {
   speedKindFor,
   type GroupFilter,
 } from '../activityLogic'
+import { requireAccess } from '../../premium/requireAccess'
 
 export interface ActivitySheetProps {
   open: boolean
@@ -122,6 +123,10 @@ export function ActivitySheet({ open, onClose, date, editing, weightKg, weightKn
       store.updateExercise(editing.date, editing.id, payload)
       toast('Ändringen är sparad', { tone: 'success' })
     } else {
+      if (!requireAccess('traning')) {
+        onClose()
+        return
+      }
       const entry = store.addExercise(payload)
       toast(`${name} är tillagd`, {
         tone: 'success',

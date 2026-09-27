@@ -6,6 +6,7 @@ import { WaterGlasses } from '../../components/domain'
 import { Card } from '../../components/ui'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { ISODate } from '../../types'
+import { requireAccess } from '../premium/requireAccess'
 
 export interface WaterCardProps {
   today: ISODate
@@ -16,7 +17,9 @@ export interface WaterCardProps {
 export const WaterCard = memo(function WaterCard({ today, targetMl, glassMl }: WaterCardProps) {
   const ml = useDiaryStore((s) => s.water[today] ?? 0)
   const addWater = useDiaryStore((s) => s.addWater)
-  const onAdd = useCallback((v: number) => addWater(today, v), [addWater, today])
+  const onAdd = useCallback((v: number) => {
+    if (requireAccess('vatten')) addWater(today, v)
+  }, [addWater, today])
   const onRemove = useCallback((v: number) => addWater(today, -v), [addWater, today])
 
   return (

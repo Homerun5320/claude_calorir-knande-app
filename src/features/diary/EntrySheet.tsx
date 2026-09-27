@@ -33,6 +33,7 @@ import {
 } from './diaryLogic'
 import { addFoodLink, entryButton, firstAddFoodLink, focusAfterClose } from './focus'
 import { TargetPicker, type Target } from './TargetPicker'
+import { requireAccess } from '../premium/requireAccess'
 
 export interface EntryTarget {
   date: ISODate
@@ -170,6 +171,10 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
   }
 
   const copyToToday = () => {
+    if (!requireAccess('kopiera')) {
+      onClose()
+      return
+    }
     const created = useDiaryStore.getState().addEntry({ ...withoutIdentity(entry), date: today, time: undefined })
     onClose()
     toast(isToday ? 'Tillagd en gång till' : 'Kopierad till idag', {

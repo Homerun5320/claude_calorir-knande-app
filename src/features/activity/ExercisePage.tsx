@@ -27,6 +27,7 @@ import { ExerciseDayCard } from './exercise/ExerciseDayCard'
 import { ExerciseInfoCard } from './exercise/ExerciseInfoCard'
 import { StepsCard } from './exercise/StepsCard'
 import { WeeklyMovementCard } from './exercise/WeeklyMovementCard'
+import { requireAccess } from '../premium/requireAccess'
 
 interface SheetState {
   open: boolean
@@ -66,7 +67,9 @@ export default function ExercisePage() {
   const dayKcal = exercise.reduce((s, x) => s + (x.kcal || 0), 0)
 
   const [sheet, setSheet] = useState<SheetState>({ open: false, key: 0, editing: null })
-  const openAdd = useCallback(() => setSheet((s) => ({ open: true, key: s.key + 1, editing: null })), [])
+  const openAdd = useCallback(() => {
+    if (requireAccess('traning')) setSheet((s) => ({ open: true, key: s.key + 1, editing: null }))
+  }, [])
   const openEdit = useCallback((entry: ExerciseEntry) => setSheet((s) => ({ open: true, key: s.key + 1, editing: entry })), [])
   const close = useCallback(() => setSheet((s) => ({ ...s, open: false })), [])
 

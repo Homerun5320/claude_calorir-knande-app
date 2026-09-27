@@ -80,6 +80,7 @@ import { PortionSheet, type SheetAction } from './PortionSheet'
 import { QuickAddSheet } from './QuickAddSheet'
 import { BasketBar, BasketSheet } from './Basket'
 import { OnlineSearch } from './OnlineSearch'
+import { requireAccess } from '../premium/requireAccess'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
 const TABS_ID = 'lagg-till-flikar'
@@ -782,6 +783,7 @@ function CopyYesterday({
   const fromLabel = date === today ? 'igår' : formatDayShort(from)
 
   const copy = () => {
+    if (!requireAccess('kopiera')) return
     const store = useDiaryStore.getState()
     const before = new Set((store.entries[date] ?? []).map((e) => e.id))
     const n = store.copyMeal(from, meal, date, meal)

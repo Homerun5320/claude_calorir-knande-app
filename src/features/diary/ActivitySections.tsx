@@ -10,6 +10,7 @@ import { formatDuration, formatEnergy, formatNumber } from '../../lib/format'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { ExerciseEntry, ISODate } from '../../types'
 import { exerciseRemoveButton, focusAfterRender, lastAddFoodLink, LOG_EXERCISE_ID } from './focus'
+import { requireAccess } from '../premium/requireAccess'
 
 /** Lägg tillbaka en borttagen träningspost med samma id och ordning (ångra). */
 export function restoreExercise(entry: ExerciseEntry): void {
@@ -127,7 +128,9 @@ export const WaterSection = memo(function WaterSection({ date, waterMl, targetMl
         ml={waterMl}
         targetMl={targetMl}
         glassMl={glassMl}
-        onAdd={(ml) => addWater(date, ml)}
+        onAdd={(ml) => {
+          if (requireAccess('vatten')) addWater(date, ml)
+        }}
         onRemove={(ml) => addWater(date, -ml)}
       />
     </Card>

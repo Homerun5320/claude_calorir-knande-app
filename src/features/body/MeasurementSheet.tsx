@@ -11,6 +11,7 @@ import { formatNumber } from '../../lib/format'
 import { useBodyStore } from '../../stores/bodyStore'
 import type { ISODate, MeasurementEntry } from '../../types'
 import { hasAnyMeasure, latestMeasure, MEASURE_KEYS, MEASURE_META, type MeasureKey } from './bodyLogic'
+import { requireAccess } from '../premium/requireAccess'
 
 type Values = Partial<Record<MeasureKey, number | undefined>>
 
@@ -61,6 +62,10 @@ export function MeasurementSheet({ open, onClose, today }: MeasurementSheetProps
 
   const save = () => {
     if (!valid) return
+    if (!requireAccess('matt')) {
+      onClose()
+      return
+    }
     const store = useBodyStore.getState()
     const previous = store.measurements.find((m) => m.date === date)
     const clean: Values = {}

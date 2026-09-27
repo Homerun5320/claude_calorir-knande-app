@@ -11,6 +11,7 @@ import { useDiaryStore } from '../../../stores/diaryStore'
 import { useProfileStore } from '../../../stores/profileStore'
 import type { ISODate } from '../../../types'
 import { waterPresets } from '../drinksLogic'
+import { requireAccess } from '../../premium/requireAccess'
 
 export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISODate; targetMl: number }) {
   const waterMl = useDiaryStore((s) => s.water[date] ?? 0)
@@ -20,13 +21,19 @@ export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISO
   const formId = useId()
   const presets = waterPresets(glassMl)
 
-  const addWater = (ml: number) => useDiaryStore.getState().addWater(date, ml)
+  const changeWater = (ml: number) => useDiaryStore.getState().addWater(date, ml)
+  /** Påfyllning är ny loggning (spärras efter provperioden); att ta bort vatten går alltid. */
+  const addWater = (ml: number) => {
+    if (!requireAccess('vatten')) return false
+    changeWater(ml)
+    return true
+  }
 
   const addWithUndo = (ml: number) => {
-    addWater(ml)
+    if (!addWater(ml)) return
     toast(`${formatNumber(ml)}\u00a0ml vatten tillagt`, {
       tone: 'success',
-      action: { label: 'Ångra', onClick: () => addWater(-ml) },
+      action: { label: 'Ångra', onClick: () => changeWater(-ml) },
     })
   }
 
@@ -39,7 +46,7 @@ export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISO
 
   return (
     <Card tone="fjall" eyebrow="Vätska" title="Vatten">
-      <WaterGlasses ml={waterMl} targetMl={targetMl} glassMl={glassMl} onAdd={addWater} onRemove={(ml) => addWater(-ml)} />
+      <WaterGlasses ml={waterMl} targetMl={targetMl} glassMl={glassMl} onAdd={addWater} onRemove={(ml) => changeWater(-ml)} />
 
       <div className="mt-4 flex flex-wrap gap-2">
         {presets.map((p) => (

@@ -10,6 +10,7 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import type { ISODate, MealId } from '../../types'
 import { addFoodHref, newEntryIds, type DayKind } from './diaryLogic'
 import { firstAddFoodLink, firstEntryButton, focusAfterRender } from './focus'
+import { requireAccess } from '../premium/requireAccess'
 
 // ---------------------------------------------------------------------------
 // Tom dag
@@ -23,6 +24,7 @@ const EMPTY_TEXT: Record<DayKind, { title: string; text: string }> = {
 
 /** Kopierar föregående dag till `date` och visar en ångra-notis. Returnerar antal poster. */
 export function copyPreviousDay(date: ISODate): number {
+  if (!requireAccess('kopiera')) return 0
   const from = addDays(date, -1)
   const before = useDiaryStore.getState().entries[date]
   const n = useDiaryStore.getState().copyDay(from, date)
