@@ -1,7 +1,8 @@
 /**
  * Exempeldata: en realistisk svensk vecka (gröt, knäckebröd, köttbullar, ärtsoppa på torsdag,
  * fredagstacos, fika …) så att man kan utforska Lagom utan att först mata in egna uppgifter.
- * Tydligt markerad som exempel och kan rensas i Inställningar.
+ * Tydligt markerad som exempel (profilen saknar namn och Idag/Dagbok visar en markering) och kan
+ * rensas när som helst – "Börja med min egen profil" eller Inställningar → Data.
  */
 import type { DiaryEntry, ExerciseEntry, Food, ISODate, MealId, Profile, UnitKey, WeightEntry } from '../types'
 import { addDays, fromISODate, todayISO, weekdayIndex } from './dates'
@@ -11,11 +12,15 @@ import { useBodyStore } from '../stores/bodyStore'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useProfileStore } from '../stores/profileStore'
 import { useFoodStore, usageFromEntries } from '../stores/foodStore'
+import { setDemoFlag } from './demoFlag'
 
-export const DEMO_FLAG_KEY = 'lagom-demo'
+export { DEMO_FLAG_KEY, clearDemoFlag, isDemoData, subscribeDemoFlag } from './demoFlag'
 
+/**
+ * Exemplets profil. Den har medvetet inget namn – exempeldatan ska aldrig kunna tas för någon
+ * annans (eller ens egen) profil. Idag och Dagbok visar en tydlig markering så länge den används.
+ */
 export const DEMO_PROFILE: Omit<Profile, 'createdAt'> = {
-  name: 'Anna',
   sex: 'kvinna',
   birthYear: 1991,
   heightCm: 168,
@@ -228,26 +233,5 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
     usage: usageFromEntries(entries),
   })
 
-  try {
-    localStorage.setItem(DEMO_FLAG_KEY, '1')
-  } catch {
-    /* lagring kan vara blockerad */
-  }
-}
-
-/** true om appen just nu visar exempeldata. */
-export function isDemoData(): boolean {
-  try {
-    return localStorage.getItem(DEMO_FLAG_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function clearDemoFlag(): void {
-  try {
-    localStorage.removeItem(DEMO_FLAG_KEY)
-  } catch {
-    /* ignorera */
-  }
+  setDemoFlag()
 }
