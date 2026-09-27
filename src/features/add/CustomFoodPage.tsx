@@ -41,6 +41,7 @@ import {
   EXTRA_KEYS,
   MAIN_LABELS,
   MAIN_NUTRIENTS,
+  SUB_NUTRIENTS,
   draftFromFood,
   draftSignature,
   draftToFood,
@@ -268,7 +269,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
               inputMode="numeric"
               autoComplete="off"
               placeholder="7310865000637"
-              hint="Då känner Lagom igen varan när du skannar den."
+              hint="Då hittar Lagom livsmedlet direkt när du skannar streckkoden."
               error={shownErrors.barcode}
             />
           </div>
@@ -359,7 +360,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
                   max={draft.basis === 'portion' ? 5000 : 100}
                   step={0.1}
                   decimals={2}
-                  className={cx(k === 'satFat' || k === 'sugars' || k === 'addedSugar' ? '[&_label]:font-normal [&_label]:text-ink-2' : undefined)}
+                  className={cx(SUB_NUTRIENTS.has(k) ? '[&_label]:font-normal [&_label]:text-ink-2' : undefined)}
                 />
               ))}
             </div>
@@ -379,13 +380,14 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
             <button
               type="button"
               aria-expanded={extrasOpen}
-              aria-controls="custom-food-extras"
+              aria-controls={extrasOpen ? 'custom-food-extras' : undefined}
               onClick={() => setExtrasOpen((o) => !o)}
-              className="flex min-h-12 items-center gap-2 rounded-2xl bg-surface-2 px-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-surface-3"
+              className="flex min-h-12 items-center gap-2 rounded-2xl bg-surface-2 px-4 py-2.5 text-left text-sm font-semibold text-ink transition-colors hover:bg-surface-3"
             >
               <span className="flex-1">
-                Vitaminer & mineraler
+                Fler näringsämnen
                 {extrasFilled > 0 && <span className="ml-1.5 font-normal text-ink-3">({extrasFilled} ifyllda)</span>}
+                <span className="block text-xs font-normal text-ink-3">Tillsatt socker, fullkorn, vitaminer och mineraler</span>
               </span>
               <ChevronDown className={cx('size-4 text-ink-3 transition-transform', extrasOpen && 'rotate-180')} aria-hidden />
             </button>
@@ -429,7 +431,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
         {/* Portioner och mått */}
         <Card title="Portioner och mått" padding="lg">
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-ink-2">Lägg till mått du brukar använda, t.ex. "1 bar", "1 skiva" eller "1 burk".</p>
+            <p className="text-sm text-ink-2">Lägg till mått du brukar använda, t.ex. ”1 bar”, ”1 skiva” eller ”1 burk”.</p>
             {draft.portions.length > 0 && (
               <ul className="flex flex-col gap-3">
                 {draft.portions.map((p, i) => (

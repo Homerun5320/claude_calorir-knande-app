@@ -11,6 +11,7 @@ import { Card } from '../../components/ui'
 import { useDay } from '../../hooks/useDay'
 import { dailyBudget } from '../../lib/diary'
 import type { ISODate, Targets } from '../../types'
+import { roundEnergy } from '../diary/diaryLogic'
 import { ringNote } from './todayLogic'
 import { SectionLink } from './SectionLink'
 
@@ -27,13 +28,15 @@ export interface DayRingCardProps {
 
 export const DayRingCard = memo(function DayRingCard({ today, targets, mindful, unit, addBackPct, showFiber, wide }: DayRingCardProps) {
   const day = useDay(today)
-  const eaten = day.totals.kcal ?? 0
-  const exerciseAdded = Math.max(0, dailyBudget(targets.kcal, day.exercise, addBackPct) - targets.kcal)
+  // Avrunda i visningsenheten innan ringen räknar ut "kvar" – då går siffrorna jämnt upp.
+  const eaten = roundEnergy(Math.max(0, day.totals.kcal ?? 0), unit)
+  const budget = roundEnergy(targets.kcal, unit)
+  const exerciseAdded = roundEnergy(Math.max(0, dailyBudget(targets.kcal, day.exercise, addBackPct) - targets.kcal), unit)
   const protein = day.totals.protein ?? 0
   const carbs = day.totals.carbs ?? 0
   const fat = day.totals.fat ?? 0
   const macros = useMemo(() => ({ protein, carbs, fat }), [protein, carbs, fat])
-  const note = mindful ? null : ringNote(summarizeRing(eaten, targets.kcal, exerciseAdded).status)
+  const note = mindful ? null : ringNote(summarizeRing(eaten, budget, exerciseAdded).status)
 
   return (
     <Card
@@ -47,7 +50,7 @@ export const DayRingCard = memo(function DayRingCard({ today, targets, mindful, 
         <div className="flex flex-col items-center">
           <CalorieRing
             eatenKcal={eaten}
-            budgetKcal={targets.kcal}
+            budgetKcal={budget}
             exerciseKcal={exerciseAdded}
             macros={macros}
             mindful={mindful}

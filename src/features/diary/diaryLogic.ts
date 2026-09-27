@@ -10,6 +10,7 @@ import { addDays, diffDays, formatDayLong, formatDayShort, relativeDayLabel } fr
 import { entryNutrients, totals } from '../../lib/diary'
 import { formatEnergy, formatNumber, formatDuration } from '../../lib/format'
 import { mealForTime, MEAL_EMOJI } from '../../lib/meals'
+import { KJ_PER_KCAL } from '../../lib/nutrients'
 import { describeAmount } from '../../components/domain/FoodRow'
 import { summarizeRing, mindfulLabel, type RingStatus } from '../../components/signature/CalorieRing'
 
@@ -109,10 +110,42 @@ export interface DayBalance {
   status: RingStatus
 }
 
-/** Ätit, budget, kvar och över för en dag (samma logik som dagsringen). */
-export function dayBalance(eatenKcal: number | undefined, budgetKcal: number): DayBalance {
-  const s = summarizeRing(eatenKcal ?? 0, budgetKcal, 0)
+/**
+ * Energi avrundad till hela enheter i den enhet som visas (kcal eller kJ), men uttryckt i kcal.
+ * Avrunda före subtraktion – då går de visade siffrorna jämnt upp (ätit + kvar = budget).
+ */
+export function roundEnergy(kcal: number, unit: 'kcal' | 'kJ' = 'kcal'): number {
+  if (!Number.isFinite(kcal)) return 0
+  const factor = unit === 'kJ' ? KJ_PER_KCAL : 1
+  return Math.round(kcal * factor) / factor
+}
+
+/**
+ * Ätit, budget, kvar och över för en dag (samma logik som dagsringen). Ätit och budget avrundas
+ * i visningsenheten innan kvar/över räknas ut, så att siffrorna som visas går jämnt upp.
+ */
+export function dayBalance(eatenKcal: number | undefined, budgetKcal: number, unit: 'kcal' | 'kJ' = 'kcal'): DayBalance {
+  const s = summarizeRing(roundEnergy(Math.max(0, eatenKcal ?? 0), unit), roundEnergy(budgetKcal, unit), 0)
   return { eaten: s.eaten, budget: s.total, remaining: s.remaining, over: s.over, ratio: s.ratio, status: s.status }
+}
+
+export interface ExerciseAddBack {
+  /** Andel (0–100) av träningens energi som läggs till dagens budget. */
+  pct: number
+  /** true när träningen redan ingår i dagsmålet (adaptiv förbrukning) och därför inte läggs till. */
+  includedInTarget: boolean
+}
+
+/**
+ * Hur mycket av träningen som läggs till budgeten. Med adaptiv förbrukning bygger dagsmålet på
+ * uppmätt intag och vikttrend – där ingår den vanliga träningen redan, så att lägga till den igen
+ * skulle räkna den två gånger. Ett eget energimål går före den adaptiva beräkningen och följer
+ * då inställningen som vanligt.
+ */
+export function exerciseAddBack(settingPct: number, tdeeSource: 'formel' | 'adaptiv' | undefined, kcalOverridden: boolean): ExerciseAddBack {
+  if (tdeeSource === 'adaptiv' && !kcalOverridden) return { pct: 0, includedInTarget: true }
+  const pct = Number.isFinite(settingPct) ? Math.max(0, Math.min(100, settingPct)) : 0
+  return { pct, includedInTarget: false }
 }
 
 /** Vänlig mening under dagens siffror – aldrig dömande. */
@@ -160,6 +193,36 @@ export function newEntryIds(before: readonly DiaryEntry[] | undefined, after: re
 /** Namn på en post (livsmedel eller snabbregistrering). */
 export function entryName(entry: DiaryEntry): string {
   return entry.kind === 'food' ? entry.food.name : entry.name
+}
+
+/**
+ * Kort namn för en post mitt i en mening ("Flytta havregrynsgröt"). Bara generiska livsmedel ur
+ * databasen får liten begynnelsebokstav – märkesvaror, egna livsmedel, recept och
+ * snabbregistreringar skrivs precis som de heter ("Flytta Oatly Havredryck").
+ */
+export function entryNameInSentence(entry: DiaryEntry): string {
+  const short = shortFoodName(entryName(entry))
+  if (entry.kind !== 'food') return short
+  const { source, brand } = entry.food
+  const generic = (source === 'lagom' || source === 'livsmedelsverket') && !brand?.trim()
+  return generic ? lowerFirst(short) : short
+}
+
+/** Liten första bokstav – men inte i förkortningar som "ICA" eller "UHT-mjölk". */
+function lowerFirst(text: string): string {
+  const [first, second] = [text.charAt(0), text.charAt(1)]
+  if (!first || (second && second !== second.toLocaleLowerCase('sv-SE'))) return text
+  return first.toLocaleLowerCase('sv-SE') + text.slice(1)
+}
+
+/**
+ * Posten som ska få fokus när `removedId` försvinner ur en måltid: nästa post, annars den
+ * föregående, annars ingen (måltiden blev tom).
+ */
+export function neighborEntryId(entries: readonly DiaryEntry[], removedId: string): string | undefined {
+  const i = entries.findIndex((e) => e.id === removedId)
+  if (i < 0) return undefined
+  return entries[i + 1]?.id ?? entries[i - 1]?.id
 }
 
 /**
@@ -229,14 +292,17 @@ export function templateItems(entries: readonly DiaryEntry[]): MealTemplate['ite
 
 /** Förslag på namn: "Havregrynsgröt och kaffe", "Lax, potatis och sallad" eller måltidens namn. */
 export function suggestTemplateName(mealName: string, entries: readonly DiaryEntry[]): string {
-  const names: string[] = []
+  // Första namnet som det heter, resten som i löptext (märkesnamn behåller stor bokstav).
+  const names: Array<{ first: string; inSentence: string }> = []
   for (const e of entries) {
     if (e.kind !== 'food') continue
     const short = shortFoodName(e.food.name)
-    if (short && !names.some((n) => n.toLocaleLowerCase('sv-SE') === short.toLocaleLowerCase('sv-SE'))) names.push(short)
+    if (short && !names.some((n) => n.first.toLocaleLowerCase('sv-SE') === short.toLocaleLowerCase('sv-SE'))) {
+      names.push({ first: short, inSentence: entryNameInSentence(e) })
+    }
   }
   if (names.length === 0) return mealName
-  const pick = names.slice(0, 3).map((n, i) => (i === 0 ? n : n.charAt(0).toLocaleLowerCase('sv-SE') + n.slice(1)))
+  const pick = names.slice(0, 3).map((n, i) => (i === 0 ? n.first : n.inSentence))
   const text = pick.length === 1 ? pick[0] : `${pick.slice(0, -1).join(', ')} och ${pick[pick.length - 1]}`
   return text.length > 60 ? `${mealName} – ${pick[0]}` : text
 }
@@ -322,7 +388,7 @@ export function daySummaryText(input: DaySummaryInput): string {
   } else if (!mindful) {
     const verb = kind === 'future' ? 'Planerat' : 'Ätit'
     if (budgetKcal !== undefined && budgetKcal > 0) {
-      const b = dayBalance(sum.kcal, budgetKcal)
+      const b = dayBalance(sum.kcal, budgetKcal, unit)
       const tail =
         b.status === 'lagom' ? 'precis lagom' : b.over > 0 ? `${e(b.over)} över – helt okej` : `${e(b.remaining)} kvar`
       lines.push(`${verb} ${e(sum.kcal ?? 0)} av ${e(b.budget)} – ${tail}`)

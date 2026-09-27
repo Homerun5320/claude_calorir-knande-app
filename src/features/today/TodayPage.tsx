@@ -27,6 +27,7 @@ import type { PlateVariant } from '../../lib/plate'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
+import { exerciseAddBack } from '../diary/diaryLogic'
 import { ContextCards } from './ContextCards'
 import { DayRingCard } from './DayRingCard'
 import { EveningCheckIn } from './EveningCheckIn'
@@ -76,18 +77,22 @@ export default function TodayPage() {
   const hydrated = useHydrated()
   const today = useToday()
   const wide = useMediaQuery('(min-width: 768px)')
-  const { targets } = useTargets(today)
+  const { targets, energy } = useTargets(today)
 
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const unit = useProfileStore((s) => s.settings.energyUnit)
   const meals = useProfileStore((s) => s.settings.meals)
-  const addBackPct = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  const addBackSetting = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  const kcalOverridden = useProfileStore((s) => s.settings.targetOverrides.kcal !== undefined)
   const glassMl = useProfileStore((s) => s.settings.waterGlassMl)
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
   const activityLevel = useProfileStore((s) => s.profile?.activityLevel)
   const firstDay = useDiaryStore((s) => isDiaryEmpty(s.entries))
 
   if (!hydrated) return <TodaySkeleton />
+
+  // Med adaptiv förbrukning ingår träningen redan i dagsmålet – då läggs den inte till igen.
+  const { pct: addBackPct, includedInTarget: exerciseInTarget } = exerciseAddBack(addBackSetting, energy?.tdeeSource, kcalOverridden)
 
   const plateVariant: PlateVariant = activityLevel === 'aktiv' || activityLevel === 'mycket_aktiv' ? 'aktiv' : 'vanlig'
 
@@ -112,7 +117,15 @@ export default function TodayPage() {
     weight: mindful ? null : <WeightCard today={today} />,
     kostrad: firstDay ? null : <KostradCard today={today} mindful={mindful} />,
     tip: <TipCard today={today} />,
-    context: <ContextCards today={today} caffeineMaxMg={targets.caffeineMaxMg} addBackPct={addBackPct} mindful={mindful} />,
+    context: (
+      <ContextCards
+        today={today}
+        caffeineMaxMg={targets.caffeineMaxMg}
+        addBackPct={addBackPct}
+        exerciseInTarget={exerciseInTarget}
+        mindful={mindful}
+      />
+    ),
     evening: <EveningCheckIn today={today} mindful={mindful} />,
   }
 

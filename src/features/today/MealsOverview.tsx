@@ -1,5 +1,7 @@
 /**
- * Dagens måltider – ett kort per aktiverad måltid i användarens ordning.
+ * Dagens måltider – ett kort per aktiverad måltid i användarens ordning. Avstängda måltider
+ * som ändå har poster idag visas också (samma regel som i dagboken), så att allt som räknas
+ * i Dagsringen går att hitta.
  *
  * Varje kort visar energi och de första livsmedlen, och har en "+" som öppnar Lägg till
  * med rätt måltid och datum. Tomma måltider får en vänlig uppmaning – och om samma måltid
@@ -14,6 +16,7 @@ import { useDay } from '../../hooks/useDay'
 import { addDays } from '../../lib/dates'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DiaryEntry, ISODate, MealConfig, MealId } from '../../types'
+import { visibleMeals } from '../diary/diaryLogic'
 import { copyableCount, EMPTY_MEAL_HINTS, mealNamesText, newEntryIds, summarizeMeal, type MealSummary } from './todayLogic'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
@@ -98,15 +101,15 @@ export const MealsOverview = memo(function MealsOverview({ today, meals, mindful
   const headingId = useId()
   const day = useDay(today)
   const yesterday = useDiaryStore((s) => s.entries[addDays(today, -1)] ?? EMPTY_ENTRIES)
-  const enabled = useMemo(() => meals.filter((m) => m.enabled), [meals])
+  const shown = useMemo(() => visibleMeals(meals, day.byMeal), [meals, day.byMeal])
   const summaries = useMemo(() => {
     const out = {} as Record<MealId, MealSummary>
-    for (const m of enabled) out[m.id] = summarizeMeal(day.byMeal[m.id])
+    for (const m of shown) out[m.id] = summarizeMeal(day.byMeal[m.id])
     return out
-  }, [enabled, day.byMeal])
+  }, [shown, day.byMeal])
   const onCopy = useCallback((meal: MealId, name: string) => copyYesterdayMeal(today, meal, name), [today])
 
-  if (enabled.length === 0) return null
+  if (shown.length === 0) return null
 
   return (
     <section aria-labelledby={headingId}>
@@ -114,7 +117,7 @@ export const MealsOverview = memo(function MealsOverview({ today, meals, mindful
         Måltider
       </SectionTitle>
       <ul className="space-y-2.5">
-        {enabled.map((m) => (
+        {shown.map((m) => (
           <MealCard
             key={m.id}
             meal={m.id}

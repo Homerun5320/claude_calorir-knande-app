@@ -11,12 +11,15 @@ import { BarChart, type BarDatum } from '../../components/charts'
 import { EnergyValue } from '../../components/domain'
 import { Card } from '../../components/ui'
 import { formatDayLong, lastNDays, WEEKDAYS_SHORT, weekdayIndex } from '../../lib/dates'
-import { formatNumber } from '../../lib/format'
+import { MIN_KCAL } from '../../lib/energy'
+import { formatEnergy, formatNumber } from '../../lib/format'
 import { KJ_PER_KCAL } from '../../lib/nutrients'
 import { useDiaryStore } from '../../stores/diaryStore'
+import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
+import { CareNote } from './CareNote'
 import { SectionLink } from './SectionLink'
-import { weekAverage, weekSeries, type WeekDay } from './todayLogic'
+import { lowIntakeAverage, weekAverage, weekChartSummary, weekSeries, type WeekDay } from './todayLogic'
 
 export interface WeekCardProps {
   today: ISODate
@@ -63,11 +66,17 @@ export const WeekCard = memo(function WeekCard({ today, targetKcal, addBackPct, 
   const navigate = useNavigate()
   const entries = useDiaryStore((s) => s.entries)
   const exercise = useDiaryStore((s) => s.exercise)
-  const todayComplete = useDiaryStore((s) => s.days[today]?.complete === true)
+  const days = useDiaryStore((s) => s.days)
+  const todayComplete = days[today]?.complete === true
+  const sex = useProfileStore((s) => s.profile?.sex ?? 'kvinna')
+  const floorKcal = MIN_KCAL[sex]
 
   const dates = useMemo(() => lastNDays(7, today), [today])
   const series = useMemo(() => weekSeries(dates, entries, exercise, targetKcal, addBackPct), [dates, entries, exercise, targetKcal, addBackPct])
   const average = useMemo(() => weekAverage(series, today, todayComplete), [series, today, todayComplete])
+  const summary = useMemo(() => weekChartSummary(series, today, todayComplete, targetKcal, unit), [series, today, todayComplete, targetKcal, unit])
+  // Varsam notis om de dagar som markerats som klara ligger under energigolvet.
+  const lowIntake = useMemo(() => lowIntakeAverage(today, entries, days, floorKcal) !== undefined, [today, entries, days, floorKcal])
 
   // Diagrammet räknar i vald enhet så att axeln och tooltipen stämmer.
   const factor = unit === 'kJ' ? KJ_PER_KCAL : 1
@@ -100,6 +109,7 @@ export const WeekCard = memo(function WeekCard({ today, targetKcal, addBackPct, 
             unit={unit}
             formatValue={formatValue}
             title="Energi per dag de senaste sju dagarna"
+            summary={summary}
             emptyText="Inget registrerat den här veckan ännu"
             legend={false}
           />
@@ -122,6 +132,13 @@ export const WeekCard = memo(function WeekCard({ today, targetKcal, addBackPct, 
             </span>
           </Link>
         </>
+      )}
+      {lowIntake && (
+        <CareNote className="mt-3">
+          {mindful
+            ? 'De dagar du markerat som klara har du ätit mindre än kroppen behöver för att orka. Ät gärna lite mer – regelbundna måltider ger energi.'
+            : `De dagar du markerat som klara har du i snitt ätit mindre än ${formatEnergy(floorKcal, unit)} per dag – mindre än kroppen behöver för att orka. Ät gärna lite mer – regelbundna måltider ger energi.`}
+        </CareNote>
       )}
     </Card>
   )

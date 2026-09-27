@@ -45,7 +45,7 @@ export const DaySummaryCard = memo(function DaySummaryCard({
   complete,
   onJump,
 }: DaySummaryCardProps) {
-  const balance = dayBalance(totals.kcal, budget)
+  const balance = dayBalance(totals.kcal, budget, energyUnit)
   const exerciseAdded = Math.max(0, Math.round(budget - targets.kcal))
   const minutes = exercise.reduce((s, x) => s + (x.minutes || 0), 0)
   const plate = useMemo(() => (mindful ? mealPlate(entries) : null), [mindful, entries])
@@ -107,26 +107,29 @@ export const DaySummaryCard = memo(function DaySummaryCard({
         hideNumbers={mindful}
       />
 
-      <div className={cx('mt-5 grid gap-2', future ? 'grid-cols-1' : 'grid-cols-2')}>
-        <MiniStat
-          icon={<Dumbbell className="size-3.5" aria-hidden />}
-          tint="bg-mossa-soft text-mossa"
-          label="Träning"
-          value={minutes > 0 ? formatDuration(minutes) : 'Ingen ännu'}
-          sub={!mindful && exerciseAdded > 0 ? `+${formatEnergy(exerciseAdded, energyUnit)} i budgeten` : undefined}
-          onClick={() => onJump('traning')}
-        />
-        {!future && (
+      {/* En planerad dag har varken vatten eller träning att visa – om inte ett pass redan ligger där. */}
+      {(!future || exercise.length > 0) && (
+        <div className={cx('mt-5 grid gap-2', future ? 'grid-cols-1' : 'grid-cols-2')}>
           <MiniStat
-            icon={<Droplet className="size-3.5" aria-hidden />}
-            tint="bg-fjall-soft text-fjall"
-            label="Vatten"
-            value={formatLiters(waterMl)}
-            sub={`av ${formatLiters(targets.waterMl)}`}
-            onClick={() => onJump('vatten')}
+            icon={<Dumbbell className="size-3.5" aria-hidden />}
+            tint="bg-mossa-soft text-mossa"
+            label="Träning"
+            value={minutes > 0 ? formatDuration(minutes) : 'Ingen ännu'}
+            sub={!mindful && exerciseAdded > 0 ? `+${formatEnergy(exerciseAdded, energyUnit)} i budgeten` : undefined}
+            onClick={() => onJump('traning')}
           />
-        )}
-      </div>
+          {!future && (
+            <MiniStat
+              icon={<Droplet className="size-3.5" aria-hidden />}
+              tint="bg-fjall-soft text-fjall"
+              label="Vatten"
+              value={formatLiters(waterMl)}
+              sub={`av ${formatLiters(targets.waterMl)}`}
+              onClick={() => onJump('vatten')}
+            />
+          )}
+        </div>
+      )}
     </section>
   )
 })

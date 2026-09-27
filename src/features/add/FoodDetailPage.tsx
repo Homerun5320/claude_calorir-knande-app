@@ -5,7 +5,7 @@
  * energi och makron per portion eller 100 g, näringsämnen mot NNR 2023, Tallriksmodellen,
  * kostråden, klimatavtryck, märkningar och Open Food Facts-information.
  */
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
@@ -157,6 +157,17 @@ function FoodDetail({ food }: { food: Food }) {
   const grams = useBasis === 'portion' && portionGrams ? portionGrams : 100
   const shown: Nutrients = useMemo(() => nutrientsForGrams(food.nutrients, grams), [food.nutrients, grams])
   const caption = useBasis === 'portion' ? `Per portion (${formatGrams(grams)})` : `Per ${per}`
+  // Rubrikerna (`.eyebrow`) skrivs med versaler – enheten ska ändå stå som "g", inte "G".
+  const captionNode: ReactNode =
+    useBasis === 'portion' ? (
+      <>
+        Per portion <span className="normal-case">({formatGrams(grams)})</span>
+      </>
+    ) : (
+      <>
+        Per <span className="normal-case">{per}</span>
+      </>
+    )
   const complete = completeness(food.nutrients)
   const usable = hasUsableNutrition(food)
   const recipeId = food.source === 'recipe' ? food.id.replace(/^recipe:/, '') : null
@@ -246,7 +257,7 @@ function FoodDetail({ food }: { food: Food }) {
               <span className="tabular-nums">{formatNumber(complete * 100)} % kända värden</span>
             </div>
             <ProgressBar value={complete * 100} max={100} size="xs" tone={complete >= 0.6 ? 'mossa' : complete >= 0.3 ? 'sol' : 'hjortron'} aria-label="Andel kända näringsvärden" />
-            {complete < 0.3 && <p className="mt-1.5 text-xs text-ink-3">Bara grundvärdena är kända. Okända ämnen visas som "–", aldrig som noll.</p>}
+            {complete < 0.3 && <p className="mt-1.5 text-xs text-ink-3">Bara grundvärdena är kända. Okända ämnen visas som ”–”, aldrig som noll.</p>}
           </div>
           {food.tags && food.tags.length > 0 && (
             <ul className="flex flex-wrap gap-1.5" aria-label="Egenskaper">
@@ -288,7 +299,7 @@ function FoodDetail({ food }: { food: Food }) {
             />
           }
         >
-          <MacroSummary nutrients={shown} mindful={mindful} caption={caption} />
+          <MacroSummary nutrients={shown} mindful={mindful} caption={captionNode} />
         </Card>
 
         {/* Näringsämnen */}
@@ -314,9 +325,9 @@ function FoodDetail({ food }: { food: Food }) {
 
         <PlateCard food={food} />
 
-        <KostradCard food={food} grams={grams} caption={caption} />
+        <KostradCard food={food} grams={grams} caption={captionNode} />
 
-        {showClimate && <ClimateCard food={food} grams={grams} caption={caption} />}
+        {showClimate && <ClimateCard food={food} grams={grams} caption={captionNode} />}
 
         {food.extra && <ProductCard food={food} />}
 
@@ -437,7 +448,7 @@ function macroEnergy(n: Nutrients): Record<(typeof MACRO_SEGMENTS)[number]['key'
   }
 }
 
-function MacroSummary({ nutrients, mindful, caption }: { nutrients: Nutrients; mindful: boolean; caption: string }) {
+function MacroSummary({ nutrients, mindful, caption }: { nutrients: Nutrients; mindful: boolean; caption: ReactNode }) {
   const e = macroEnergy(nutrients)
   const total = e.protein + e.carbs + e.fat + e.alcohol
   const segments = MACRO_SEGMENTS.filter((m) => m.key !== 'alcohol' || e.alcohol > 0).map((m) => ({ key: m.key, label: m.label, value: e[m.key], color: m.color }))
@@ -537,7 +548,7 @@ function PlateCard({ food }: { food: Food }) {
   )
 }
 
-function KostradCard({ food, grams, caption }: { food: Food; grams: number; caption: string }) {
+function KostradCard({ food, grams, caption }: { food: Food; grams: number; caption: ReactNode }) {
   const list = useMemo(() => kostradContributions(food, grams), [food, grams])
   if (list.length === 0) return null
   return (
@@ -558,7 +569,7 @@ function KostradCard({ food, grams, caption }: { food: Food; grams: number; capt
   )
 }
 
-function ClimateCard({ food, grams, caption }: { food: Food; grams: number; caption: string }) {
+function ClimateCard({ food, grams, caption }: { food: Food; grams: number; caption: ReactNode }) {
   const factor = foodClimateFactor(food)
   const kg = (factor.kgPerKg * grams) / 1000
   const eq = co2eEquivalents(kg)

@@ -1,5 +1,6 @@
 import type { DiaryEntry, ExerciseEntry, Food, FoodEntry, MealConfig, QuickEntry } from '../../types'
 import { DEFAULT_MEALS } from '../../stores/profileStore'
+import { formatEnergy } from '../../lib/format'
 import {
   addFoodHref,
   balanceNote,
@@ -10,9 +11,12 @@ import {
   dayTitle,
   defaultMealForDay,
   diaryPath,
+  entryNameInSentence,
+  exerciseAddBack,
   isValidISODate,
   mealAriaSummary,
   mealMacroDots,
+  neighborEntryId,
   newEntryIds,
   normalizeNote,
   normalizeTime,
@@ -137,6 +141,31 @@ describe('balans', () => {
     expect(dayBalance(undefined, 2000).status).toBe('tom')
   })
 
+  it('avrundar före subtraktion så att ätit + kvar = budget i det som visas', () => {
+    // 1 315,6 + 354,9 skulle annars visas som "1 316 … 355" mot budgeten 1 670.
+    const b = dayBalance(1315.6, 1670.5)
+    expect(b).toMatchObject({ eaten: 1316, budget: 1671, remaining: 355 })
+    expect(b.eaten + b.remaining).toBe(b.budget)
+    const over = dayBalance(2100.4, 1869.6)
+    expect(over.budget + over.over).toBe(over.eaten)
+    // I kJ går de visade (avrundade) talen också jämnt upp.
+    const num = (kcal: number) => Number(formatEnergy(kcal, 'kJ', false).replace(/\s/g, ''))
+    for (const [eaten, budget] of [[1315.6, 1670.4], [803.3, 1920], [1999.9, 2000.2]]) {
+      const kj = dayBalance(eaten, budget, 'kJ')
+      expect(num(kj.eaten) + num(kj.remaining)).toBe(num(kj.budget))
+    }
+  })
+
+  it('lägger inte till träningen igen när dagsmålet bygger på adaptiv förbrukning', () => {
+    expect(exerciseAddBack(50, 'formel', false)).toEqual({ pct: 50, includedInTarget: false })
+    expect(exerciseAddBack(50, undefined, false)).toEqual({ pct: 50, includedInTarget: false })
+    expect(exerciseAddBack(50, 'adaptiv', false)).toEqual({ pct: 0, includedInTarget: true })
+    // Ett eget energimål går före den adaptiva beräkningen – då gäller inställningen.
+    expect(exerciseAddBack(50, 'adaptiv', true)).toEqual({ pct: 50, includedInTarget: false })
+    expect(exerciseAddBack(150, 'formel', false).pct).toBe(100)
+    expect(exerciseAddBack(Number.NaN, 'formel', false).pct).toBe(0)
+  })
+
   it('är aldrig dömande', () => {
     const over = balanceNote('over', 'today')
     expect(over).toMatch(/helt okej/)
@@ -172,6 +201,29 @@ describe('poster', () => {
     expect(quickNutrientsPatch({ kcal: 100 }, { kcal: -5 })).toEqual({})
   })
 
+  it('skriver namn i löptext utan att förstöra märkesnamn', () => {
+    expect(entryNameInSentence(food(LAX, 100, 'middag'))).toBe('lax')
+    const branded: Food = { ...GROT, id: 'off:123', name: 'Proteinbar Testmärke', source: 'openfoodfacts', brand: 'Testmärke' }
+    expect(entryNameInSentence(food(branded, 60, 'fika'))).toBe('Proteinbar Testmärke')
+    const own: Food = { ...GROT, id: 'custom:1', name: 'Mormors kålpudding', source: 'custom' }
+    expect(entryNameInSentence(food(own, 200, 'middag'))).toBe('Mormors kålpudding')
+    const lagomBrand: Food = { ...GROT, id: 'lagom:wasa', name: 'Wasa Husman', brand: 'Wasa' }
+    expect(entryNameInSentence(food(lagomBrand, 20, 'frukost'))).toBe('Wasa Husman')
+    const acronym: Food = { ...GROT, id: 'lagom:uht', name: 'UHT-mjölk, 3 % fett' }
+    expect(entryNameInSentence(food(acronym, 200, 'frukost'))).toBe('UHT-mjölk')
+    expect(entryNameInSentence(quick('Kaffe hos Anna', { kcal: 30 }, 'fika'))).toBe('Kaffe hos Anna')
+  })
+
+  it('väljer grannposten när en post försvinner', () => {
+    const a = food(GROT, 100, 'frukost', { id: 'a' })
+    const b = food(GROT, 100, 'frukost', { id: 'b' })
+    const c = food(GROT, 100, 'frukost', { id: 'c' })
+    expect(neighborEntryId([a, b, c], 'b')).toBe('c')
+    expect(neighborEntryId([a, b, c], 'c')).toBe('b')
+    expect(neighborEntryId([a], 'a')).toBeUndefined()
+    expect(neighborEntryId([a, b], 'x')).toBeUndefined()
+  })
+
   it('normaliserar klockslag och anteckningar', () => {
     expect(normalizeTime('7:05')).toBe('07:05')
     expect(normalizeTime('18:30')).toBe('18:30')
@@ -203,6 +255,8 @@ describe('sparade måltider', () => {
     expect(suggestTemplateName('Fika', [quick('Bulle', { kcal: 250 }, 'fika')])).toBe('Fika')
     const milk: Food = { ...GROT, id: 'lagom:mjolk', name: 'Mjölk mellan 1,5 % fett' }
     expect(suggestTemplateName('Frukost', [food(GROT, 300, 'frukost'), food(milk, 100, 'frukost')])).toBe('Havregrynsgröt och mjölk mellan 1,5 % fett')
+    const oatly: Food = { ...GROT, id: 'off:1', name: 'Oatly Havredryck', source: 'openfoodfacts', brand: 'Oatly' }
+    expect(suggestTemplateName('Frukost', [food(GROT, 300, 'frukost'), food(oatly, 100, 'frukost')])).toBe('Havregrynsgröt och Oatly Havredryck')
   })
 })
 

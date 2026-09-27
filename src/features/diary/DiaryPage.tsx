@@ -39,6 +39,7 @@ import {
   daySummaryText,
   defaultMealForDay,
   diaryPath,
+  exerciseAddBack,
   isValidISODate,
   MAX_FUTURE_DAYS,
   mealLabel,
@@ -48,6 +49,7 @@ import {
   visibleMeals,
 } from './diaryLogic'
 import { EntrySheet, type EntryTarget } from './EntrySheet'
+import { addFoodLink, firstAddFoodLink, focusAfterClose } from './focus'
 import { MealSection } from './MealSection'
 import { CopyMealSheet, SaveTemplateDialog, type MealSource } from './MealSheets'
 import { shareOrCopy } from './share'
@@ -119,14 +121,17 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
   const meals = useProfileStore((s) => s.settings.meals)
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const energyUnit = useProfileStore((s) => s.settings.energyUnit)
-  const addBackPct = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  const addBackSetting = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  const kcalOverridden = useProfileStore((s) => s.settings.targetOverrides.kcal !== undefined)
   const glassMl = useProfileStore((s) => s.settings.waterGlassMl)
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
-  const { targets } = useTargets(today)
+  const { targets, energy } = useTargets(today)
   const day = useDay(date)
 
   const kind = dayKind(date, today)
-  const budget = dailyBudget(targets.kcal, day.exercise, addBackPct)
+  // Med adaptiv förbrukning ingår träningen redan i dagsmålet – då läggs den inte till igen.
+  const addBack = exerciseAddBack(addBackSetting, energy?.tdeeSource, kcalOverridden)
+  const budget = dailyBudget(targets.kcal, day.exercise, addBack.pct)
   const enabledMeals = useMemo(() => meals.filter((m) => m.enabled), [meals])
   const shownMeals = useMemo(() => visibleMeals(meals, day.byMeal), [meals, day.byMeal])
   const complete = day.meta.complete === true
@@ -194,6 +199,8 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
     if (!ok) return
     const store = useDiaryStore.getState()
     const removed = list.map((e) => store.removeEntry(date, e.id)).filter((e): e is DiaryEntry => e !== undefined)
+    // "Fler val"-knappen försvinner med posterna – ge fokus till måltidens "Lägg till i …".
+    focusAfterClose(() => addFoodLink(meal), firstAddFoodLink)
     toast(`${name} är tömd`, {
       action: {
         label: 'Ångra',
@@ -380,8 +387,10 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
 
             {!hasEntries && <EmptyDayCard date={date} today={today} kind={kind} defaultMeal={defaultMeal} />}
 
-            <section aria-label="Måltider" className="flex flex-col gap-3">
-              <h2 className="sr-only">Måltider</h2>
+            <section aria-labelledby="dagbok-maltider-rubrik" className="flex flex-col gap-3">
+              <h2 id="dagbok-maltider-rubrik" className="sr-only">
+                Måltider
+              </h2>
               {shownMeals.map((meal) => (
                 <MealSection
                   key={meal.id}
@@ -397,7 +406,18 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
               ))}
             </section>
 
-            <ExerciseSection date={date} exercise={day.exercise} mindful={mindful} energyUnit={energyUnit} addBackPct={addBackPct} />
+            {/* Träning loggas när dagen är här – en planerad dag visar bara redan inlagda pass. */}
+            {(kind !== 'future' || day.exercise.length > 0) && (
+              <ExerciseSection
+                date={date}
+                exercise={day.exercise}
+                mindful={mindful}
+                energyUnit={energyUnit}
+                addBackPct={addBack.pct}
+                exerciseInTarget={addBack.includedInTarget}
+                canLog={kind !== 'future'}
+              />
+            )}
             {kind !== 'future' && <WaterSection date={date} waterMl={day.waterMl} targetMl={targets.waterMl} glassMl={glassMl} />}
             <DayNotesCard key={date} date={date} planned={kind === 'future'} />
             {kind !== 'future' && hasEntries && <CompleteDayCard date={date} complete={complete} />}

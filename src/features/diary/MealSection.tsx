@@ -13,6 +13,7 @@ import { CategoryIcon, EnergyValue, FoodRow, MealIcon, entryToRow } from '../../
 import { formatEnergy, formatNumber } from '../../lib/format'
 import type { DiaryEntry, ISODate, MealConfig, MealId, Nutrients } from '../../types'
 import { addFoodHref, entryAmountText, entryName, mealAriaSummary, mealMacroDots, shortFoodName } from './diaryLogic'
+import { addFoodLinkId } from './focus'
 
 export interface MealSectionProps {
   meal: MealConfig
@@ -49,9 +50,10 @@ export const MealSection = memo(function MealSection({
       <div className="flex items-center gap-2">
         <MealIcon meal={meal.id} size={empty ? 'sm' : 'md'} />
         <div className="ml-1 mr-1 min-w-0 flex-1">
-          <h2 id={headingId} className="font-display text-[1.0625rem] font-semibold leading-tight text-ink">
+          {/* h3: måltiderna ligger under sidans (dolda) rubrik "Måltider" (h2). */}
+          <h3 id={headingId} className="font-display text-[1.0625rem] font-semibold leading-tight text-ink">
             {meal.name}
-          </h2>
+          </h3>
           <p className="sr-only">{mealAriaSummary(meal.name, entries, energyUnit, mindful)}</p>
           {empty ? (
             <p className="mt-0.5 text-xs text-ink-3">Inget registrerat ännu</p>
@@ -60,18 +62,29 @@ export const MealSection = memo(function MealSection({
               {names}
             </p>
           ) : (
-            <div className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-ink-3 tabular-nums" aria-hidden>
+            // Radbryts hellre än att klippa bort ett makro på smala skärmar.
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-ink-3 tabular-nums" aria-hidden>
               <EnergyValue kcal={totals.kcal} className="font-semibold text-ink-2" />
+              {/* Bokstaven (P/K/F) bär betydelsen – färgpricken är bara ett extra stöd (WCAG 1.4.1). */}
               {dots.map((d) => (
-                <span key={d.key} className="inline-flex items-center gap-[3px] text-[11px]" title={`${d.label} ${formatNumber(d.grams)} g`}>
+                <span
+                  key={d.key}
+                  className="inline-flex items-center gap-[2px] whitespace-nowrap text-[11px]"
+                  title={`${d.label} ${formatNumber(d.grams)} g`}
+                >
                   <span className={cx('size-1.5 rounded-full', DOT_CLASS[d.key])} />
-                  {formatNumber(d.grams, d.grams < 10 ? 1 : 0)}
+                  <span>
+                    <span className="font-semibold text-ink-2">{d.short}</span>
+                    {'\u2009'}
+                    {formatNumber(d.grams, d.grams < 10 ? 1 : 0)}
+                  </span>
                 </span>
               ))}
             </div>
           )}
         </div>
         <Link
+          id={addFoodLinkId(meal.id)}
           to={addFoodHref(meal.id, date)}
           aria-label={`Lägg till i ${lower}`}
           title={`Lägg till i ${lower}`}
@@ -90,12 +103,15 @@ export const MealSection = memo(function MealSection({
             {entries.map((entry) => (
               <motion.li
                 key={entry.id}
+                data-entry-id={entry.id}
+                data-meal={meal.id}
                 layout={reduce ? false : 'position'}
                 initial={reduce ? false : { opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                // Klipp bara medan raden fälls ihop – annars skulle fokusringen och
+                // hovringsytan (som sticker ut lite utanför raden) klippas bort.
+                exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, overflow: 'hidden' }}
                 transition={{ type: 'spring', stiffness: 420, damping: 36 }}
-                className="overflow-hidden"
               >
                 {mindful ? (
                   <MindfulEntryRow entry={entry} onOpen={onOpenEntry} />

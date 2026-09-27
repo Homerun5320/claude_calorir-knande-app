@@ -12,13 +12,19 @@ import { formatKg, formatNumber } from '../../lib/format'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
+import { CareNote } from './CareNote'
 import { SectionLink } from './SectionLink'
-import { weightGoodDirection, weightSnapshot } from './todayLogic'
+import { weightCaution, weightGoodDirection, weightSnapshot, type WeightCaution } from './todayLogic'
 
 const MIN_KG = 20
 const MAX_KG = 400
 const TREND_ICON = { up: ArrowUpRight, down: ArrowDownRight, flat: ArrowRight } as const
 const TREND_WORD = { up: 'uppåt', down: 'nedåt', flat: 'oförändrad' } as const
+
+const CAUTION_TEXT: Record<WeightCaution, string> = {
+  snabb: 'Vikten går ner snabbare än vi rekommenderar – högst ungefär 1 % av kroppsvikten i veckan. Ät gärna lite mer; kroppen mår bäst av en lugn takt.',
+  lag: 'Din trendvikt ligger under det som räknas som hälsosamt för din längd. Ät gärna lite mer, och prata med vården om du är osäker.',
+}
 
 export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }) {
   const weights = useBodyStore((s) => s.weights)
@@ -26,9 +32,13 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
   const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
   const birthYear = useProfileStore((s) => s.profile?.birthYear)
   const startWeight = useProfileStore((s) => s.profile?.startWeightKg)
+  const heightCm = useProfileStore((s) => s.profile?.heightCm)
 
   const snap = useMemo(() => weightSnapshot(weights, today), [weights, today])
-  const good = weightGoodDirection(goal, lifeStage, birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined)
+  const age = birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined
+  const good = weightGoodDirection(goal, lifeStage, age)
+  // För snabb nedgång eller låg vikt tonas aldrig grönt – då visas en varsam notis i stället.
+  const caution = snap ? weightCaution(snap, { heightCm, age, lifeStage }) : null
 
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState<number | undefined>(undefined)
@@ -60,7 +70,7 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
   }
 
   const TrendIcon = snap ? TREND_ICON[snap.direction] : null
-  const trendGood = snap !== null && good !== undefined && snap.direction === good
+  const trendGood = snap !== null && good !== undefined && snap.direction === good && caution === null
 
   return (
     <Card title="Vikt" action={<SectionLink to="/vikt" label="Visa viktkurvan">Visa</SectionLink>}>
@@ -107,6 +117,7 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
           Trendvikt {formatKg(snap.trendKg)}. Vikten svänger naturligt från dag till dag – det är riktningen över tid som räknas.
         </p>
       )}
+      {caution && <CareNote className="mt-3">{CAUTION_TEXT[caution]}</CareNote>}
 
       <Sheet
         open={open}

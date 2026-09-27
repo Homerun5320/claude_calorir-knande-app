@@ -145,8 +145,49 @@ describe('DiaryPage', () => {
     fireEvent.click(within(menu).getByRole('button', { name: /Töm måltid/ }))
     await waitFor(() => expect(useDiaryStore.getState().entries[today]).toBeUndefined())
     expect(lastToast()?.message).toBe('Middag är tömd')
+    // "Fler val" försvann med posterna – fokus hamnar på måltidens "Lägg till i …", inte på <body>.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Lägg till i middag' })))
     act(() => lastToast()?.action?.onClick())
     expect(useDiaryStore.getState().entries[today]?.map((e) => e.meal)).toEqual(['middag', 'middag'])
+  })
+
+  it('ger fokus till grannposten när en post tas bort och till "Lägg till i …" när måltiden töms', async () => {
+    const today = todayISO()
+    const store = useDiaryStore.getState()
+    store.addEntry({ kind: 'food', food: GROT, amount: 1, unit: 'portion:portion', grams: 300, date: today, meal: 'frukost' })
+    store.addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'frukost' })
+    renderAt('/dagbok')
+
+    const row = await screen.findByRole('button', { name: /Ändra Havregrynsgröt/ })
+    row.focus()
+    fireEvent.click(row)
+    const sheet = await screen.findByRole('dialog', { name: 'Havregrynsgröt' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Ta bort' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: /Ändra Lax, ugnsbakad/ })))
+
+    // Sista posten i måltiden: fokus till måltidens "+".
+    fireEvent.click(screen.getByRole('button', { name: /Ändra Lax, ugnsbakad/ }))
+    const again = await screen.findByRole('dialog', { name: 'Lax, ugnsbakad' })
+    fireEvent.click(within(again).getByRole('button', { name: 'Ta bort' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Lägg till i frukost' })))
+  })
+
+  it('behåller märkesnamn i "Flytta …" men skriver vanliga livsmedel som i löptext', async () => {
+    const today = todayISO()
+    const bar: Food = { ...GROT, id: 'off:1', name: 'Proteinbar Testmärke', brand: 'Testmärke', source: 'openfoodfacts' }
+    useDiaryStore.getState().addEntry({ kind: 'food', food: bar, amount: 60, unit: 'g', grams: 60, date: today, meal: 'fika' })
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'middag' })
+    renderAt('/dagbok')
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ändra Proteinbar/ }))
+    const sheet = await screen.findByRole('dialog', { name: 'Proteinbar Testmärke' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Flytta till annan dag' }))
+    expect(await screen.findByRole('dialog', { name: 'Flytta Proteinbar Testmärke' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Stäng' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ändra Lax/ }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Lax, ugnsbakad' })).getByRole('button', { name: 'Flytta till annan dag' }))
+    expect(await screen.findByRole('dialog', { name: 'Flytta lax' })).toBeInTheDocument()
   })
 
   it('byter dag med pilarna och håller adressen i synk', async () => {
@@ -171,6 +212,22 @@ describe('DiaryPage', () => {
     expect(await screen.findByRole('heading', { name: 'Planera dagen' })).toBeInTheDocument()
     const summary = screen.getByRole('region', { name: 'Dagens summering' })
     expect(within(summary).getAllByText('Planerat').length).toBeGreaterThanOrEqual(2)
+    // Träning loggas när dagen är här – ingen "Logga" som i tysthet skulle lägga passet på idag.
+    expect(screen.queryByRole('link', { name: 'Logga' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Träning' })).not.toBeInTheDocument()
+  })
+
+  it('visar "Logga" för träning på dagar som varit', async () => {
+    const yesterday = addDays(todayISO(), -1)
+    renderAt(`/dagbok/${yesterday}`)
+    expect(await screen.findByRole('link', { name: 'Logga' })).toHaveAttribute('href', `/traning?datum=${yesterday}`)
+  })
+
+  it('har rubriker i rätt nivåer: Måltider (h2) och måltiderna under (h3)', async () => {
+    renderAt('/dagbok')
+    expect(await screen.findByRole('heading', { level: 2, name: 'Måltider' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Frukost' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Måltider' })).toBeInTheDocument()
   })
 
   it('markerar dagen som klar via dagens meny', async () => {

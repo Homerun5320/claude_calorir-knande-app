@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Check, Plus } from 'lucide-react'
 import type { Food, FoodSource, MealConfig, MealId, UnitKey } from '../../types'
-import { Badge, Chip, cx } from '../../components/ui'
-import { FoodRow, foodToRow, MEAL_META } from '../../components/domain'
+import { Badge, Chip, cx, useMediaQuery } from '../../components/ui'
+import { FoodRow, foodToRow, MEAL_META, useEnergyFormatter } from '../../components/domain'
 import { useProfileStore } from '../../stores/profileStore'
 import { isUsableUnit } from '../../components/domain/PortionPicker'
 import { sourceMeta } from './addLogic'
@@ -55,11 +55,34 @@ export function visibleMeals(meals: MealConfig[], selected: MealId): MealConfig[
   return meals.filter((m) => m.enabled || m.id === selected)
 }
 
+/**
+ * Måltidsväljare som vågrät rad. Den valda måltiden rullas alltid fram – annars kan t.ex.
+ * "Mellanmål" ligga utanför skärmen i 375 px och man ser inte vart maten hamnar.
+ */
 export function MealChips({ value, onChange, className, label = 'Måltid' }: { value: MealId; onChange: (meal: MealId) => void; className?: string; label?: string }) {
   const meals = useProfileStore((s) => s.settings.meals)
   const list = visibleMeals(meals, value)
+  const ref = useRef<HTMLDivElement>(null)
+  const reduce = useReducedMotion()
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    const row = ref.current
+    const chip = row?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (row && chip) {
+      const box = row.getBoundingClientRect()
+      const c = chip.getBoundingClientRect()
+      if (c.left < box.left || c.right > box.right) {
+        // Rulla bara raden i sidled (scrollIntoView skulle även kunna rulla sidan).
+        const left = row.scrollLeft + (c.left - box.left) - (box.width - c.width) / 2
+        row.scrollTo?.({ left: Math.max(0, left), behavior: mounted.current && !reduce ? 'smooth' : 'auto' })
+      }
+    }
+    mounted.current = true
+  }, [value, list.length, reduce])
+
   return (
-    <div role="group" aria-label={label} className={cx('no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1.5', className)}>
+    <div ref={ref} role="group" aria-label={label} className={cx('no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1.5', className)}>
       {list.map((m) => (
         <Chip key={m.id} selected={m.id === value} onClick={() => onChange(m.id)} icon={MEAL_META[m.id].icon}>
           {m.name}
@@ -150,11 +173,16 @@ export interface AddRowProps {
 }
 
 /**
- * En sökträff/listrad: tryck för att välja mängd, "+" för att lägga till direkt, håll inne för
- * detaljer. I medvetet läge döljs energi och makron.
+ * En sökträff/listrad: tryck för att välja mängd, "+" för att lägga till direkt, håll inne (eller
+ * högerklicka) för detaljer. I medvetet läge döljs energi och makron. På smala skärmar står
+ * energin på raden under namnet – då får namnet hela bredden och bryts inte mitt i ord.
  */
 export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, showSource = true, inBasket = 0, extraBadge, compact }: AddRowProps) {
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
+  const formatEnergy = useEnergyFormatter()
+  // Smal skärm: energin flyttar till raden under namnet så att namnet får hela bredden
+  // (annars blir det ~125 px i 390 px och liknande livsmedel går inte att skilja åt).
+  const wide = useMediaQuery('(min-width: 640px)')
   const reduce = useReducedMotion()
   const [added, setAdded] = useState(false)
   const addedTimer = useRef<number | undefined>(undefined)
@@ -163,18 +191,26 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
 
   const useUnit = unit && isUsableUnit(food, unit) ? unit : undefined
   const row = foodToRow(food, useUnit ? { amount, unit: useUnit } : {})
-  const badge =
-    showSource || inBasket > 0 || extraBadge ? (
-      <span className="inline-flex items-center gap-1">
-        {extraBadge}
-        {showSource && <FoodSourceBadge source={food.source} short />}
-        {inBasket > 0 && (
-          <Badge tone="gran" variant="solid" title="I korgen">
-            {inBasket > 1 ? `${inBasket} i korgen` : 'I korgen'}
-          </Badge>
-        )}
-      </span>
-    ) : undefined
+  const energyInline = !mindful && !wide
+  const energyText = mindful ? undefined : row.kcal === undefined ? 'energi okänd' : formatEnergy(row.kcal)
+  const badge = (
+    <span className="inline-flex items-center gap-1">
+      {extraBadge}
+      {showSource && <FoodSourceBadge source={food.source} short />}
+      {inBasket > 0 && (
+        <Badge tone="gran" variant="solid" title="I korgen">
+          {inBasket > 1 ? `${inBasket} i korgen` : 'I korgen'}
+        </Badge>
+      )}
+      {energyInline && (
+        <span className={cx('whitespace-nowrap text-xs font-semibold tabular-nums', row.kcal === undefined ? 'text-ink-3' : 'text-ink-2')}>
+          {energyText}
+          {row.amountText && <span className="font-normal text-ink-3"> ·</span>}
+        </span>
+      )}
+    </span>
+  )
+  const hasBadge = showSource || inBasket > 0 || Boolean(extraBadge) || energyInline
 
   const quick = onQuickAdd ? (
     <motion.button
@@ -213,14 +249,14 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
         {...row}
         kcal={mindful ? undefined : row.kcal}
         showMacros={!mindful}
-        hideEnergy={mindful}
+        hideEnergy={mindful || energyInline}
         compact={compact}
-        badge={badge}
+        badge={hasBadge ? badge : undefined}
         onClick={() => {
           if (longPress.consumeFired()) return
           onPick(food)
         }}
-        actionLabel={`${food.name}${row.amountText ? `, ${row.amountText}` : ''}. Välj mängd.${onDetails ? ' Håll inne för detaljer.' : ''}`}
+        actionLabel={[food.name, row.amountText, energyText].filter(Boolean).join(', ') + '. Välj mängd.'}
         trailing={quick}
       />
     </div>

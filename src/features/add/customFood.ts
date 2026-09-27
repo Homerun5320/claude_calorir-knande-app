@@ -5,7 +5,7 @@
  * Allt är rena funktioner – sidan `CustomFoodPage` håller bara tillståndet.
  */
 import type { Food, FoodCategory, FoodTag, NutrientKey, Nutrients, Portion } from '../../types'
-import { KJ_PER_KCAL, MINERAL_KEYS, NUTRIENT_KEYS, VITAMIN_KEYS, completeNutrients, kcalFromMacros } from '../../lib/nutrients'
+import { KJ_PER_KCAL, MINERAL_KEYS, NUTRIENT_KEYS, VITAMIN_KEYS, completeNutrients, kcalFromMacros, sodiumMgFromSalt } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
 import { isValidEan, normalizeBarcode } from '../../lib/openFoodFacts'
 import { slugify, uid } from '../../lib/id'
@@ -46,19 +46,26 @@ export interface CustomFoodDraft {
   note: string
 }
 
-/** Näringsämnen i huvudformuläret, i samma ordning som på en svensk näringsdeklaration. */
-export const MAIN_NUTRIENTS = ['fat', 'satFat', 'carbs', 'sugars', 'addedSugar', 'fiber', 'protein', 'salt'] as const satisfies readonly NutrientKey[]
+/**
+ * Näringsämnen i huvudformuläret – i samma ordning och med samma ord som på en svensk
+ * näringsdeklaration (Energi, Fett, varav mättat fett, Kolhydrat, varav sockerarter, Fiber,
+ * Protein, Salt), så att man kan skriva av förpackningen uppifrån och ned. Tillsatt socker står
+ * inte på förpackningar och ligger bland de övriga näringsämnena.
+ */
+export const MAIN_NUTRIENTS = ['fat', 'satFat', 'carbs', 'sugars', 'fiber', 'protein', 'salt'] as const satisfies readonly NutrientKey[]
 
 export const MAIN_LABELS: Record<(typeof MAIN_NUTRIENTS)[number], string> = {
   fat: 'Fett',
   satFat: 'varav mättat fett',
-  carbs: 'Kolhydrater',
+  carbs: 'Kolhydrat',
   sugars: 'varav sockerarter',
-  addedSugar: 'varav tillsatt socker',
   fiber: 'Fiber',
   protein: 'Protein',
   salt: 'Salt',
 }
+
+/** "varav"-rader som visas som underrader till raden före. */
+export const SUB_NUTRIENTS: ReadonlySet<NutrientKey> = new Set<NutrientKey>(['satFat', 'sugars'])
 
 const MAIN_SET = new Set<NutrientKey>(MAIN_NUTRIENTS)
 
@@ -105,6 +112,16 @@ export function emptyDraft(opts: { name?: string; barcode?: string; energyUnit?:
   }
 }
 
+/**
+ * true om natriumvärdet bara är saltet omräknat (salt = natrium × 2,5) – då är det härlett och
+ * ska räknas om när saltet ändras, inte ligga kvar som ett eget inmatat värde.
+ */
+export function isDerivedSodium(salt: number | undefined, sodiumMg: number | undefined): boolean {
+  if (salt === undefined || sodiumMg === undefined) return false
+  const expected = sodiumMgFromSalt(salt)
+  return Math.abs(sodiumMg - expected) <= Math.max(0.5, expected * 0.01)
+}
+
 /** Formulär från ett befintligt livsmedel (värden per 100 g). */
 export function draftFromFood(food: Food, energyUnit: EnergyInputUnit = 'kcal'): CustomFoodDraft {
   const values: Partial<Record<NutrientKey, number>> = {}
@@ -113,6 +130,9 @@ export function draftFromFood(food: Food, energyUnit: EnergyInputUnit = 'kcal'):
     const v = food.nutrients[key]
     if (v !== undefined && Number.isFinite(v)) values[key] = round(v)
   }
+  // Natrium som bara är saltet omräknat fylls inte i – annars blir det kvar med det gamla värdet
+  // när saltet ändras. `draftNutrients` räknar fram det igen när livsmedlet sparas.
+  if (isDerivedSodium(food.nutrients.salt, food.nutrients.sodium)) delete values.sodium
   const kcal = food.nutrients.kcal
   return {
     name: food.name,

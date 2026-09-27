@@ -102,6 +102,28 @@ describe('TodayPage', () => {
     expect(screen.getByText('Veckan')).toBeInTheDocument()
   })
 
+  it('visar en avstängd måltid som ändå har poster idag – allt i ringen går att hitta', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'mellanmal' })
+    const meals = DEFAULT_SETTINGS.meals.map((m) => (m.id === 'mellanmal' ? { ...m, enabled: false } : m))
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, meals } })
+    renderPage()
+    expect(await screen.findByText('Lax, ugnsbakad')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Lägg till i mellanmål' })).toBeInTheDocument()
+  })
+
+  it('säger varsamt till när vikten går ner för fort – utan grön ton', async () => {
+    const today = todayISO()
+    const body = useBodyStore.getState()
+    // 0,3 kg om dagen i tre veckor – långt mer än 1 % av kroppsvikten i veckan.
+    for (let k = 0; k <= 21; k++) body.logWeight(addDays(today, k - 21), 78 - k * 0.3)
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'ga_ner' } })
+    renderPage()
+    expect(await screen.findByText(/snabbare än vi rekommenderar/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Frisk & Fri' })).toHaveAttribute('href', 'https://www.friskfri.se')
+  })
+
   it('kopierar gårdagens måltid och kan ångra', async () => {
     const today = todayISO()
     const yesterday = addDays(today, -1)

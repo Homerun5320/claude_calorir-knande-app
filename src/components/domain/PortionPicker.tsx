@@ -26,7 +26,7 @@
  * kan bytas medan den är monterad. Hjälpfunktionerna längre ned är rena och exporteras för
  * återanvändning och tester.
  */
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type Ref } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import type { Food, Nutrients, UnitKey } from '../../types'
 import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
@@ -254,6 +254,11 @@ export interface PortionPickerProps {
   busy?: boolean
   /** Fokusera siffran direkt (bra på desktop, undvik på mobil där tangentbordet fälls upp). */
   autoFocus?: boolean
+  /**
+   * Ref till mängdfältet – t.ex. som `initialFocusRef` i ett ark, där modalen annars flyttar
+   * fokus till panelen efter `autoFocus`.
+   */
+  amountRef?: Ref<HTMLInputElement>
   /** Extra innehåll mellan förhandsvisningen och knapparna. */
   children?: ReactNode
   className?: string
@@ -280,6 +285,7 @@ export function PortionPicker({
   hideActions = false,
   busy = false,
   autoFocus = false,
+  amountRef,
   children,
   className,
 }: PortionPickerProps) {
@@ -355,6 +361,7 @@ export function PortionPicker({
           decimals={2}
           suffix={suffix}
           autoFocus={autoFocus}
+          ref={amountRef}
           placeholder="0"
         />
         <p className="mt-2 min-h-5 text-center text-sm text-ink-3 tabular-nums">{hint}</p>

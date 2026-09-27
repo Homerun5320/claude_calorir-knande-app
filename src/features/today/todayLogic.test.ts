@@ -15,6 +15,8 @@ import {
   headerFoodDay,
   isDiaryEmpty,
   kostradProgressText,
+  kostradWeekDates,
+  lowIntakeAverage,
   mainMealEntries,
   mealNamesText,
   newEntryIds,
@@ -23,7 +25,9 @@ import {
   showEveningCheckIn,
   summarizeMeal,
   weekAverage,
+  weekChartSummary,
   weekSeries,
+  weightCaution,
   weightGoodDirection,
   weightSnapshot,
 } from './todayLogic'
@@ -207,6 +211,20 @@ describe('veckan', () => {
     expect(weekAverage(weekSeries(dates, { '2026-09-26': entries['2026-09-26'] }, {}, 2000, 0), '2026-09-26')).toBe(400)
     expect(weekAverage(weekSeries(dates, {}, {}, 2000, 0), '2026-09-26')).toBeUndefined()
   })
+
+  it('läser upp samma snitt som visas under diagrammet', () => {
+    const s = weekSeries(dates, entries, ex, 2000, 50)
+    const text = weekChartSummary(s, '2026-09-26', false, 2000).replace(/\u00a0/g, ' ')
+    expect(text).toContain('2 av 3 dagar har registreringar')
+    // Idag (400 kcal, inte klar) räknas inte – samma snitt som weekAverage.
+    expect(text).toContain('Snitt 1 800 kcal per dag, utom idag som inte är klar än.')
+    expect(text).toContain('Högst 1 800 kcal (24 sep)')
+    expect(text).toContain('Mål 2 000 kcal.')
+    const complete = weekChartSummary(s, '2026-09-26', true, 2000).replace(/\u00a0/g, ' ')
+    expect(complete).toContain('Snitt 1 100 kcal per dag.')
+    expect(weekChartSummary(weekSeries(dates, {}, {}, 2000, 0), '2026-09-26', false, 2000)).toMatch(/inget registrerat/)
+    expect(weekChartSummary(s, '2026-09-26', false, 2000, 'kJ')).toContain('kJ')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -246,9 +264,35 @@ describe('kostråd i veckan', () => {
       '150 av 300 g i veckan',
     )
     expect(kostradProgressText(kostrad('baljvaxter', 'nastan', { unit: 'dagar', actual: 2, target: 4 }))).toBe('2 av 4 dagar')
+    expect(kostradProgressText(kostrad('baljvaxter', 'langt_kvar', { unit: 'dagar', actual: 0, target: 1 }))).toBe('0 av 1 dag')
+    expect(kostradProgressText(kostrad('baljvaxter', 'bra', { unit: 'dagar', actual: 1, target: 1 }))).toBe('1 av 1 dag')
     expect(kostradProgressText(kostrad('rorelse', 'nastan', { unit: 'min', actual: 45, target: 64, weeklyTarget: 150 }))).toBe(
       '45 av 150 min i veckan',
     )
+  })
+})
+
+describe('veckans kostråd – vilka dagar räknas', () => {
+  // 2026-09-24 är en torsdag – veckan började måndag 2026-09-21.
+  const today = '2026-09-24'
+  const earlier = { '2026-09-22': [quick('2026-09-22', 'lunch', 'Lunch', { kcal: 600 })] }
+  const todays = { [today]: [quick(today, 'frukost', 'Frukost', { kcal: 300 })] }
+
+  it('räknar inte dagens halvfärdiga registrering', () => {
+    const week = kostradWeekDates(today, { ...earlier, ...todays }, {}, false)
+    expect(week).toEqual({ dates: ['2026-09-21', '2026-09-22', '2026-09-23'], todayExcluded: true })
+  })
+
+  it('räknar in idag när dagen är klar eller är veckans enda dag med data', () => {
+    expect(kostradWeekDates(today, { ...earlier, ...todays }, {}, true).dates).toContain(today)
+    expect(kostradWeekDates(today, todays, {}, false)).toEqual({
+      dates: ['2026-09-21', '2026-09-22', '2026-09-23', today],
+      todayExcluded: false,
+    })
+    // Måndag: veckan består bara av idag.
+    expect(kostradWeekDates('2026-09-21', todays, {}, false)).toEqual({ dates: ['2026-09-21'], todayExcluded: false })
+    // Träning tidigare i veckan räknas också som data.
+    expect(kostradWeekDates(today, todays, { '2026-09-21': [exercise('2026-09-21', 200)] }, false).todayExcluded).toBe(true)
   })
 })
 
@@ -331,6 +375,43 @@ describe('vikt', () => {
     expect(weightGoodDirection('ga_ner', 'ammar', 30)).toBeUndefined()
     expect(weightGoodDirection('ga_ner', 'ingen', 16)).toBeUndefined()
     expect(weightGoodDirection(undefined, undefined, undefined)).toBeUndefined()
+  })
+
+  it('säger något varsamt vid för snabb nedgång eller låg vikt', () => {
+    const adult = { heightCm: 170, age: 35, lifeStage: 'ingen' as const }
+    // 0,5 kg/vecka vid 80 kg (0,6 %) är lugnt.
+    expect(weightCaution({ trendKg: 80, weekChangeKg: -0.5, direction: 'down' }, adult)).toBeNull()
+    // 1,2 kg/vecka vid 80 kg (1,5 %) är för snabbt.
+    expect(weightCaution({ trendKg: 80, weekChangeKg: -1.2, direction: 'down' }, adult)).toBe('snabb')
+    // Upp eller stabilt är aldrig "för snabbt ned".
+    expect(weightCaution({ trendKg: 80, weekChangeKg: 1.2, direction: 'up' }, adult)).toBeNull()
+    // BMI 17,3 (50 kg, 170 cm) – under 18,5.
+    expect(weightCaution({ trendKg: 50, weekChangeKg: 0, direction: 'flat' }, adult)).toBe('lag')
+    // Från 70 år gäller 22 som nedre gräns: BMI 20,8 (60 kg, 170 cm).
+    expect(weightCaution({ trendKg: 60, direction: 'flat' }, { ...adult, age: 74 })).toBe('lag')
+    expect(weightCaution({ trendKg: 60, direction: 'flat' }, adult)).toBeNull()
+    // BMI-gränsen gäller inte under 18 år eller vid graviditet – men för snabb nedgång gör det.
+    expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, age: 16 })).toBeNull()
+    expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, lifeStage: 'gravid' })).toBeNull()
+    expect(weightCaution({ trendKg: 70, weekChangeKg: -1, direction: 'down' }, { ...adult, lifeStage: 'ammar' })).toBe('snabb')
+    // Utan längd: bara takten bedöms.
+    expect(weightCaution({ trendKg: 45, direction: 'flat' }, {})).toBeNull()
+  })
+
+  it('märker ett lågt intag bara på dagar som är markerade som klara', () => {
+    const today = '2026-09-26'
+    const days = ['2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25']
+    const entriesByDate = Object.fromEntries(days.map((d) => [d, [quick(d, 'lunch', 'Mat', { kcal: 900 })]]))
+    const allComplete = Object.fromEntries(days.map((d) => [d, { complete: true }]))
+    expect(lowIntakeAverage(today, entriesByDate, allComplete, 1200)).toBe(900)
+    // Över golvet – inget att säga.
+    expect(lowIntakeAverage(today, entriesByDate, allComplete, 800)).toBeUndefined()
+    // Ofullständigt loggade dagar räknas inte – två klara dagar räcker inte som underlag.
+    expect(lowIntakeAverage(today, entriesByDate, { '2026-09-22': { complete: true }, '2026-09-23': { complete: true } }, 1200)).toBeUndefined()
+    expect(lowIntakeAverage(today, entriesByDate, {}, 1200)).toBeUndefined()
+    // Dagar äldre än en vecka räknas inte.
+    const old = { '2026-09-10': [quick('2026-09-10', 'lunch', 'Mat', { kcal: 500 })] }
+    expect(lowIntakeAverage(today, { ...old }, { '2026-09-10': { complete: true } }, 1200)).toBeUndefined()
   })
 })
 

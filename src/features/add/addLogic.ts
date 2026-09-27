@@ -193,7 +193,14 @@ export interface ItemTotals {
   kcal: number | undefined
   /** Antal poster där energin är okänd. */
   unknownEnergy: number
+  /**
+   * Antal poster där energi, protein, kolhydrater eller fett är okänt – då är summan bara
+   * det som är känt (minst så mycket), inte hela sanningen.
+   */
+  incomplete: number
 }
+
+const TOTAL_KEYS = ['kcal', 'protein', 'carbs', 'fat'] as const
 
 /** Summor för korgen eller en sparad måltid. Poster utan giltig vikt räknas inte in. */
 export function itemTotals(items: readonly GramItem[]): ItemTotals {
@@ -205,7 +212,18 @@ export function itemTotals(items: readonly GramItem[]): ItemTotals {
     nutrients,
     kcal: nutrients.kcal,
     unknownEnergy: items.filter((i) => i.food.nutrients.kcal === undefined || !(i.grams > 0)).length,
+    incomplete: valid.filter((i) => TOTAL_KEYS.some((k) => i.food.nutrients[k] === undefined)).length,
   }
+}
+
+/**
+ * Förvalt namn när korgen sparas som måltid: "Min frukost", "Mitt mellanmål". Ett-ord som
+ * slutar på "-mål" (mellanmål, kvällsmål) och "mellis" får "Mitt".
+ */
+export function defaultTemplateName(mealName: string): string {
+  const name = mealName.trim().toLocaleLowerCase('sv-SE')
+  if (!name) return 'Min måltid'
+  return `${/(mål|mellis)$/.test(name) ? 'Mitt' : 'Min'} ${name}`
 }
 
 /** "1 livsmedel" / "3 livsmedel". */

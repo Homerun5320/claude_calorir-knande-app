@@ -6,6 +6,7 @@ import {
   barcodeVariants,
   findByBarcode,
   decodeFoodId,
+  defaultTemplateName,
   foodClimateLevel,
   foodDetailHref,
   isISODate,
@@ -93,6 +94,17 @@ describe('itemTotals (korgsummor)', () => {
     const t = itemTotals([{ food: unknownEnergy, grams: 50 }])
     expect(t.kcal).toBeUndefined()
     expect(t.unknownEnergy).toBe(1)
+    expect(t.incomplete).toBe(1)
+  })
+
+  it('räknar varor där något av energi och makron saknas', () => {
+    const t = itemTotals([
+      { food: bulle, grams: 60 },
+      { food: { nutrients: { kcal: 200 } }, grams: 100 },
+    ])
+    expect(t.incomplete).toBe(1)
+    expect(t.nutrients.protein).toBeCloseTo(6.8 * 0.6, 5)
+    expect(itemTotals([{ food: bulle, grams: 60 }]).incomplete).toBe(0)
   })
 
   it('hoppar över varor utan giltig vikt', () => {
@@ -193,5 +205,15 @@ describe('etiketter och nivåer', () => {
     expect(sourceMeta('openfoodfacts').crowdSourced).toBe(true)
     expect(sourceMeta('lagom').crowdSourced).toBe(false)
     expect(sourceMeta('livsmedelsverket').short).toBe('LMV')
+  })
+})
+
+describe('defaultTemplateName', () => {
+  it('böjer min/mitt efter måltidens genus', () => {
+    expect(defaultTemplateName('Frukost')).toBe('Min frukost')
+    expect(defaultTemplateName('Kvällsmat')).toBe('Min kvällsmat')
+    expect(defaultTemplateName('Mellanmål')).toBe('Mitt mellanmål')
+    expect(defaultTemplateName('Kvällsmål')).toBe('Mitt kvällsmål')
+    expect(defaultTemplateName('  ')).toBe('Min måltid')
   })
 })

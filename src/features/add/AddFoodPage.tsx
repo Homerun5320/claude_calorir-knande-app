@@ -6,13 +6,16 @@
  * - Sök direkt bland 1 000+ svenska livsmedel (lokalt, fungerar offline) och vid behov i Open Food Facts.
  * - Utan sökning: "Brukar du äta till frukost" (ett tryck lägger i korgen), kopiera från igår,
  *   senaste, favoriter, egna livsmedel/recept och sparade måltider.
- * - Tryck på en rad → välj mängd → korgen. "+" på raden lägger till direkt med förvald mängd.
- *   Håll inne en rad för detaljer.
+ * - Tryck på en rad → välj mängd → "Lägg till i Frukost" (eller "Lägg i korgen"). "+" på raden
+ *   lägger till direkt med förvald mängd. Håll inne (högerklicka) en rad för detaljer.
  * - Korgen samlar flera livsmedel och läggs till i ett svep – en vanlig frukost tar sekunder.
+ *   När korgen har något i sig blir "Lägg i korgen" huvudknappen i portionsarket, så att varje
+ *   nytt livsmedel fortfarande bara är ett tryck.
+ * - Dator: sök → Enter (första träffen) → skriv mängd → Enter.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CalendarDays,
   Check,
@@ -73,7 +76,7 @@ import {
 import { useAddFood } from './useAddFood'
 import { useBasketStore, type BasketItem } from './basketStore'
 import { AddRow, MealChips, RowList, useLeave } from './components'
-import { PortionSheet } from './PortionSheet'
+import { PortionSheet, type SheetAction } from './PortionSheet'
 import { QuickAddSheet } from './QuickAddSheet'
 import { BasketBar, BasketSheet } from './Basket'
 import { OnlineSearch } from './OnlineSearch'
@@ -85,8 +88,16 @@ interface Picked {
   food: Food
   /** Satt när en vara i korgen redigeras. */
   basketKey?: string
+  /** Korgen hade innehåll när arket öppnades – då är "Lägg i korgen" huvudknappen. */
+  basketFirst?: boolean
   amount?: number
   unit?: UnitKey
+}
+
+/** Skärmläsartext för sökresultatet. */
+export function searchAnnouncement(q: string, count: number): string {
+  if (count === 0) return `Inga träffar för ”${q}”. Prova ett annat ord, sök online eller snabbregistrera.`
+  return `${count === 1 ? '1 träff' : `${count} träffar`} för ”${q}”`
 }
 
 export default function AddFoodPage() {
@@ -166,7 +177,7 @@ export default function AddFoodPage() {
   const [picked, setPicked] = useState<Picked | null>(null)
   const [quickOpen, setQuickOpen] = useState(false)
 
-  const pick = useCallback((food: Food) => setPicked({ food }), [])
+  const pick = useCallback((food: Food) => setPicked({ food, basketFirst: useBasketStore.getState().items.length > 0 }), [])
   const details = useCallback(
     (food: Food) => navigate(foodDetailHref(food.id, { meal, date }), { state: { from: 'lagg-till' } }),
     [navigate, meal, date],
@@ -205,6 +216,56 @@ export default function AddFoodPage() {
     }
     leave(exitTo)
   }
+
+  // Skärmläsare: berätta hur många träffar det blev när sökningen har landat.
+  const settled = q !== '' && !loading && !pending
+  const announcement = settled ? searchAnnouncement(q, results.length) : ''
+  const [announced, setAnnounced] = useState('')
+  useEffect(() => {
+    const t = window.setTimeout(() => setAnnounced(announcement), 500)
+    return () => window.clearTimeout(t)
+  }, [announcement])
+
+  // På dator: markera söktexten när arket stängts så att nästa livsmedel kan skrivas direkt.
+  const refocusSearch = () => {
+    if (desktop) window.setTimeout(() => searchRef.current?.select(), 250)
+  }
+  const toBasket: SheetAction = {
+    label: 'Lägg i korgen',
+    icon: ShoppingBasket,
+    onClick: (amount, unit) => {
+      if (picked) basketAdd(picked.food, amount, unit, 'search')
+      setPicked(null)
+      refocusSearch()
+    },
+  }
+  const addDirect = (label: string): SheetAction => ({
+    label,
+    icon: Plus,
+    onClick: (amount, unit) => {
+      if (!picked || !addFood(picked.food, amount, unit, { date, meal })) return
+      setPicked(null)
+      refocusSearch()
+    },
+  })
+  const saveEdit: SheetAction = {
+    label: 'Spara ändring',
+    icon: Check,
+    onClick: (amount, unit) => {
+      if (picked?.basketKey) basketUpdate(picked.basketKey, amount, unit)
+      setPicked(null)
+      setBasketOpen(true)
+    },
+  }
+  // Behåll knapparna medan arket animeras ut (annars byter de etikett under utgången).
+  const [lastPicked, setLastPicked] = useState<Picked | null>(null)
+  if (picked && picked !== lastPicked) setLastPicked(picked)
+  const sheetMode = picked ?? lastPicked
+  const [sheetPrimary, sheetSecondary]: [SheetAction, SheetAction | undefined] = sheetMode?.basketKey
+    ? [saveEdit, undefined]
+    : sheetMode?.basketFirst
+      ? [toBasket, { ...addDirect('Lägg till direkt'), icon: undefined }]
+      : [addDirect(`Lägg till i ${mealLabel}`), toBasket]
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && results[0]) {
@@ -278,7 +339,7 @@ export default function AddFoodPage() {
                 ))}
               </RowList>
               <p className="mt-2 px-1 text-xs text-ink-3">
-                Lagom = kurerad svensk databas · LMV = Livsmedelsverket · Håll inne en rad för detaljer.
+                Lagom = granskad svensk databas · LMV = Livsmedelsverket · {desktop ? 'Högerklicka på' : 'Håll inne'} en rad för detaljer.
               </p>
             </div>
           ) : loading || pending ? (
@@ -293,7 +354,7 @@ export default function AddFoodPage() {
             <EmptyState
               compact
               illustration="search"
-              title={`Inga träffar för "${q}"`}
+              title={`Inga träffar för ”${q}”`}
               text="Prova ett annat ord eller en kortare stavning – eller leta bland märkesvaror online."
             />
           )}
@@ -355,38 +416,8 @@ export default function AddFoodPage() {
         initialAmount={picked?.amount}
         initialUnit={picked?.unit}
         detailsTo={picked ? foodDetailHref(picked.food.id, { meal, date }) : undefined}
-        primary={
-          picked?.basketKey
-            ? {
-                label: 'Spara ändring',
-                icon: Check,
-                onClick: (amount, unit) => {
-                  if (picked.basketKey) basketUpdate(picked.basketKey, amount, unit)
-                  setPicked(null)
-                  setBasketOpen(true)
-                },
-              }
-            : {
-                label: 'Lägg i korgen',
-                icon: ShoppingBasket,
-                onClick: (amount, unit) => {
-                  if (picked) basketAdd(picked.food, amount, unit, 'search')
-                  setPicked(null)
-                  // På dator: markera söktexten så att nästa livsmedel kan skrivas direkt.
-                  if (desktop) window.setTimeout(() => searchRef.current?.select(), 250)
-                },
-              }
-        }
-        secondary={
-          picked?.basketKey
-            ? undefined
-            : {
-                label: 'Lägg till direkt',
-                onClick: (amount, unit) => {
-                  if (picked && addFood(picked.food, amount, unit, { date, meal })) setPicked(null)
-                },
-              }
-        }
+        primary={sheetPrimary}
+        secondary={sheetSecondary}
       />
 
       <BasketSheet
@@ -408,6 +439,9 @@ export default function AddFoodPage() {
       <span className="sr-only" aria-live="polite">
         {basketItems.length > 0 ? `${countLabel(basketItems.length)} i korgen` : ''}
       </span>
+      <p role="status" className="sr-only">
+        {q ? announced : ''}
+      </p>
     </div>
   )
 }
@@ -443,7 +477,8 @@ function DateButton({ date, today, onChange }: { date: string; today: string; on
           }
         }}
         aria-label={`Dag: ${relativeDayLabel(date, today)}. Byt dag`}
-        className="absolute inset-0 cursor-pointer opacity-0"
+        // Osynligt fält över chippen – 6 px extra upp och ned ger 44 px tryckyta.
+        className="absolute inset-x-0 -inset-y-1.5 cursor-pointer opacity-0"
       />
     </label>
   )
@@ -509,13 +544,15 @@ function Browse(props: BrowseProps) {
   }
 
   const inSuggestionBasket = (id: string) => basketItems.some((i) => i.food.id === id && i.origin === 'suggestion')
+  const reduce = useReducedMotion()
 
   return (
     <div className="flex flex-col gap-6">
       {/* Stora genvägar */}
       <div className="grid grid-cols-2 gap-3">
-        <ActionTile icon={ScanBarcode} title="Skanna streckkod" text="Snabbast för förpackningar" tone="gran" onClick={props.onScan} />
-        <ActionTile icon={Zap} title="Snabbregistrera" text="Bara energin, ungefär" tone="sol" onClick={props.onQuick} />
+        {/* Mjuka bindestreck (\u00AD) låter de långa orden brytas snyggt i smala rutor (320–390 px). */}
+        <ActionTile icon={ScanBarcode} title="Skanna streckkod" text={'Snabbast för förpack\u00ADningar'} tone="gran" onClick={props.onScan} />
+        <ActionTile icon={Zap} title={'Snabb\u00ADregistrera'} text="Bara energin, ungefär" tone="sol" onClick={props.onQuick} />
       </div>
 
       <CopyYesterday date={date} today={today} meal={meal} mealLabel={mealLabel} mindful={mindful} onCopied={props.onCopied} />
@@ -545,7 +582,13 @@ function Browse(props: BrowseProps) {
         <Tabs id={TABS_ID} value={tab} onChange={onTab} variant="pill" aria-label="Välj lista" tabs={ADD_TABS.map((v) => ({ value: v, label: ADD_TAB_LABELS[v], count: counts[v] }))} />
         <div {...tabPanelProps(TABS_ID, tab)} className="mt-3 outline-none">
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            <motion.div
+              key={tab}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduce ? 0.12 : 0.18 }}
+            >
               {tab === 'senaste' &&
                 (recent.length === 0 ? (
                   <EmptyState
@@ -640,7 +683,7 @@ function Browse(props: BrowseProps) {
                     compact
                     illustration="plate"
                     title="Spara måltider du äter ofta"
-                    text={'Lägg din vanliga frukost i korgen och välj "Spara som måltid" – sedan loggar du allt med ett tryck.'}
+                    text="Lägg din vanliga frukost i korgen och välj ”Spara som måltid” – sedan loggar du allt med ett tryck."
                   />
                 ) : (
                   <ul className="flex flex-col gap-3">
@@ -658,17 +701,19 @@ function Browse(props: BrowseProps) {
 }
 
 function ActionTile({ icon: Icon, title, text, tone, onClick }: { icon: LucideIcon; title: string; text: string; tone: 'gran' | 'sol'; onClick: () => void }) {
+  const reduce = useReducedMotion()
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      className="card flex min-h-[4.5rem] items-center gap-3 p-3 text-left transition-colors hover:bg-surface-2"
+      whileTap={reduce ? undefined : { scale: 0.97 }}
+      // Under 360 px blir textkolumnen bredvid ikonen för smal – då står ikonen ovanför texten.
+      className="card flex min-h-[4.5rem] min-w-0 items-center gap-3 p-3 text-left transition-colors hover:bg-surface-2 max-[359px]:flex-col max-[359px]:items-start max-[359px]:gap-2"
     >
       <span className={cx('grid size-11 shrink-0 place-items-center rounded-2xl', tone === 'gran' ? 'bg-gran-soft text-gran' : 'bg-sol-soft text-hjortron')}>
         <Icon className="size-5" strokeWidth={2.2} aria-hidden />
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1 break-words [hyphens:manual]" lang="sv">
         <span className="block text-[0.9rem] font-semibold leading-tight text-ink">{title}</span>
         <span className="mt-0.5 block text-xs leading-snug text-ink-3">{text}</span>
       </span>
@@ -687,13 +732,14 @@ function SuggestionChip({
   selected: boolean
   onToggle: () => void
 }) {
+  const reduce = useReducedMotion()
   const sel = initialSelection(food, { usage: usageAmount })
   const amountText = describeAmount(food, sel.amount, sel.unit)
   return (
     <motion.button
       type="button"
       onClick={onToggle}
-      whileTap={{ scale: 0.95 }}
+      whileTap={reduce ? undefined : { scale: 0.95 }}
       aria-pressed={selected}
       aria-label={`${food.name}, ${amountText}. ${selected ? 'I korgen – tryck för att ta bort' : 'Lägg i korgen'}`}
       className={cx(

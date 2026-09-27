@@ -4,8 +4,10 @@
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import AddFoodPage from './AddFoodPage'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
+import AddFoodPage, { searchAnnouncement } from './AddFoodPage'
+import { BasketSheet } from './Basket'
+import { PortionSheet } from './PortionSheet'
 import FoodDetailPage from './FoodDetailPage'
 import CustomFoodPage from './CustomFoodPage'
 import ScanPage from './ScanPage'
@@ -78,6 +80,37 @@ describe('AddFoodPage', () => {
     await waitFor(() => expect(useDiaryStore.getState().entries['2026-01-15']).toHaveLength(1))
     expect(useBasketStore.getState().items).toHaveLength(0)
     expect(router.state.location.pathname).toBe('/dagbok/2026-01-15')
+  })
+
+  it('lägger till ett enskilt livsmedel direkt – och korgen blir huvudvalet när den har innehåll', async () => {
+    const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }, { timeout: 3000 }))
+    let dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg till i Fika' }))
+    expect(useDiaryStore.getState().entries['2026-09-26']).toHaveLength(1)
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Tillagt i Fika')
+    // Man stannar kvar och kan lägga till mer.
+    expect(router.state.location.pathname).toBe('/lagg-till')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    useBasketStore.getState().add(bulle, 1, 'portion:st', 'search')
+    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }))
+    dialog = await screen.findByRole('dialog')
+    const buttons = within(dialog).getAllByRole('button').map((b) => b.textContent)
+    // Huvudknappen ligger sist i sidfoten.
+    expect(buttons.at(-1)).toBe('Lägg i korgen')
+    expect(buttons).toContain('Lägg till direkt')
+  })
+
+  it('berättar för skärmläsare hur många träffar sökningen gav', async () => {
+    renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    await waitFor(() => expect(screen.getByText(/träff(ar)? för ”kanelbulle bageri”/)).toHaveAttribute('role', 'status'), { timeout: 3000 })
+    // Radens namn nämner inte längre en gest som bara finns på pekskärm.
+    const row = screen.getByRole('button', { name: /^Kanelbulle, bageri/ })
+    expect(row.getAttribute('aria-label')).not.toMatch(/Håll inne/)
+    expect(row.getAttribute('aria-label')).toMatch(/kcal/)
   })
 
   it('snabbknappen lägger till direkt med förvald mängd', async () => {
@@ -167,7 +200,7 @@ describe('CustomFoodPage', () => {
     renderAt('/nytt-livsmedel?namn=Test')
     fireEvent.change(screen.getByLabelText('Energi'), { target: { value: '800' } })
     fireEvent.change(screen.getByLabelText('Protein'), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText('Kolhydrater'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Kolhydrat'), { target: { value: '20' } })
     fireEvent.change(screen.getByLabelText('Fett'), { target: { value: '5' } })
     expect(screen.getByText(/Energin stämmer inte med makronäringsämnena/)).toBeInTheDocument()
   })
@@ -206,5 +239,53 @@ describe('ScanPage', () => {
     expect(within(dialog).getByText('Proteinbar')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
     expect(useBasketStore.getState().items[0]).toMatchObject({ unit: 'portion:serving', origin: 'scan' })
+  })
+})
+
+describe('searchAnnouncement', () => {
+  it('säger antal träffar på svenska', () => {
+    expect(searchAnnouncement('mjölk', 1)).toBe('1 träff för ”mjölk”')
+    expect(searchAnnouncement('mjölk', 12)).toBe('12 träffar för ”mjölk”')
+    expect(searchAnnouncement('xyz', 0)).toMatch(/^Inga träffar för ”xyz”/)
+  })
+})
+
+describe('PortionSheet', () => {
+  it('fokuserar mängden på dator så att Enter lägger till direkt', async () => {
+    const onPrimary = vi.fn()
+    render(
+      <MemoryRouter>
+        <PortionSheet food={bulle} onClose={() => {}} autoFocusAmount primary={{ label: 'Lägg till i Fika', onClick: onPrimary }} />
+      </MemoryRouter>,
+    )
+    const amount = await screen.findByRole('spinbutton', { name: 'Mängd' })
+    await waitFor(() => expect(amount).toHaveFocus())
+    fireEvent.change(amount, { target: { value: '2' } })
+    fireEvent.submit(amount.closest('form')!)
+    expect(onPrimary).toHaveBeenCalledWith(2, 'portion:st', 120)
+  })
+
+  it('fokuserar inte mängden på pekskärm (tangentbordet ska inte fällas upp)', async () => {
+    render(
+      <MemoryRouter>
+        <PortionSheet food={bulle} onClose={() => {}} primary={{ label: 'Lägg till', onClick: () => {} }} />
+      </MemoryRouter>,
+    )
+    const amount = await screen.findByRole('spinbutton', { name: 'Mängd' })
+    expect(amount).not.toHaveFocus()
+    expect(screen.getByRole('dialog')).toHaveFocus()
+  })
+})
+
+describe('BasketSheet', () => {
+  it('visar okända makron som – och säger att summan är ofullständig', () => {
+    useBasketStore.getState().add({ ...offBar, nutrients: { kcal: 380 } }, 1, 'portion:serving', 'search')
+    render(<BasketSheet open onClose={() => {}} date="2026-09-26" meal="mellanmal" today="2026-09-26" onCommit={() => {}} onEdit={() => {}} />)
+    const total = screen.getByText('Totalt').closest('div')!.parentElement!
+    expect(within(total).getAllByText('–')).toHaveLength(3)
+    expect(within(total).queryByText(/0 g/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Vissa näringsvärden saknas för 1 livsmedel/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Spara som måltid' }))
+    expect(screen.getByLabelText('Namn på måltiden')).toHaveAttribute('placeholder', 'Mitt mellanmål')
   })
 })

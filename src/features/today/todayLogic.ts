@@ -6,10 +6,10 @@
  * (fasta, träning, koffein, alkohol) som ska visas.
  */
 import type { DayMeta, DiaryEntry, ExerciseEntry, GoalType, ISODate, LifeStage, MealId, WeightEntry } from '../../types'
-import { capitalize, diffDays, formatDayLong, greeting, isoWeek } from '../../lib/dates'
+import { addDays, capitalize, dateRange, diffDays, formatDayLong, formatDayShort, greeting, isoWeek, startOfWeek } from '../../lib/dates'
 import { dailyBudget, entryKcal, totals } from '../../lib/diary'
-import { weightTrend } from '../../lib/energy'
-import { formatNumber } from '../../lib/format'
+import { bmi, weightTrend } from '../../lib/energy'
+import { formatEnergy, formatNumber, plural } from '../../lib/format'
 import type { KostradId, KostradResult, KostradStatus } from '../../lib/kostrad'
 import { standardDrinks } from '../../lib/nutrients'
 import { foodDayCountdown, foodDayFor, upcomingFoodDays, type FoodDay } from '../../lib/swedishCalendar'
@@ -172,9 +172,56 @@ export function weekAverage(series: readonly WeekDay[], today: ISODate, todayCom
   return pick.reduce((s, d) => s + d.kcal, 0) / pick.length
 }
 
+/**
+ * Uppläst sammanfattning av veckodiagrammet. Snittet är detsamma som visas under diagrammet
+ * (`weekAverage`) – så att skärmläsaren inte läser upp två olika snitt efter varandra.
+ */
+export function weekChartSummary(
+  series: readonly WeekDay[],
+  today: ISODate,
+  todayComplete: boolean,
+  targetKcal: number,
+  unit: 'kcal' | 'kJ' = 'kcal',
+): string {
+  const title = 'Energi per dag de senaste sju dagarna'
+  const logged = series.filter((d): d is WeekDay & { kcal: number } => d.kcal !== undefined)
+  if (logged.length === 0) return `${title}: inget registrerat den här veckan ännu.`
+  const e = (kcal: number) => formatEnergy(kcal, unit)
+  const parts = [`${title}. ${formatNumber(logged.length)} av ${plural(series.length, 'dag', 'dagar')} har registreringar.`]
+  const average = weekAverage(series, today, todayComplete)
+  if (average !== undefined) {
+    // Samma regel som weekAverage: idag räknas inte förrän dagen är klar (om det finns andra dagar).
+    const withoutToday = !todayComplete && logged.some((d) => d.date === today && d.kcal > 0) && logged.some((d) => d.date !== today && d.kcal > 0)
+    parts.push(`Snitt ${e(average)} per dag${withoutToday ? ', utom idag som inte är klar än' : ''}.`)
+  }
+  const top = logged.reduce((a, b) => (b.kcal > a.kcal ? b : a))
+  parts.push(`Högst ${e(top.kcal)} (${top.date === today ? 'idag' : formatDayShort(top.date)}).`)
+  parts.push(`Mål ${e(targetKcal)}.`)
+  return parts.join(' ')
+}
+
 // ---------------------------------------------------------------------------
 // Kostråd
 // ---------------------------------------------------------------------------
+
+/**
+ * Dagarna som veckans kostråd räknas på: måndag till och med idag – men dagens (ofta ofullständiga)
+ * registrering räknas bara med när dagen är markerad som klar, eller när ingen tidigare dag i
+ * veckan har registreringar. Samma regel som veckosnittet, så att en halv dag inte drar ned snitten.
+ */
+export function kostradWeekDates(
+  today: ISODate,
+  entriesByDate: Record<ISODate, readonly DiaryEntry[] | undefined>,
+  exerciseByDate: Record<ISODate, readonly ExerciseEntry[] | undefined>,
+  todayComplete: boolean,
+): { dates: ISODate[]; todayExcluded: boolean } {
+  const start = startOfWeek(today)
+  const all = dateRange(start, today)
+  if (todayComplete || start === today) return { dates: all, todayExcluded: false }
+  const earlier = dateRange(start, addDays(today, -1))
+  const hasEarlier = earlier.some((d) => (entriesByDate[d]?.length ?? 0) > 0 || (exerciseByDate[d]?.length ?? 0) > 0)
+  return hasEarlier ? { dates: earlier, todayExcluded: true } : { dates: all, todayExcluded: false }
+}
 
 /**
  * Kostråd som passar som små framstegschips – bara "ät mer av"-råd, i ordning efter hur
@@ -224,10 +271,10 @@ export function pickKostradHighlights(results: readonly KostradResult[], count =
   return picked.sort((a, b) => rank(a) - rank(b))
 }
 
-/** "320 av 500 g/dag", "150 av 300 g i veckan", "2 av 4 dagar", "45 av 150 min i veckan". */
+/** "320 av 500 g/dag", "150 av 300 g i veckan", "2 av 4 dagar", "0 av 1 dag", "45 av 150 min i veckan". */
 export function kostradProgressText(r: KostradResult): string {
   const n = (v: number) => formatNumber(v)
-  if (r.unit === 'dagar') return `${n(r.actual)} av ${n(r.target)} dagar`
+  if (r.unit === 'dagar') return `${n(r.actual)} av ${plural(r.target, 'dag', 'dagar')}`
   if (r.weeklyTarget !== undefined) {
     const unit = r.unit === 'min' ? 'min' : 'g'
     return `${n(r.actual)} av ${n(r.weeklyTarget)} ${unit} i veckan`
@@ -336,6 +383,59 @@ export function weightSnapshot(weights: readonly WeightEntry[], today: ISODate):
   const weekChangeKg = trendKg - ref.trend
   const direction = Math.abs(weekChangeKg) < 0.05 ? 'flat' : weekChangeKg > 0 ? 'up' : 'down'
   return { latest, trendKg, weekChangeKg, direction }
+}
+
+/** Snabbare än så här (andel av kroppsvikten per vecka) rekommenderas inte. */
+export const MAX_WEEKLY_LOSS_SHARE = 0.01
+
+export type WeightCaution = 'snabb' | 'lag'
+
+/**
+ * Ska Idag säga något varsamt om vikten i stället för att tona nedgången grönt?
+ * - 'snabb': trenden går ned mer än 1 % av kroppsvikten per vecka.
+ * - 'lag': BMI under 18,5 (under 22 från 70 år) för vuxna – inte under graviditet eller amning.
+ */
+export function weightCaution(
+  snap: Pick<WeightSnapshot, 'trendKg' | 'weekChangeKg' | 'direction'>,
+  profile: { heightCm?: number; age?: number; lifeStage?: LifeStage },
+): WeightCaution | null {
+  const { heightCm, age, lifeStage } = profile
+  if (snap.direction === 'down' && snap.weekChangeKg !== undefined && -snap.weekChangeKg > snap.trendKg * MAX_WEEKLY_LOSS_SHARE) {
+    return 'snabb'
+  }
+  const adult = age === undefined || age >= 18
+  const pregnantOrNursing = lifeStage !== undefined && lifeStage !== 'ingen'
+  if (heightCm && heightCm > 0 && adult && !pregnantOrNursing) {
+    const floor = age !== undefined && age >= 70 ? 22 : 18.5
+    if (bmi(snap.trendKg, heightCm) < floor) return 'lag'
+  }
+  return null
+}
+
+/** Minsta antal dagar markerade som klara innan Lagom säger något om ett lågt intag. */
+export const LOW_INTAKE_MIN_DAYS = 3
+
+/**
+ * Snittintag de senaste sju dagarna, räknat bara på dagar som är markerade som klara (och har
+ * poster). Returnerar snittet om det ligger under `floorKcal` och bygger på minst tre dagar –
+ * annars undefined. Ofullständigt loggade dagar räknas aldrig, så glömda måltider ger inget larm.
+ */
+export function lowIntakeAverage(
+  today: ISODate,
+  entriesByDate: Record<ISODate, readonly DiaryEntry[] | undefined>,
+  days: Record<ISODate, DayMeta | undefined>,
+  floorKcal: number,
+): number | undefined {
+  const values: number[] = []
+  for (const date of dateRange(addDays(today, -6), today)) {
+    const list = entriesByDate[date]
+    if (days[date]?.complete !== true || !list || list.length === 0) continue
+    const kcal = totals(list).kcal
+    if (kcal !== undefined && Number.isFinite(kcal)) values.push(kcal)
+  }
+  if (values.length < LOW_INTAKE_MIN_DAYS) return undefined
+  const avg = values.reduce((sum, v) => sum + v, 0) / values.length
+  return avg < floorKcal ? avg : undefined
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,8 @@ import {
   draftWarnings,
   emptyDraft,
   energyToKcal,
+  isDerivedSodium,
+  MAIN_NUTRIENTS,
   newPortionDraft,
   toPer100,
   validateDraft,
@@ -44,6 +46,32 @@ describe('per portion → per 100 g', () => {
   it('kompletterar natrium från salt', () => {
     const n = draftNutrients(draft({ values: { salt: 1 } }))
     expect(n.sodium).toBeCloseTo(400)
+  })
+
+  it('räknar om natrium när saltet ändras på ett sparat livsmedel', () => {
+    const saved = draftToFood(draft({ values: { salt: 1 } }), { id: 'custom:x', now: 1 })
+    expect(saved.nutrients.sodium).toBeCloseTo(400)
+    const edit = draftFromFood(saved)
+    // Det härledda natriumvärdet fylls inte i formuläret …
+    expect(edit.values.sodium).toBeUndefined()
+    expect(edit.values.salt).toBe(1)
+    // … så att det följer med när saltet ändras.
+    const changed = draftNutrients({ ...edit, values: { ...edit.values, salt: 2 } })
+    expect(changed.salt).toBe(2)
+    expect(changed.sodium).toBeCloseTo(800)
+  })
+
+  it('behåller ett natriumvärde som inte är härlett från saltet', () => {
+    expect(isDerivedSodium(1, 400)).toBe(true)
+    expect(isDerivedSodium(1.25, 500.2)).toBe(true)
+    expect(isDerivedSodium(1, 300)).toBe(false)
+    expect(isDerivedSodium(undefined, 300)).toBe(false)
+    const edit = draftFromFood({ ...offBar, nutrients: { ...offBar.nutrients, salt: 1, sodium: 300 } })
+    expect(edit.values.sodium).toBe(300)
+  })
+
+  it('följer näringsdeklarationens ordning utan tillsatt socker', () => {
+    expect(MAIN_NUTRIENTS).toEqual(['fat', 'satFat', 'carbs', 'sugars', 'fiber', 'protein', 'salt'])
   })
 
   it('räknar kJ till kcal', () => {

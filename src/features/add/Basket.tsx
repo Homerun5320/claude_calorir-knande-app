@@ -11,9 +11,9 @@ import { CategoryIcon, EnergyValue, FoodRow, describeAmount, useEnergyFormatter 
 import { useProfileStore } from '../../stores/profileStore'
 import { mealName } from '../../lib/meals'
 import { relativeDayLabel } from '../../lib/dates'
-import { formatNumber } from '../../lib/format'
+import { formatNutrient } from '../../lib/format'
 import { nutrientsForGrams } from '../../lib/nutrients'
-import { countLabel, itemTotals } from './addLogic'
+import { countLabel, defaultTemplateName, itemTotals } from './addLogic'
 import { useBasketStore, type BasketItem } from './basketStore'
 import { useAddFood } from './useAddFood'
 
@@ -85,6 +85,12 @@ export interface BasketSheetProps {
   onEdit: (item: BasketItem) => void
 }
 
+const TOTAL_MACROS = [
+  { key: 'protein', label: 'Protein', dot: 'bg-protein' },
+  { key: 'carbs', label: 'Kolhydrater', dot: 'bg-carbs' },
+  { key: 'fat', label: 'Fett', dot: 'bg-fat' },
+] as const
+
 /** Översikt över korgen: ändra mängder, ta bort, spara som måltid eller lägg till allt. */
 export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit }: BasketSheetProps) {
   const items = useBasketStore((s) => s.items)
@@ -97,10 +103,11 @@ export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit
   const [saving, setSaving] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const name = mealName(meals, meal)
+  const suggestedName = defaultTemplateName(name)
 
   const save = (e: FormEvent) => {
     e.preventDefault()
-    const t = saveTemplate(templateName || `Min ${name.toLocaleLowerCase('sv-SE')}`, items, meal)
+    const t = saveTemplate(templateName.trim() || suggestedName, items, meal)
     if (t) {
       setSaving(false)
       setTemplateName('')
@@ -127,7 +134,7 @@ export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit
           <span className="grid size-14 place-items-center rounded-full bg-gran-soft text-gran">
             <ShoppingBasket className="size-7" aria-hidden />
           </span>
-          <p className="max-w-xs text-sm text-ink-2">Korgen är tom. Välj livsmedel och tryck "Lägg i korgen" för att lägga till flera på en gång.</p>
+          <p className="max-w-xs text-sm text-ink-2">Korgen är tom. Välj livsmedel och tryck ”Lägg i korgen” för att lägga till flera på en gång.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4 pb-2">
@@ -156,16 +163,29 @@ export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit
           </ul>
 
           {!mindful && (
-            <div className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3 text-sm">
-              <span className="font-semibold text-ink">Totalt</span>
-              <span className="flex items-center gap-3 tabular-nums text-ink-2">
-                <span>P {formatNumber(totals.nutrients.protein ?? 0)} g</span>
-                <span>K {formatNumber(totals.nutrients.carbs ?? 0)} g</span>
-                <span>F {formatNumber(totals.nutrients.fat ?? 0)} g</span>
-                <span className="font-semibold text-ink">
+            <div className="rounded-2xl bg-surface-2 px-4 py-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold text-ink">Totalt</span>
+                <span className="font-semibold text-ink tabular-nums">
                   <EnergyValue kcal={totals.kcal} />
                 </span>
-              </span>
+              </div>
+              <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-ink-2 tabular-nums">
+                {TOTAL_MACROS.map((m) => (
+                  <div key={m.key} className="flex items-center gap-1.5">
+                    <dt className="flex items-center gap-1.5">
+                      <span aria-hidden className={cx('size-2 rounded-full', m.dot)} />
+                      {m.label}
+                    </dt>
+                    <dd className="font-semibold text-ink">{formatNutrient(m.key, totals.nutrients[m.key])}</dd>
+                  </div>
+                ))}
+              </dl>
+              {totals.incomplete > 0 && (
+                <p className="mt-1.5 text-xs text-ink-3">
+                  Vissa näringsvärden saknas för {countLabel(totals.incomplete)} – summan visar det som är känt.
+                </p>
+              )}
             </div>
           )}
 
@@ -175,7 +195,7 @@ export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit
                 label="Namn på måltiden"
                 value={templateName}
                 onValueChange={setTemplateName}
-                placeholder={`Min ${name.toLocaleLowerCase('sv-SE')}`}
+                placeholder={suggestedName}
                 className="flex-1"
                 autoFocus
                 enterKeyHint="done"

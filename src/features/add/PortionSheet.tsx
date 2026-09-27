@@ -1,12 +1,16 @@
 /**
  * Bottenark med portionsväljaren för ett livsmedel – används av sök, korg och streckkodsläsaren.
  * Knapparna ligger i arkets fasta sidfot så att de syns även när tangentbordet är uppe.
+ *
+ * På dator (mus/styrplatta) får mängdfältet fokus med siffran markerad, så att man kan skriva en
+ * ny mängd och trycka Enter direkt: sök → Enter → mängd → Enter. På mobil fokuseras panelen
+ * i stället, så att tangentbordet inte fälls upp och skymmer arket.
  */
 import { useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Info, Users } from 'lucide-react'
 import type { Food, UnitKey } from '../../types'
-import { Button, IconButton, Sheet, type IconLike } from '../../components/ui'
+import { Button, IconButton, Sheet, useMediaQuery, type IconLike } from '../../components/ui'
 import { PortionPicker, type PortionSelection } from '../../components/domain/PortionPicker'
 import { hasUsableNutrition } from '../../lib/openFoodFacts'
 import { sourceMeta } from './addLogic'
@@ -34,10 +38,26 @@ export interface PortionSheetProps {
   children?: ReactNode
   /** Knapp eller länk i varningen när näringsvärden saknas (standard: hänvisning till detaljsidan). */
   missingNutritionAction?: ReactNode
+  /** Fokusera mängdfältet när arket öppnas. Standard: på dator (fin pekare), inte på pekskärm. */
+  autoFocusAmount?: boolean
 }
 
-export function PortionSheet({ food, onClose, primary, secondary, initialAmount, initialUnit, detailsTo, children, missingNutritionAction }: PortionSheetProps) {
+export function PortionSheet({
+  food,
+  onClose,
+  primary,
+  secondary,
+  initialAmount,
+  initialUnit,
+  detailsTo,
+  children,
+  missingNutritionAction,
+  autoFocusAmount,
+}: PortionSheetProps) {
   const navigate = useNavigate()
+  const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
+  const focusAmount = autoFocusAmount ?? finePointer
+  const amountRef = useRef<HTMLInputElement>(null)
   // Behåll livsmedlet medan arket animeras ut.
   const [shown, setShown] = useState<Food | null>(food)
   if (food && food !== shown) setShown(food)
@@ -59,6 +79,7 @@ export function PortionSheet({ food, onClose, primary, secondary, initialAmount,
       open={food !== null}
       onClose={onClose}
       onExitComplete={() => setShown(null)}
+      initialFocusRef={focusAmount ? amountRef : undefined}
       title={current?.name ?? 'Välj mängd'}
       description={
         current ? (
@@ -82,13 +103,15 @@ export function PortionSheet({ food, onClose, primary, secondary, initialAmount,
       }
       footer={
         current ? (
-          <div className="flex gap-2">
+          // Sida vid sida när etiketterna får plats, annars under varandra med huvudknappen
+          // underst (närmast tummen) – "Lägg till i Mellanmål" + "Lägg i korgen" ryms inte i 375 px.
+          <div className="flex flex-wrap gap-2">
             {secondary && (
-              <Button variant="soft" size="lg" className="flex-1" iconLeft={secondary.icon} disabled={!valid} onClick={() => run(secondary)}>
+              <Button variant="soft" size="lg" className="min-w-0 grow basis-auto" iconLeft={secondary.icon} disabled={!valid} onClick={() => run(secondary)}>
                 {secondary.label}
               </Button>
             )}
-            <Button size="lg" className="flex-1" iconLeft={primary.icon} disabled={!valid} onClick={() => run(primary)}>
+            <Button size="lg" className="min-w-0 grow basis-auto" iconLeft={primary.icon} disabled={!valid} onClick={() => run(primary)}>
               {primary.label}
             </Button>
           </div>
@@ -122,6 +145,7 @@ export function PortionSheet({ food, onClose, primary, secondary, initialAmount,
             initialAmount={initialAmount}
             initialUnit={initialUnit}
             hideActions
+            amountRef={amountRef}
             onChange={(s) => {
               sel.current = s
               setValid(Number.isFinite(s.grams) && s.grams > 0)

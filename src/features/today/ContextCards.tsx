@@ -88,7 +88,20 @@ function FastTile({ active }: { active: { start: number; targetHours: number; pr
 // Träning
 // ---------------------------------------------------------------------------
 
-function ExerciseTile({ list, kcal, addBackPct, mindful }: { list: readonly ExerciseEntry[]; kcal: number; addBackPct: number; mindful: boolean }) {
+function ExerciseTile({
+  list,
+  kcal,
+  addBackPct,
+  inTarget,
+  mindful,
+}: {
+  list: readonly ExerciseEntry[]
+  kcal: number
+  addBackPct: number
+  /** Adaptiv förbrukning: träningen ingår redan i dagsmålet. */
+  inTarget: boolean
+  mindful: boolean
+}) {
   const minutes = list.reduce((s, x) => s + (Number.isFinite(x.minutes) ? x.minutes : 0), 0)
   const names = [...new Set(list.map((x) => x.name))]
   const added = (kcal * Math.max(0, Math.min(100, addBackPct))) / 100
@@ -110,6 +123,7 @@ function ExerciseTile({ list, kcal, addBackPct, mindful }: { list: readonly Exer
                 (<EnergyValue kcal={added} unitClassName="" /> till budgeten)
               </span>
             )}
+            {inTarget && <span className="text-ink-3"> (ingår redan i dagsmålet)</span>}
           </>
         )}
       </span>
@@ -158,10 +172,12 @@ export interface ContextCardsProps {
   today: ISODate
   caffeineMaxMg: number
   addBackPct: number
+  /** Adaptiv förbrukning: träningen ingår redan i dagsmålet och läggs inte till budgeten. */
+  exerciseInTarget?: boolean
   mindful: boolean
 }
 
-export const ContextCards = memo(function ContextCards({ today, caffeineMaxMg, addBackPct, mindful }: ContextCardsProps) {
+export const ContextCards = memo(function ContextCards({ today, caffeineMaxMg, addBackPct, exerciseInTarget = false, mindful }: ContextCardsProps) {
   const active = useFastingStore((s) => s.active)
   const day = useDay(today)
   const entries = useDiaryStore((s) => s.entries)
@@ -178,7 +194,16 @@ export const ContextCards = memo(function ContextCards({ today, caffeineMaxMg, a
           case 'fasta':
             return active ? <FastTile key={id} active={active} /> : null
           case 'traning':
-            return <ExerciseTile key={id} list={day.exercise} kcal={day.exerciseKcal} addBackPct={addBackPct} mindful={mindful} />
+            return (
+              <ExerciseTile
+                key={id}
+                list={day.exercise}
+                kcal={day.exerciseKcal}
+                addBackPct={addBackPct}
+                inTarget={exerciseInTarget}
+                mindful={mindful}
+              />
+            )
           case 'koffein':
             return <CaffeineTile key={id} mg={caffeineMg ?? 0} maxMg={caffeineMaxMg > 0 ? caffeineMaxMg : 400} mindful={mindful} />
           case 'alkohol':

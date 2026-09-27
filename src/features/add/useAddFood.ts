@@ -5,7 +5,9 @@
  * 1. skapar en post med en ögonblicksbild av livsmedlet (`makeFoodEntry`),
  * 2. uppdaterar användningsstatistiken (senaste mängd, måltid) för smarta förval,
  * 3. sparar onlineprodukter (Open Food Facts) lokalt så att de fungerar offline nästa gång,
- * 4. visar en notis "Tillagt i Frukost" med "Ångra".
+ * 4. visar en notis "Tillagt i Frukost" med "Ångra" – som tar bort posterna och återställer
+ *    användningsstatistiken och offlinekopian, så att ett ångrat tillägg inte lever kvar i
+ *    "Senaste" eller i förslagen.
  *
  * ```ts
  * const { addFood, addQuick } = useAddFood()
@@ -16,7 +18,7 @@
 import { useMemo } from 'react'
 import type { DiaryEntry, Food, FoodCategory, ISODate, MealId, MealTemplate, Nutrients, UnitKey } from '../../types'
 import { useDiaryStore, type NewDiaryEntry } from '../../stores/diaryStore'
-import { useFoodStore } from '../../stores/foodStore'
+import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { makeFoodEntry } from '../../lib/diary'
 import { gramsFor } from '../../lib/units'
@@ -64,10 +66,67 @@ export interface UseAddFoodResult {
   saveTemplate: (name: string, items: readonly AddItem[], meal?: MealId) => MealTemplate | null
 }
 
-/** Ta bort poster igen (för "Ångra"). */
-function undo(entries: readonly DiaryEntry[]) {
-  const { removeEntry } = useDiaryStore.getState()
-  for (const e of entries) removeEntry(e.date, e.id)
+/** Vad ett tillägg ändrade i livsmedelsbutiken – så att "Ångra" kan återställa det. */
+export interface FoodEffects {
+  /** Användningsstatistiken per livsmedel före och efter tillägget. */
+  usage: Map<string, { before: FoodUsage | undefined; after: FoodUsage | undefined; times: number; meal: MealId }>
+  /** Onlineprodukter som sparades lokalt för första gången vid tillägget. */
+  cached: Set<string>
+}
+
+export function newFoodEffects(): FoodEffects {
+  return { usage: new Map(), cached: new Set() }
+}
+
+/**
+ * Återställ användningsstatistik och offlinekopior efter ett ångrat tillägg.
+ *
+ * Har inget annat hänt med livsmedlet sedan dess återställs statistiken exakt (senaste mängd,
+ * antal, måltider). Har det loggats igen efteråt räknas bara det ångrade tillägget bort, så att
+ * det senare tillägget finns kvar. En nysparad onlineprodukt tas bort om den inte längre används.
+ */
+export function revertFoodEffects(fx: FoodEffects): void {
+  if (fx.usage.size === 0 && fx.cached.size === 0) return
+  useFoodStore.setState((s) => {
+    const usage = { ...s.usage }
+    for (const [id, u] of fx.usage) {
+      const cur = usage[id]
+      if (cur === u.after) {
+        if (u.before) usage[id] = u.before
+        else delete usage[id]
+      } else if (cur) {
+        const count = cur.count - u.times
+        if (count <= 0) {
+          delete usage[id]
+          continue
+        }
+        const meals = { ...cur.meals }
+        const inMeal = (meals[u.meal] ?? 0) - u.times
+        if (inMeal > 0) meals[u.meal] = inMeal
+        else delete meals[u.meal]
+        usage[id] = { ...cur, count, meals }
+      }
+    }
+    let cachedFoods = s.cachedFoods
+    for (const id of fx.cached) {
+      if (usage[id] || !(id in cachedFoods)) continue
+      if (cachedFoods === s.cachedFoods) cachedFoods = { ...cachedFoods }
+      delete cachedFoods[id]
+    }
+    return { usage, cachedFoods }
+  })
+}
+
+/** Ta bort poster igen och återställ det de ändrade (för "Ångra"). Gör något bara första gången. */
+function undoer(entries: readonly DiaryEntry[], fx: FoodEffects): () => void {
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const { removeEntry } = useDiaryStore.getState()
+    for (const e of entries) removeEntry(e.date, e.id)
+    revertFoodEffects(fx)
+  }
 }
 
 /**
@@ -95,17 +154,25 @@ export function useAddFood(): UseAddFoodResult {
   return useMemo<UseAddFoodResult>(() => {
     const nameOf = (meal: MealId) => mealName(meals, meal)
 
-    const notify = (entries: DiaryEntry[], fallback: string, opts: AddOptions = {}) => {
+    const notify = (entries: DiaryEntry[], fx: FoodEffects, fallback: string, opts: AddOptions = {}) => {
       if (opts.silent || entries.length === 0) return
       toast(opts.message ?? fallback, {
         tone: 'success',
-        action: { label: 'Ångra', onClick: () => undo(entries) },
+        action: { label: 'Ångra', onClick: undoer(entries, fx) },
       })
     }
 
-    const record = (food: Food, amount: number, unit: UnitKey, meal: MealId) => {
-      useFoodStore.getState().recordUsage(food.id, amount, unit, meal)
+    /** Uppdatera statistik och offlinekopia – och notera ändringarna i `fx` för "Ångra". */
+    const record = (food: Food, amount: number, unit: UnitKey, meal: MealId, fx: FoodEffects) => {
+      const store = useFoodStore.getState()
+      const prev = fx.usage.get(food.id)
+      const before = prev ? prev.before : store.usage[food.id]
+      const wasCached = food.id in store.cachedFoods
+      store.recordUsage(food.id, amount, unit, meal)
       cacheIfOnline(food)
+      const after = useFoodStore.getState()
+      fx.usage.set(food.id, { before, after: after.usage[food.id], times: (prev?.times ?? 0) + 1, meal })
+      if (!wasCached && food.id in after.cachedFoods) fx.cached.add(food.id)
     }
 
     const toEntry = (item: AddItem, target: AddTarget): NewDiaryEntry | null => {
@@ -129,9 +196,10 @@ export function useAddFood(): UseAddFoodResult {
         return []
       }
       const entries = useDiaryStore.getState().addEntries(drafts)
-      for (const item of valid) record(item.food, item.amount, item.unit, target.meal)
+      const fx = newFoodEffects()
+      for (const item of valid) record(item.food, item.amount, item.unit, target.meal, fx)
       const n = entries.length
-      notify(entries, `${countLabel(n)} ${n === 1 ? 'tillagt' : 'tillagda'} i ${nameOf(target.meal)}`, opts)
+      notify(entries, fx, `${countLabel(n)} ${n === 1 ? 'tillagt' : 'tillagda'} i ${nameOf(target.meal)}`, opts)
       return entries
     }
 
@@ -143,8 +211,9 @@ export function useAddFood(): UseAddFoodResult {
           return null
         }
         const entry = useDiaryStore.getState().addEntry(draft)
-        record(food, amount, unit, target.meal)
-        notify([entry], `Tillagt i ${nameOf(target.meal)}`, opts)
+        const fx = newFoodEffects()
+        record(food, amount, unit, target.meal, fx)
+        notify([entry], fx, `Tillagt i ${nameOf(target.meal)}`, opts)
         return entry
       },
 
@@ -166,7 +235,7 @@ export function useAddFood(): UseAddFoodResult {
           meal: meta.meal,
           time: meta.time,
         })
-        notify([entry], `Tillagt i ${nameOf(meta.meal)}`, opts)
+        notify([entry], newFoodEffects(), `Tillagt i ${nameOf(meta.meal)}`, opts)
         return entry
       },
 

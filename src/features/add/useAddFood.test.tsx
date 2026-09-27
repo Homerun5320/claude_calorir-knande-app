@@ -80,6 +80,74 @@ describe('useAddFood', () => {
     expect(useDiaryStore.getState().entries[target.date]).toBeUndefined()
   })
 
+  it('ångra återställer användningsstatistiken exakt', () => {
+    const before = { count: 3, lastUsed: 1_000, lastAmount: 1, lastUnit: 'portion:st' as const, meals: { frukost: 2, fika: 1 } }
+    useFoodStore.setState({ usage: { [bulle.id]: before } })
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(bulle, 2, 'portion:stor', { ...target, meal: 'fika' })
+    })
+    expect(useFoodStore.getState().usage[bulle.id]).toMatchObject({ count: 4, lastAmount: 2, lastUnit: 'portion:stor' })
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(useFoodStore.getState().usage[bulle.id]).toEqual(before)
+  })
+
+  it('ångra tar bort statistik och nysparad onlineprodukt för ett livsmedel som aldrig loggats', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(offBar, 1, 'portion:serving', target)
+    })
+    expect(useFoodStore.getState().cachedFoods[offBar.id]).toBeDefined()
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(useFoodStore.getState().usage[offBar.id]).toBeUndefined()
+    expect(useFoodStore.getState().cachedFoods[offBar.id]).toBeUndefined()
+  })
+
+  it('ångra behåller en redan sparad onlineprodukt', () => {
+    useFoodStore.setState({ cachedFoods: { [offBar.id]: offBar } })
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(offBar, 1, 'portion:serving', target)
+    })
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(useFoodStore.getState().cachedFoods[offBar.id]).toBeDefined()
+  })
+
+  it('ångra räknar bara bort sitt eget tillägg om livsmedlet har loggats igen efteråt', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(bulle, 1, 'portion:st', target)
+    })
+    const firstUndo = useToastStore.getState().toasts.at(-1)?.action?.onClick
+    act(() => {
+      result.current.addFood(bulle, 3, 'portion:st', { ...target, meal: 'lunch' })
+    })
+    act(() => firstUndo?.())
+    expect(useFoodStore.getState().usage[bulle.id]).toMatchObject({ count: 1, lastAmount: 3, meals: { lunch: 1 } })
+    expect(useFoodStore.getState().usage[bulle.id]?.meals.frukost).toBeUndefined()
+    // Att ångra två gånger ändrar inget mer.
+    act(() => firstUndo?.())
+    expect(useFoodStore.getState().usage[bulle.id]).toMatchObject({ count: 1, lastAmount: 3 })
+    expect(useDiaryStore.getState().entries[target.date]).toHaveLength(1)
+  })
+
+  it('ångra av korgen återställer statistiken även när samma livsmedel finns två gånger', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addMany(
+        [
+          { food: bulle, amount: 1, unit: 'portion:st' },
+          { food: bulle, amount: 2, unit: 'portion:st' },
+          { food: mjolk, amount: 2, unit: 'dl' },
+        ],
+        target,
+      )
+    })
+    expect(useFoodStore.getState().usage[bulle.id]?.count).toBe(2)
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(useFoodStore.getState().usage).toEqual({})
+  })
+
   it('snabbregistrerar med okända makron som okända', () => {
     const { result } = renderHook(() => useAddFood())
     act(() => {

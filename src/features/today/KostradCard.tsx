@@ -1,16 +1,17 @@
 /**
  * Kostråden den här veckan – tre små framstegschips (t.ex. grönt, fisk och fullkorn) enligt
- * Livsmedelsverkets kostråd, utvärderade för veckan hittills (måndag till idag).
+ * Livsmedelsverkets kostråd, utvärderade för veckan hittills (måndag till idag). Dagens halvfärdiga
+ * registrering räknas in först när dagen är markerad som klar (se `kostradWeekDates`).
  */
 import { memo, useId, useMemo } from 'react'
 import { Card, ProgressRing } from '../../components/ui'
-import { dateRange, isoWeek, startOfWeek } from '../../lib/dates'
+import { isoWeek } from '../../lib/dates'
 import { evaluateKostrad, type KostradResult, type KostradStatus } from '../../lib/kostrad'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { SectionLink } from './SectionLink'
-import { KOSTRAD_SHORT_TITLE, KOSTRAD_STATUS_LABEL, kostradProgressText, pickKostradHighlights } from './todayLogic'
+import { KOSTRAD_SHORT_TITLE, KOSTRAD_STATUS_LABEL, kostradProgressText, kostradWeekDates, pickKostradHighlights } from './todayLogic'
 
 const STATUS_TONE: Record<KostradStatus, 'mossa' | 'sol' | 'gran' | 'hjortron'> = {
   bra: 'mossa',
@@ -60,13 +61,14 @@ export const KostradCard = memo(function KostradCard({ today, mindful }: { today
   const hintId = useId()
   const entries = useDiaryStore((s) => s.entries)
   const exercise = useDiaryStore((s) => s.exercise)
+  const todayComplete = useDiaryStore((s) => s.days[today]?.complete === true)
   const sex = useProfileStore((s) => s.profile?.sex ?? 'kvinna')
 
-  const highlights = useMemo(() => {
-    const dates = dateRange(startOfWeek(today), today)
-    const results = evaluateKostrad({ entriesByDate: entries, exerciseByDate: exercise, dates, sex })
-    return pickKostradHighlights(results, 3)
-  }, [entries, exercise, today, sex])
+  const { highlights, todayExcluded } = useMemo(() => {
+    const week = kostradWeekDates(today, entries, exercise, todayComplete)
+    const results = evaluateKostrad({ entriesByDate: entries, exerciseByDate: exercise, dates: week.dates, sex })
+    return { highlights: pickKostradHighlights(results, 3), todayExcluded: week.todayExcluded }
+  }, [entries, exercise, today, todayComplete, sex])
 
   return (
     <Card
@@ -91,7 +93,9 @@ export const KostradCard = memo(function KostradCard({ today, mindful }: { today
             ))}
           </ul>
           <p id={hintId} className="mt-3 text-xs leading-relaxed text-ink-3">
-            Veckan hittills, enligt Livsmedelsverkets kostråd. Små steg räknas.
+            {todayExcluded
+              ? 'Veckan hittills enligt Livsmedelsverkets kostråd – idag räknas in när dagen är klar. Små steg räknas.'
+              : 'Veckan hittills, enligt Livsmedelsverkets kostråd. Små steg räknas.'}
           </p>
         </>
       )}

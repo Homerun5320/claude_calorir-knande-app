@@ -19,17 +19,19 @@ import type { DiaryEntry, ISODate, MealConfig, MealId } from '../../types'
 import {
   dayTitle,
   entryName,
+  entryNameInSentence,
   mealLabel,
+  neighborEntryId,
   normalizeNote,
   normalizeTime,
   QUICK_EDIT_KEYS,
   quickNutrientsPatch,
-  shortFoodName,
   targetPhrase,
   visibleMeals,
   withoutIdentity,
   type QuickEditKey,
 } from './diaryLogic'
+import { addFoodLink, entryButton, firstAddFoodLink, focusAfterClose } from './focus'
 import { TargetPicker, type Target } from './TargetPicker'
 
 export interface EntryTarget {
@@ -118,6 +120,17 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
   const selectionValid = (s: PortionSelection | null) => s !== null && Number.isFinite(s.grams) && s.grams > 0
   const canSave = entry.kind === 'food' ? selectionValid(selection) : name.trim().length > 0
 
+  /**
+   * När posten försvinner från sin plats (borttagen, flyttad till en annan dag) – ge fokus till
+   * grannposten i samma måltid, annars till måltidens "Lägg till i …", så att fokus inte tappas.
+   */
+  const focusNearby = () => {
+    const siblings = (useDiaryStore.getState().entries[entry.date] ?? []).filter((e) => e.meal === entry.meal)
+    const neighbor = neighborEntryId(siblings, entry.id)
+    const fromMeal = entry.meal
+    return () => focusAfterClose(() => entryButton(neighbor, fromMeal), () => addFoodLink(fromMeal), firstAddFoodLink)
+  }
+
   const save = (override?: PortionSelection) => {
     const common = { meal, time: normalizeTime(time), note: normalizeNote(note) }
     if (entry.kind === 'food') {
@@ -130,14 +143,18 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
       updateEntry(entry.date, entry.id, { ...common, name: trimmed, nutrients: quickNutrientsPatch(entry.nutrients, quick) })
     }
     onClose()
+    // Ny måltid: raden flyttar – följ med den dit.
+    if (meal !== entry.meal) focusAfterClose(() => entryButton(entry.id, meal), () => addFoodLink(meal))
     toast('Ändringen är sparad', { tone: 'success' })
   }
 
   const remove = () => {
+    const refocus = focusNearby()
     const store = useDiaryStore.getState()
     const removed = store.removeEntry(entry.date, entry.id)
     onClose()
     if (removed) {
+      refocus()
       toast(`${entryName(removed)} är borttagen`, {
         action: { label: 'Ångra', onClick: () => useDiaryStore.getState().restoreEntry(removed) },
       })
@@ -167,14 +184,19 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
       setMode('edit')
       return
     }
+    const refocus = focusNearby()
     useDiaryStore.getState().moveEntry(from.date, entry.id, to.date, to.meal)
     onClose()
+    // Samma dag: raden finns kvar i den nya måltiden. Annan dag: fokus till grannen här.
+    if (to.date === from.date) focusAfterClose(() => entryButton(entry.id, to.meal), () => addFoodLink(to.meal))
+    else refocus()
     toast(`Flyttad till ${targetPhrase(meals, to.meal, to.date, today)}`, {
       action: { label: 'Ångra', onClick: () => useDiaryStore.getState().moveEntry(to.date, entry.id, from.date, from.meal) },
     })
   }
 
-  const title = mode === 'move' ? `Flytta ${shortFoodName(entryName(entry)).toLocaleLowerCase('sv-SE')}` : entryName(entry)
+  // "Flytta havregrynsgröt" – men märkesvaror och egna namn behåller sin stavning ("Flytta Oatly iKaffe").
+  const title = mode === 'move' ? `Flytta ${entryNameInSentence(entry)}` : entryName(entry)
   const description = `${dayTitle(entry.date, today)} · ${mealLabel(meals, entry.meal)}`
 
   const footer =

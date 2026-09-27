@@ -22,9 +22,24 @@ export interface ExerciseSectionProps {
   energyUnit: 'kcal' | 'kJ'
   /** Andel av träningen som läggs till budgeten (0–100). */
   addBackPct: number
+  /** Adaptiv förbrukning: den vanliga träningen ingår redan i dagsmålet. */
+  exerciseInTarget?: boolean
+  /**
+   * Visa "Logga". Av för planerade (framtida) dagar – träningssidan loggar bara pass som
+   * redan har hänt, så knappen skulle annars lägga passet på idag.
+   */
+  canLog?: boolean
 }
 
-export const ExerciseSection = memo(function ExerciseSection({ date, exercise, mindful, energyUnit, addBackPct }: ExerciseSectionProps) {
+export const ExerciseSection = memo(function ExerciseSection({
+  date,
+  exercise,
+  mindful,
+  energyUnit,
+  addBackPct,
+  exerciseInTarget = false,
+  canLog = true,
+}: ExerciseSectionProps) {
   const total = exercise.reduce((s, x) => s + (x.kcal || 0), 0)
   const added = (total * Math.max(0, Math.min(100, addBackPct))) / 100
 
@@ -42,9 +57,11 @@ export const ExerciseSection = memo(function ExerciseSection({ date, exercise, m
       title="Träning"
       titleAs="h2"
       action={
-        <Button size="sm" variant="soft" iconLeft={Plus} to={`/traning?datum=${date}`}>
-          Logga
-        </Button>
+        canLog ? (
+          <Button size="sm" variant="soft" iconLeft={Plus} to={`/traning?datum=${date}`}>
+            Logga
+          </Button>
+        ) : undefined
       }
     >
       {exercise.length === 0 ? (
@@ -78,9 +95,11 @@ export const ExerciseSection = memo(function ExerciseSection({ date, exercise, m
         <p className="mt-3 flex items-start gap-2 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-xs leading-relaxed text-ink-2">
           <Info className="mt-px size-3.5 shrink-0 text-ink-3" aria-hidden />
           <span>
-            {addBackPct > 0
-              ? `${formatNumber(addBackPct)} % av träningen (${formatEnergy(added, energyUnit)}) räknas in i dagens budget. Träningskalorier överskattas ofta, därför räknas bara en del.`
-              : 'Träningen räknas inte in i budgeten enligt dina inställningar.'}
+            {exerciseInTarget
+              ? 'Med adaptiv förbrukning ingår din vanliga träning redan i dagsmålet, så den läggs inte till budgeten en gång till.'
+              : addBackPct > 0
+                ? `${formatNumber(addBackPct)} % av träningen (${formatEnergy(added, energyUnit)}) räknas in i dagens budget. Träningskalorier överskattas ofta, därför räknas bara en del.`
+                : 'Träningen räknas inte in i budgeten enligt dina inställningar.'}
           </span>
         </p>
       )}
