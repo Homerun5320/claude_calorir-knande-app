@@ -9,6 +9,7 @@ import { getActivity } from '../../data/activities'
 import { formatDuration, formatEnergy, formatNumber } from '../../lib/format'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { ExerciseEntry, ISODate } from '../../types'
+import { exerciseRemoveButton, focusAfterRender, lastAddFoodLink, LOG_EXERCISE_ID } from './focus'
 
 /** Lägg tillbaka en borttagen träningspost med samma id och ordning (ångra). */
 export function restoreExercise(entry: ExerciseEntry): void {
@@ -44,8 +45,12 @@ export const ExerciseSection = memo(function ExerciseSection({
   const added = (total * Math.max(0, Math.min(100, addBackPct))) / 100
 
   const remove = (x: ExerciseEntry) => {
+    // Knappen försvinner med raden – ge fokus till nästa (eller föregående) pass, annars "Logga".
+    const i = exercise.findIndex((e) => e.id === x.id)
+    const neighbor = exercise[i + 1]?.id ?? exercise[i - 1]?.id
     const removed = useDiaryStore.getState().removeExercise(date, x.id)
     if (removed) {
+      focusAfterRender(() => exerciseRemoveButton(neighbor), () => document.getElementById(LOG_EXERCISE_ID), lastAddFoodLink)
       toast(`${removed.name} är borttagen`, { action: { label: 'Ångra', onClick: () => restoreExercise(removed) } })
     }
   }
@@ -58,7 +63,7 @@ export const ExerciseSection = memo(function ExerciseSection({
       titleAs="h2"
       action={
         canLog ? (
-          <Button size="sm" variant="soft" iconLeft={Plus} to={`/traning?datum=${date}`}>
+          <Button id={LOG_EXERCISE_ID} size="sm" variant="soft" iconLeft={Plus} to={`/traning?datum=${date}`}>
             Logga
           </Button>
         ) : undefined
@@ -76,7 +81,7 @@ export const ExerciseSection = memo(function ExerciseSection({
               .filter(Boolean)
               .join(' · ')
             return (
-              <li key={x.id}>
+              <li key={x.id} data-exercise-id={x.id}>
                 <ListRow
                   dense
                   leading={emoji}

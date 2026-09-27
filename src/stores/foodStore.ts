@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Food, MealId, MealTemplate, Recipe, UnitKey } from '../types'
+import type { DiaryEntry, Food, ISODate, MealId, MealTemplate, Recipe, UnitKey } from '../types'
 import { idbStorage, STORE_KEYS } from './storage'
 
 export interface FoodUsage {
@@ -10,6 +10,29 @@ export interface FoodUsage {
   lastUnit: UnitKey
   /** Hur ofta livsmedlet loggats per måltid – används för smarta förslag. */
   meals: Partial<Record<MealId, number>>
+}
+
+/**
+ * Bygg användningsstatistik ("Senaste", förslag per måltid) från dagboksposter – samma fält som
+ * `recordUsage` fyller i när man loggar. Används när dagboken fylls på i efterhand (exempeldata).
+ */
+export function usageFromEntries(entries: Record<ISODate, readonly DiaryEntry[]>): Record<string, FoodUsage> {
+  const usage: Record<string, FoodUsage> = {}
+  const foodEntries = Object.values(entries)
+    .flat()
+    .filter((e) => e.kind === 'food')
+    .sort((a, b) => a.createdAt - b.createdAt)
+  for (const e of foodEntries) {
+    const cur = usage[e.food.id]
+    usage[e.food.id] = {
+      count: (cur?.count ?? 0) + 1,
+      lastUsed: e.createdAt,
+      lastAmount: e.amount,
+      lastUnit: e.unit,
+      meals: { ...(cur?.meals ?? {}), [e.meal]: (cur?.meals?.[e.meal] ?? 0) + 1 },
+    }
+  }
+  return usage
 }
 
 interface FoodState {

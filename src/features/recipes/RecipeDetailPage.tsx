@@ -9,7 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { Car, Clock, Copy, Eye, Heart, Info, Leaf, ListOrdered, Pencil, Plus, Scale, Trash2, Users, Utensils } from 'lucide-react'
-import type { Nutrients, Recipe } from '../../types'
+import type { FoodTag, Nutrients, Recipe } from '../../types'
 import {
   Badge,
   Button,
@@ -45,6 +45,7 @@ import {
   formatIngredientAmount,
   parseInstructions,
   perServingText,
+  plateFractions,
   plateNote,
   recipeFavoriteId,
   scaleFactor,
@@ -60,6 +61,10 @@ import { LogRecipeSheet, RecipeEmoji, TagBadges } from './components'
 
 /** Redigeraren går tillbaka hit efter "Spara" i stället för att lägga en ny sida i historiken. */
 const EDIT_STATE = { fromDetail: true }
+
+/** Märkningar som inte upprepas som badges – klassikerna har redan "Svensk klassiker" i rubriken. */
+const OWN_HIDDEN_TAGS: readonly FoodTag[] = ['svensk']
+const CLASSIC_HIDDEN_TAGS: readonly FoodTag[] = ['svensk', 'klassiker']
 
 export default function RecipeDetailPage() {
   const { id } = useParams()
@@ -144,6 +149,8 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
   const totals = useMemo(() => recipeTotals(recipe), [recipe])
   const weight = useMemo(() => weightInfo(recipe), [recipe])
   const plate = useMemo(() => recipePlate(recipe), [recipe])
+  // Andelar av tallrikens tre delar (summa 1) – samma som när rätten loggas som måltid.
+  const plateShown = useMemo(() => plateFractions(plate), [plate])
   const climate = useMemo(() => servingClimate(recipe), [recipe])
   const tags = useMemo(() => recipeTags(recipe), [recipe])
   const parsed = useMemo(() => parseInstructions(recipe.instructions), [recipe.instructions])
@@ -221,17 +228,17 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
           <RecipeEmoji emoji={recipe.emoji} size="lg" />
           <dl className="grid min-w-0 flex-1 grid-cols-3 gap-2 text-center">
             <HeroStat icon={Clock} label="Tid" value={recipe.prepMinutes ? formatDuration(recipe.prepMinutes) : '–'} />
-            <HeroStat icon={Users} label={noun[0] === 'portion' ? 'Portioner' : capitalizeSv(noun[1])} value={formatNumber(recipe.servings)} />
+            <HeroStat icon={Users} label={capitalizeSv(noun[1])} value={formatNumber(recipe.servings)} />
             <HeroStat
               icon={Utensils}
-              label={noun[0] === 'portion' ? 'Portion' : capitalizeSv(noun[0])}
+              label={perServingText(noun)}
               value={numbersHidden ? mindfulShort(perServing.kcal) : <EnergyValue kcal={perServing.kcal} unitClassName="text-[0.72em] font-medium text-ink-3" />}
             />
           </dl>
         </div>
         {tags.length > 0 && (
           <div className="mt-4">
-            <TagBadges tags={tags} hide={['svensk']} size="md" />
+            <TagBadges tags={tags} hide={builtin ? CLASSIC_HIDDEN_TAGS : OWN_HIDDEN_TAGS} size="md" />
           </div>
         )}
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -288,14 +295,14 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
           </motion.div>
         )}
 
-        {(showPlate || (showClimate && climate)) && (
+        {((showPlate && plateShown) || (showClimate && climate)) && (
           <motion.div {...enter(3)} className="grid gap-4 sm:grid-cols-2">
-            {showPlate && plate && (
+            {showPlate && plateShown && (
               <Card title="Tallriksmodellen" eyebrow="Livsmedelsverket">
                 <div className="flex justify-center">
-                  <PlateModel fractions={plate} size={220} showLabels={!numbersHidden} />
+                  <PlateModel fractions={plateShown} size={220} showLabels={!numbersHidden} />
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-ink-2">{plateNote(plate)}</p>
+                <p className="mt-3 text-sm leading-relaxed text-ink-2">{plateNote(plateShown)}</p>
               </Card>
             )}
             {showClimate && climate && (
@@ -373,14 +380,19 @@ function capitalizeSv(s: string): string {
   return s ? s[0].toLocaleUpperCase('sv-SE') + s.slice(1) : s
 }
 
+/**
+ * Liten faktaruta: ikon, värde och en etikett under ("45 min / Tid", "4 / Portioner",
+ * "387 kcal / Per portion"). Etiketten står först i DOM:en (dt före dd) men visas sist, och får
+ * radbrytas i stället för att kapas på smala skärmar.
+ */
 function HeroStat({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col justify-center rounded-2xl bg-surface-2/70 px-1 py-2.5">
-      <dt className="flex items-center justify-center gap-1 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-ink-3">
-        <Icon aria-hidden className="size-3 shrink-0" />
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="mt-1 font-display text-[0.9375rem] font-semibold leading-tight text-ink tabular-nums">{value}</dd>
+    <div className="flex min-w-0 flex-col items-center justify-center rounded-2xl bg-surface-2/70 px-1 py-2.5">
+      <dt className="order-last mt-0.5 text-[0.6875rem] font-medium leading-tight text-ink-3 hyphens-auto [overflow-wrap:break-word]">{label}</dt>
+      <dd className="flex flex-col items-center font-display text-[0.9375rem] font-semibold leading-tight text-ink tabular-nums">
+        <Icon aria-hidden className="mb-1 size-3.5 shrink-0 text-ink-3" />
+        {value}
+      </dd>
     </div>
   )
 }
@@ -548,7 +560,12 @@ function IngredientsCard({
               <span className="w-28 shrink-0 text-[0.9375rem] font-semibold text-ink tabular-nums">{amount.text}</span>
               <span className="min-w-0 flex-1 text-[0.9375rem] leading-snug text-ink-2">
                 {ing.food.name}
-                {amount.grams && <span className="ml-1.5 whitespace-nowrap text-xs text-ink-3 tabular-nums">({amount.grams})</span>}
+                {amount.grams && (
+                  <>
+                    {' '}
+                    <span className="ml-1 whitespace-nowrap text-xs text-ink-3 tabular-nums">({amount.grams})</span>
+                  </>
+                )}
               </span>
             </li>
           )

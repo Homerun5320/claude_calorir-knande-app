@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createBackup, diaryToCsv, parseBackup, restoreBackup, summarizeBackup, wipeAllData, BackupError } from './backup'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useBodyStore } from '../stores/bodyStore'
+import { DEFAULT_SETTINGS } from '../stores/profileStore'
 import type { Food } from '../types'
 
 const mjolk: Food = {
@@ -50,5 +51,27 @@ describe('backup', () => {
     expect(lines[0]).toContain('Datum;Måltid')
     expect(lines[1]).toContain('Mjölk 1,5 %')
     expect(lines[1]).toContain('94,76') // 46 kcal × 2,06
+    expect(lines[1].split(';')[1]).toBe('Frukost')
+  })
+
+  it('skriver användarens måltidsnamn, aldrig interna id:n', () => {
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Äpple', nutrients: { kcal: 60 }, date: '2026-09-20', meal: 'mellanmal' })
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Te', nutrients: { kcal: 5 }, date: '2026-09-20', meal: 'kvallsmat' })
+    const meals = DEFAULT_SETTINGS.meals.map((m) => (m.id === 'mellanmal' ? { ...m, name: 'Eftermiddagsfika' } : m))
+    const lines = diaryToCsv(useDiaryStore.getState().entries, meals).split('\r\n')
+    const mealCol = lines.slice(1).map((l) => l.split(';')[1])
+    expect(mealCol).toContain('Eftermiddagsfika')
+    expect(mealCol).toContain('Kvällsmat')
+    expect(mealCol).not.toContain('mellanmal')
+    expect(mealCol).not.toContain('kvallsmat')
+  })
+
+  it('skyddar mot formelinjektion i textceller', () => {
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: '=HYPERLINK("http://example.com";"klick")', nutrients: { kcal: 1 }, date: '2026-09-20', meal: 'fika' })
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: '@SUM(A1)', nutrients: { kcal: 1 }, date: '2026-09-20', meal: 'fika' })
+    const csv = diaryToCsv(useDiaryStore.getState().entries)
+    expect(csv).toContain(`"'=HYPERLINK(""http://example.com"";""klick"")"`)
+    expect(csv).toContain(`'@SUM(A1)`)
+    expect(csv).not.toMatch(/;=HYPERLINK/)
   })
 })

@@ -3,7 +3,7 @@
  * markera dagen som klar (används av den adaptiva energiberäkningen). Visas efter klockan 18,
  * i medvetet läge eller när dagen redan har reflekterats.
  */
-import { memo, useId, useState } from 'react'
+import { memo, useId, useRef, useState } from 'react'
 import { CircleCheck, RotateCcw } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Confetti } from '../../components/signature'
@@ -11,6 +11,7 @@ import { Button, Card, toast } from '../../components/ui'
 import { DAY_SCALES, type ScaleDef, type ScaleKey } from '../../lib/dayMeta'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DayMeta, ISODate } from '../../types'
+import { focusAfterRender } from '../diary/focus'
 import { useClock } from './hooks'
 import { showEveningCheckIn } from './todayLogic'
 
@@ -66,15 +67,23 @@ export const EveningCheckIn = memo(function EveningCheckIn({ today, mindful }: {
   const meta = useDiaryStore((s) => s.days[today] ?? EMPTY_META)
   const setDayMeta = useDiaryStore((s) => s.setDayMeta)
   const [burst, setBurst] = useState(0)
+  // "Markera dagen som klar" och "Öppna igen" byter plats – fokus följer med till den nya knappen.
+  const toggleRef = useRef<HTMLButtonElement>(null)
 
   if (!showEveningCheckIn(now, mindful, meta)) return null
 
   const complete = meta.complete === true
   const setValue = (key: ScaleKey, v: number | undefined) => setDayMeta(today, { [key]: v })
 
+  const reopen = () => {
+    setDayMeta(today, { complete: false })
+    focusAfterRender(() => toggleRef.current)
+  }
+
   const markComplete = () => {
     setDayMeta(today, { complete: true })
     setBurst((n) => n + 1)
+    focusAfterRender(() => toggleRef.current)
     toast('Dagen är klar – tack för att du tog en stund för dig själv', {
       tone: 'success',
       action: { label: 'Ångra', onClick: () => useDiaryStore.getState().setDayMeta(today, { complete: false }) },
@@ -95,13 +104,13 @@ export const EveningCheckIn = memo(function EveningCheckIn({ today, mindful }: {
           <div className="flex items-center gap-3 rounded-2xl bg-mossa-soft px-4 py-3">
             <CircleCheck className="size-5 shrink-0 text-good" strokeWidth={2.4} aria-hidden="true" />
             <p className="min-w-0 flex-1 text-sm font-semibold text-ink">Dagen är markerad som klar</p>
-            <Button variant="ghost" size="sm" iconLeft={RotateCcw} onClick={() => setDayMeta(today, { complete: false })}>
+            <Button ref={toggleRef} variant="ghost" size="sm" iconLeft={RotateCcw} onClick={reopen}>
               Öppna igen
             </Button>
           </div>
         ) : (
           <>
-            <Button variant="soft" fullWidth iconLeft={CircleCheck} onClick={markComplete}>
+            <Button ref={toggleRef} variant="soft" fullWidth iconLeft={CircleCheck} onClick={markComplete}>
               Markera dagen som klar
             </Button>
             <p className="mt-2 text-center text-xs leading-relaxed text-ink-3">

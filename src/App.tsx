@@ -1,6 +1,7 @@
 import { lazy } from 'react'
 import { createHashRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
 import { AppShell, PageFallback } from './components/layout/AppShell'
+import { RouteError } from './components/layout/RouteError'
 import { useHydrated } from './stores/hydration'
 import { useProfileStore } from './stores/profileStore'
 
@@ -44,31 +45,40 @@ const router = createHashRouter([
         <AppShell />
       </Gate>
     ),
+    // Fel i själva ramen (sällsynt): hel felsida utan navigering.
+    errorElement: <RouteError />,
     children: [
-      { index: true, element: <TodayPage /> },
-      { path: 'dagbok', element: <DiaryPage /> },
-      { path: 'dagbok/:date', element: <DiaryPage /> },
-      { path: 'lagg-till', element: <AddFoodPage /> },
-      { path: 'skanna', element: <ScanPage /> },
-      { path: 'livsmedel/:id', element: <FoodDetailPage /> },
-      { path: 'nytt-livsmedel', element: <CustomFoodPage /> },
-      { path: 'livsmedel/:id/redigera', element: <CustomFoodPage /> },
-      { path: 'recept', element: <RecipesPage /> },
-      { path: 'recept/nytt', element: <RecipeEditorPage /> },
-      { path: 'recept/:id', element: <RecipeDetailPage /> },
-      { path: 'recept/:id/redigera', element: <RecipeEditorPage /> },
-      { path: 'vikt', element: <BodyPage /> },
-      { path: 'insikter', element: <InsightsPage /> },
-      { path: 'traning', element: <ExercisePage /> },
-      { path: 'dryck', element: <DrinksPage /> },
-      { path: 'fasta', element: <FastingPage /> },
-      { path: 'mer', element: <MorePage /> },
-      { path: 'om', element: <AboutPage /> },
-      { path: 'matkalender', element: <FoodCalendarPage /> },
-      { path: 'installningar', element: <SettingsPage /> },
-      { path: 'installningar/:section', element: <SettingsPage /> },
-      { path: 'valkommen', element: <OnboardingPage /> },
-      { path: '*', element: <Navigate to="/" replace /> },
+      {
+        // Fel på en sida (rendering eller en koddel som inte gick att hämta) visas inuti ramen,
+        // så att navigeringen finns kvar.
+        errorElement: <RouteError inShell />,
+        children: [
+          { index: true, element: <TodayPage /> },
+          { path: 'dagbok', element: <DiaryPage /> },
+          { path: 'dagbok/:date', element: <DiaryPage /> },
+          { path: 'lagg-till', element: <AddFoodPage /> },
+          { path: 'skanna', element: <ScanPage /> },
+          { path: 'livsmedel/:id', element: <FoodDetailPage /> },
+          { path: 'nytt-livsmedel', element: <CustomFoodPage /> },
+          { path: 'livsmedel/:id/redigera', element: <CustomFoodPage /> },
+          { path: 'recept', element: <RecipesPage /> },
+          { path: 'recept/nytt', element: <RecipeEditorPage /> },
+          { path: 'recept/:id', element: <RecipeDetailPage /> },
+          { path: 'recept/:id/redigera', element: <RecipeEditorPage /> },
+          { path: 'vikt', element: <BodyPage /> },
+          { path: 'insikter', element: <InsightsPage /> },
+          { path: 'traning', element: <ExercisePage /> },
+          { path: 'dryck', element: <DrinksPage /> },
+          { path: 'fasta', element: <FastingPage /> },
+          { path: 'mer', element: <MorePage /> },
+          { path: 'om', element: <AboutPage /> },
+          { path: 'matkalender', element: <FoodCalendarPage /> },
+          { path: 'installningar', element: <SettingsPage /> },
+          { path: 'installningar/:section', element: <SettingsPage /> },
+          { path: 'valkommen', element: <OnboardingPage /> },
+          { path: '*', element: <Navigate to="/" replace /> },
+        ],
+      },
     ],
   },
 ])

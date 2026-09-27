@@ -371,10 +371,17 @@ function ActivitySummary({ activity, met }: { activity: Activity; met: number })
           <Badge tone="neutral">{formatNumber(met, 1)} MET</Badge>
         </div>
         {activity.note && <p className="mt-1.5 text-[0.8125rem] leading-snug text-ink-3">{activity.note}</p>}
+        {activity.group === 'vardag' && <p className="mt-1.5 text-[0.8125rem] leading-snug text-ink-2">{EVERYDAY_HINT}</p>}
       </div>
     </div>
   )
 }
+
+/**
+ * Vardagsrörelse (promenader, pendling) ingår ofta redan i aktivitetsnivån i profilen – loggas
+ * den också räknas den två gånger.
+ */
+const EVERYDAY_HINT = 'Ingår det här redan i din vanliga vardag räknas det i din aktivitetsnivå – logga bara det som är extra.'
 
 function CustomFields({ name, onName, met, onMet }: { name: string; onName: (v: string) => void; met: number; onMet: (v: number) => void }) {
   const labelId = useId()

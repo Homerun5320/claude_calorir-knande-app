@@ -60,6 +60,19 @@ describe('NumberField', () => {
     expect(input).toHaveValue('1,5')
   })
 
+  it('tolkar blandade tal som "1 1/2" rätt (inte 11/2)', async () => {
+    const user = userEvent.setup()
+    const onValue = vi.fn()
+    render(<ControlledNumber onValue={onValue} />)
+    const input = screen.getByRole('spinbutton', { name: 'Mängd' })
+    await user.type(input, '1 1/2')
+    expect(onValue).toHaveBeenLastCalledWith(1.5)
+    expect(onValue).not.toHaveBeenCalledWith(5.5)
+    expect(onValue).not.toHaveBeenCalledWith(11)
+    await user.tab()
+    expect(input).toHaveValue('1,5')
+  })
+
   it('ignorerar bokstäver och ger undefined för tomt fält', async () => {
     const user = userEvent.setup()
     const onValue = vi.fn()
@@ -322,6 +335,31 @@ describe('Sheet', () => {
 
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('gör appen bakom arket inert medan det är öppet', async () => {
+    const user = userEvent.setup()
+    const root = document.createElement('div')
+    root.id = 'root'
+    document.body.appendChild(root)
+    function Harness() {
+      const [open, setOpen] = useState(true)
+      return (
+        <>
+          <button type="button">Bakom</button>
+          <Sheet open={open} onClose={() => setOpen(false)} title="Portion">
+            innehåll
+          </Sheet>
+        </>
+      )
+    }
+    render(<Harness />, { container: root })
+    expect(root).toHaveAttribute('inert')
+    // Arket ligger i en portal utanför #root och går att använda.
+    expect(root.contains(screen.getByRole('dialog', { name: 'Portion' }))).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Stäng' }))
+    await waitFor(() => expect(root).not.toHaveAttribute('inert'))
+    root.remove()
   })
 
   it('återställer fokus och scroll när arket stängs', async () => {

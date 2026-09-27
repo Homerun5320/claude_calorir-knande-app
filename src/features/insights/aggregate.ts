@@ -11,7 +11,7 @@ import type { DiaryEntry, ExerciseEntry, FoodCategory, ISODate, MealId, Nutrient
 import { MEAL_IDS } from '../../types'
 import { dailyBudget, entryNutrients, exerciseKcal, totals } from '../../lib/diary'
 import { energyDistribution, NUTRIENT_KEYS, type NutrientKey } from '../../lib/nutrients'
-import { MIN_COVERAGE, percentOfReference, type ReferenceMap } from '../../lib/nnr'
+import { MIN_COVERAGE, nutrientStatus, percentOfReference, type ReferenceMap } from '../../lib/nnr'
 import { mealPlate, PLATE_GOOD_SCORE, type MealPlate, type PlateVariant } from '../../lib/plate'
 import { dayClimate, entryCo2e } from '../../lib/climate'
 import { weightTrend } from '../../lib/energy'
@@ -303,6 +303,44 @@ export function rankNutrients(
     .sort((a, b) => a.percent - b.percent)
     .slice(0, limit)
   return { strongest, weakest }
+}
+
+/**
+ * Referenser där protein jämförs med ditt eget proteinmål – samma mål som energikortet visar – i
+ * stället för NNR:s minimibehov. Annars kan samma snitt vara både "under målet" och "123 %".
+ * Proteinmålet är aldrig lägre än NNR:s rekommendation för din vikt.
+ */
+export function withPersonalProtein(refs: ReferenceMap, proteinTargetG: number | undefined): ReferenceMap {
+  const ref = refs.protein
+  if (!ref || proteinTargetG === undefined || !(proteinTargetG > 0)) return refs
+  return { ...refs, protein: { ...ref, ri: proteinTargetG, note: 'Ditt proteinmål' } }
+}
+
+/**
+ * Referenser för näringstabellen utan omdömen som bygger på för lite data. När värdet saknas för
+ * en stor del av maten (täckning under `MIN_COVERAGE`) är snittet bara en nedre gräns: "Bra" och
+ * "Över" stämmer då fortfarande, men "Lågt", "Nästan" och "under maxgränsen" kan vara fel. För de
+ * ämnena tas referensen bort så att tabellen bara visar värdet – samma regel som Kostråd och
+ * "Håll koll på" använder.
+ */
+export function reliableReferences(averages: Nutrients, coverage: Partial<Record<NutrientKey, number>>, refs: ReferenceMap): ReferenceMap {
+  const out: ReferenceMap = {}
+  for (const [key, ref] of Object.entries(refs) as Array<[NutrientKey, NonNullable<ReferenceMap[NutrientKey]>]>) {
+    const cov = coverage[key]
+    if (cov === undefined || cov >= MIN_COVERAGE) {
+      out[key] = ref
+      continue
+    }
+    const status = nutrientStatus(averages[key], ref)
+    const reachedRi = status === 'uppnatt' && ref.ri !== undefined && ref.ri > 0
+    if (reachedRi || status === 'over_max' || status === 'over_ul') out[key] = ref
+  }
+  return out
+}
+
+/** Ämnen där tabellens omdöme har tagits bort på grund av låg täckning (se `reliableReferences`). */
+export function uncertainNutrients(refs: ReferenceMap, reliable: ReferenceMap, averages: Nutrients): NutrientKey[] {
+  return (Object.keys(refs) as NutrientKey[]).filter((k) => !reliable[k] && averages[k] !== undefined)
 }
 
 export interface SourceItem {

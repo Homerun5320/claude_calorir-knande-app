@@ -77,9 +77,11 @@ export function LogWeightCard({ today, first, hideNumbers = false }: LogWeightCa
           suffix="kg"
           step={0.1}
           decimals={1}
-          min={MIN_KG}
-          max={MAX_KG}
-          placeholder="72,4"
+          // Bara min 0 (inga negativa tal): fältet ska inte tyst skriva om en felskriven vikt
+          // (t.ex. "7,24" till 20 kg). Intervallet kontrolleras här och visas som fel.
+          min={0}
+          // Medvetet läge: ingen exempelvikt i fältet – bara ett neutralt streck.
+          placeholder={hideNumbers ? '–' : '72,4'}
           error={kg !== undefined && !kgValid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG} kg` : undefined}
         />
 

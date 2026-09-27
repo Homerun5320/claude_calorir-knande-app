@@ -26,6 +26,7 @@ import {
   rollingAverage,
   summarizeDays,
   weightWindow,
+  withPersonalProtein,
   type DayStat,
   type MacroRangeKey,
   type RankedNutrient,
@@ -317,13 +318,15 @@ function DistributionCard({ data }: { data: InsightsData }) {
   }, [verdicts, alcoholPct])
 
   return (
-    <Card title="Energifördelning" eyebrow="Jämfört med NNR 2023">
+    // @container: diagram och lista hamnar sida vid sida först när kortet självt är brett nog –
+    // i tvåkolumnsläget (från 768 px) är kortet bara halvbrett.
+    <Card title="Energifördelning" eyebrow="Jämfört med NNR 2023" className="@container">
       {verdicts.length === 0 ? (
         <p className="text-sm leading-relaxed text-ink-2">
           När du har loggat mat med protein, fett och kolhydrater ser du här hur energin fördelar sig.
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+        <div className="flex flex-col items-center gap-5 @md:flex-row @md:items-start">
           <DonutChart
             segments={segments}
             size={140}
@@ -345,7 +348,7 @@ function DistributionCard({ data }: { data: InsightsData }) {
               </span>
             )}
           </DonutChart>
-          <ul className="w-full space-y-3">
+          <ul className="w-full min-w-0 space-y-3 @md:flex-1">
             {verdicts.map((v) => (
               <li key={v.key}>
                 <div className="flex items-center gap-2">
@@ -397,17 +400,24 @@ function NutrientList({ items, tone, mindful }: { items: readonly RankedNutrient
 }
 
 function NutrientHighlightsCard({ data, onTab }: { data: InsightsData; onTab: (tab: InsightsTab) => void }) {
-  const { avg, refs, mindful } = data
-  const { strongest, weakest } = useMemo(() => rankNutrients(avg.averages, avg.coverage, refs), [avg.averages, avg.coverage, refs])
+  const { avg, refs, mindful, targets } = data
+  // Protein mäts mot ditt proteinmål, samma som i energikortet ovan.
+  const rankRefs = useMemo(() => withPersonalProtein(refs, targets.proteinG), [refs, targets.proteinG])
+  const { strongest, weakest } = useMemo(() => rankNutrients(avg.averages, avg.coverage, rankRefs), [avg.averages, avg.coverage, rankRefs])
   return (
-    <Card title="Näring i korthet" eyebrow="Mot rekommendationen" action={<CardAction onClick={() => onTab('naring')}>All näring</CardAction>}>
+    <Card
+      title="Näring i korthet"
+      eyebrow="Mot rekommendationen"
+      action={<CardAction onClick={() => onTab('naring')}>All näring</CardAction>}
+      className="@container"
+    >
       {strongest.length === 0 && weakest.length === 0 ? (
         <p className="text-sm leading-relaxed text-ink-2">
           Det finns inte tillräckligt med kända näringsvärden för att jämföra ännu. Livsmedel från Lagoms databas har mest
           kompletta värden.
         </p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 @md:grid-cols-2">
           <section aria-label="Starkast">
             <h3 className="eyebrow mb-2">Starkast 💪</h3>
             {strongest.length ? (
@@ -426,7 +436,9 @@ function NutrientHighlightsCard({ data, onTab }: { data: InsightsData; onTab: (t
           </section>
         </div>
       )}
-      {!mindful && <InfoNote className="mt-4">Procent av rekommenderat intag (NNR 2023) i snitt per loggad dag.</InfoNote>}
+      {!mindful && (
+        <InfoNote className="mt-4">Procent av rekommenderat intag (NNR 2023) i snitt per loggad dag. Protein jämförs med ditt proteinmål.</InfoNote>
+      )}
     </Card>
   )
 }

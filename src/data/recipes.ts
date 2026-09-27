@@ -297,7 +297,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
   {
     id: 'biff-a-la-lindstrom',
     name: 'Biff à la Lindström',
-    emoji: '🍔',
+    emoji: '🥩',
     servings: 4,
     prepMinutes: 40,
     tags: ['klassiker', 'svensk'],
@@ -642,7 +642,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
   {
     id: 'fiskgratang',
     name: 'Fiskgratäng med potatismos',
-    emoji: '🐠',
+    emoji: '🐟',
     servings: 4,
     prepMinutes: 50,
     tags: ['klassiker', 'svensk'],
@@ -672,7 +672,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
   {
     id: 'stekt-stromming',
     name: 'Stekt strömming med potatismos',
-    emoji: '🎣',
+    emoji: '🐟',
     servings: 4,
     prepMinutes: 40,
     tags: ['klassiker', 'svensk'],
@@ -1030,7 +1030,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
   {
     id: 'sill-och-potatis',
     name: 'Sill och färskpotatis',
-    emoji: '🌼',
+    emoji: '🥔',
     servings: 4,
     prepMinutes: 30,
     tags: ['klassiker', 'svensk', 'glutenfri'],

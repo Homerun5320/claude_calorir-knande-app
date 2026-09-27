@@ -100,7 +100,7 @@ export interface PlateSplit {
 
 /** Gram per 100 g livsmedel som räknas mot Livsmedelsverkets kostråd. */
 export interface KostradContrib {
-  /** Frukt, grönsaker, bär, baljväxter (ej potatis, ej juice). */
+  /** Frukt, grönsaker och bär (ej potatis, ej juice och sedan 2025 ej baljväxter). */
   fruktGront?: number
   /** Rött kött + chark (tillagad vikt). */
   rottKott?: number
@@ -108,6 +108,10 @@ export interface KostradContrib {
   fisk?: number
   /** Nötter och frön. */
   notter?: number
+  /** Bönor, ärter, linser och kikärtor (tillagad vikt). Eget kostråd sedan 2025. */
+  baljvaxter?: number
+  /** Mjölk, fil, yoghurt, kvarg och växtbaserade alternativ (g ≈ ml). Eget kostråd sedan 2025. */
+  mejeri?: number
 }
 
 export interface FoodExtra {

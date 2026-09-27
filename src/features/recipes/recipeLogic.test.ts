@@ -14,6 +14,7 @@ import {
   isDraftDirty,
   makeIngredient,
   parseInstructions,
+  plateFractions,
   plateNote,
   portionAmountText,
   recipeFavoriteId,
@@ -259,6 +260,21 @@ describe('tillagad vikt, klimat och tallrik', () => {
     expect(cookedWeightText(weightInfo(recipe()))).toContain('råvikten')
   })
 
+  it('förklarar viktökning utan att påstå att det är ris eller pasta', () => {
+    // Mjöl (spannmål) kan suga upp vätska.
+    const withFlour = weightInfo(recipe({ cookedWeightG: 450 }))
+    expect(withFlour.absorbs).toBe(true)
+    expect(cookedWeightText(withFlour)).toContain('50 %')
+    expect(cookedWeightText(withFlour)).toMatch(/suger upp vatten/)
+    // Grönsakssoppa utan torra råvaror: vätskan står troligen inte bland ingredienserna.
+    const soup = weightInfo(recipe({ cookedWeightG: 300, ingredients: [{ id: 'l', food: lok, amount: 2, unit: 'portion:st', grams: 200 }] }))
+    expect(soup.absorbs).toBeUndefined()
+    const text = cookedWeightText(soup)
+    expect(text).toContain('50 %')
+    expect(text).not.toMatch(/ris|pasta|gryn/)
+    expect(text).toMatch(/vatten eller buljong/)
+  })
+
   it('varnar vänligt för orimliga vikter', () => {
     expect(cookedWeightWarning(1000, 200)).toBeDefined()
     expect(cookedWeightWarning(1000, 4000)).toBeDefined()
@@ -288,6 +304,17 @@ describe('tillagad vikt, klimat och tallrik', () => {
     // Bakverk bland klassikerna.
     expect(showPlateFor({ id: 'klassiker-lussekatter', builtin: true }, { kcal: 180 }, meal)).toBe(false)
     expect(showPlateFor({ id: 'klassiker-kalops', builtin: true }, { kcal: 450 }, meal)).toBe(true)
+  })
+
+  it('räknar tallrikens andelar på bara de tre delarna', () => {
+    // Köttbullar: mycket "övrigt" (mjölk, smör, salt) – andelarna ska ändå summera till 100 %.
+    const f = plateFractions({ veg: 0.06, carb: 0.04, protein: 0.67 })
+    expect(f).toBeDefined()
+    expect((f?.veg ?? 0) + (f?.carb ?? 0) + (f?.protein ?? 0)).toBeCloseTo(1)
+    expect(f?.protein).toBeCloseTo(0.67 / 0.77)
+    expect(plateFractions({ veg: 0, carb: 0, protein: 0 })).toBeUndefined()
+    expect(plateFractions(undefined)).toBeUndefined()
+    expect(plateFractions({ veg: -1, carb: Number.NaN, protein: 0.3 })).toEqual({ veg: 0, carb: 0, protein: 1 })
   })
 
   it('ger neutrala tallrikskommentarer', () => {

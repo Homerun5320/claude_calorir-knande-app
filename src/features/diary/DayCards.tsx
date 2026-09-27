@@ -1,7 +1,7 @@
 /**
  * Små kort för dagboken: tom dag (med "Kopiera gårdagen") och "Markera dagen som klar".
  */
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { CircleCheck, CopyPlus, Plus, RotateCcw } from 'lucide-react'
 import { Button, EmptyState, toast } from '../../components/ui'
 import { Confetti } from '../../components/signature'
@@ -9,6 +9,7 @@ import { addDays, formatDayShort } from '../../lib/dates'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { ISODate, MealId } from '../../types'
 import { addFoodHref, newEntryIds, type DayKind } from './diaryLogic'
+import { firstAddFoodLink, firstEntryButton, focusAfterRender } from './focus'
 
 // ---------------------------------------------------------------------------
 // Tom dag
@@ -65,7 +66,14 @@ export const EmptyDayCard = memo(function EmptyDayCard({ date, today, kind, defa
               Lägg till mat
             </Button>
             {prevCount > 0 && (
-              <Button variant="soft" iconLeft={CopyPlus} onClick={() => copyPreviousDay(date)}>
+              <Button
+                variant="soft"
+                iconLeft={CopyPlus}
+                onClick={() => {
+                  // Kortet försvinner när dagen fylls – ge fokus till den första kopierade posten.
+                  if (copyPreviousDay(date) > 0) focusAfterRender(firstEntryButton, firstAddFoodLink)
+                }}
+              >
                 {copyLabel}
               </Button>
             )}
@@ -94,13 +102,20 @@ export function toggleDayComplete(date: ISODate, complete: boolean): void {
 
 export const CompleteDayCard = memo(function CompleteDayCard({ date, complete }: { date: ISODate; complete: boolean }) {
   const [burst, setBurst] = useState(0)
+  // "Markera dagen som klar" och "Öppna igen" byter plats – fokus följer med till den nya knappen.
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const toggle = (next: boolean) => {
+    toggleDayComplete(date, next)
+    if (next) setBurst((n) => n + 1)
+    focusAfterRender(() => toggleRef.current)
+  }
   return (
     <div className="relative">
       {complete ? (
         <div className="flex items-center gap-3 rounded-card bg-mossa-soft px-4 py-3.5">
           <CircleCheck className="size-5 shrink-0 text-good" strokeWidth={2.4} aria-hidden />
           <p className="min-w-0 flex-1 text-sm font-semibold text-ink">Dagen markerad som klar</p>
-          <Button variant="ghost" size="sm" iconLeft={RotateCcw} onClick={() => toggleDayComplete(date, false)}>
+          <Button ref={toggleRef} variant="ghost" size="sm" iconLeft={RotateCcw} onClick={() => toggle(false)}>
             Öppna igen
           </Button>
         </div>
@@ -110,15 +125,7 @@ export const CompleteDayCard = memo(function CompleteDayCard({ date, complete }:
           <p className="mx-auto mt-1 max-w-[36ch] text-sm leading-relaxed text-ink-2">
             Klara dagar hjälper Lagom att räkna ut din förbrukning mer exakt. Det gör inget om något saknas.
           </p>
-          <Button
-            className="mt-3"
-            variant="soft"
-            iconLeft={CircleCheck}
-            onClick={() => {
-              toggleDayComplete(date, true)
-              setBurst((n) => n + 1)
-            }}
-          >
+          <Button ref={toggleRef} className="mt-3" variant="soft" iconLeft={CircleCheck} onClick={() => toggle(true)}>
             Markera dagen som klar
           </Button>
         </div>

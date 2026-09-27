@@ -15,6 +15,8 @@ import {
   fastProgress,
   formatFastDuration,
   formatHms,
+  isTooShortFast,
+  MIN_SAVED_FAST_MS,
   protocolById,
 } from '../fastingLogic'
 import { useNow } from '../hooks'
@@ -40,6 +42,20 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
 
   const end = async () => {
     const current = fastProgress(active, Date.now())
+    // Nyss startad (t.ex. av misstag): avsluta utan att spara, så att en "0 min"-fasta inte
+    // hamnar i historiken och veckans statistik.
+    if (isTooShortFast(current.elapsedMs)) {
+      const ok = await confirmDialog({
+        title: 'Avsluta fastan?',
+        message: `Fastan har bara pågått ${formatFastDuration(current.elapsedMs)}. Fastor under ${formatFastDuration(MIN_SAVED_FAST_MS)} sparas inte i historiken.`,
+        confirmLabel: 'Avsluta utan att spara',
+        cancelLabel: 'Fortsätt fasta',
+        icon: Hourglass,
+      })
+      if (!ok) return
+      discard('Fastan är avslutad utan att sparas')
+      return
+    }
     if (!current.done) {
       const ok = await confirmDialog({
         title: 'Avsluta fastan nu?',
@@ -65,9 +81,14 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
       tone: 'danger',
     })
     if (!ok) return
+    discard('Fastan är avbruten')
+  }
+
+  /** Ta bort den pågående fastan utan att spara (med Ångra). */
+  const discard = (message: string) => {
     const snapshot = { ...active }
     useFastingStore.getState().cancelFast()
-    toast('Fastan är avbruten', {
+    toast(message, {
       action: { label: 'Ångra', onClick: () => useFastingStore.getState().startFast(snapshot.targetHours, snapshot.protocol, snapshot.start) },
     })
   }

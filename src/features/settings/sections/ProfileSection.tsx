@@ -1,20 +1,25 @@
 /**
  * Inställningar → Profil. Samma fält och validering som välkomstflödet. Målen räknas om
- * direkt medan man ändrar, och sparas först när man trycker Spara.
+ * direkt medan man ändrar, och sparas först när man trycker Spara. Lämnar man sidan med
+ * osparade ändringar frågar Lagom först – t.ex. graviditet ändrar målen och får inte tappas bort.
  */
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { CalendarHeart, Check, UserRound } from 'lucide-react'
-import { Button, Card, EmptyState, NumberField, SegmentedControl, Select, toast } from '../../../components/ui'
+import { Button, Card, EmptyState, NumberField, SegmentedControl, Select, confirmDialog, toast } from '../../../components/ui'
+import { useEnergyUnit } from '../../../components/domain/EnergyValue'
 import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
 import { computeEnergy, computeTargets } from '../../../lib/energy'
-import { formatNumber } from '../../../lib/format'
+import { formatEnergy, formatNumber } from '../../../lib/format'
 import { useBodyStore } from '../../../stores/bodyStore'
 import { useProfileStore } from '../../../stores/profileStore'
 import { ACTIVITY_LEVELS, type ActivityLevel, type DietType, type GoalType, type Profile } from '../../../types'
 import { AboutFields, Note } from '../../onboarding/AboutFields'
+import { focusFirstInvalid } from '../../onboarding/focusFirstInvalid'
 import { TargetsSummary } from '../../onboarding/TargetsSummary'
+import { clampKcalOverride, kcalFloorText, kcalOverrideFloor } from '../settingsLogic'
 import {
   DIET_OPTIONS,
   buildProfile,
@@ -22,6 +27,7 @@ import {
   describeProjection,
   draftFromProfile,
   effectiveGoal,
+  effectiveRate,
   hasErrors,
   isDraftComplete,
   lossBlockReason,
@@ -61,8 +67,10 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
   const reduce = useReducedMotion()
   const setProfile = useProfileStore((s) => s.setProfile)
   const overrides = useProfileStore((s) => s.settings.targetOverrides)
+  const updateSettings = useProfileStore((s) => s.updateSettings)
   const logWeight = useBodyStore((s) => s.logWeight)
   const { adaptive } = useTargets(today)
+  const unit = useEnergyUnit()
   const goalLabelId = useId()
   const rateLabelId = useId()
 
@@ -82,34 +90,62 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
   const wanted = draft.goalChoice
   const options = rateOptions(draft.weightKg, goal)
   const rate = clampRate(draft.weeklyRateKg, draft.weightKg, goal)
-  const projection = projectedGoalDate(draft, today)
+  const projection = projectedGoalDate(draft, today, { adaptiveTdee: adaptive?.tdee })
+  const eff = effectiveRate(draft, today, { adaptiveTdee: adaptive?.tdee })
 
-  // Förhandsvisning av målen med de ändrade uppgifterna.
+  // Förhandsvisning av målen med de ändrade uppgifterna. Ett eget energimål som blir för lågt
+  // med de nya uppgifterna (t.ex. vid graviditet) höjs till golvet – samma sak sker när man sparar.
   const preview = useMemo(() => {
     if (!complete) return null
     try {
       const p = buildProfile(draft, { today, base: profile })
       const w = draft.weightKg as number
       const opts = { today, adaptiveTdee: adaptive?.tdee }
-      return { energy: computeEnergy(p, w, opts), targets: computeTargets(p, w, overrides, opts) }
+      const energy = computeEnergy(p, w, opts)
+      const floor = kcalOverrideFloor(p, energy, today)
+      const safeOverrides = clampKcalOverride(overrides, floor.kcal)
+      return { energy, floor, safeOverrides, targets: computeTargets(p, w, safeOverrides, opts) }
     } catch {
       return null
     }
   }, [complete, draft, today, profile, adaptive, overrides])
 
+  // Fråga innan osparade ändringar går förlorade (tillbaka-knapp, bottenmeny, länkar).
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
+  const asking = useRef(false)
+  useEffect(() => {
+    if (blocker.state !== 'blocked' || asking.current) return
+    asking.current = true
+    void confirmDialog({
+      title: 'Lämna utan att spara?',
+      message: 'Ändringarna i din profil sparas inte, och dina mål räknas inte om.',
+      confirmLabel: 'Lämna',
+      cancelLabel: 'Fortsätt redigera',
+      tone: 'danger',
+    }).then((ok) => {
+      asking.current = false
+      if (ok) blocker.proceed()
+      else blocker.reset()
+    })
+  }, [blocker])
+
   const save = () => {
     if (!complete) {
       setAttempted(true)
-      window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
+      window.requestAnimationFrame(() => focusFirstInvalid())
       return
     }
     const next = buildProfile(draft, { today, base: profile })
     setProfile(next)
     const w = Math.round((draft.weightKg as number) * 10) / 10
     if (Math.abs(w - currentWeight) >= 0.05) logWeight(today, w)
+    const raised = preview !== null && preview.safeOverrides !== overrides
+    if (raised) updateSettings({ targetOverrides: preview.safeOverrides })
     setDraft(draftFromProfile(next, w))
     setAttempted(false)
-    toast('Profilen är sparad', { tone: 'success' })
+    toast(raised ? `Profilen är sparad. Ditt eget energimål är höjt till ${formatEnergy(preview.floor.kcal, unit)}.` : 'Profilen är sparad', {
+      tone: 'success',
+    })
   }
 
   const blocked = wanted === 'ga_ner' ? lossBlockReason(draft, today) : null
@@ -195,11 +231,18 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
                 decimals={1}
                 error={targetError}
               />
+              {goal === 'ga_ner' && eff?.limitedByFloor && eff.kcal !== undefined && (
+                <Note>
+                  Lagom sätter aldrig dagsmålet under {formatEnergy(eff.kcal, unit)}, så att du får i dig tillräckligt med näring. För dig blir takten därför
+                  ungefär {formatNumber(eff.rate, 2)} kg i veckan – och det är helt okej.
+                </Note>
+              )}
               {projection && !targetError && (
                 <p className="flex items-start gap-2 text-[0.875rem] leading-relaxed text-ink-2">
                   <CalendarHeart aria-hidden className="mt-0.5 size-4 shrink-0 text-hjortron" />
                   <span>
-                    Med den takten når du {formatNumber(draft.targetWeightKg, 1)} kg {describeProjection(projection, today)}.
+                    Med {eff?.limitedByFloor ? `ungefär ${formatNumber(eff.rate, 2)} kg i veckan` : 'den takten'} når du {formatNumber(draft.targetWeightKg, 1)} kg{' '}
+                    {describeProjection(projection, today)}.
                   </span>
                 </p>
               )}
@@ -210,7 +253,15 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
 
       <Card title="Dina mål med de här uppgifterna" eyebrow={dirty ? 'Förhandsvisning' : 'Nu'}>
         {preview ? (
-          <TargetsSummary energy={preview.energy} targets={preview.targets} />
+          <TargetsSummary
+            energy={preview.energy}
+            targets={preview.targets}
+            extraNotes={
+              preview.safeOverrides !== overrides && overrides.kcal !== undefined
+                ? [`Ditt eget energimål (${formatEnergy(overrides.kcal, unit)}) höjs när du sparar. ${kcalFloorText(preview.floor, unit)}`]
+                : []
+            }
+          />
         ) : (
           <p className="text-[0.9375rem] text-ink-2">Fyll i alla uppgifter så räknas målen om direkt.</p>
         )}

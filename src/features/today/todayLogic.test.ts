@@ -15,6 +15,7 @@ import {
   headerFoodDay,
   isDiaryEmpty,
   kostradProgressText,
+  kostradStatusLabel,
   kostradWeekDates,
   lowIntakeAverage,
   mainMealEntries,
@@ -269,6 +270,16 @@ describe('kostråd i veckan', () => {
     expect(kostradProgressText(kostrad('rorelse', 'nastan', { unit: 'min', actual: 45, target: 64, weeklyTarget: 150 }))).toBe(
       '45 av 150 min i veckan',
     )
+  })
+
+  it('säger "I fas" – inte "I mål" – när ett veckoråd ligger i takt men veckomålet inte är nått', () => {
+    // Sex dagar in i veckan: målet är omskalat till 257 g, 283 g räcker – men inte till 300 g.
+    const onPace = kostrad('fisk', 'bra', { unit: 'g', actual: 283, target: 257.1, weeklyTarget: 300 })
+    expect(kostradStatusLabel(onPace)).toBe('I fas')
+    expect(kostradStatusLabel({ ...onPace, actual: 320 })).toBe('I mål')
+    expect(kostradStatusLabel(kostrad('rorelse', 'bra', { unit: 'min', actual: 90, target: 64, weeklyTarget: 150 }))).toBe('I fas')
+    expect(kostradStatusLabel(kostrad('frukt_gront', 'bra', { actual: 520, target: 500 }))).toBe('I mål')
+    expect(kostradStatusLabel(kostrad('fisk', 'nastan', { unit: 'g', actual: 200, target: 257.1, weeklyTarget: 300 }))).toBe('Nästan')
   })
 })
 

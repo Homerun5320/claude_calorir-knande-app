@@ -28,7 +28,6 @@ import {
   downloadFile,
   parseBackup,
   requestPersistentStorage,
-  restoreBackup,
   storageEstimate,
   summarizeBackup,
   wipeAllData,
@@ -36,10 +35,11 @@ import {
   type ImportSummary,
 } from '../../../lib/backup'
 import { clearDemoFlag, isDemoData } from '../../../lib/demo'
-import { formatDayLong, relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
-import { formatNumber, plural } from '../../../lib/format'
+import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
+import { backupDateLabel, restoreBackupSafely } from '../backupImport'
 import { clearLastBackup, markBackupNow, useLastBackup } from '../backupStatus'
+import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
 function exportBackup() {
@@ -106,7 +106,8 @@ export function DataSection() {
       if (!ok) return
     }
     try {
-      restoreBackup(pending.backup, mode)
+      // Rullar tillbaka allt om något går fel, så att felmeddelandet nedan stämmer.
+      restoreBackupSafely(pending.backup, mode)
       if (mode === 'replace') {
         clearDemoFlag()
         setDemo(false)
@@ -236,7 +237,7 @@ export function DataSection() {
         open={pending !== null}
         onClose={() => setPending(null)}
         title="Importera säkerhetskopia"
-        description={pending ? `${pending.fileName} · skapad ${formatDayLong(toISODate(new Date(pending.backup.exportedAt)))}` : undefined}
+        description={pending ? `${pending.fileName} · skapad ${backupDateLabel(pending.backup.exportedAt)}` : undefined}
         footer={
           <div className="flex flex-col gap-2">
             <Button fullWidth iconLeft={Merge} onClick={() => doImport('merge')}>
@@ -293,25 +294,6 @@ export function DataSection() {
         </form>
       </Dialog>
     </div>
-  )
-}
-
-function ImportSummaryList({ summary }: { summary: ImportSummary }) {
-  const rows: Array<[string, string]> = [
-    ['Dagbok', `${plural(summary.days, 'dag', 'dagar')} · ${plural(summary.entries, 'post', 'poster')}`],
-    ['Vikt', plural(summary.weights, 'vägning', 'vägningar')],
-    ['Egna livsmedel', formatNumber(summary.customFoods)],
-    ['Recept', formatNumber(summary.recipes)],
-  ]
-  return (
-    <dl className="flex flex-col rounded-2xl bg-surface-2 px-4 py-1">
-      {rows.map(([k, v]) => (
-        <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-0">
-          <dt className="text-[0.9375rem] text-ink-2">{k}</dt>
-          <dd className="text-[0.9375rem] font-semibold tabular-nums text-ink">{v}</dd>
-        </div>
-      ))}
-    </dl>
   )
 }
 

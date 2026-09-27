@@ -81,7 +81,15 @@ describe('RecipesPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Recept' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Mina recept/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Ditt första recept väntar')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /Skapa recept|Nytt recept/ }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByRole('link', { name: 'Skapa recept' })).toHaveAttribute('href', '/recept/nytt')
+    // Den flytande knappen dubblerar inte tomlägets egen knapp (och täcker inte tipsen).
+    expect(screen.queryByRole('link', { name: 'Nytt recept' })).not.toBeInTheDocument()
+  })
+
+  it('visar den flytande knappen "Nytt recept" bland klassikerna', async () => {
+    renderAt('/recept?flik=klassiker')
+    expect(await screen.findByText('Köttbullar')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Nytt recept' })).toHaveAttribute('href', '/recept/nytt')
   })
 
   it('listar klassikerna och filtrerar med sökning', async () => {
@@ -108,7 +116,15 @@ describe('RecipeDetailPage', () => {
     renderAt('/recept/klassiker-pannkakor')
     expect(await screen.findByRole('heading', { level: 1, name: 'Pannkakor' })).toBeInTheDocument()
     expect(screen.getByText('Svensk klassiker')).toBeInTheDocument()
+    // Faktarutorna har korta, olika etiketter (inte "Portioner" bredvid "Portion").
+    const stats = screen.getByText('Tid').closest('dl') as HTMLElement
+    expect(within(stats).getByText('Portioner')).toBeInTheDocument()
+    expect(within(stats).getByText('Per portion')).toBeInTheDocument()
+    // "Klassiker" upprepas inte som badge under rubriken "Svensk klassiker".
+    expect(screen.queryByText('Klassiker')).not.toBeInTheDocument()
     expect(screen.getByText('2½ dl')).toBeInTheDocument()
+    // Namn och vikt är skilda åt med ett mellanslag (även för skärmläsare).
+    expect(screen.getByText('2½ dl').closest('li')).toHaveTextContent(/Vetemjöl \(\d+ g\)/)
     expect(screen.getByText('3 ägg')).toBeInTheDocument()
     expect(screen.getByText(/Vispa mjöl, salt och hälften av mjölken/)).toBeInTheDocument()
 

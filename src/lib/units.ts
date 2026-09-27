@@ -100,9 +100,162 @@ export function unitLabel(food: Pick<Food, 'portions'>, unit: UnitKey): string {
   return UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
 }
 
+/** Pluralformer för vanliga portionsord i livsmedelsdatabasen ("skiva" → "skivor"). */
+export const PORTION_PLURALS: Record<string, string> = {
+  st: 'st',
+  ägg: 'ägg',
+  äggula: 'äggulor',
+  äggvita: 'äggvitor',
+  klyfta: 'klyftor',
+  förpackning: 'förpackningar',
+  portion: 'portioner',
+  tortilla: 'tortillas',
+  platta: 'plattor',
+  påse: 'påsar',
+  tärning: 'tärningar',
+  knippe: 'knippen',
+  skiva: 'skivor',
+  burk: 'burkar',
+  bit: 'bitar',
+  kaka: 'kakor',
+  stjälk: 'stjälkar',
+  klick: 'klickar',
+  filé: 'filéer',
+  kruka: 'krukor',
+  ask: 'askar',
+  huvud: 'huvuden',
+  kvist: 'kvistar',
+  nypa: 'nypor',
+  kopp: 'koppar',
+  flaska: 'flaskor',
+  paket: 'paket',
+  tub: 'tuber',
+  kula: 'kulor',
+  skopa: 'skopor',
+  handfull: 'handfullar',
+  näve: 'nävar',
+  blad: 'blad',
+  bukett: 'buketter',
+  ring: 'ringar',
+  rad: 'rader',
+  glas: 'glas',
+  smörgås: 'smörgåsar',
+  macka: 'mackor',
+  tallrik: 'tallrikar',
+  skål: 'skålar',
+  bägare: 'bägare',
+  slev: 'slevar',
+  kanna: 'kannor',
+  drink: 'drinkar',
+  skvätt: 'skvättar',
+  hekto: 'hekto',
+  bulle: 'bullar',
+  biff: 'biffar',
+  korv: 'korvar',
+  muffins: 'muffins',
+  kanelbulle: 'kanelbullar',
+  pizza: 'pizzor',
+  bar: 'bars',
+  dl: 'dl',
+  cl: 'cl',
+  msk: 'msk',
+  tsk: 'tsk',
+  krm: 'krm',
+}
+
+/** Adjektiv i portionsetiketter ("1 liten burk", "1 st medelstor") och deras pluralform. */
+const ADJECTIVE_PLURALS: Record<string, string> = {
+  hel: 'hela',
+  helt: 'hela',
+  halv: 'halva',
+  liten: 'små',
+  litet: 'små',
+  stor: 'stora',
+  stort: 'stora',
+  medelstor: 'medelstora',
+  medelstort: 'medelstora',
+}
+
+/** Portionsord i plural – även sammansättningar ("hamburgerbiff" → "hamburgerbiffar"). */
+function pluralNoun(noun: string): string | undefined {
+  const lower = noun.toLocaleLowerCase('sv-SE')
+  if (lower in PORTION_PLURALS) return PORTION_PLURALS[lower]
+  if (lower.includes('/')) {
+    const parts = lower.split('/').map(pluralNoun)
+    return parts.every((x) => x !== undefined) ? parts.join('/') : undefined
+  }
+  // Sammansättning: böj efterledet (minst tre bokstäver, så att "st" inte matchar vad som helst).
+  const tail = Object.keys(PORTION_PLURALS)
+    .filter((k) => k.length >= 3 && lower.length > k.length && lower.endsWith(k))
+    .sort((a, b) => b.length - a.length)[0]
+  return tail ? lower.slice(0, -tail.length) + PORTION_PLURALS[tail] : undefined
+}
+
+/** Portionsord med adjektiv i plural: "liten portion" → "små portioner". undefined om ordet är okänt. */
+function pluralPhrase(phrase: string): string | undefined {
+  const words = phrase.split(/\s+/)
+  const nounIndex = words.findIndex((w) => !(w.toLocaleLowerCase('sv-SE') in ADJECTIVE_PLURALS))
+  if (nounIndex < 0) return undefined
+  const noun = pluralNoun(words[nounIndex])
+  if (noun === undefined) return undefined
+  return words
+    .map((w, i) => (i === nounIndex ? noun : (ADJECTIVE_PLURALS[w.toLocaleLowerCase('sv-SE')] ?? w)))
+    .join(' ')
+}
+
+/** Antal portioner i välbekant form: 0,5 → "½", 1,5 → "1½", 0,4 → "0,4". */
+function formatCount(value: number): string {
+  const whole = Math.floor(value + 1e-9)
+  const rest = value - whole
+  const glyph = Math.abs(rest - 0.25) < 1e-6 ? '¼' : Math.abs(rest - 0.5) < 1e-6 ? '½' : Math.abs(rest - 0.75) < 1e-6 ? '¾' : ''
+  if (glyph) return whole > 0 ? `${whole}${glyph}` : glyph
+  return formatNumber(value, 2)
+}
+
+/** Etiketten anger redan vikten ("1 smörgås (ca 62 g)", "1 portion (8 st, ca 160 g)"). */
+const WEIGHT_IN_TEXT = /\d\s*k?g\b/i
+/** Ett mått som gäller EN portion ("ca 62 g", "1,5 dl", "8 st", "1/8 pizza") – stämmer inte för flera. */
+const PER_PORTION_MEASURE = /^(ca\s+)?[\d½¼¾]/i
+
 /**
- * Läsbar mängd: "2 dl", "1 st (medel)", "150 g". För portioner visas gramvikten inom parentes
- * när `withGrams` är satt: "2 skivor (24 g)".
+ * Läsbar mängd för en portion utan upprepningar:
+ * - `1 × "1 glas (2 dl)"` → "1 glas (2 dl, 206 g)"
+ * - `1 × "1 smörgås (ca 62 g)"` → "1 smörgås (ca 62 g)" (vikten står redan i etiketten)
+ * - `2 × "1 smörgås (ca 62 g)"` → "2 smörgåsar (124 g)"
+ * - `2 × "1 portion (okokt, 0,75 dl)"` → "2 portioner (okokt, 150 g)"
+ * - `1 × "på 1 smörgås (5 g)"` → "på 1 smörgås (5 g)" (inget "1 " framför)
+ * - `2 × "på 1 smörgås (5 g)"` → "2 × på 1 smörgås (10 g)"
+ */
+export function formatPortionAmount(label: string, amount: number, grams?: number): string {
+  const trimmed = label.trim() || 'portion'
+  const paren = trimmed.match(/^(.*?)\s*\(([^()]*)\)$/)
+  const head = paren ? paren[1] : trimmed
+  // Dela bara på ", " – decimalkomma ("1,5 dl") har inget mellanslag efter kommat.
+  let notes = paren ? paren[2].split(/,\s+/).map((x) => x.trim()).filter(Boolean) : []
+  const gramsText = grams !== undefined && Number.isFinite(grams) ? `${formatNumber(grams, grams < 10 ? 1 : 0)} g` : undefined
+  const single = Math.abs(amount - 1) < 1e-9
+
+  let text: string
+  if (single) {
+    text = head
+  } else {
+    // Måtten i etiketten gäller en portion – ersätts av den totala vikten.
+    notes = notes.filter((n) => !PER_PORTION_MEASURE.test(n))
+    const one = head.match(/^(?:1|en|ett)\s+(.+)$/i)
+    const qty = formatCount(amount)
+    if (one && amount < 1) text = `${qty} ${one[1]}`
+    else if (one) {
+      const many = pluralPhrase(one[1])
+      text = many ? `${qty} ${many}` : `${qty} × ${one[1]}`
+    } else text = `${qty} × ${head}`
+  }
+  if (gramsText && !(single && notes.some((n) => WEIGHT_IN_TEXT.test(n)))) notes.push(gramsText)
+  return notes.length > 0 ? `${text} (${notes.join(', ')})` : text
+}
+
+/**
+ * Läsbar mängd: "2 dl", "1 st (medel)", "150 g", "2 skivor". Med `withGrams` visas vikten inom
+ * parentes – "2 dl (76 g)", "1 glas (2 dl, 206 g)" – men aldrig två gånger.
  */
 export function formatAmount(
   food: Pick<Food, 'portions' | 'density' | 'liquid'>,
@@ -110,10 +263,10 @@ export function formatAmount(
   unit: UnitKey,
   withGrams = false,
 ): string {
-  const label = unitLabel(food, unit)
   const amt = formatNumber(amount, amount < 10 ? 2 : 0)
   if (unit === 'g') return `${amt} g`
   const grams = gramsFor(food, amount, unit)
+  if (isPortionUnit(unit)) return formatPortionAmount(unitLabel(food, unit), amount, withGrams ? grams : undefined)
   const tail = withGrams && Number.isFinite(grams) ? ` (${formatNumber(grams, 0)} g)` : ''
-  return `${amt} ${label}${tail}`
+  return `${amt} ${unitLabel(food, unit)}${tail}`
 }

@@ -20,6 +20,7 @@
  */
 import { useEffect, useId, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from 'motion/react'
+import { Pause, Play } from 'lucide-react'
 import { skyPhase as computeSkyPhase, sunAltitude, sunTimes, swedishSeason, type Season, type SkyPhase } from '../../lib/season'
 import type { ISODate } from '../../types'
 
@@ -592,6 +593,7 @@ const CSS = `
 .lsh-bob{animation:lsh-bob 4.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
 @keyframes lsh-shimmer{0%,100%{opacity:1;transform:scaleX(1)}50%{opacity:.5;transform:scaleX(.78)}}
 .lsh-shimmer{animation:lsh-shimmer 3.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.lsh-paused *{animation-play-state:paused!important}
 @media (prefers-reduced-motion: reduce){.lsh-root *{animation:none!important}}
 `
 
@@ -731,7 +733,7 @@ function CloudLayer({ p, season }: { p: Palette; season: Season }) {
 function BirdLayer({ p }: { p: Palette }) {
   const birds: Pt[] = [[0, 0], [-9, 5], [-18, 10], [9, 5.5], [18, 11], [-27, 15]]
   return (
-    <div className="lsh-birds absolute inset-0" data-testid="birds">
+    <div className="lsh-birds absolute inset-0" style={TEXT_SAFE_MASK} data-testid="birds">
       <svg {...SVG_PROPS}>
         <g transform="translate(360 44)" fill="none" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: p.bird, opacity: 0.7 }}>
           {birds.map(([bx, by], i) => (
@@ -1056,7 +1058,7 @@ function Particles({ kind, height }: { kind: 'snow' | 'leaves'; height: number }
     })
   }, [kind])
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0" data-testid={`particles-${kind}`}>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={TEXT_SAFE_MASK} data-testid={`particles-${kind}`}>
       {items.map((it, i) => (
         <span
           key={i}
@@ -1119,6 +1121,46 @@ function useDarkTheme(): boolean {
   return useSyncExternalStore(subscribeTheme, getDark, getDarkServer)
 }
 
+/**
+ * Rörliga detaljer (löv, snö, fåglar) tonas bort överst till vänster där hälsningen står, så att
+ * inget rör sig bakom texten.
+ */
+const TEXT_SAFE_MASK: CSSProperties = {
+  maskImage: 'radial-gradient(ellipse 95% 72% at 0% 0%, transparent 62%, black 92%)',
+  WebkitMaskImage: 'radial-gradient(ellipse 95% 72% at 0% 0%, transparent 62%, black 92%)',
+}
+
+const MOTION_KEY = 'lagom-header-motion'
+
+function readMotionPaused(): boolean {
+  try {
+    return localStorage.getItem(MOTION_KEY) === 'paused'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Paus för landskapets återkommande animationer (WCAG 2.2.2). Valet sparas på enheten.
+ * Reducerad rörelse i systemet stänger av dem helt oavsett.
+ */
+function useMotionPaused(): [boolean, () => void] {
+  const [paused, setPaused] = useState(readMotionPaused)
+  const toggle = () => {
+    setPaused((p) => {
+      const next = !p
+      try {
+        if (next) localStorage.setItem(MOTION_KEY, 'paused')
+        else localStorage.removeItem(MOTION_KEY)
+      } catch {
+        /* lagring kan vara blockerad – valet gäller då bara nu */
+      }
+      return next
+    })
+  }
+  return [paused, toggle]
+}
+
 /** Läsbar textfärg mot mörk natthimmel – tokens skrivs över lokalt för innehållet. */
 const NIGHT_INK = {
   '--lg-ink': mix(WHITE, 94, tok('sol')),
@@ -1157,10 +1199,11 @@ export function SeasonalHeader({ date, now: nowProp, season: seasonProp, phase: 
   const birds = phase === 'dag' && (season === 'var' || season === 'host')
   const particles: 'snow' | 'leaves' | null = reduce ? null : season === 'vinter' && !night ? 'snow' : season === 'host' && !night ? 'leaves' : null
   const f = (v: number) => (reduce ? 0 : v)
+  const [paused, togglePaused] = useMotionPaused()
 
   return (
     <div
-      className={`lsh-root relative isolate w-full overflow-hidden ${className}`}
+      className={`lsh-root relative isolate w-full overflow-hidden ${paused ? 'lsh-paused' : ''} ${className}`}
       style={{ height, background: palette.skyTop }}
       data-season={season}
       data-phase={phase}
@@ -1213,6 +1256,21 @@ export function SeasonalHeader({ date, now: nowProp, season: seasonProp, phase: 
         >
           {children}
         </div>
+      )}
+
+      {!reduce && (
+        <button
+          type="button"
+          onClick={togglePaused}
+          aria-pressed={paused}
+          aria-label="Pausa animationerna i sidhuvudet"
+          title={paused ? 'Starta animationerna' : 'Pausa animationerna'}
+          className="group absolute right-1 bottom-1 z-20 grid size-11 place-items-center rounded-full"
+        >
+          <span className="grid size-7 place-items-center rounded-full bg-surface/55 text-ink-2 opacity-70 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+          </span>
+        </button>
       )}
     </div>
   )

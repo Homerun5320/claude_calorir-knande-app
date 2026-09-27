@@ -19,6 +19,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import { useToastStore } from '../../components/ui/toast'
 import { loadBuiltinCatalog } from '../../lib/foodRepo'
 import { bulle, offBar } from './testFoods'
+import { NutriScoreBadge, nutriScoreTextClass } from './components'
 
 function renderAt(path: string) {
   const router = createMemoryRouter(
@@ -130,7 +131,7 @@ describe('AddFoodPage', () => {
     })
     renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
     expect(screen.getByText(/Brukar du äta till fika/)).toBeInTheDocument()
-    const chip = screen.getByRole('button', { name: /Kanelbulle, 2 × 1 st \(medel\).*Lägg i korgen/ })
+    const chip = screen.getByRole('button', { name: /Kanelbulle, 2 st \(medel, 120 g\)\. Lägg i korgen/ })
     fireEvent.click(chip)
     expect(useBasketStore.getState().items[0]).toMatchObject({ amount: 2, unit: 'portion:st', origin: 'suggestion' })
     fireEvent.click(chip)
@@ -287,5 +288,17 @@ describe('BasketSheet', () => {
     expect(screen.getByText(/Vissa näringsvärden saknas för 1 livsmedel/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Spara som måltid' }))
     expect(screen.getByLabelText('Namn på måltiden')).toHaveAttribute('placeholder', 'Mitt mellanmål')
+  })
+})
+
+describe('NutriScoreBadge', () => {
+  it('har mörk text på gult och orange, vit text på grönt och rött (kontrast i ljust läge)', () => {
+    const { rerender } = render(<NutriScoreBadge score={{ grade: 'C', tone: 'sol' }} />)
+    expect(screen.getByText('Nutri-Score C')).toHaveClass('text-ink')
+    rerender(<NutriScoreBadge score={{ grade: 'D', tone: 'hjortron' }} />)
+    expect(screen.getByText('Nutri-Score D')).toHaveClass('text-ink')
+    rerender(<NutriScoreBadge score={{ grade: 'A', tone: 'mossa' }} />)
+    expect(screen.getByText('Nutri-Score A')).toHaveClass('text-on-gran')
+    expect(nutriScoreTextClass('lingon')).toBe('text-on-gran')
   })
 })

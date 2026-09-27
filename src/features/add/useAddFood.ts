@@ -109,7 +109,8 @@ export function revertFoodEffects(fx: FoodEffects): void {
     }
     let cachedFoods = s.cachedFoods
     for (const id of fx.cached) {
-      if (usage[id] || !(id in cachedFoods)) continue
+      // Behåll kopian om livsmedlet fortfarande används – t.ex. har sparats som favorit under tiden.
+      if (usage[id] || s.favorites.includes(id) || !(id in cachedFoods)) continue
       if (cachedFoods === s.cachedFoods) cachedFoods = { ...cachedFoods }
       delete cachedFoods[id]
     }

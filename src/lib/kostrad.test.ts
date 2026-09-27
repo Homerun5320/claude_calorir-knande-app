@@ -123,6 +123,23 @@ describe('foodKostrad', () => {
     expect(foodKostrad(override)).toEqual({ fruktGront: 50 })
   })
 
+  it('flyttar baljväxtandelen i äldre kostrådsdata från frukt och grönt till baljväxter', () => {
+    const pea = food('Ärtsoppa med fläsk', 'fardigratt', { kcal: 90 }, { kostrad: { fruktGront: 48, rottKott: 10 } })
+    expect(foodKostrad(pea)).toEqual({ baljvaxter: 48, rottKott: 10 })
+    const dal = food('Dal (indisk linsgryta)', 'fardigratt', { kcal: 120 }, { kostrad: { fruktGront: 69 } })
+    expect(foodKostrad(dal)).toEqual({ baljvaxter: 69 })
+    // Blandade rätter: ungefär hälften är baljväxter, resten grönsaker.
+    const chili = food('Bönchili (vegetarisk chili)', 'fardigratt', { kcal: 100 }, { kostrad: { fruktGront: 94 } })
+    expect(foodKostrad(chili)).toEqual({ baljvaxter: 47, fruktGront: 47 })
+    const plate = food('Falafeltallrik med bulgur, hummus och sallad', 'fardigratt', { kcal: 150 }, { kostrad: { fruktGront: 45 } })
+    expect(foodKostrad(plate)).toEqual({ baljvaxter: 23, fruktGront: 22 })
+    // Gröna ärtor och egna baljväxtvärden lämnas orörda.
+    const wallenbergare = food('Wallenbergare med potatismos, gröna ärtor och lingon', 'fardigratt', { kcal: 150 }, { kostrad: { fruktGront: 13 } })
+    expect(foodKostrad(wallenbergare)).toEqual({ fruktGront: 13 })
+    const explicit = food('Ärtsoppa, vegetarisk', 'fardigratt', { kcal: 80 }, { kostrad: { fruktGront: 10, baljvaxter: 40 } })
+    expect(foodKostrad(explicit)).toEqual({ fruktGront: 10, baljvaxter: 40 })
+  })
+
   it('returnerar en kopia som inte påverkar schablonen', () => {
     const r = foodKostrad(broccoli)
     r.fruktGront = 1
@@ -317,6 +334,26 @@ describe('evaluateKostrad', () => {
     expect(r.target).toBeCloseTo(150)
     expect(r.status).toBe('nastan')
     expect(r.score).toBeCloseTo(0.8)
+  })
+
+  it('räknar inte lätt aktivitet till rörelserådet – samma regel som Träningssidan', () => {
+    const byDate: Record<string, DiaryEntry[]> = Object.fromEntries(WEEK.map((d) => [d, [entry(broccoli, 100, d)]]))
+    const stretching: ExerciseEntry = { ...exercise(WEEK[0], 25, 2.3), activityId: 'stretching', name: 'Stretching' }
+    const exerciseByDate = Object.fromEntries(WEEK.map((d) => [d, [{ ...stretching, date: d }]]))
+    const r = find(evaluateKostrad(input(byDate, { exerciseByDate })), 'rorelse')
+    expect(r.actual).toBe(0)
+    expect(r.status).not.toBe('bra')
+  })
+
+  it('slår upp MET från aktiviteten när posten saknar MET', () => {
+    const results = evaluateKostrad({
+      entriesByDate: {},
+      exerciseByDate: { '2026-09-21': [{ ...exercise('2026-09-21', 30), activityId: 'yoga' }, exercise('2026-09-21', 20)] },
+      dates: WEEK,
+      sex: 'man',
+    })
+    // Yoga (2,3 MET) räknas inte, promenad i normal takt (3,8 MET) räknas.
+    expect(results[0]).toMatchObject({ id: 'rorelse', actual: 20 })
   })
 
   it('räknar dagar med bara träning till rörelserådet', () => {

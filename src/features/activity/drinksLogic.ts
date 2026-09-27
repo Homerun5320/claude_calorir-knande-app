@@ -21,6 +21,23 @@ export const CAFFEINE_HALF_LIFE_H = 5
 /** Riktmärke när målet saknas: 400 mg per dag för friska vuxna (EFSA). */
 export const DEFAULT_CAFFEINE_MAX_MG = 400
 
+/** EFSA (2015): för barn och ungdomar under 18 år högst ca 3 mg koffein per kg kroppsvikt och dag. */
+export const YOUTH_CAFFEINE_MG_PER_KG = 3
+
+/** Vikt som används för ungdomars koffeingräns om vikten är okänd (kg). */
+const YOUTH_FALLBACK_WEIGHT_KG = 50
+
+/**
+ * Dagens koffeinriktmärke. Vuxna: målet (400 mg, 200 mg vid graviditet och amning). Under 18 år:
+ * högst 3 mg per kg kroppsvikt – aldrig mer än vuxenmålet.
+ */
+export function caffeineLimitMg(targetMaxMg: number, age: number | undefined, weightKg: number | undefined): number {
+  const adult = targetMaxMg > 0 ? targetMaxMg : DEFAULT_CAFFEINE_MAX_MG
+  if (age === undefined || age >= 18) return adult
+  const kg = weightKg !== undefined && weightKg > 0 ? weightKg : YOUTH_FALLBACK_WEIGHT_KG
+  return Math.min(adult, Math.round(YOUTH_CAFFEINE_MG_PER_KG * kg))
+}
+
 /** Ungefärlig läggdags som används i sömntipset. */
 export const BEDTIME_MINUTE = 23 * 60
 

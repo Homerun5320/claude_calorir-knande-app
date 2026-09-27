@@ -41,6 +41,17 @@ export const MAX_FAST_HOURS = 72
 const HOUR_MS = 3_600_000
 const MINUTE_MS = 60_000
 
+/**
+ * Kortare fastor än så här sparas inte och räknas inte i statistiken – t.ex. en fasta som
+ * startades och avslutades av misstag ("0 min").
+ */
+export const MIN_SAVED_FAST_MS = 30 * MINUTE_MS
+
+/** För kort för att vara en fasta (se `MIN_SAVED_FAST_MS`). */
+export function isTooShortFast(elapsedMs: number): boolean {
+  return !(elapsedMs >= MIN_SAVED_FAST_MS)
+}
+
 // ---------------------------------------------------------------------------
 // Förlopp
 // ---------------------------------------------------------------------------
@@ -198,11 +209,15 @@ export interface FastingWeek {
   days: Array<{ date: ISODate; status: 'klar' | 'paborjad' | null }>
 }
 
-/** Summering för de angivna dagarna (fastor räknas till dagen de avslutades). */
+/**
+ * Summering för de angivna dagarna (fastor räknas till dagen de avslutades). Fastor kortare än
+ * `MIN_SAVED_FAST_MS` (t.ex. sparade av misstag) räknas inte.
+ */
 export function fastingWeek(history: readonly FastRecord[], dates: readonly ISODate[]): FastingWeek {
   const inRange = new Set(dates)
   const byDay = new Map<ISODate, FastRecord[]>()
   for (const rec of history) {
+    if (isTooShortFast(fastDurationMs(rec))) continue
     const d = fastDate(rec)
     if (!inRange.has(d)) continue
     const list = byDay.get(d)

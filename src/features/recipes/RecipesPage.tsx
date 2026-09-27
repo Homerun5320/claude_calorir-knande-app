@@ -67,6 +67,9 @@ export default function RecipesPage() {
   }
 
   const searching = deferredQuery.trim() !== ''
+  // Tomma "Mina recept" har en egen "Skapa recept"-knapp – den flytande knappen skulle bara
+  // dubblera den och täcka tipsen under.
+  const showFab = !(tab === 'mina' && own.length === 0)
 
   return (
     <div className="px-4 pb-24">
@@ -155,16 +158,18 @@ export default function RecipesPage() {
         )}
       </div>
 
-      <motion.div
-        initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 420, damping: 30, delay: 0.1 }}
-        className="fixed right-4 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-40 lg:right-8 lg:bottom-8"
-      >
-        <Button to="/recept/nytt" size="lg" iconLeft={Plus} className="!rounded-full shadow-[var(--shadow-float)]">
-          Nytt recept
-        </Button>
-      </motion.div>
+      {showFab && (
+        <motion.div
+          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 30, delay: 0.1 }}
+          className="fixed right-4 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-40 lg:right-8 lg:bottom-8"
+        >
+          <Button to="/recept/nytt" size="lg" iconLeft={Plus} className="!rounded-full shadow-[var(--shadow-float)]">
+            Nytt recept
+          </Button>
+        </motion.div>
+      )}
     </div>
   )
 }

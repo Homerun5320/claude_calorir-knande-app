@@ -81,6 +81,60 @@ describe('BodyPage', () => {
     expect(screen.queryByText('Ingen vägning ännu')).not.toBeInTheDocument()
   })
 
+  it('skriver inte tyst om en felskriven vikt – visar ett fel i stället', async () => {
+    renderPage()
+    const input = await screen.findByRole('spinbutton', { name: 'Vikt i kilo' })
+    fireEvent.change(input, { target: { value: '7,24' } })
+    expect(input).toHaveAttribute('aria-valuenow', '7.24')
+    expect(screen.getByText('Ange en vikt mellan 20 och 400 kg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Spara vikt' })).toBeDisabled()
+    fireEvent.change(input, { target: { value: '4000' } })
+    expect(screen.getByText('Ange en vikt mellan 20 och 400 kg')).toBeInTheDocument()
+    expect(useBodyStore.getState().weights).toHaveLength(0)
+  })
+
+  it('visar ingen exempelvikt i medvetet läge', async () => {
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
+    renderPage()
+    const input = await screen.findByRole('spinbutton', { name: 'Vikt i kilo' })
+    expect(input).toHaveAttribute('placeholder', '–')
+  })
+
+  it('pausar viktnedgången varsamt när vikten är under hälsosamt BMI och kan byta mål', async () => {
+    // 168 cm: BMI 18,5 ≈ 52,2 kg.
+    const today = todayISO()
+    useBodyStore.setState({ weights: [{ id: 'w1', date: today, kg: 50, createdAt: 0 }], measurements: [] })
+    useProfileStore.setState({ profile: { ...PROFILE, startWeightKg: 55, targetWeightKg: 48 } })
+    renderPage()
+    const note = (await screen.findByText(/rekommenderar inte att gå ner mer/)).closest('section') as HTMLElement
+    expect(within(note).getByRole('link', { name: 'Frisk & Fri' })).toHaveAttribute('href', 'https://www.friskfri.se')
+    // Inget "Mot målet"/prognos när viktnedgången är pausad.
+    expect(screen.queryByText('Mot målet')).not.toBeInTheDocument()
+    fireEvent.click(within(note).getByRole('button', { name: 'Byt till att behålla vikten' }))
+    expect(useProfileStore.getState().profile?.goal).toBe('behalla')
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(useProfileStore.getState().profile?.goal).toBe('ga_ner')
+  })
+
+  it('erbjuder att byta till att behålla vikten när målvikten är nådd', async () => {
+    const today = todayISO()
+    useBodyStore.setState({ weights: [{ id: 'w1', date: today, kg: 67.5, createdAt: 0 }], measurements: [] })
+    renderPage()
+    expect(await screen.findByText(/Du har nått din målvikt 68 kg/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Byt till att behålla vikten' }))
+    expect(useProfileStore.getState().profile?.goal).toBe('behalla')
+  })
+
+  it('använder inte adaptiv förbrukning under graviditet', async () => {
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla', lifeStage: 'gravid' } })
+    renderPage()
+    expect(await screen.findByText(/Under graviditeten ändras vikten av naturliga skäl/)).toBeInTheDocument()
+    const toggle = screen.getByRole('switch', { name: /Låt målen följa min verkliga förbrukning/ })
+    expect(toggle).toBeDisabled()
+    fireEvent.click(toggle)
+    expect(useProfileStore.getState().settings.adaptiveTargets).toBe(false)
+  })
+
   it('ångrar en loggad vikt via toasten', async () => {
     renderPage()
     const input = await screen.findByRole('spinbutton', { name: 'Vikt i kilo' })

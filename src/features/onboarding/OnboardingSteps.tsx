@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Card, NumberField, toneVars, type IconLike, type Tone } from '../../components/ui'
-import { EnergyValue } from '../../components/domain/EnergyValue'
+import { EnergyValue, useEnergyFormatter } from '../../components/domain/EnergyValue'
 import { PlateModel } from '../../components/signature/PlateModel'
 import { SeasonalHeader } from '../../components/signature/SeasonalHeader'
 import { LogoMark, Wordmark } from '../../components/layout/Logo'
@@ -40,6 +40,7 @@ import {
   clampRate,
   describeProjection,
   effectiveGoal,
+  effectiveRate,
   goalFromChoice,
   lossBlockReason,
   projectedGoalDate,
@@ -274,8 +275,15 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
   const rate = clampRate(draft.weeklyRateKg, draft.weightKg, goal)
   const targetError = validateTarget(draft, today)
   const projection = projectedGoalDate(draft, today)
+  const eff = effectiveRate(draft, today)
+  const fmtEnergy = useEnergyFormatter()
   const losing = goal === 'ga_ner'
   const anyDisabled = options.some((o) => o.disabled)
+  // Säkerhetsgolvet (1 200/1 500 kcal) kan göra att den valda takten inte går att nå.
+  const floorNote =
+    losing && eff?.limitedByFloor && eff.kcal !== undefined
+      ? `Lagom sätter aldrig dagsmålet under ${fmtEnergy(eff.kcal)}, så att du får i dig tillräckligt med näring. För dig blir takten därför ungefär ${formatNumber(eff.rate, 2)} kg i veckan – och det är helt okej.`
+      : null
 
   return (
     <>
@@ -320,6 +328,11 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
       {anyDisabled && losing && (
         <p className="mt-2 px-1 text-[0.8125rem] leading-snug text-ink-3">Lagom begränsar takten till högst 1 % av kroppsvikten per vecka.</p>
       )}
+      {floorNote && (
+        <div className="mt-3">
+          <Note>{floorNote}</Note>
+        </div>
+      )}
 
       <div className="mt-7">
         <NumberField
@@ -339,7 +352,8 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
             <div className="flex items-start gap-3 px-1 py-0.5">
               <CalendarHeart aria-hidden className="mt-0.5 size-5 shrink-0 text-(--tone-ink)" />
               <p className="text-[0.9375rem] leading-relaxed text-ink">
-                Med {formatNumber(rate, 2)} kg i veckan når du {formatNumber(draft.targetWeightKg, 1)} kg{' '}
+                Med {eff?.limitedByFloor ? 'ungefär ' : ''}
+                {formatNumber(eff?.rate ?? rate, 2)} kg i veckan når du {formatNumber(draft.targetWeightKg, 1)} kg{' '}
                 <strong className="font-semibold">{describeProjection(projection, today)}</strong>. Vikten går sällan spikrakt – Lagom följer din
                 trend, inte enskilda vägningar.
               </p>

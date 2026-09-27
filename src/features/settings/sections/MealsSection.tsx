@@ -18,7 +18,18 @@ function hours(meal: MealConfig): string {
   return `Föreslås ca ${clock(from)}–${clock(to)}`
 }
 
-function MealRow({ meal, onlyEnabled, onRename, onToggle }: { meal: MealConfig; onlyEnabled: boolean; onRename: (name: string) => void; onToggle: (on: boolean) => void }) {
+function MealRow({
+  meal,
+  onlyEnabled,
+  onRename,
+  onToggle,
+}: {
+  meal: MealConfig
+  onlyEnabled: boolean
+  /** Sparar namnet och returnerar det namn som faktiskt sparades (tomt namn ger standardnamnet). */
+  onRename: (name: string) => string
+  onToggle: (on: boolean) => void
+}) {
   const [name, setName] = useState(meal.name)
   const [synced, setSynced] = useState(meal.name)
   if (synced !== meal.name) {
@@ -36,7 +47,8 @@ function MealRow({ meal, onlyEnabled, onRename, onToggle }: { meal: MealConfig; 
           maxLength={MEAL_NAME_MAX}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => {
-            if (name !== meal.name) onRename(name)
+            // Visa det namn som sparades – ett tomt fält får tillbaka standardnamnet.
+            if (name !== meal.name) setName(onRename(name))
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.currentTarget.blur()
@@ -70,7 +82,11 @@ export function MealsSection() {
               key={m.id}
               meal={m}
               onlyEnabled={m.enabled && enabledCount === 1}
-              onRename={(name) => updateSettings({ meals: renameMeal(meals, m.id, name) })}
+              onRename={(name) => {
+                const next = renameMeal(meals, m.id, name)
+                updateSettings({ meals: next })
+                return next.find((x) => x.id === m.id)?.name ?? m.name
+              }}
               onToggle={(on) => updateSettings({ meals: setMealEnabled(meals, m.id, on) })}
             />
           ))}

@@ -131,6 +131,16 @@ describe('Träning', () => {
     expect(useProfileStore.getState().settings.exerciseAddBackPct).toBe(25)
   })
 
+  it('påminner om att vardagsrörelse kan ingå i aktivitetsnivån', async () => {
+    renderAt('/traning')
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till aktivitet' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Välj aktivitet' })
+    fireEvent.change(within(dialog).getByRole('searchbox', { name: 'Sök aktivitet' }), { target: { value: 'cykla till jobbet' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Cykla till jobbet/ }))
+    const details = await screen.findByRole('dialog', { name: 'Lägg till aktivitet' })
+    expect(within(details).getByText(/räknas det i din aktivitetsnivå – logga bara det som är extra/)).toBeInTheDocument()
+  })
+
   it('medvetet läge döljer energisiffror', () => {
     useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
     useDiaryStore.getState().addExercise({ date: todayISO(), activityId: 'promenad', name: 'Promenad', minutes: 30, kcal: 98 })
@@ -166,6 +176,22 @@ describe('Dryck', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Lägg till Starköl/ }))
     await waitFor(() => expect(screen.getAllByText('1,1').length).toBeGreaterThan(0))
     expect(screen.getByRole('link', { name: /Alkoholhjälpen/ })).toHaveAttribute('href', 'https://alkoholhjalpen.se')
+    // Vuxna ser riktmärket 400 mg koffein – med mellanslag mellan siffran och enheten.
+    expect(screen.getByText(/mg av 400 mg/).parentElement).toHaveTextContent(/^0 mg av 400 mg$/)
+  })
+
+  it('under 18 år: lägre koffeingräns och rådet att avstå från alkohol', async () => {
+    const year = Number(todayISO().slice(0, 4))
+    useProfileStore.setState({ profile: { ...PROFILE, birthYear: year - 15, startWeightKg: 55 } })
+    renderAt('/dryck')
+    // 3 mg per kg kroppsvikt: 55 kg → 165 mg.
+    expect(await screen.findByText(/mg av 165 mg/)).toBeInTheDocument()
+    expect(screen.getByText(/för dig under 18 år gäller högst ca 3 mg per kg kroppsvikt/)).toBeInTheDocument()
+    expect(screen.getByText(/Under 18 år är rådet att avstå från alkohol helt/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lägg till Starköl/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Om standardglas och risknivåer')).not.toBeInTheDocument()
+    // Snabbvalen för kaffe och te finns kvar.
+    expect(await screen.findByRole('button', { name: /Lägg till Bryggkaffe/ })).toBeInTheDocument()
   })
 })
 
@@ -178,6 +204,21 @@ describe('Fasta', () => {
     expect(useFastingStore.getState().active).toMatchObject({ targetHours: 14, protocol: '14:10' })
     expect(await screen.findByRole('progressbar', { name: 'Fastans förlopp' })).toBeInTheDocument()
 
+    // Nyss startad: avslutas utan att sparas (ingen "0 min"-fasta i historiken).
+    fireEvent.click(screen.getByRole('button', { name: 'Avsluta fastan' }))
+    await waitFor(() => expect(useFastingStore.getState().active).toBeNull())
+    expect(window.confirm).toHaveBeenCalled()
+    expect(useFastingStore.getState().history).toHaveLength(0)
+    expect(lastToast()?.message).toBe('Fastan är avslutad utan att sparas')
+    await act(async () => {
+      lastToast()?.action?.onClick()
+    })
+    expect(useFastingStore.getState().active).toMatchObject({ targetHours: 14, protocol: '14:10' })
+  })
+
+  it('sparar en fasta som avslutas tidigt efter bekräftelse', async () => {
+    useFastingStore.setState({ active: { start: Date.now() - 2 * 3_600_000, targetHours: 16, protocol: '16:8' } })
+    renderAt('/fasta')
     fireEvent.click(screen.getByRole('button', { name: 'Avsluta fastan' }))
     await waitFor(() => expect(useFastingStore.getState().history).toHaveLength(1))
     expect(window.confirm).toHaveBeenCalled()

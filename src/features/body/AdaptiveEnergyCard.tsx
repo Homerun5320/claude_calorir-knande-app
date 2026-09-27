@@ -11,12 +11,14 @@ import { EnergyValue, useEnergyFormatter } from '../../components/domain'
 import { adaptiveIntake, computeEnergy, estimateAdaptiveTdee, KCAL_PER_KG } from '../../lib/energy'
 import { plural } from '../../lib/format'
 import { useTargets } from '../../hooks/useTargets'
+import { ageFromBirthYear } from '../../lib/dates'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import {
   ADAPTIVE_REQUIREMENTS as REQ,
+  adaptiveBlockReason,
   adaptiveNeeds,
   adaptiveProgress,
   compareTdeeText,
@@ -52,6 +54,30 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
   const toggle = (on: boolean) => {
     updateSettings({ adaptiveTargets: on })
     toast(on ? 'Dina mål följer nu din verkliga förbrukning' : 'Målen räknas från formeln igen', { tone: 'success' })
+  }
+
+  // Graviditet, amning och uppväxt: viktförändringen är naturlig och får inte styra målet.
+  const blocked = profile ? adaptiveBlockReason(profile.lifeStage, ageFromBirthYear(profile.birthYear, today)) : null
+  if (blocked) {
+    return (
+      <Card eyebrow="Adaptiv energi" title="Din verkliga förbrukning" action={<Activity aria-hidden className="size-5 text-gran" strokeWidth={2.2} />}>
+        <p className="text-sm leading-relaxed text-ink-2">{blocked}</p>
+        {!hideNumbers && formulaTdee !== undefined && (
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">
+            Formelns förbrukning just nu: <EnergyValue kcal={formulaTdee} unitClassName="" />
+            /dag.
+          </p>
+        )}
+        <div className="mt-5 border-t border-line pt-3">
+          <Switch
+            label="Låt målen följa min verkliga förbrukning"
+            description="Inte tillgängligt just nu – dagsmålet räknas från formeln utifrån din profil."
+            checked={false}
+            disabled
+          />
+        </div>
+      </Card>
+    )
   }
 
   const needs = adaptiveNeeds(progress)

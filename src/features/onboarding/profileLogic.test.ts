@@ -5,6 +5,7 @@ import {
   describeProjection,
   draftFromProfile,
   effectiveGoal,
+  effectiveRate,
   emptyDraft,
   hasErrors,
   isDraftComplete,
@@ -12,6 +13,7 @@ import {
   lossBlockReason,
   maxRateFor,
   minHealthyWeight,
+  minimumAge,
   projectedGoalDate,
   rateOptions,
   reviveDraft,
@@ -55,8 +57,19 @@ describe('validering av Om dig', () => {
     expect(validateBirthYear(90, TODAY)).toMatch(/fyra siffror/)
     expect(validateBirthYear(2030, TODAY)).toMatch(/fyra siffror/)
     expect(validateBirthYear(2015, TODAY)).toMatch(/13 år eller äldre/)
-    expect(validateBirthYear(2013, TODAY)).toBeUndefined()
+    // Född 2013 kan vara 12 år i september 2026 – släpps inte igenom för tidigt.
+    expect(validateBirthYear(2013, TODAY)).toMatch(/13 år eller äldre/)
+    expect(validateBirthYear(2013, '2026-12-31')).toBeUndefined()
+    expect(validateBirthYear(2012, TODAY)).toBeUndefined()
     expect(validateBirthYear(1950, TODAY)).toBeUndefined()
+  })
+
+  it('räknar lägsta möjliga ålder när bara födelseåret är känt', () => {
+    // Född i november 2008 är man 17 år i september 2026.
+    expect(minimumAge(2008, TODAY)).toBe(17)
+    expect(minimumAge(2008, '2026-01-01')).toBe(17)
+    // Den 31 december har alla födda 2008 fyllt 18.
+    expect(minimumAge(2008, '2026-12-31')).toBe(18)
   })
 
   it('längd och vikt inom rimliga gränser', () => {
@@ -68,7 +81,8 @@ describe('validering av Om dig', () => {
 
   it('känner igen minderåriga (13–17 år)', () => {
     expect(isMinor(draft({ birthYear: 2010 }), TODAY)).toBe(true)
-    expect(isMinor(draft({ birthYear: 2008 }), TODAY)).toBe(false)
+    expect(isMinor(draft({ birthYear: 2008 }), TODAY)).toBe(true)
+    expect(isMinor(draft({ birthYear: 2007 }), TODAY)).toBe(false)
   })
 })
 
@@ -77,6 +91,10 @@ describe('säkerhetsregler för viktnedgång', () => {
     expect(lossBlockReason(draft({ lifeStage: 'gravid' }), TODAY)).toMatch(/graviditeten/)
     expect(lossBlockReason(draft({ lifeStage: 'ammar' }), TODAY)).toMatch(/ammar/)
     expect(lossBlockReason(draft({ birthYear: 2011 }), TODAY)).toMatch(/under 18/)
+    // Kan fortfarande vara 17 år – inget underskott förrän det är säkert att hen fyllt 18.
+    expect(lossBlockReason(draft({ birthYear: 2008 }), TODAY)).toMatch(/under 18/)
+    expect(effectiveGoal(draft({ birthYear: 2008 }), TODAY)).toBe('behalla')
+    expect(lossBlockReason(draft({ birthYear: 2007 }), TODAY)).toBeNull()
     expect(effectiveGoal(draft({ lifeStage: 'gravid' }), TODAY)).toBe('behalla')
   })
 
@@ -139,6 +157,28 @@ describe('målvikt och prognos', () => {
     // 76 → 71 kg med 0,5 kg/vecka = 10 veckor = 70 dagar
     expect(projectedGoalDate(draft({ targetWeightKg: 71, weeklyRateKg: 0.5 }), TODAY)).toBe('2026-12-05')
     expect(projectedGoalDate(draft({ targetWeightKg: 71, goalChoice: 'behalla' }), TODAY)).toBeNull()
+  })
+
+  it('prognosen utgår från takten dagsmålet faktiskt ger när kalorigolvet slår till', () => {
+    // 60 år, 155 cm, 52 kg, stillasittande: förbrukning ca 1 440 kcal. Golvet 1 200 kcal ger ett
+    // underskott på ca 240 kcal/dag ≈ 0,22 kg/vecka – inte de valda 0,5 kg.
+    const d = draft({ birthYear: 1966, heightCm: 155, weightKg: 52, activityLevel: 'stillasittande', weeklyRateKg: 0.5, targetWeightKg: 49 })
+    const eff = effectiveRate(d, TODAY)
+    expect(eff?.chosen).toBe(0.5)
+    expect(eff?.limitedByFloor).toBe(true)
+    expect(eff?.kcal).toBe(1200)
+    expect(eff?.rate).toBeGreaterThan(0.18)
+    expect(eff?.rate).toBeLessThan(0.26)
+    const date = projectedGoalDate(d, TODAY) as string
+    // 3 kg med ca 0,22 kg/vecka ≈ 13–14 veckor, inte 6 veckor.
+    expect(date > '2026-12-20').toBe(true)
+    expect(date < '2027-01-15').toBe(true)
+  })
+
+  it('utan golv blir takten den valda', () => {
+    const eff = effectiveRate(draft({ weeklyRateKg: 0.5 }), TODAY)
+    expect(eff).toMatchObject({ chosen: 0.5, rate: 0.5, limitedByFloor: false })
+    expect(effectiveRate(draft({ goalChoice: 'behalla' }), TODAY)).toBeNull()
   })
 
   it('beskriver prognosen med svenska ord', () => {

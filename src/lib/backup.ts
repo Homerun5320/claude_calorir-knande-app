@@ -7,10 +7,11 @@ import { useDiaryStore } from '../stores/diaryStore'
 import { useFastingStore } from '../stores/fastingStore'
 import { useFoodStore } from '../stores/foodStore'
 import { useProfileStore, DEFAULT_SETTINGS } from '../stores/profileStore'
-import type { DiaryEntry, ISODate } from '../types'
+import type { DiaryEntry, ISODate, MealConfig } from '../types'
 import { entryNutrients } from './diary'
 import { NUTRIENTS, type NutrientKey } from './nutrients'
 import { todayISO } from './dates'
+import { mealName } from './meals'
 
 export const BACKUP_FORMAT = 'lagom-backup'
 export const BACKUP_VERSION = 1
@@ -176,26 +177,33 @@ const CSV_NUTRIENTS: NutrientKey[] = ['kcal', 'protein', 'carbs', 'sugars', 'fib
 
 function csvCell(v: string | number | undefined): string {
   if (v === undefined) return ''
-  const s = typeof v === 'number' ? String(Math.round(v * 100) / 100).replace('.', ',') : v
-  return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  if (typeof v === 'number') return String(Math.round(v * 100) / 100).replace('.', ',')
+  // Skydd mot formelinjektion: text som börjar med = + - @ (eller tabb/CR) tolkas annars som en
+  // formel av Excel/Numbers. Namn från Open Food Facts och snabbregistreringar är fritext.
+  const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v
+  return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-/** Dagboken som CSV (semikolonseparerad, decimalkomma – öppnas direkt i svenska Excel/Numbers). */
-export function diaryToCsv(entries: Record<ISODate, DiaryEntry[]>): string {
+/**
+ * Dagboken som CSV (semikolonseparerad, decimalkomma – öppnas direkt i svenska Excel/Numbers).
+ * Måltiderna skrivs med användarens egna namn (standard: inställningarna i profilen).
+ */
+export function diaryToCsv(entries: Record<ISODate, DiaryEntry[]>, meals: MealConfig[] = useProfileStore.getState().settings.meals): string {
   const header = ['Datum', 'Måltid', 'Tid', 'Livsmedel', 'Varumärke', 'Mängd', 'Enhet', 'Gram', ...CSV_NUTRIENTS.map((k) => `${NUTRIENTS[k].name} (${NUTRIENTS[k].unit})`)]
   const rows = [header.join(';')]
   const dates = Object.keys(entries).sort()
   for (const date of dates) {
     for (const e of entries[date]) {
       const n = entryNutrients(e)
+      const meal = mealName(meals, e.meal)
       const base =
         e.kind === 'food'
-          ? [date, e.meal, e.time ?? '', e.food.name, e.food.brand ?? '', e.amount, e.unit.replace('portion:', ''), e.grams]
-          : [date, e.meal, e.time ?? '', e.name, '', 1, 'snabbregistrering', undefined]
+          ? [date, meal, e.time ?? '', e.food.name, e.food.brand ?? '', e.amount, e.unit.replace('portion:', ''), e.grams]
+          : [date, meal, e.time ?? '', e.name, '', 1, 'snabbregistrering', undefined]
       rows.push([...base, ...CSV_NUTRIENTS.map((k) => n[k])].map((v) => csvCell(v as string | number | undefined)).join(';'))
     }
   }
-  return '﻿' + rows.join('\r\n')
+  return '\ufeff' + rows.join('\r\n')
 }
 
 /** Starta nedladdning av en fil i webbläsaren. */
@@ -213,6 +221,19 @@ export function downloadFile(filename: string, content: string, mime = 'applicat
 
 export function backupFilename(): string {
   return `lagom-sakerhetskopia-${todayISO()}.json`
+}
+
+/**
+ * Ladda ned en säkerhetskopia av all data direkt (t.ex. från felsidan eller varningen om att
+ * data inte sparas). Returnerar false om det inte gick.
+ */
+export function downloadBackup(): boolean {
+  try {
+    downloadFile(backupFilename(), JSON.stringify(createBackup(), null, 1))
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Be webbläsaren att inte rensa lagringen automatiskt (skyddar mot dataförlust). */

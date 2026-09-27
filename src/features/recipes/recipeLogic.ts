@@ -430,7 +430,12 @@ export interface WeightInfo {
   cooked: boolean
   /** Förändring i procent från råvikt till tillagad vikt (negativ = vatten har kokat bort). */
   changePct?: number
+  /** Receptet innehåller torra råvaror som suger upp vatten vid kokning (ris, pasta, gryn, baljväxter). */
+  absorbs?: boolean
 }
+
+/** Kategorier med torra råvaror som suger upp vatten när de kokas. */
+const ABSORBING_CATEGORIES: ReadonlySet<string> = new Set(['pasta_ris', 'spannmal', 'baljvaxter'])
 
 export function weightInfo(recipe: Pick<Recipe, 'ingredients' | 'cookedWeightG' | 'servings'>): WeightInfo {
   const raw = recipeRawWeight(recipe)
@@ -438,6 +443,7 @@ export function weightInfo(recipe: Pick<Recipe, 'ingredients' | 'cookedWeightG' 
   const cooked = recipe.cookedWeightG !== undefined && recipe.cookedWeightG > 0
   const info: WeightInfo = { raw, final, perServing: recipeServingWeight(recipe), cooked }
   if (cooked && raw > 0) info.changePct = ((final - raw) / raw) * 100
+  if (recipe.ingredients.some((i) => i.grams > 0 && ABSORBING_CATEGORIES.has(i.food.category))) info.absorbs = true
   return info
 }
 
@@ -447,9 +453,12 @@ export function cookedWeightText(info: WeightInfo): string {
   const change = info.changePct ?? 0
   if (Math.abs(change) < 2) return 'Rätten väger ungefär lika mycket färdig som rå.'
   const pct = formatNumber(Math.abs(change))
-  return change < 0
-    ? `Rätten har tappat ${pct} % i vikt (mest vatten som kokat bort) – varje gram innehåller därför mer näring.`
-    : `Rätten väger ${pct} % mer färdig – ris, pasta och gryn har sugit upp vatten.`
+  if (change < 0) return `Rätten har tappat ${pct} % i vikt (mest vatten som kokat bort) – varje gram innehåller därför mer näring.`
+  // Viktökning kommer av vätska: antingen sådan som torra råvaror sugit upp, eller vatten och buljong
+  // som inte står bland ingredienserna. Påstå inte att det är ris eller pasta om receptet saknar det.
+  return info.absorbs
+    ? `Rätten väger ${pct} % mer färdig – torra råvaror som ris, pasta, gryn och baljväxter suger upp vatten när de kokas.`
+    : `Rätten väger ${pct} % mer färdig – troligen av vätska som inte står bland ingredienserna, till exempel vatten eller buljong.`
 }
 
 /** Mild varning om den tillagade vikten verkar orimlig jämfört med råvikten. */
@@ -516,6 +525,22 @@ export function showPlateFor(recipe: Pick<Recipe, 'id' | 'builtin'>, perServing:
   const sugar = perServing.sugars ?? perServing.addedSugar
   if (kcal !== undefined && kcal > 0 && sugar !== undefined && (sugar * 4) / kcal >= 0.2) return false
   return true
+}
+
+/**
+ * Tallrikens andelar räknade på bara de tre delarna (grönsaker, kolhydrater, protein) så att de
+ * summerar till 1 – samma sätt som måltider räknas i dagboken (`mealPlate`). Sås, fett, mjölk och
+ * annat "övrigt" ingår inte. undefined när inget hör till tallrikens delar.
+ */
+export function plateFractions(split: PlateSplit | undefined): PlateSplit | undefined {
+  if (!split) return undefined
+  const clean = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
+  const veg = clean(split.veg)
+  const carb = clean(split.carb)
+  const protein = clean(split.protein)
+  const total = veg + carb + protein
+  if (!(total > 0)) return undefined
+  return { veg: veg / total, carb: carb / total, protein: protein / total }
 }
 
 /** Neutral, uppmuntrande kommentar om rätten i Tallriksmodellen. */

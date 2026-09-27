@@ -309,7 +309,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
                     />
                     <TextField label="Portionens namn" optional value={draft.basisLabel} onValueChange={(v) => set('basisLabel', v)} placeholder="1 bar" />
                   </div>
-                  <p className="mt-1 text-xs text-ink-3">Lagom räknar om till per 100 g och sparar portionen så att du kan välja den direkt.</p>
+                  <p className="mt-1 text-xs text-ink-3">Lagom räknar om till per 100 g och sparar portionen så att du kan välja den direkt.</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -493,8 +493,8 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
               error={shownErrors.gramsPerDl}
               hint={
                 draft.liquid
-                  ? 'Lämna tomt så räknas 1 dl som 100 g.'
-                  : 'Gör att du kan ange mängden i dl, msk och tsk. T.ex. havregryn ca 35 g, vetemjöl ca 60 g.'
+                  ? 'Lämna tomt så räknas 1 dl som 100 g.'
+                  : 'Gör att du kan ange mängden i dl, msk och tsk. T.ex. havregryn ca 35 g, vetemjöl ca 60 g.'
               }
             />
           </div>

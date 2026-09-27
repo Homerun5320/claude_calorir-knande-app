@@ -71,7 +71,7 @@ import {
   sourceMeta,
 } from './addLogic'
 import { useAddFood } from './useAddFood'
-import { FoodSourceBadge, MealChips, useLeave } from './components'
+import { FoodSourceBadge, MealChips, nutriScoreTextClass, useLeave } from './components'
 
 type Basis = 'portion' | '100g'
 
@@ -151,7 +151,7 @@ function FoodDetail({ food }: { food: Food }) {
   const [showNumbers, setShowNumbers] = useState(false)
 
   const liquid = food.liquid === true
-  const per = liquid ? '100 ml' : '100 g'
+  const per = liquid ? '100\u00A0ml' : '100\u00A0g'
   const portionGrams = sel && Number.isFinite(sel.grams) && sel.grams > 0 ? sel.grams : undefined
   const useBasis: Basis = basis === 'portion' && portionGrams ? 'portion' : '100g'
   const grams = useBasis === 'portion' && portionGrams ? portionGrams : 100
@@ -610,13 +610,13 @@ function ProductCard({ food }: { food: Food }) {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {nutri && (
               <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
-                <span className="flex overflow-hidden rounded-xl" aria-hidden>
+                <span className="flex shrink-0 overflow-hidden rounded-xl" aria-hidden>
                   {(['A', 'B', 'C', 'D', 'E'] as const).map((g) => (
                     <span
                       key={g}
                       className={cx(
                         'grid w-6 place-items-center font-display text-sm font-bold',
-                        g === nutri.grade ? 'h-9 scale-y-110 bg-(--tone) text-bg' : 'h-7 self-center bg-surface-3 text-ink-3',
+                        g === nutri.grade ? cx('h-9 scale-y-110 bg-(--tone)', nutriScoreTextClass(nutri.tone)) : 'h-7 self-center bg-surface-3 text-ink-3',
                       )}
                       style={g === nutri.grade ? ({ '--tone': `var(--lg-${nutri.tone})` } as CSSProperties) : undefined}
                     >
@@ -626,7 +626,7 @@ function ProductCard({ food }: { food: Food }) {
                 </span>
                 <span className="min-w-0">
                   <span className="block font-semibold text-ink">Nutri-Score {nutri.grade}</span>
-                  <span className="block text-xs text-ink-3">Jämför produkter inom samma kategori, från A till E.</span>
+                  <span className="block text-xs text-ink-3">Jämför produkter inom samma kategori, från A till E.</span>
                 </span>
               </div>
             )}

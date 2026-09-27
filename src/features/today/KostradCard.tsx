@@ -11,7 +11,7 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { SectionLink } from './SectionLink'
-import { KOSTRAD_SHORT_TITLE, KOSTRAD_STATUS_LABEL, kostradProgressText, kostradWeekDates, pickKostradHighlights } from './todayLogic'
+import { KOSTRAD_SHORT_TITLE, kostradProgressText, kostradStatusLabel, kostradWeekDates, pickKostradHighlights } from './todayLogic'
 
 const STATUS_TONE: Record<KostradStatus, 'mossa' | 'sol' | 'gran' | 'hjortron'> = {
   bra: 'mossa',
@@ -30,7 +30,7 @@ const STATUS_TEXT: Record<KostradStatus, string> = {
 function KostradChip({ result, mindful }: { result: KostradResult; mindful: boolean }) {
   const title = KOSTRAD_SHORT_TITLE[result.id] ?? result.title
   const progress = kostradProgressText(result)
-  const status = KOSTRAD_STATUS_LABEL[result.status]
+  const status = kostradStatusLabel(result)
   return (
     <li
       className="flex min-w-0 flex-col items-center rounded-2xl bg-surface-2/70 px-1.5 pt-3 pb-2.5 text-center"

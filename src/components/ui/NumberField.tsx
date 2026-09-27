@@ -1,5 +1,5 @@
 /**
- * NumberField – sifferfält för svenska tal ("1,5", "1 234", "½").
+ * NumberField – sifferfält för svenska tal ("1,5", "1 234", "½", "1 1/2").
  *
  * - `inputMode="decimal"` ger siffertangentbord med decimalkomma på mobil.
  * - Den råa texten behålls medan man skriver (inget omformaterande mitt i), värdet tolkas med
@@ -130,7 +130,7 @@ export function NumberField({
     if (!sameNumber(next, value)) onChange(next)
   }
 
-  const allowed = allowNegative ? /^[-−]?[\d\s  .,½¼¾/]*$/ : /^[\d\s  .,½¼¾/]*$/
+  const allowed = allowNegative ? /^[-−]?[\d\s  .,½¼¾⅓⅔/]*$/ : /^[\d\s  .,½¼¾⅓⅔/]*$/
 
   const handleInput = (raw: string) => {
     if (!allowed.test(raw)) return
@@ -140,7 +140,7 @@ export function NumberField({
       return
     }
     const parsed = parseSwedishNumber(raw.replace('−', '-'))
-    // Ofullständig inmatning ("-", "1/") – vänta tills den blir ett tal.
+    // Ofullständig inmatning ("-", "1/", "1 1") – vänta tills den blir ett tal.
     if (Number.isNaN(parsed)) return
     emit(clampNumber(parsed, min, max))
   }

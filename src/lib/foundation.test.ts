@@ -46,6 +46,16 @@ describe('energi', () => {
     expect(t.fiberG).toBe(25)
     expect(t.proteinG).toBeGreaterThanOrEqual(Math.round(70 * 0.83))
   })
+  it('makromålen överstiger aldrig energimålet när proteingolvet slår till', () => {
+    // 76 år, 110 kg, LCHF, 1 360 kcal: proteingolvet 1,2 g/kg = 132 g tar mer än kolhydraternas andel.
+    const senior: Profile = { ...profile, birthYear: 1950, startWeightKg: 110, macroPreset: 'lchf' }
+    const t = computeTargets(senior, 110, { kcal: 1360 }, { today: '2026-09-26' })
+    expect(t.proteinG).toBe(132)
+    expect(t.carbsG).toBe(0)
+    const kcal = t.proteinG * 4 + t.carbsG * 4 + t.fatG * 9
+    expect(kcal).toBeLessThanOrEqual(1360 + 5)
+    expect(kcal).toBeGreaterThan(1360 - 10)
+  })
   it('vikttrend jämnar ut och interpolerar', () => {
     const w: WeightEntry[] = [
       { id: '1', date: '2026-09-01', kg: 80, createdAt: 0 },
@@ -90,6 +100,33 @@ describe('enheter', () => {
     expect(availableUnits(havregryn)).toEqual(['portion:portion', 'g', 'dl', 'msk', 'tsk', 'krm'])
     expect(formatAmount(havregryn, 2, 'dl', true)).toBe('2 dl (76 g)')
   })
+  it('upprepar aldrig gramvikten och böjer portionsord', () => {
+    const food = (label: string, grams: number) => ({ portions: [{ id: 'p', label, grams }] })
+    // Vikten står redan i etiketten.
+    expect(formatAmount(food('1 portion (8 st, ca 160 g)', 160), 1, 'portion:p', true)).toBe('1 portion (8 st, ca 160 g)')
+    expect(formatAmount(food('1 smörgås (ca 62 g)', 62), 1, 'portion:p', true)).toBe('1 smörgås (ca 62 g)')
+    expect(formatAmount(food('1 skiva (osthyvel)', 10), 1, 'portion:p', true)).toBe('1 skiva (osthyvel, 10 g)')
+    // Parenteser slås ihop i stället för "(2 dl) (206 g)".
+    expect(formatAmount(food('1 glas (2 dl)', 206), 1, 'portion:p', true)).toBe('1 glas (2 dl, 206 g)')
+    expect(formatAmount(food('1 portion (på 1 dl gryn)', 240), 1, 'portion:p', true)).toBe('1 portion (på 1 dl gryn, 240 g)')
+    expect(formatAmount(food('1 kopp (1,5 dl)', 150), 1, 'portion:p', true)).toBe('1 kopp (1,5 dl, 150 g)')
+    // Etiketter utan antal får inget "1 " framför.
+    expect(formatAmount(food('på 1 smörgås (5 g)', 5), 1, 'portion:p', true)).toBe('på 1 smörgås (5 g)')
+    expect(formatAmount(food('½ paprika', 60), 1, 'portion:p', true)).toBe('½ paprika (60 g)')
+    // Flera portioner: plural, måtten per portion ersätts av totalvikten.
+    expect(formatAmount(food('1 smörgås (ca 62 g)', 62), 2, 'portion:p', true)).toBe('2 smörgåsar (124 g)')
+    expect(formatAmount(food('1 kopp (1,5 dl)', 150), 2, 'portion:p', true)).toBe('2 koppar (300 g)')
+    expect(formatAmount(food('1 portion (okokt, 0,75 dl)', 75), 2, 'portion:p', true)).toBe('2 portioner (okokt, 150 g)')
+    expect(formatAmount(food('1 liten portion (300 g)', 300), 2, 'portion:p', true)).toBe('2 små portioner (600 g)')
+    expect(formatAmount(food('1 hamburgerbiff (ca 90 g)', 90), 2, 'portion:p', true)).toBe('2 hamburgerbiffar (180 g)')
+    expect(formatAmount(food('1 skiva', 12), 0.5, 'portion:p', true)).toBe('½ skiva (6 g)')
+    expect(formatAmount(food('1 skiva', 12), 1.5, 'portion:p', true)).toBe('1½ skivor (18 g)')
+    // Okänt portionsord eller etikett utan antal: tydligt "×".
+    expect(formatAmount(food('1 xyzord', 10), 3, 'portion:p', true)).toBe('3 × xyzord (30 g)')
+    expect(formatAmount(food('på 1 smörgås (5 g)', 5), 2, 'portion:p', true)).toBe('2 × på 1 smörgås (10 g)')
+    // Utan gram.
+    expect(formatAmount(food('1 skiva', 12), 3, 'portion:p')).toBe('3 skivor')
+  })
 })
 
 describe('datum', () => {
@@ -118,6 +155,28 @@ describe('format', () => {
     expect(parseSwedishNumber('½')).toBe(0.5)
     expect(parseSwedishNumber('1/4')).toBe(0.25)
     expect(parseSwedishNumber('abc')).toBeNaN()
+    // Blandade tal får inte bli 11/2 = 5,5.
+    expect(parseSwedishNumber('1 1/2')).toBe(1.5)
+    expect(parseSwedishNumber('2 1/4')).toBe(2.25)
+    expect(parseSwedishNumber('2 3/4')).toBe(2.75)
+    expect(parseSwedishNumber('1 ½')).toBe(1.5)
+    expect(parseSwedishNumber('1½')).toBe(1.5)
+    expect(parseSwedishNumber('1/2')).toBe(0.5)
+    // Mellanslag som tusentalsavgränsare (vanligt, fast och smalt fast mellanslag).
+    expect(parseSwedishNumber('1 000')).toBe(1000)
+    expect(parseSwedishNumber('1 234,5')).toBe(1234.5)
+    expect(parseSwedishNumber('1\u00a0234')).toBe(1234)
+    expect(parseSwedishNumber('1\u202f234')).toBe(1234)
+    // Negativa tal, även med typografiskt minus.
+    expect(parseSwedishNumber('-2,5')).toBe(-2.5)
+    expect(parseSwedishNumber('−1')).toBe(-1)
+    // Ofullständigt eller tvetydigt.
+    expect(parseSwedishNumber('1 1')).toBeNaN()
+    expect(parseSwedishNumber('1 1/')).toBeNaN()
+    expect(parseSwedishNumber('1/0')).toBeNaN()
+    expect(parseSwedishNumber('-')).toBeNaN()
+    expect(parseSwedishNumber('.')).toBeNaN()
+    expect(parseSwedishNumber('1.')).toBe(1)
     expect(formatNutrient('vitD', 1.234)).toBe('1,2 µg')
     expect(formatNutrient('kcal', undefined)).toBe('–')
   })

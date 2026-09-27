@@ -52,20 +52,11 @@ export interface FoodRowProps extends FoodRowData {
 }
 
 /**
- * Läsbar mängd. Portioner vars etikett redan innehåller antal ("1 skiva") skrivs som
- * "2 × 1 skiva (24 g)" för att undvika "2 1 skiva".
+ * Läsbar mängd med vikten för portioner och volymer: "2 dl (76 g)", "1 glas (2 dl, 206 g)",
+ * "2 smörgåsar (124 g)". Gramvikten upprepas aldrig om etiketten redan anger den.
  */
 export function describeAmount(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): string {
-  const withGrams = isPortionUnit(unit) || isVolumeUnit(unit)
-  if (isPortionUnit(unit)) {
-    const p = food.portions.find((x) => `portion:${x.id}` === unit)
-    if (p && /^\d/.test(p.label.trim())) {
-      const grams = gramsFor(food, amount, unit)
-      const tail = Number.isFinite(grams) ? ` (${formatNumber(grams, 0)} g)` : ''
-      return amount === 1 ? `${p.label}${tail}` : `${formatNumber(amount, 2)} × ${p.label}${tail}`
-    }
-  }
-  return formatAmount(food, amount, unit, withGrams)
+  return formatAmount(food, amount, unit, isPortionUnit(unit) || isVolumeUnit(unit))
 }
 
 /** Props för en dagbokspost. */

@@ -236,6 +236,16 @@ export const KOSTRAD_STATUS_LABEL: Record<KostradStatus, string> = {
   over: 'Över',
 }
 
+/**
+ * Statusord för ett kostrådschip. Veckoråd (fisk, rörelse) bedöms mot veckomålet omskalat till
+ * dagarna som gått – den som ligger i takt är alltså "bra" innan hela veckomålet är nått. Då heter
+ * det "I fas", så att "I mål" aldrig står bredvid t.ex. "283 av 300 g i veckan".
+ */
+export function kostradStatusLabel(r: Pick<KostradResult, 'status' | 'actual' | 'weeklyTarget'>): string {
+  if (r.status === 'bra' && r.weeklyTarget !== undefined && r.actual < r.weeklyTarget) return 'I fas'
+  return KOSTRAD_STATUS_LABEL[r.status]
+}
+
 /** Kortare rubriker som får plats i ett chip. */
 export const KOSTRAD_SHORT_TITLE: Partial<Record<KostradId, string>> = {
   frukt_gront: 'Grönt, frukt & bär',

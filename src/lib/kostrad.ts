@@ -17,6 +17,7 @@
  */
 import type { DiaryEntry, ExerciseEntry, Food, FoodCategory, ISODate, KostradContrib, Sex } from '../types'
 import { entryNutrients } from './diary'
+import { moderateEquivalentMinutes } from './exercise'
 import { formatNumber } from './format'
 import { saltFromSodiumMg, STANDARD_DRINK_G } from './nutrients'
 
@@ -25,15 +26,10 @@ import { saltFromSodiumMg, STANDARD_DRINK_G } from './nutrients'
 // ---------------------------------------------------------------------------
 
 /**
- * Gram per 100 g livsmedel som räknas mot kostråden. Utökar `KostradContrib` i `types.ts` med
- * baljväxter och mejeri, som blev egna råd 2025.
+ * Gram per 100 g livsmedel som räknas mot kostråden (inklusive baljväxter och mejeri, som blev
+ * egna råd 2025). Samma typ som `KostradContrib` i `types.ts` – namnet finns kvar för bakåtkompatibilitet.
  */
-export interface KostradContribFull extends KostradContrib {
-  /** Bönor, ärter, linser och kikärtor (tillagad vikt). Eget råd sedan 2025. */
-  baljvaxter?: number
-  /** Mjölk, fil, yoghurt, kvarg och växtbaserade alternativ (g ≈ ml). */
-  mejeri?: number
-}
+export type KostradContribFull = KostradContrib
 
 /** Kategoriernas schabloner (gram per 100 g). Kategorier som saknas bidrar inte. */
 export const CATEGORY_KOSTRAD: Partial<Record<FoodCategory, KostradContribFull>> = {
@@ -66,6 +62,36 @@ const RAW_WORDS = /(^|[\s,(])(rå|råa|rått|okokt|otillagad)([\s,)]|$)/
 const SOY_WORDS = /tofu|soja|tempeh|edamame/
 
 /**
+ * Rätter där baljväxterna är huvudingrediensen bland "grönsakerna" (ärtsoppa, dal, linsgryta …).
+ * Gröna ärtor, sockerärtor och haricots verts räknas som grönsaker och matchas inte.
+ */
+const LEGUME_MAIN = /ärtsoppa|linssoppa|bönsoppa|linsgryta|kikärtsgryta|bönsallad|(^|[\s(])dal([\s,)]|$)|bruna bönor|falafel|hummus|bönbiff|linsbiff/
+/** Rätter med baljväxter blandade med andra grönsaker (chili, burrito …) – ungefär hälften räknas. */
+const LEGUME_MIXED = /chili con carne|chili sin carne|bönchili|bönor|linser|kikärt/
+/** Tallrikar med sallad eller grönsaker vid sidan av – även där räknas bara ungefär hälften. */
+const WITH_VEGETABLES = /sallad|grönsak/
+const NOT_LEGUME = /gröna bönor|haricots|brytbön|sockerärt|gröna ärtor|böngrodd/
+
+/**
+ * Livsmedel med egna kostrådsvärden från före 2025 har baljväxterna inräknade i frukt och grönt.
+ * Flytta den andelen till baljväxter när namnet tydligt visar en baljväxträtt, så att t.ex.
+ * ärtsoppa räknas mot baljväxtrådet i stället för mot 500 g frukt och grönt.
+ */
+function legumeShareFromName(name: string, contrib: KostradContribFull): KostradContribFull {
+  const fg = contrib.fruktGront
+  if (fg === undefined || fg <= 0 || NOT_LEGUME.test(name)) return contrib
+  const main = LEGUME_MAIN.test(name)
+  const share = main && !WITH_VEGETABLES.test(name) ? 1 : main || LEGUME_MIXED.test(name) ? 0.5 : 0
+  if (share === 0) return contrib
+  const moved = Math.round(fg * share)
+  const rest = fg - moved
+  const result: KostradContribFull = { ...contrib, baljvaxter: moved }
+  if (rest > 0) result.fruktGront = rest
+  else delete result.fruktGront
+  return result
+}
+
+/**
  * Råvikt → tillagad vikt för kött. Rådet gäller tillagad vikt: 350 g tillagat motsvarar ca
  * 400–500 g rått (Livsmedelsverket), dvs. en faktor på ungefär 0,75.
  */
@@ -77,11 +103,11 @@ export const RAW_TO_COOKED_MEAT = 0.75
  * justerad med några nyckelord i namnet (rått kött, sojaprodukter, hummus, feta mejeriprodukter).
  */
 export function foodKostrad(food: Food): KostradContribFull {
-  if (food.kostrad) {
-    const override: KostradContribFull = food.kostrad
-    return { ...override }
-  }
   const name = norm(food.name)
+  if (food.kostrad) {
+    const override: KostradContribFull = { ...food.kostrad }
+    return override.baljvaxter === undefined ? legumeShareFromName(name, override) : override
+  }
   const base: KostradContribFull = { ...(CATEGORY_KOSTRAD[food.category] ?? {}) }
 
   if ((food.category === 'rott_kott' || food.category === 'chark') && RAW_WORDS.test(name)) {
@@ -618,13 +644,10 @@ export function evaluateKostrad(input: KostradInput): KostradResult[] {
 
   // --- Rörelse -------------------------------------------------------------
   {
+    // Samma regel som Träningssidan (Folkhälsomyndigheten): hög intensitet räknas dubbelt,
+    // lätt aktivitet (under 3 MET, t.ex. stretching) räknas inte.
     let minutes = 0
-    for (const date of activityDays) {
-      for (const x of input.exerciseByDate[date] ?? []) {
-        const m = Number.isFinite(x.minutes) ? Math.max(0, x.minutes) : 0
-        minutes += x.met !== undefined && x.met >= VIGOROUS_MET ? m * 2 : m
-      }
-    }
+    for (const date of activityDays) minutes += moderateEquivalentMinutes(input.exerciseByDate[date] ?? [])
     const weekly = KOSTRAD_TARGETS.rorelsePerWeek
     const target = (weekly * nAct) / 7
     const ratio = target > 0 ? minutes / target : 0

@@ -301,7 +301,8 @@ export function BarChart({
             const total = totals[i]
             const x = band.x(i)
             const bw = band.bandwidth
-            const opacity = dim(i) ? 0.42 : 1
+            // 0,65 ger minst 3:1 mot kortet för standardfärgen (gran) i båda teman (WCAG 1.4.11).
+            const opacity = dim(i) ? 0.65 : 1
             if (total === undefined || total <= 0) {
               return (
                 <circle

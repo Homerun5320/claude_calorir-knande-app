@@ -5,11 +5,20 @@
 import type { ReactNode } from 'react'
 import { Ruler } from 'lucide-react'
 import { Badge, Button, Stat } from '../../components/ui'
-import { bmi, bmiCategory } from '../../lib/energy'
 import { formatDayShort } from '../../lib/dates'
 import { formatKg, formatNumber } from '../../lib/format'
 import type { GoalType, LifeStage } from '../../types'
-import { directionOf, formatSigned, formatSignedKg, waistToHeight, whtrCategory, type BodyOverview, type LatestMeasure } from './bodyLogic'
+import {
+  bmiDisplay,
+  directionOf,
+  formatSigned,
+  formatSignedKg,
+  OLDER_ADULT_AGE,
+  waistToHeight,
+  whtrCategory,
+  type BodyOverview,
+  type LatestMeasure,
+} from './bodyLogic'
 
 interface BodyStatsProps {
   overview: BodyOverview
@@ -34,10 +43,13 @@ export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, 
   const { trendKg, startKg, startDate, rate, good, age } = overview
   if (trendKg === undefined) return null
 
-  const bmiValue = heightCm && heightCm > 0 ? bmi(trendKg, heightCm) : undefined
+  // Klassningen görs på det visade (avrundade) värdet och tar hänsyn till åldern.
+  const bmiShown = heightCm && heightCm > 0 ? bmiDisplay(trendKg, heightCm, age, lifeStage) : undefined
+  const bmiValue = bmiShown?.value
   const adult = age === undefined || age >= 18
   const pregnant = lifeStage === 'gravid'
-  const category = bmiValue !== undefined && adult && !pregnant ? bmiCategory(bmiValue) : undefined
+  const category = bmiShown?.category
+  const older = age !== undefined && age >= OLDER_ADULT_AGE
   const ratio = waist && heightCm ? waistToHeight(waist.value, heightCm) : undefined
   const whtr = ratio !== undefined ? whtrCategory(ratio) : undefined
   const sinceStart = startKg !== undefined ? trendKg - startKg : undefined
@@ -126,6 +138,16 @@ export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, 
         BMI och midjemått är grova mått framtagna för grupper. De skiljer inte på muskler och fett och säger inget om hur du
         mår – se dem som en fingervisning, inte ett betyg. Midja/längd under 0,5 brukar förknippas med lägre risk för
         hjärt-kärlsjukdom.
+        {older && (
+          <>
+            {' '}
+            Från {OLDER_ADULT_AGE} år brukar BMI 22–27 räknas som normalt – lite marginal skyddar mot undernäring. Läs mer hos{' '}
+            <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+              1177
+            </a>
+            .
+          </>
+        )}
       </p>
     </section>
   )

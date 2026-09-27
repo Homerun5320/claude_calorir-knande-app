@@ -10,6 +10,7 @@ import {
   formatFastDuration,
   formatHms,
   guessStartDay,
+  isTooShortFast,
   lastProtocolId,
   protocolById,
   resolveStartTime,
@@ -125,6 +126,18 @@ describe('historik', () => {
     expect(w.averageMs).toBe(13 * H)
     expect(w.longestMs).toBe(16 * H)
     expect(w.days.map((d) => d.status)).toEqual([null, 'klar', null, 'paborjad', null, null, null])
+  })
+
+  it('räknar inte fastor som avslutats direkt (av misstag) i veckan', () => {
+    const week = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27']
+    const start = new Date(2026, 8, 23, 2, 30)
+    const oops: FastRecord = { id: 'x', start: start.getTime(), end: start.getTime() + M, targetHours: 16, protocol: '16:8' }
+    const w = fastingWeek([oops, rec('b', new Date(2026, 8, 23, 20, 0), 10)], week)
+    expect(w.count).toBe(1)
+    expect(w.averageMs).toBe(10 * H)
+    expect(isTooShortFast(0)).toBe(true)
+    expect(isTooShortFast(29 * M)).toBe(true)
+    expect(isTooShortFast(30 * M)).toBe(false)
   })
 
   it('tom vecka', () => {

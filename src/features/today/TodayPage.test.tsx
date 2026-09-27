@@ -133,6 +133,8 @@ describe('TodayPage', () => {
     fireEvent.click(chip)
     await waitFor(() => expect(useDiaryStore.getState().entries[today]?.length).toBe(1))
     expect(useDiaryStore.getState().entries[today]?.[0].meal).toBe('lunch')
+    // Knappen försvann – fokus på lunchkortet (som nu visar maten), inte på <body>.
+    await waitFor(() => expect(document.activeElement?.textContent).toMatch(/Lunch.*Lax, ugnsbakad/))
 
     const t = useToastStore.getState().toasts.at(-1)
     expect(t?.message).toMatch(/Gårdagens lunch är kopierad/)
@@ -166,6 +168,18 @@ describe('TodayPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Markera dagen som klar/ }))
     expect(useDiaryStore.getState().days[today]?.complete).toBe(true)
     expect(await screen.findByText('Dagen är markerad som klar')).toBeInTheDocument()
+    // Knappen byttes mot "Öppna igen" – fokus följer med.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Öppna igen' })))
+  })
+
+  it('ger fokus till nästa del av sidan när dagens tips döljs', async () => {
+    renderPage()
+    const hide = await screen.findByRole('button', { name: 'Dölj dagens tips' })
+    hide.focus()
+    fireEvent.click(hide)
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body))
+    expect(document.activeElement).not.toBe(hide)
+    expect(document.activeElement?.closest('[inert], [aria-hidden="true"]')).toBeNull()
   })
 
   it('visar pågående fasta och träning som sammanhangskort', async () => {

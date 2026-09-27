@@ -99,6 +99,8 @@ describe('DiaryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Kopiera gårdagen' }))
     await waitFor(() => expect(useDiaryStore.getState().entries[today]?.length).toBe(1))
     expect(await screen.findByText('Lax, ugnsbakad')).toBeInTheDocument()
+    // Kortet med knappen försvann – fokus hamnar på den kopierade posten, inte på <body>.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: /Ändra Lax, ugnsbakad/ })))
 
     act(() => lastToast()?.action?.onClick())
     expect(useDiaryStore.getState().entries[today]).toBeUndefined()
@@ -228,6 +230,32 @@ describe('DiaryPage', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Måltider' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 3, name: 'Frukost' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Måltider' })).toBeInTheDocument()
+  })
+
+  it('flyttar fokus till nästa pass, och sedan till "Logga", när träning tas bort', async () => {
+    const yesterday = addDays(todayISO(), -1)
+    const store = useDiaryStore.getState()
+    store.addExercise({ date: yesterday, activityId: 'promenad', name: 'Promenad', minutes: 30, kcal: 120 })
+    store.addExercise({ date: yesterday, activityId: 'cykling', name: 'Cykling', minutes: 20, kcal: 150 })
+    renderAt(`/dagbok/${yesterday}`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ta bort Promenad' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Ta bort Cykling' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Ta bort Cykling' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Logga' })))
+    expect(useDiaryStore.getState().exercise[yesterday] ?? []).toHaveLength(0)
+  })
+
+  it('behåller fokus när "Markera dagen som klar" byts mot "Öppna igen" och tillbaka', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'lunch' })
+    renderAt('/dagbok')
+    const mark = await screen.findByRole('button', { name: 'Markera dagen som klar' })
+    mark.focus()
+    fireEvent.click(mark)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Öppna igen' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Öppna igen' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Markera dagen som klar' })))
   })
 
   it('markerar dagen som klar via dagens meny', async () => {

@@ -1,13 +1,14 @@
 /**
  * Dagens tips – ett kort, vänligt råd som följer årstiden. Kan döljas för resten av dagen.
  */
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
 import { Card, IconButton, toast } from '../../components/ui'
 import { TIP_CATEGORIES, tipForDate } from '../../data/tips'
 import { SEASONS, swedishSeason } from '../../lib/season'
 import type { ISODate } from '../../types'
+import { focusAfterRender, focusableNear } from '../diary/focus'
 import { useDismissedForDay } from './hooks'
 
 const STORAGE_KEY = 'lagom-idag-tips-dolt'
@@ -20,8 +21,13 @@ export const TipCard = memo(function TipCard({ today }: { today: ISODate }) {
   const seasonal = tip.seasons !== undefined || tip.months !== undefined
   const category = TIP_CATEGORIES[tip.category]
 
+  const cardRef = useRef<HTMLDivElement>(null)
+
   const onDismiss = () => {
+    // Kortet (och knappen) försvinner – ge fokus till det som kommer efter, inte till <body>.
+    const next = focusableNear(cardRef.current)
     dismiss()
+    focusAfterRender(() => next)
     toast('Tipset är dolt till imorgon', { action: { label: 'Ångra', onClick: restore } })
   }
 
@@ -29,6 +35,7 @@ export const TipCard = memo(function TipCard({ today }: { today: ISODate }) {
     <AnimatePresence initial={false}>
       {!dismissed && (
         <motion.div
+          ref={cardRef}
           key="tip"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

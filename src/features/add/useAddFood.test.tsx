@@ -12,7 +12,7 @@ const target = { date: '2026-09-26', meal: 'frukost' as const }
 
 function reset() {
   useDiaryStore.setState({ entries: {} })
-  useFoodStore.setState({ usage: {}, cachedFoods: {}, templates: [] })
+  useFoodStore.setState({ usage: {}, cachedFoods: {}, templates: [], favorites: [] })
   useToastStore.setState({ toasts: [] })
   useBasketStore.setState({ items: [] })
 }
@@ -101,6 +101,18 @@ describe('useAddFood', () => {
     act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
     expect(useFoodStore.getState().usage[offBar.id]).toBeUndefined()
     expect(useFoodStore.getState().cachedFoods[offBar.id]).toBeUndefined()
+  })
+
+  it('ångra behåller en nysparad onlineprodukt som hunnit bli favorit', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(offBar, 1, 'portion:serving', target)
+    })
+    const undo = useToastStore.getState().toasts.at(-1)?.action?.onClick
+    useFoodStore.getState().toggleFavorite(offBar.id)
+    act(() => undo?.())
+    expect(useFoodStore.getState().usage[offBar.id]).toBeUndefined()
+    expect(useFoodStore.getState().cachedFoods[offBar.id]).toBeDefined()
   })
 
   it('ångra behåller en redan sparad onlineprodukt', () => {

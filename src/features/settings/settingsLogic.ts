@@ -1,9 +1,12 @@
 /**
  * Ren logik för Inställningar: makrofördelning, egna mål, måltider, lagring och cache.
  */
-import type { Food, MealConfig, MealId, NutrientKey, Targets } from '../../types'
+import type { Food, ISODate, MealConfig, MealId, NutrientKey, Profile, Targets } from '../../types'
 import { DEFAULT_MEALS } from '../../stores/profileStore'
-import { formatNumber } from '../../lib/format'
+import { MIN_KCAL, type EnergyBreakdown } from '../../lib/energy'
+import { todayISO } from '../../lib/dates'
+import { formatEnergy, formatNumber } from '../../lib/format'
+import { minimumAge } from '../onboarding/profileLogic'
 
 // ---------------------------------------------------------------------------
 // Makrofördelning (energiprocent)
@@ -140,6 +143,63 @@ export const OVERRIDE_FIELDS: readonly OverrideField[] = [
   { key: 'waterMl', label: 'Dryck', unit: 'ml', step: 100, decimals: 0, min: 500, max: 6000, hint: 'Vatten och annan dryck' },
   { key: 'saltMaxG', label: 'Salt, högst', unit: 'g', step: 0.5, decimals: 1, min: 1, max: 15, hint: 'Rekommendationen är högst 6 g per dag' },
 ]
+
+export type KcalFloorReason = 'golv' | 'gravid' | 'ammar' | 'ung'
+
+export interface KcalFloor {
+  /** Lägsta tillåtna egna energimål i kcal. */
+  kcal: number
+  reason: KcalFloorReason
+}
+
+/**
+ * Lägsta egna energimål. Aldrig under säkerhetsgolvet (1 200/1 500 kcal), och vid graviditet,
+ * amning eller under 18 år aldrig under förbrukningen – då rekommenderas ingen viktnedgång.
+ * Samma regler som `computeEnergy`; åldern räknas försiktigt (se `minimumAge`).
+ */
+export function kcalOverrideFloor(
+  profile: Pick<Profile, 'sex' | 'lifeStage' | 'birthYear'>,
+  energy: Pick<EnergyBreakdown, 'tdee' | 'lifeStageKcal'>,
+  today: ISODate = todayISO(),
+): KcalFloor {
+  const base = MIN_KCAL[profile.sex]
+  const reason: KcalFloorReason | null =
+    profile.lifeStage === 'gravid' ? 'gravid' : profile.lifeStage === 'ammar' ? 'ammar' : minimumAge(profile.birthYear, today) < 18 ? 'ung' : null
+  if (reason === null) return { kcal: base, reason: 'golv' }
+  const maintenance = Math.ceil((energy.tdee + energy.lifeStageKcal) / 10) * 10
+  return maintenance > base ? { kcal: maintenance, reason } : { kcal: base, reason: 'golv' }
+}
+
+/** Förklaring till golvet för egna energimål (visas under fältet). */
+export function kcalFloorText(floor: KcalFloor, unit: 'kcal' | 'kJ'): string {
+  const value = formatEnergy(floor.kcal, unit)
+  switch (floor.reason) {
+    case 'gravid':
+      return `Lägst ${value} – under graviditeten rekommenderas ingen viktnedgång, så målet följer din förbrukning.`
+    case 'ammar':
+      return `Lägst ${value} – när du ammar rekommenderas ingen viktnedgång, så målet följer din förbrukning.`
+    case 'ung':
+      return `Lägst ${value} – under 18 år rekommenderas inget kaloriunderskott, så målet följer din förbrukning.`
+    default:
+      return `Lägst ${value} – så att kroppen får tillräckligt med näring.`
+  }
+}
+
+/** Egna mål där ett för lågt energimål har höjts till golvet. Samma objekt om inget behövde ändras. */
+export function clampKcalOverride(overrides: Partial<Targets>, floorKcal: number): Partial<Targets> {
+  if (overrides.kcal === undefined || overrides.kcal >= floorKcal) return overrides
+  return { ...overrides, kcal: floorKcal }
+}
+
+/**
+ * Hur mycket energi makromålen motsvarar tillsammans (protein och kolhydrater 4 kcal/g, fett 9 kcal/g)
+ * jämfört med dagsmålet. `null` när de stämmer ungefär (inom 3 %, minst 50 kcal).
+ */
+export function macroEnergyMismatch(targets: Pick<Targets, 'kcal' | 'proteinG' | 'carbsG' | 'fatG'>): { macroKcal: number; diff: number } | null {
+  const macroKcal = Math.round(targets.proteinG * 4 + targets.carbsG * 4 + targets.fatG * 9)
+  const diff = macroKcal - targets.kcal
+  return Math.abs(diff) >= Math.max(50, targets.kcal * 0.03) ? { macroKcal, diff } : null
+}
 
 /** Ny override-karta där `key` är satt – eller borttagen om värdet saknas. */
 export function withOverride(overrides: Partial<Targets>, key: keyof Targets, value: number | undefined): Partial<Targets> {

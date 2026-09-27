@@ -160,8 +160,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/components/ui/toast.tsx`
 - interface `ToastItem`
 - const `useToastStore`
-- `toast(message: string, opts: Omit<ToastItem, 'id' | 'message'> = {}): string`
-- `ToastViewport()`
+- `toast(message: string, opts: Omit<ToastItem, 'id' | 'message'> = {}): string` – med `action` visas notisen 8 s och pausas vid hovring/fokus
+- `toastDuration(t): number`, `pauseToast(id)`, `resumeToast(id)`
+- `ToastViewport()` – portal till `<body>`; fel läses upp med `role="alert"`, övrigt artigt
 
 
 ## Diagram
@@ -344,8 +345,14 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ## Layout
 
 ### `src/components/layout/AppShell.tsx`
-- `PageFallback()`
-- `AppShell()`
+- `PageFallback()` – `role="status"` med dold text "Laddar …"
+- `AppShell()` – sätter dokumenttitel per sida, flyttar fokus till sidans `h1` efter navigering, visar varning när data inte kan sparas
+- `routeTitle(pathname: string): string` – "Vikt & mått – Lagom"
+- `navMatch(item, pathname, exclude?): 'page' | 'section' | null` – "Mer" markeras även på sidor man når därifrån
+
+### `src/components/layout/RouteError.tsx`
+- `RouteError({ inShell }: { inShell?: boolean })` – `errorElement` för routern: svensk felsida med Ladda om / Till Idag / säkerhetskopia; laddar om en gång vid chunkfel efter uppdatering
+- `isChunkLoadError(error: unknown): boolean`
 
 ### `src/components/layout/Logo.tsx`
 - `LogoMark({ size = 32, className = '' }: { size?: number; className?: string })`
@@ -365,9 +372,10 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `summarizeBackup(b: BackupFile): ImportSummary`
 - `restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void`
 - `wipeAllData(): void`
-- `diaryToCsv(entries: Record<ISODate, DiaryEntry[]>): string`
+- `diaryToCsv(entries: Record<ISODate, DiaryEntry[]>, meals: MealConfig[] = profilens måltider): string` – måltidsnamn (inte id:n), skydd mot formelinjektion
 - `downloadFile(filename: string, content: string, mime = 'application/json'): void`
 - `backupFilename(): string`
+- `downloadBackup(): boolean` – skapa och ladda ned en säkerhetskopia direkt
 - `requestPersistentStorage(): Promise<boolean>`
 - `storageEstimate(): Promise<{ usage: number; quota: number } | null>`
 
@@ -511,7 +519,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `formatGrams(g: number | undefined, decimals = 0): string`
 - `formatKg(kg: number | undefined, decimals = 1): string`
 - `formatPercent(v: number | undefined, decimals = 0): string`
-- `parseSwedishNumber(input: string): number`
+- `parseSwedishNumber(input: string): number` – "1,5", "1 234,5", "½", "1½", "1/2", "1 1/2", "-2"; NaN för ofullständig inmatning
 - `formatDuration(minutes: number): string`
 - `plural(n: number, one: string, many: string): string`
 
@@ -520,7 +528,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `slugify(s: string): string`
 
 ### `src/lib/kostrad.ts`
-- interface `KostradContribFull`
+- type `KostradContribFull` (= `KostradContrib`, som nu har `baljvaxter` och `mejeri`)
 - const `CATEGORY_KOSTRAD : Partial<Record<FoodCategory, KostradContribFull>>`
 - const `RAW_TO_COOKED_MEAT`
 - `foodKostrad(food: Food): KostradContribFull`
@@ -565,7 +573,8 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - const `MEAL_HOURS : Record<MealId, [number, number]>`
 - const `MEAL_EMOJI : Record<MealId, string>`
 - `mealForTime(meals: MealConfig[], now: Date = new Date()): MealId`
-- `mealName(meals: MealConfig[], id: MealId): string`
+- const `DEFAULT_MEAL_NAMES : Record<MealId, string>`
+- `mealName(meals: MealConfig[], id: MealId): string` – faller tillbaka på standardnamnet, aldrig id:t
 
 ### `src/lib/nnr.ts`
 - type `ReferenceKind`
@@ -750,7 +759,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `defaultAmount(unit: UnitKey): number`
 - `gramsFor(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): number`
 - `unitLabel(food: Pick<Food, 'portions'>, unit: UnitKey): string`
-- `formatAmount(`
+- `formatAmount(food, amount, unit, withGrams = false): string` – "2 dl (76 g)", "1 glas (2 dl, 206 g)", "2 smörgåsar (124 g)"; upprepar aldrig gramvikten
+- `formatPortionAmount(label: string, amount: number, grams?: number): string`
+- const `PORTION_PLURALS : Record<string, string>` – pluralformer för portionsord
 
 
 ## Hooks
@@ -782,6 +793,12 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/hooks/useTheme.ts`
 - `useTheme()`
 
+### `src/hooks/useDocumentTitle.ts`
+- `useDocumentTitle(title: string | undefined): void` – förfina sidans titel ("Havregrynsgröt – Lagom")
+
+### `src/hooks/useStorageStatus.ts`
+- `useMemoryOnlyStorage(): boolean` – true när ändringar inte sparas på enheten
+
 ### `src/hooks/useToday.ts`
 - `useToday(): string`
 
@@ -803,6 +820,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 
 ### `src/stores/foodStore.ts`
 - interface `FoodUsage`
+- `usageFromEntries(entries): Record<string, FoodUsage>` – "Senaste" byggt från dagboksposter
 - const `useFoodStore`
 
 ### `src/stores/hydration.ts`
@@ -814,7 +832,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - const `useProfileStore`
 
 ### `src/stores/storage.ts`
-- const `idbStorage`
+- const `idbStorage` – långsam läsning stänger inte av lagringen; osparad data skrivs aldrig över
+- `isMemoryOnlyStorage(): boolean`, `subscribeStorageStatus(listener)`, `onLateRead(listener)`
+- const `READ_TIMEOUT_MS`
 - const `STORE_KEYS`
 
 

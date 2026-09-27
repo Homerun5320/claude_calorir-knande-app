@@ -46,6 +46,27 @@ function unlockScroll() {
   document.body.style.paddingRight = savedPaddingRight
 }
 
+let inertLocks = 0
+
+/**
+ * Gör appen bakom modalen (#root) inert så att skärmläsare och tangentbord inte kan vandra in
+ * bakom arket – även de som ignorerar aria-modal. Modaler och toast-notiser ligger i portaler
+ * direkt i <body> och påverkas inte. Räknar lås så att nästlade modaler fungerar.
+ */
+function lockBackground() {
+  if (inertLocks++ > 0) return
+  document.getElementById('root')?.setAttribute('inert', '')
+}
+
+function unlockBackground() {
+  if (--inertLocks > 0) return
+  inertLocks = 0
+  document.getElementById('root')?.removeAttribute('inert')
+}
+
+/** Element utanför modalen som ändå får ta emot fokus (t.ex. Ångra i en toast-notis). */
+const FOCUS_ALLOWED_OUTSIDE = '[data-toast-viewport]'
+
 const FOCUSABLE = [
   'a[href]',
   'button:not([disabled])',
@@ -91,6 +112,7 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     lockScroll()
+    lockBackground()
     const target = initialFocusRef?.current ?? ref.current
     target?.focus({ preventScroll: true })
 
@@ -128,6 +150,7 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
     const onFocusIn = (e: FocusEvent) => {
       const root = ref.current
       if (!isTop() || !root || !(e.target instanceof Node) || root.contains(e.target)) return
+      if (e.target instanceof Element && e.target.closest(FOCUS_ALLOWED_OUTSIDE)) return
       ;(getFocusable(root)[0] ?? root).focus({ preventScroll: true })
     }
 
@@ -139,6 +162,7 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
       const i = modalStack.indexOf(token)
       if (i >= 0) modalStack.splice(i, 1)
       unlockScroll()
+      unlockBackground()
       if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true })
     }
     // ref och initialFocusRef är stabila objekt – effekten styrs enbart av `active`.

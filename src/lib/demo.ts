@@ -10,7 +10,7 @@ import { uid } from './id'
 import { useBodyStore } from '../stores/bodyStore'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useProfileStore } from '../stores/profileStore'
-import { useFoodStore } from '../stores/foodStore'
+import { useFoodStore, usageFromEntries } from '../stores/foodStore'
 
 export const DEMO_FLAG_KEY = 'lagom-demo'
 
@@ -185,8 +185,11 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   }
   useBodyStore.setState({ weights, measurements: [{ id: uid('m_'), date: addDays(today, -30), waistCm: 82, hipCm: 101, createdAt: now.getTime() }, { id: uid('m_'), date: addDays(today, -2), waistCm: 80, hipCm: 100, createdAt: now.getTime() }] })
 
-  // Favoriter
-  useFoodStore.setState({ favorites: ['lagom:havregrynsgrot-mellanmjolk', 'lagom:knackebrod-wasa-husman', 'lagom:kanelbulle-bageri', 'lagom:kaffe-bryggt'] })
+  // Favoriter och "Senaste" (samma statistik som när man loggar själv)
+  useFoodStore.setState({
+    favorites: ['lagom:havregrynsgrot-mellanmjolk', 'lagom:knackebrod-wasa-husman', 'lagom:kanelbulle-bageri', 'lagom:kaffe-bryggt'],
+    usage: usageFromEntries(entries),
+  })
 
   try {
     localStorage.setItem(DEMO_FLAG_KEY, '1')

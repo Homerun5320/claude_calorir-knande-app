@@ -14,7 +14,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Camera, Flashlight, FlashlightOff, Keyboard, PackageSearch, Plus, RefreshCw, ShoppingBasket, WifiOff, X } from 'lucide-react'
 import type { Food } from '../../types'
-import { Badge, Button, IconButton, Sheet, Spinner, TextField, cx, toast } from '../../components/ui'
+import { Button, IconButton, Sheet, Spinner, TextField, cx, toast } from '../../components/ui'
 import { CategoryIcon, MealIcon } from '../../components/domain'
 import { useProfileStore } from '../../stores/profileStore'
 import { useFoodStore } from '../../stores/foodStore'
@@ -26,7 +26,7 @@ import { relativeDayLabel } from '../../lib/dates'
 import { addPageHref, countLabel, findByBarcode, foodDetailHref, newFoodHref, nutriScoreInfo, parseAddParams } from './addLogic'
 import { useAddFood } from './useAddFood'
 import { useBasketStore } from './basketStore'
-import { useLeave } from './components'
+import { NutriScoreBadge, useLeave } from './components'
 import { PortionSheet } from './PortionSheet'
 import {
   CAMERA_ERROR_TEXT,
@@ -327,9 +327,9 @@ export default function ScanPage() {
           {busy && (
             <motion.div
               key="busy"
-              initial={{ opacity: 0, y: 12 }}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
               className="mx-auto flex w-full max-w-md items-center gap-3 rounded-2xl bg-surface/90 px-4 py-3 backdrop-blur-md"
               role="status"
             >
@@ -473,9 +473,7 @@ function ProductHeader({ food }: { food: Food }) {
       <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-ink-2">
         {food.extra?.quantity && <span>{food.extra.quantity}</span>}
         {nutri && (
-          <Badge tone={nutri.tone} variant="solid">
-            Nutri-Score {nutri.grade}
-          </Badge>
+          <NutriScoreBadge score={nutri} />
         )}
         {food.barcode && <span className="w-full text-xs tabular-nums text-ink-3">{food.barcode}</span>}
       </div>
@@ -580,7 +578,7 @@ function LookupProblem({
           {lookup.kind === 'notfound' && (
             <>
               Streckkoden <span className="font-semibold tabular-nums text-ink">{code}</span> finns varken i Lagom eller i Open Food Facts. Lägg in
-              värdena från förpackningen – då känner Lagom igen varan nästa gång.
+              värdena från förpackningen – då känner Lagom igen produkten nästa gång.
             </>
           )}
           {lookup.kind === 'offline' && (

@@ -53,6 +53,7 @@ export function Note({ children, tone = 'blabar', icon: Icon = Info }: { childre
 
 export function AboutFields({ draft, onChange, errors, visibleErrors, onBlurField, today, showName = true, autoFocus }: AboutFieldsProps) {
   const sexLabelId = useId()
+  const sexHintId = useId()
   const stageLabelId = useId()
   const err = (f: ProfileField) => (visibleErrors[f] ? errors[f] : undefined)
   const wantsLoss = goalFromChoice(draft.goalChoice) === 'ga_ner'
@@ -80,6 +81,10 @@ export function AboutFields({ draft, onChange, errors, visibleErrors, onBlurFiel
         </div>
         <SegmentedControl<Sex>
           aria-labelledby={sexLabelId}
+          // Felet (eller förklaringen) kopplas till radiogruppen så att skärmläsare läser upp det,
+          // och aria-invalid gör att "gå till första felet" hittar gruppen. SegmentedControl
+          // sprider ARIA-attributen till radiogruppen.
+          {...{ 'aria-describedby': sexHintId, 'aria-invalid': err('sex') ? true : undefined }}
           fullWidth
           value={draft.sex ?? ('' as Sex)}
           onChange={(sex) => {
@@ -88,7 +93,7 @@ export function AboutFields({ draft, onChange, errors, visibleErrors, onBlurFiel
           }}
           options={SEX_OPTIONS}
         />
-        <p className={cx('mt-1.5 text-[0.8125rem] leading-snug', err('sex') ? 'text-bad' : 'text-ink-3')}>
+        <p id={sexHintId} className={cx('mt-1.5 text-[0.8125rem] leading-snug', err('sex') ? 'text-bad' : 'text-ink-3')}>
           {err('sex') ?? 'Används bara i formeln för ditt energibehov – kroppar med olika kön gör i genomsnitt av med olika mycket energi.'}
         </p>
       </div>

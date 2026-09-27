@@ -78,18 +78,20 @@ export function Switch({
         'relative inline-flex shrink-0 items-center rounded-full p-0.5 transition-colors duration-200',
         'disabled:cursor-not-allowed disabled:opacity-45',
         s.track,
-        checked ? 'bg-gran' : 'bg-surface-3 hover:bg-[color-mix(in_oklab,var(--lg-surface-3)_85%,var(--lg-ink-3))]',
+        // Av: tydlig kant och mörk knopp – minst 3:1 mot kortet och mellan knopp och spår (WCAG 1.4.11).
+        checked ? 'bg-gran' : 'bg-surface-3 ring-2 ring-inset ring-ink-3 hover:bg-[color-mix(in_oklab,var(--lg-surface-3)_85%,var(--lg-ink-3))]',
       )}
     >
       <motion.span
         aria-hidden
         initial={false}
-        animate={{ x: checked ? s.travel : 0 }}
+        // Mindre knopp när reglaget är av (som Material 3) så att kanten runt spåret syns.
+        animate={{ x: checked ? s.travel : 0, scale: checked ? 1 : 0.76 }}
         transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 700, damping: 38 }}
         className={cx(
           'block rounded-full shadow-[0_1px_3px_0_var(--lg-shadow-b)] transition-colors duration-200',
           s.knob,
-          checked ? 'bg-on-gran' : 'bg-surface dark:bg-ink-3',
+          checked ? 'bg-on-gran' : 'bg-ink-3',
         )}
       />
     </button>

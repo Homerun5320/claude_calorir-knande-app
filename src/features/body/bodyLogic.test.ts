@@ -1,10 +1,14 @@
 import { addDays } from '../../lib/dates'
 import type { DiaryEntry, MeasurementEntry, WeightEntry } from '../../types'
 import {
+  adaptiveBlockReason,
   adaptiveNeeds,
   adaptiveProgress,
+  bmiDisplay,
   bodyOverview,
   chartWindow,
+  goalChartPlacement,
+  minHealthyBmi,
   compareTdeeText,
   directionOf,
   formatSigned,
@@ -177,6 +181,77 @@ describe('goalStatus', () => {
   it('saknar målstatus när målet är att behålla vikten', () => {
     expect(goalStatus({ ...base, goal: 'behalla', rate: null }).kind).toBe('none')
     expect(goalStatus({ ...base, targetKg: undefined, rate: null }).kind).toBe('none')
+  })
+
+  it('pausar viktnedgång när trendvikten ligger under hälsosamt BMI – även utan målvikt', () => {
+    // 165 cm: BMI 18,5 ≈ 50,4 kg.
+    const low = { ...base, heightCm: 165, trendKg: 48, targetKg: 45, rate: null }
+    expect(goalStatus(low)).toEqual({ kind: 'paused', reason: 'lowBmi' })
+    expect(goalStatus({ ...low, targetKg: undefined })).toEqual({ kind: 'paused', reason: 'lowBmi' })
+    // Nådd målvikt på låg vikt räknas inte som "nådd" – säkerheten går först.
+    expect(goalStatus({ ...low, targetKg: 48 })).toEqual({ kind: 'paused', reason: 'lowBmi' })
+    // Från 70 år gäller BMI 22 som nedre gräns (≈ 59,9 kg vid 165 cm).
+    expect(goalStatus({ ...base, heightCm: 165, trendKg: 58, targetKg: 55, age: 75, rate: null })).toEqual({ kind: 'paused', reason: 'lowBmi' })
+    expect(goalStatus({ ...base, heightCm: 165, trendKg: 58, targetKg: 55, age: 45, rate: null }).kind).toBe('early')
+    // Att gå upp i vikt pausas förstås inte.
+    expect(goalStatus({ ...low, goal: 'ga_upp', targetKg: 55 }).kind).toBe('early')
+  })
+})
+
+describe('BMI', () => {
+  it('har en högre nedre gräns från 70 år', () => {
+    expect(minHealthyBmi(35)).toBe(18.5)
+    expect(minHealthyBmi(undefined)).toBe(18.5)
+    expect(minHealthyBmi(70)).toBe(22)
+  })
+
+  it('klassar det avrundade värdet så att siffra och etikett stämmer', () => {
+    // 70,5 kg / 168 cm = 24,98 → visas som 25 och räknas då inte som normalvikt.
+    const d = bmiDisplay(70.5, 168, 40, 'ingen')
+    expect(d?.value).toBe(25)
+    expect(d?.category?.label).toBe('Övervikt')
+    expect(bmiDisplay(70, 168, 40, 'ingen')?.category).toEqual({ label: 'Normalvikt', tone: 'good' })
+  })
+
+  it('tar hänsyn till åldern från 70 år och klassar inte under 18 år eller vid graviditet', () => {
+    // 60 kg / 170 cm ≈ 20,8
+    expect(bmiDisplay(60, 170, 78, 'ingen')?.category).toEqual({ label: 'Lägre än rekommenderat för din ålder', tone: 'neutral' })
+    expect(bmiDisplay(60, 170, 40, 'ingen')?.category?.label).toBe('Normalvikt')
+    // 75 kg / 170 cm ≈ 26 – normalt för äldre
+    expect(bmiDisplay(75, 170, 78, 'ingen')?.category?.label).toBe('Normalvikt för din ålder')
+    expect(bmiDisplay(60, 170, 16, 'ingen')?.category).toBeUndefined()
+    expect(bmiDisplay(60, 170, 30, 'gravid')?.category).toBeUndefined()
+    expect(bmiDisplay(60, 0, 30, 'ingen')).toBeUndefined()
+  })
+})
+
+describe('goalChartPlacement', () => {
+  it('säger att målet syns när den avrundade axeln ändå når dit', () => {
+    // En enda vägning på 72,5 kg och mål 66 kg: mer än 5 kg bort, men axeln blir 65–80 och målet ritas ut.
+    const p = goalChartPlacement([72.5, 72.5], 66)
+    expect(p.includeInDomain).toBe(false)
+    expect(p.visible).toBe(true)
+    // Brett spann (steg 10): axeln börjar på 70 och når målet 72 fast det inte drogs in.
+    expect(goalChartPlacement([79.9, 110], 72)).toEqual({ includeInDomain: false, visible: true })
+  })
+
+  it('drar in ett närliggande mål i axeln', () => {
+    expect(goalChartPlacement([72.5, 74], 70)).toEqual({ includeInDomain: true, visible: true })
+  })
+
+  it('säger att målet ligger utanför när det inte ritas', () => {
+    expect(goalChartPlacement([90, 92], 60)).toEqual({ includeInDomain: false, visible: false })
+    expect(goalChartPlacement([], 60)).toEqual({ includeInDomain: false, visible: false })
+  })
+})
+
+describe('adaptiveBlockReason', () => {
+  it('stänger av adaptiv förbrukning vid graviditet, amning och under 18 år', () => {
+    expect(adaptiveBlockReason('gravid', 30)).toMatch(/graviditeten/)
+    expect(adaptiveBlockReason('ammar', 30)).toMatch(/amningen/)
+    expect(adaptiveBlockReason('ingen', 16)).toMatch(/uppväxten/)
+    expect(adaptiveBlockReason('ingen', 30)).toBeNull()
+    expect(adaptiveBlockReason(undefined, undefined)).toBeNull()
   })
 })
 

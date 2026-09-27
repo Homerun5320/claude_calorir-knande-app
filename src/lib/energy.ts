@@ -172,8 +172,14 @@ export function computeTargets(
   const pct = macroPercents(profile)
   const age = ageFromBirthYear(profile.birthYear, opts.today ?? todayISO())
   const proteinG = Math.max((kcal * pct.protein) / 100 / 4, proteinMinG(weightKg, age))
-  const fatG = (kcal * pct.fat) / 100 / 9
-  const carbsG = Math.max(0, (kcal - proteinG * 4 - fatG * 9) / 4)
+  let fatG = (kcal * pct.fat) / 100 / 9
+  let carbsG = (kcal - proteinG * 4 - fatG * 9) / 4
+  // Proteingolvet tas i första hand från kolhydraterna. Räcker de inte (t.ex. LCHF med lågt
+  // energimål och hög vikt) tas resten från fettet – makrona får aldrig överstiga energimålet.
+  if (carbsG < 0) {
+    carbsG = 0
+    fatG = Math.max(0, (kcal - proteinG * 4) / 9)
+  }
   return {
     kcal,
     proteinG: overrides.proteinG ?? Math.round(proteinG),

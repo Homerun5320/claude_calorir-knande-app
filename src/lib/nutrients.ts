@@ -74,7 +74,7 @@ export const NUTRIENTS: Record<NutrientKey, NutrientMeta> = {
   sugars: { key: 'sugars', name: 'Sockerarter', short: 'Socker', unit: 'g', group: 'kolhydrat', decimals: 1, lmvCode: 'SUGAR', info: 'Totala sockerarter, inklusive naturligt socker i frukt och mjölk.' },
   addedSugar: { key: 'addedSugar', name: 'Tillsatt socker', short: 'Tills. socker', unit: 'g', group: 'kolhydrat', decimals: 1, lmvCode: 'SUGAR_ADDED', info: 'Socker som tillsatts vid tillverkning eller tillagning. Bör vara under 10 E%.' },
   fiber: { key: 'fiber', name: 'Fibrer', short: 'Fibrer', unit: 'g', group: 'kolhydrat', decimals: 1, lmvCode: 'FIBT', info: 'Kostfiber – bra för magen, mättnaden och blodsockret.' },
-  wholegrain: { key: 'wholegrain', name: 'Fullkorn', short: 'Fullkorn', unit: 'g', group: 'kolhydrat', decimals: 1, lmvCode: 'WHOLEGRAIN', info: 'Livsmedelsverket rekommenderar 70 g/dag för kvinnor och 90 g/dag för män.' },
+  wholegrain: { key: 'wholegrain', name: 'Fullkorn', short: 'Fullkorn', unit: 'g', group: 'kolhydrat', decimals: 1, lmvCode: 'WHOLEGRAIN', info: 'Livsmedelsverket rekommenderar 90 g fullkorn per dag för vuxna (kostråden 2025).' },
   fat: { key: 'fat', name: 'Fett', short: 'Fett', unit: 'g', group: 'makro', decimals: 1, lmvCode: 'FAT' },
   satFat: { key: 'satFat', name: 'Mättat fett', short: 'Mättat', unit: 'g', group: 'fett', decimals: 1, lmvCode: 'FASAT', info: 'Bör vara under 10 E%. Byt gärna mot omättat fett.' },
   monoFat: { key: 'monoFat', name: 'Enkelomättat fett', short: 'Enkelomätt.', unit: 'g', group: 'fett', decimals: 1, lmvCode: 'FAMS' },

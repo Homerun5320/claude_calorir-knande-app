@@ -18,15 +18,15 @@ Lagom är en svensk kalori- och näringsdagbok (PWA): React 19 + TypeScript 6 + 
 - Kommentarer och all text som användaren ser skrivs på **svenska** med korrekt å/ä/ö. Kodidentifierare på engelska.
 - Siffror visas alltid med `src/lib/format.ts` (decimalkomma, `formatNumber`, `formatNutrient`, `formatEnergy`, `formatGrams`). Tolka inmatade tal med `parseSwedishNumber` (klarar "1,5").
 - Datum är lokala `ISODate`-strängar ('YYYY-MM-DD') – använd `src/lib/dates.ts` (`todayISO`, `addDays`, `relativeDayLabel`, `isoWeek` …). Veckan börjar på måndag.
-- Mått: `src/lib/units.ts` (`gramsFor`, `availableUnits`, `formatAmount`) – svenska köksmått dl/msk/tsk/krm/cl och portioner.
+- Mått: `src/lib/units.ts` (`gramsFor`, `availableUnits`, `formatAmount`) – svenska köksmått dl/msk/tsk/krm/cl och portioner. `formatAmount(…, true)` böjer portionsord och upprepar aldrig gramvikten ("2 smörgåsar (124 g)").
 - Ett saknat näringsvärde (`undefined`) betyder okänt, inte 0. Visa "–".
 
 ## Zustand – viktigt
 
 - Butiker: `useProfileStore`, `useDiaryStore`, `useFoodStore`, `useBodyStore`, `useFastingStore` i `src/stores/`.
 - Selektorer får **inte** skapa nya objekt/arrayer vid varje anrop (ger oändlig renderingsloop i React 19). Välj fält var för sig, använd stabila tomma konstanter (`?? EMPTY`) eller `useShallow` från `zustand/react/shallow`. Beräkna härledda värden med `useMemo`.
-- Färdiga hooks: `useDay(date)` (poster, summor, vatten, träning), `useTargets()` (dagsmål), `useToday()`.
-- Toast-notiser: `toast('Tillagt', { action: { label: 'Ångra', onClick } })` från `src/components/ui/toast.tsx`.
+- Färdiga hooks: `useDay(date)` (poster, summor, vatten, träning), `useTargets()` (dagsmål), `useToday()`, `useDocumentTitle(title)` (förfina sidtiteln – AppShell sätter en per sökväg), `useMemoryOnlyStorage()` (true när data inte kan sparas).
+- Toast-notiser: `toast('Tillagt', { action: { label: 'Ångra', onClick } })` från `src/components/ui/toast.tsx`. Notiser med åtgärd visas 8 s och pausas vid hovring/fokus; fel (`tone: 'error'`) läses upp direkt.
 
 ## Design – "Nordisk natur"
 
@@ -37,6 +37,8 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 - Primär: `bg-gran text-on-gran`, `text-gran`, `bg-gran-soft`
 - Accenter (+ `-soft`): `lingon` (protein/varning), `hjortron` (kolhydrater), `blabar` (fett), `mossa` (fibrer/bra), `vinbar` (alkohol), `fjall` (vatten), `sol` (höjdpunkter)
 - Semantiska: `text-protein`, `bg-carbs`, `text-fat`, `bg-fiber`, `text-water`, `text-good`, `text-warn`, `text-bad`
+- Omvänd yta (toast m.m.): `bg-inverse text-on-inverse`, accent `text-inverse-accent` – mörk i ljust tema, ljus i mörkt
+- `text-ink-3` klarar 4,5:1 mot alla ytor och får användas för liten sekundärtext
 - Typsnitt: `font-display` (Fraunces) för rubriker och stora siffror, klassen `display-num` för stora tal, `eyebrow` för små etiketter i versaler. Brödtext Inter.
 - Kort: klassen `card` (rundad 1.5rem, mjuk skugga) + `p-4`/`p-5`. Knappar/chips rundade (`rounded-2xl`/`rounded-full`).
 - Ikoner: `lucide-react`. Animationer: `motion/react` (sparsamt, fjädrande; respektera reducerad rörelse).

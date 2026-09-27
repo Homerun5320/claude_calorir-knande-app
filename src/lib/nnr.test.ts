@@ -158,6 +158,8 @@ describe('referenceIntakes', () => {
     expect(r.protein?.ri).toBe(67) // 58,1 + 9
     expect(r.alcohol?.note).toMatch(/avstå/i)
     expect(r.vitA?.note).toMatch(/lever/i)
+    // Leverpastej går bra enligt Livsmedelsverket – bara lever och leverrätter ska undvikas.
+    expect(r.vitA?.note).toMatch(/leverpastej och leverkorv går bra/)
   })
 
   it('ger värden för amning', () => {
@@ -393,6 +395,20 @@ describe('nutrientsToWatch', () => {
     const c = items.find((i) => i.key === 'vitC')
     expect(c).toMatchObject({ status: 'lagt', priority: 3 })
     expect(c!.reason).toMatch(/vitamin c/i)
+  })
+
+  it('flaggar inte ämnen med adekvat intag (AI) som låga', () => {
+    // Under AI går inte att tolka som för lite (NNR 2023) – kalium, magnesium och vitamin E ska inte bli "Lågt".
+    const items = nutrientsToWatch({
+      ...man30,
+      averages: { potassium: 1500, magnesium: 150, vitE: 4, vitC: 30 },
+      coverage: { potassium: 0.9, magnesium: 0.9, vitE: 0.9, vitC: 0.9 },
+    })
+    const keys = items.map((i) => i.key)
+    expect(keys).not.toContain('potassium')
+    expect(keys).not.toContain('magnesium')
+    expect(keys).not.toContain('vitE')
+    expect(keys).toContain('vitC')
   })
 
   it('prioriterar D-vitamin från 75 år', () => {

@@ -6,9 +6,10 @@
  */
 import type { DiaryEntry, GoalType, ISODate, LifeStage, MeasurementEntry, Profile, WeightEntry } from '../../types'
 import { addDays, ageFromBirthYear, capitalize, diffDays, fromISODate, MONTHS, toISODate } from '../../lib/dates'
-import { projectGoalDate, slopePerDay, weightTrend, type TrendPoint } from '../../lib/energy'
+import { bmi, bmiCategory, projectGoalDate, slopePerDay, weightTrend, type TrendPoint } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 import { totals } from '../../lib/diary'
+import { niceTicks } from '../../components/charts/chartUtils'
 
 // ---------------------------------------------------------------------------
 // Grundläggande hjälpare
@@ -143,6 +144,45 @@ export function trendWord(kgPerWeek: number | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// BMI
+// ---------------------------------------------------------------------------
+
+/** Från den här åldern gäller en högre nedre BMI-gräns (Socialstyrelsen, 1177). */
+export const OLDER_ADULT_AGE = 70
+
+/**
+ * Lägsta BMI som räknas som hälsosamt: 18,5 för vuxna och 22 från 70 år – hos äldre är
+ * BMI under 22 ett tecken på risk för undernäring.
+ */
+export function minHealthyBmi(age: number | undefined): number {
+  return age !== undefined && age >= OLDER_ADULT_AGE ? 22 : 18.5
+}
+
+export interface BmiDisplay {
+  /** Värdet avrundat till en decimal – samma tal som visas och klassas. */
+  value: number
+  /** Klassning, eller undefined när BMI inte är meningsfullt (under 18 år, graviditet). */
+  category?: { label: string; tone: 'good' | 'neutral' }
+}
+
+/**
+ * BMI för visning. Klassningen görs på det avrundade värdet så att siffran och etiketten
+ * alltid stämmer överens (24,97 visas som "25" och klassas då inte som normalvikt).
+ * Från 70 år räknas 22–27 som normalt och under 22 som lägre än rekommenderat.
+ */
+export function bmiDisplay(weightKg: number, heightCm: number, age: number | undefined, lifeStage: LifeStage | undefined): BmiDisplay | undefined {
+  if (!(weightKg > 0) || !(heightCm > 0)) return undefined
+  const value = round1(bmi(weightKg, heightCm))
+  if ((age !== undefined && age < 18) || lifeStage === 'gravid') return { value }
+  if (age !== undefined && age >= OLDER_ADULT_AGE) {
+    if (value < 22) return { value, category: { label: 'Lägre än rekommenderat för din ålder', tone: 'neutral' } }
+    if (value < 27) return { value, category: { label: 'Normalvikt för din ålder', tone: 'good' } }
+  }
+  const c = bmiCategory(value)
+  return { value, category: { label: c.label, tone: c.tone === 'good' ? 'good' : 'neutral' } }
+}
+
+// ---------------------------------------------------------------------------
 // Mål och prognos
 // ---------------------------------------------------------------------------
 
@@ -156,8 +196,11 @@ export function goalProgress(startKg: number, currentKg: number, targetKg: numbe
 export type GoalStatus =
   /** Inget målviktsmål (behålla vikten eller ingen målvikt satt). */
   | { kind: 'none' }
-  /** Viktnedgång rekommenderas inte just nu (graviditet, amning, under 18 år). */
-  | { kind: 'paused'; reason: 'gravid' | 'ammar' | 'under18' }
+  /**
+   * Viktnedgång rekommenderas inte just nu: graviditet, amning, under 18 år eller en vikt som
+   * redan ligger under det hälsosamma BMI-intervallet för längden (och åldern).
+   */
+  | { kind: 'paused'; reason: 'gravid' | 'ammar' | 'under18' | 'lowBmi' }
   | { kind: 'reached' }
   /** För få vägningar för en prognos. */
   | { kind: 'early' }
@@ -172,16 +215,24 @@ export interface GoalStatusInput {
   rate: WeeklyRate | null
   lifeStage: LifeStage | undefined
   age: number | undefined
+  /** Längd för BMI-kontrollen (utan längd görs ingen kontroll). */
+  heightCm?: number
   today: ISODate
 }
 
-/** Status för målvikten: nådd, prognos, stabil eller pausad. */
-export function goalStatus({ goal, targetKg, trendKg, rate, lifeStage, age, today }: GoalStatusInput): GoalStatus {
-  if (goal === undefined || goal === 'behalla' || targetKg === undefined || !Number.isFinite(targetKg)) return { kind: 'none' }
+/**
+ * Status för målvikten: nådd, prognos, stabil eller pausad.
+ *
+ * Viktnedgång pausas vid graviditet, amning, under 18 år och när trendvikten ligger under
+ * `minHealthyBmi` – även utan satt målvikt, eftersom underskottet annars fortsätter.
+ */
+export function goalStatus({ goal, targetKg, trendKg, rate, lifeStage, age, heightCm, today }: GoalStatusInput): GoalStatus {
   if (goal === 'ga_ner') {
     if (lifeStage === 'gravid' || lifeStage === 'ammar') return { kind: 'paused', reason: lifeStage }
     if (age !== undefined && age < 18) return { kind: 'paused', reason: 'under18' }
+    if (heightCm !== undefined && heightCm > 0 && bmi(trendKg, heightCm) < minHealthyBmi(age)) return { kind: 'paused', reason: 'lowBmi' }
   }
+  if (goal === undefined || goal === 'behalla' || targetKg === undefined || !Number.isFinite(targetKg)) return { kind: 'none' }
   const reached = goal === 'ga_ner' ? trendKg <= targetKg + 0.1 : trendKg >= targetKg - 0.1
   if (reached) return { kind: 'reached' }
   if (!rate) return { kind: 'early' }
@@ -230,7 +281,8 @@ export interface BodyOverview {
   daysSinceLast?: number
 }
 
-type OverviewProfile = Pick<Profile, 'goal' | 'targetWeightKg' | 'lifeStage' | 'birthYear' | 'startWeightKg' | 'createdAt'>
+type OverviewProfile = Pick<Profile, 'goal' | 'targetWeightKg' | 'lifeStage' | 'birthYear' | 'startWeightKg' | 'createdAt'> &
+  Partial<Pick<Profile, 'heightCm'>>
 
 /** Allt som sidans överblick behöver, beräknat en gång. */
 export function bodyOverview(weights: readonly WeightEntry[], profile: OverviewProfile | null | undefined, today: ISODate): BodyOverview {
@@ -245,7 +297,7 @@ export function bodyOverview(weights: readonly WeightEntry[], profile: OverviewP
   const status =
     trendKg === undefined
       ? ({ kind: 'none' } as const)
-      : goalStatus({ goal: profile?.goal, targetKg: target, trendKg, rate, lifeStage: profile?.lifeStage, age, today })
+      : goalStatus({ goal: profile?.goal, targetKg: target, trendKg, rate, lifeStage: profile?.lifeStage, age, heightCm: profile?.heightCm, today })
   return {
     sorted,
     latest,
@@ -255,12 +307,13 @@ export function bodyOverview(weights: readonly WeightEntry[], profile: OverviewP
     change30: trendChange(points, 30),
     rate,
     age,
-    good: goodDirection(profile?.goal, profile?.lifeStage, age),
+    // Pausad viktnedgång har ingen "önskad" riktning – nedåt ska inte tonas grönt.
+    good: status.kind === 'paused' ? undefined : goodDirection(profile?.goal, profile?.lifeStage, age),
     status,
     startKg,
     startDate: profileStartDate(profile?.createdAt) ?? sorted[0]?.date,
     progress:
-      trendKg !== undefined && startKg !== undefined && target !== undefined && profile?.goal !== 'behalla'
+      trendKg !== undefined && startKg !== undefined && target !== undefined && profile?.goal !== 'behalla' && status.kind !== 'paused'
         ? goalProgress(startKg, trendKg, target)
         : undefined,
     daysSinceLast: latest ? diffDays(latest.date, today) : undefined,
@@ -291,6 +344,42 @@ export function chartWindow(range: WeightRange, firstDate: ISODate, today: ISODa
   const minStart = addDays(today, -6)
   if (start > minStart) start = minStart
   return [start, today]
+}
+
+/** Hur långt från datan målvikten får ligga och ändå dras in i viktkurvans y-axel (kg). */
+export const GOAL_DOMAIN_MARGIN = 5
+
+export interface GoalPlacement {
+  /** Ska målvikten vidga y-axeln? (Bara när den ligger nära datan – annars blir kurvan platt.) */
+  includeInDomain: boolean
+  /** Hamnar målvikten inom diagrammets slutliga (avrundade) y-axel och ritas alltså ut? */
+  visible: boolean
+}
+
+/**
+ * Var målvikten hamnar i viktkurvan. Axeln avrundas till "snygga" värden på samma sätt som i
+ * `LineChart` (`niceTicks` med `tickCount` intervall), så ett mål strax utanför datan kan ändå
+ * synas. `visible` avgör om texten "ligger utanför diagrammet" ska visas.
+ */
+export function goalChartPlacement(
+  values: readonly number[],
+  targetKg: number,
+  tickCount = 4,
+  margin = GOAL_DOMAIN_MARGIN,
+): GoalPlacement {
+  const finite = values.filter((v) => Number.isFinite(v))
+  if (finite.length === 0 || !Number.isFinite(targetKg)) return { includeInDomain: false, visible: false }
+  let lo = Math.min(...finite)
+  let hi = Math.max(...finite)
+  const includeInDomain = targetKg >= lo - margin && targetKg <= hi + margin
+  if (includeInDomain) {
+    lo = Math.min(lo, targetKg)
+    hi = Math.max(hi, targetKg)
+  }
+  const ticks = niceTicks(lo, hi, tickCount)
+  const eps = 1e-9
+  const visible = ticks.length > 0 && targetKg >= ticks[0] - eps && targetKg <= ticks[ticks.length - 1] + eps
+  return { includeInDomain, visible }
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +566,18 @@ export function intakeByDay(entries: Readonly<Record<ISODate, readonly DiaryEntr
     out[date] = totals(list).kcal ?? 0
   }
   return out
+}
+
+/**
+ * Varför adaptiv förbrukning inte används, eller null om den får användas. Under graviditet,
+ * amning och uppväxt ändras vikten av naturliga skäl – en viktökning skulle läsas som ett
+ * överskott och sänka målet. Då används formeln (med livsstadietillägg) i stället.
+ */
+export function adaptiveBlockReason(lifeStage: LifeStage | undefined, age: number | undefined): string | null {
+  if (lifeStage === 'gravid') return 'Under graviditeten ändras vikten av naturliga skäl – därför används formeln i stället för den uppmätta förbrukningen.'
+  if (lifeStage === 'ammar') return 'Under amningen förändras kroppen av naturliga skäl – därför används formeln (med tillägg för amning) i stället för den uppmätta förbrukningen.'
+  if (age !== undefined && age < 18) return 'Under uppväxten ändras vikten av naturliga skäl – därför används formeln i stället för den uppmätta förbrukningen.'
+  return null
 }
 
 /** Samma krav som `estimateAdaptiveTdee` i lib/energy. */

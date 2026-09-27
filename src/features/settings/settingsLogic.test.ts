@@ -5,6 +5,10 @@ import { backupDue } from './backupStatus'
 import {
   MACRO_BOUNDS,
   cachedFoodStats,
+  clampKcalOverride,
+  kcalFloorText,
+  kcalOverrideFloor,
+  macroEnergyMismatch,
   formatBytes,
   glassLabel,
   isDeleteConfirmed,
@@ -180,5 +184,40 @@ describe('radering och säkerhetskopia', () => {
     expect(backupDue(null, now, true)).toBe(true)
     expect(backupDue(now - 10 * day, now, true)).toBe(false)
     expect(backupDue(now - 31 * day, now, true)).toBe(true)
+  })
+})
+
+describe('golv för eget energimål', () => {
+  const energy = { tdee: 2083, lifeStageKcal: 0 }
+  const TODAY = '2026-09-26'
+
+  it('är säkerhetsgolvet för vuxna utan graviditet eller amning', () => {
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'ingen', birthYear: 1990 }, energy, TODAY)).toEqual({ kcal: 1200, reason: 'golv' })
+    expect(kcalOverrideFloor({ sex: 'man', lifeStage: 'ingen', birthYear: 1990 }, energy, TODAY)).toEqual({ kcal: 1500, reason: 'golv' })
+  })
+
+  it('följer förbrukningen vid graviditet, amning och under 18 år', () => {
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'gravid', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 300 }, TODAY)).toEqual({ kcal: 2390, reason: 'gravid' })
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'ammar', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 500 }, TODAY)).toEqual({ kcal: 2590, reason: 'ammar' })
+    // Född 2008 kan vara 17 år i september 2026.
+    expect(kcalOverrideFloor({ sex: 'man', lifeStage: 'ingen', birthYear: 2008 }, energy, TODAY)).toEqual({ kcal: 2090, reason: 'ung' })
+    expect(kcalFloorText({ kcal: 2390, reason: 'gravid' }, 'kcal')).toMatch(/^Lägst 2\s390 kcal – under graviditeten rekommenderas ingen viktnedgång/)
+    expect(kcalFloorText({ kcal: 1200, reason: 'golv' }, 'kcal')).toMatch(/tillräckligt med näring/)
+  })
+
+  it('höjer ett för lågt eget mål men lämnar resten orört', () => {
+    const o = { kcal: 1200, proteinG: 90 }
+    expect(clampKcalOverride(o, 2390)).toEqual({ kcal: 2390, proteinG: 90 })
+    expect(clampKcalOverride(o, 1200)).toBe(o)
+    const none = { proteinG: 90 }
+    expect(clampKcalOverride(none, 2390)).toBe(none)
+  })
+})
+
+describe('makromål mot energimål', () => {
+  it('säger till när egna makron inte går ihop med dagsmålet', () => {
+    // 120 g protein, 225 g kolhydrater och 64 g fett = 1 956 kcal mot 1 800 kcal.
+    expect(macroEnergyMismatch({ kcal: 1800, proteinG: 120, carbsG: 225, fatG: 64 })).toEqual({ macroKcal: 1956, diff: 156 })
+    expect(macroEnergyMismatch({ kcal: 1800, proteinG: 81, carbsG: 225, fatG: 64 })).toBeNull()
   })
 })

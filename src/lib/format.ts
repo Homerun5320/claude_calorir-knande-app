@@ -53,24 +53,51 @@ export function formatPercent(v: number | undefined, decimals = 0): string {
   return v === undefined || !Number.isFinite(v) ? '–' : `${formatNumber(v, decimals)} %`
 }
 
+/** Unicode-bråk som går att skriva direkt ("1½ dl"). */
+const VULGAR_FRACTIONS: Record<string, number> = { '½': 1 / 2, '¼': 1 / 4, '¾': 3 / 4, '⅓': 1 / 3, '⅔': 2 / 3 }
+
+function fraction(whole: number, numerator: string, denominator: string): number {
+  const den = Number(denominator)
+  return den === 0 ? Number.NaN : whole + Number(numerator) / den
+}
+
+/** Tolka ett tal utan tecken (se `parseSwedishNumber`). */
+function parseUnsigned(s: string): number {
+  // Blandat tal: "1 1/2", "2 3/4" – måste tolkas innan mellanslag tas bort (annars blir det 11/2).
+  let m = s.match(/^(\d+) (\d+) ?\/ ?(\d+)$/)
+  if (m) return fraction(Number(m[1]), m[2], m[3])
+  // Bråk: "1/2"
+  m = s.match(/^(\d+) ?\/ ?(\d+)$/)
+  if (m) return fraction(0, m[1], m[2])
+  // Unicode-bråk, ev. med heltal före: "½", "1½", "1 ½"
+  m = s.match(/^(\d+)? ?([½¼¾⅓⅔])$/)
+  if (m) return Number(m[1] ?? 0) + VULGAR_FRACTIONS[m[2]]
+  // Mellanslag är bara tillåtna som tusentalsavgränsare: "1 234,5", "12 000".
+  let d = s
+  if (/^\d{1,3}( \d{3})+([.,]\d*)?$/.test(d)) d = d.replace(/ /g, '')
+  d = d.replace(',', '.')
+  if (/^\d+\.?\d*$|^\.\d+$/.test(d)) return Number(d)
+  return Number.NaN
+}
+
 /**
- * Tolka ett tal skrivet på svenska: "1,5", "1.5", "1 234,5", "½".
- * Returnerar NaN om det inte går.
+ * Tolka ett tal skrivet på svenska: "1,5", "1.5", "1 234,5", "½", "1½", "1/2", "1 1/2", "-2".
+ * Mellanslag godtas bara som tusentalsavgränsare eller mellan heltal och bråk.
+ * Returnerar NaN om det inte går (även för ofullständig inmatning som "1 1/").
  */
 export function parseSwedishNumber(input: string): number {
-  const s = input
+  let s = input
+    .replace(/[\s\u00a0\u202f\u2009]+/g, ' ')
     .trim()
-    .replace(/\s| | /g, '')
-    .replace('½', '.5')
-    .replace('¼', '.25')
-    .replace('¾', '.75')
-    .replace(',', '.')
-  if (s === '' || s === '.' || s === '-') return Number.NaN
-  if (/^\d*\.\d*$|^\d+$/.test(s)) return Number(s.startsWith('.') ? `0${s}` : s)
-  // Bråk: "1/2"
-  const frac = s.match(/^(\d+)\/(\d+)$/)
-  if (frac) return Number(frac[1]) / Number(frac[2])
-  return Number.NaN
+    .replace(/^[−–]/, '-')
+  let sign = 1
+  if (s.startsWith('-')) {
+    sign = -1
+    s = s.slice(1).trim()
+  }
+  if (s === '') return Number.NaN
+  const value = parseUnsigned(s)
+  return Number.isNaN(value) ? Number.NaN : sign * value
 }
 
 /** Minuter → "1 h 25 min" */

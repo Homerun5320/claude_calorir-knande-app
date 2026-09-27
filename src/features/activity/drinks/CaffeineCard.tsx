@@ -30,9 +30,11 @@ export interface CaffeineCardProps {
   mindful: boolean
   /** Visa "nu"-markering och mängd i kroppen just nu (bara för idag). */
   isToday: boolean
+  /** Under 18 år – riktmärket är då 3 mg per kg kroppsvikt (redan inräknat i `maxMg`). */
+  minor?: boolean
 }
 
-export const CaffeineCard = memo(function CaffeineCard({ date, entries, maxMg, mindful, isToday }: CaffeineCardProps) {
+export const CaffeineCard = memo(function CaffeineCard({ date, entries, maxMg, mindful, isToday, minor = false }: CaffeineCardProps) {
   const intakes = useMemo(() => caffeineIntakes(entries), [entries])
   const total = intakes.reduce((s, i) => s + i.mg, 0)
   const max = maxMg > 0 ? maxMg : DEFAULT_CAFFEINE_MAX_MG
@@ -52,8 +54,8 @@ export const CaffeineCard = memo(function CaffeineCard({ date, entries, maxMg, m
           <p className="font-display text-2xl font-semibold leading-tight text-ink">{levelText.label}</p>
         ) : (
           <p className="leading-none">
-            <span className="display-num text-[2.5rem] font-semibold text-ink">{formatNumber(total)}</span>
-            <span className="ml-1.5 text-sm text-ink-3">mg av {formatNumber(max)} mg</span>
+            <span className="display-num text-[2.5rem] font-semibold text-ink">{formatNumber(total)}</span>{' '}
+            <span className="ml-1 text-sm text-ink-3">mg av {formatNumber(max)} mg</span>
           </p>
         )}
         {!mindful && level !== 'inget' && (
@@ -113,8 +115,10 @@ export const CaffeineCard = memo(function CaffeineCard({ date, entries, maxMg, m
       <h3 className="eyebrow mb-2 mt-5">Lägg till</h3>
       <QuickDrinks options={COFFEE_OPTIONS} kind="caffeine" date={date} mindful={mindful} label="Snabbval kaffe och te" />
       <p className="mt-3 text-xs leading-relaxed text-ink-3">
-        Riktmärke enligt EFSA: upp till 400 mg per dag för friska vuxna, 200 mg under graviditet och amning. Kurvan är en förenklad
-        uppskattning – hur snabbt koffein bryts ned varierar mycket mellan personer.
+        {minor
+          ? 'Riktmärke enligt EFSA: för dig under 18 år gäller högst ca 3 mg per kg kroppsvikt och dag – undvik gärna energidrycker. '
+          : 'Riktmärke enligt EFSA: upp till 400 mg per dag för friska vuxna, 200 mg under graviditet och amning. '}
+        Kurvan är en förenklad uppskattning – hur snabbt koffein bryts ned varierar mycket mellan personer.
       </p>
     </Card>
   )

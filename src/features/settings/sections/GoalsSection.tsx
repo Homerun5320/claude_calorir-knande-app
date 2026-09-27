@@ -10,7 +10,7 @@ import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
 import { addDays } from '../../../lib/dates'
 import { totals } from '../../../lib/diary'
-import { MACRO_PRESETS, MIN_KCAL, computeTargets, macroPercents } from '../../../lib/energy'
+import { MACRO_PRESETS, computeTargets, macroPercents, type EnergyBreakdown } from '../../../lib/energy'
 import { formatEnergy, formatNumber, parseSwedishNumber } from '../../../lib/format'
 import { KJ_PER_KCAL } from '../../../lib/nutrients'
 import { useBodyStore } from '../../../stores/bodyStore'
@@ -26,12 +26,17 @@ import {
   MACRO_KEYS,
   MACRO_LABELS,
   OVERRIDE_FIELDS,
+  clampKcalOverride,
+  kcalFloorText,
+  kcalOverrideFloor,
+  macroEnergyMismatch,
   macroGrams,
   nnrNote,
   normalizeMacroPct,
   overrideCount,
   rebalanceMacros,
   withOverride,
+  type KcalFloor,
   type MacroKey,
   type MacroPct,
   type OverrideField,
@@ -69,7 +74,7 @@ export function GoalsSection() {
       </Card>
       <AdaptiveCard />
       <MacroCard profile={profile} kcal={targets.kcal} />
-      <OverridesCard profile={profile} weightKg={weightKg} computedKcal={energy.kcal} />
+      <OverridesCard profile={profile} weightKg={weightKg} energy={energy} targets={targets} />
     </div>
   )
 }
@@ -222,11 +227,17 @@ function MacroCard({ profile, kcal }: { profile: Profile; kcal: number }) {
 // Egna mål
 // ---------------------------------------------------------------------------
 
-function OverridesCard({ profile, weightKg, computedKcal }: { profile: Profile; weightKg: number; computedKcal: number }) {
+function OverridesCard({ profile, weightKg, energy, targets }: { profile: Profile; weightKg: number; energy: EnergyBreakdown; targets: Targets }) {
   const overrides = useProfileStore((s) => s.settings.targetOverrides)
   const updateSettings = useProfileStore((s) => s.updateSettings)
-  const { adaptive } = useTargets()
+  const today = useToday()
+  const { adaptive } = useTargets(today)
   const unit = useEnergyUnit()
+  const computedKcal = energy.kcal
+  const floor = kcalOverrideFloor(profile, energy, today)
+  // Ett eget energimål från förr (t.ex. innan graviditet eller byte av kön) kan ligga under golvet.
+  const tooLow = overrides.kcal !== undefined && overrides.kcal < floor.kcal
+  const mismatch = macroEnergyMismatch(targets)
 
   // Beräknade standardvärden: egna kcal påverkar makrona, men egna makron räknas inte in.
   const defaults = useMemo<Targets>(() => {
@@ -261,20 +272,32 @@ function OverridesCard({ profile, weightKg, computedKcal }: { profile: Profile; 
       <p className="-mt-1 mb-4 text-[0.875rem] leading-relaxed text-ink-2">
         Lämna fältet tomt för att använda Lagoms beräkning. Egna värden gäller tills du återställer dem.
       </p>
+      {tooLow && (
+        <div className="mb-4">
+          <Note>
+            Ditt eget energimål ({formatEnergy(overrides.kcal, unit)}) är lägre än vad Lagom rekommenderar för dig nu. {kcalFloorText(floor, unit)}
+            <div className="mt-2">
+              <Button size="sm" variant="soft" onClick={() => updateSettings({ targetOverrides: clampKcalOverride(overrides, floor.kcal) })}>
+                Höj till {formatEnergy(floor.kcal, unit)}
+              </Button>
+            </div>
+          </Note>
+        </div>
+      )}
       <ul className="flex flex-col gap-4">
         {OVERRIDE_FIELDS.map((f) => (
           <li key={f.key}>
-            <OverrideRow
-              field={f}
-              value={overrides[f.key]}
-              computed={defaults[f.key]}
-              onCommit={(v) => set(f.key, v)}
-              unit={unit}
-              floorKcal={MIN_KCAL[profile.sex]}
-            />
+            <OverrideRow field={f} value={overrides[f.key]} computed={defaults[f.key]} onCommit={(v) => set(f.key, v)} unit={unit} floor={floor} />
           </li>
         ))}
       </ul>
+      {mismatch && (
+        <p className="mt-4 rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2" role="note">
+          Makromålen motsvarar tillsammans {formatEnergy(mismatch.macroKcal, unit)} – {formatEnergy(Math.abs(mismatch.diff), unit)}{' '}
+          {mismatch.diff > 0 ? 'mer' : 'mindre'} än dagsmålet på {formatEnergy(targets.kcal, unit)}. Justera gärna kolhydraterna eller fettet så att det
+          går jämnt upp.
+        </p>
+      )}
     </Card>
   )
 }
@@ -285,19 +308,19 @@ function OverrideRow({
   computed,
   onCommit,
   unit,
-  floorKcal,
+  floor,
 }: {
   field: OverrideField
   value: number | undefined
   computed: number
   onCommit: (v: number | undefined) => void
   unit: 'kcal' | 'kJ'
-  floorKcal: number
+  floor: KcalFloor
 }) {
   const energy = field.key === 'kcal'
   const kj = energy && unit === 'kJ'
   const factor = kj ? KJ_PER_KCAL : 1
-  const min = energy ? floorKcal : field.min
+  const min = energy ? floor.kcal : field.min
   const toShown = (v: number | undefined) => (v === undefined ? undefined : Math.round(v * factor))
   const [local, setLocal] = useState<number | undefined>(() => toShown(value))
   const [synced, setSynced] = useState(value)
@@ -335,7 +358,7 @@ function OverrideRow({
       decimals={field.decimals}
       hint={
         energy
-          ? `Beräknat: ${computedText}. Lägst ${formatEnergy(floorKcal, unit)} – så att kroppen får tillräckligt med näring.`
+          ? `Beräknat: ${computedText}. ${kcalFloorText(floor, unit)}`
           : `Beräknat: ${computedText}${field.hint ? ` · ${field.hint}` : ''}`
       }
       labelAction={

@@ -5,13 +5,14 @@
  * I medvetet läge visas bara riktningen i ord – siffrorna kan visas på begäran.
  */
 import { useMemo } from 'react'
-import { Eye, Flag, PencilLine, Sprout } from 'lucide-react'
-import { Button, Card, ProgressBar } from '../../components/ui'
+import { Eye, Flag, PencilLine, Scale, Sprout } from 'lucide-react'
+import { Button, Card, ProgressBar, toast } from '../../components/ui'
 import { Sparkline } from '../../components/charts'
 import { relativeDayLabel } from '../../lib/dates'
 import { formatKg, formatNumber } from '../../lib/format'
+import { useProfileStore } from '../../stores/profileStore'
 import type { GoalType } from '../../types'
-import { formatSignedKg, goalDateLabel, trendWord, type BodyOverview } from './bodyLogic'
+import { formatSignedKg, goalDateLabel, OLDER_ADULT_AGE, trendWord, type BodyOverview } from './bodyLogic'
 import { ChangePill } from './parts'
 
 const PROFILE_LINK = '/installningar/profil'
@@ -99,6 +100,18 @@ function GoalSection({ overview, goal, targetKg, today }: WeightHeroProps) {
     )
   }
 
+  if (status.kind === 'paused' && status.reason === 'lowBmi') {
+    return (
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="eyebrow">Ditt mål</p>
+          {editLink}
+        </div>
+        <LowWeightNote age={overview.age} />
+      </div>
+    )
+  }
+
   if (status.kind === 'paused') {
     return (
       <div className="mt-5 border-t border-line pt-4">
@@ -155,7 +168,55 @@ function GoalSection({ overview, goal, targetKg, today }: WeightHeroProps) {
         <Sprout aria-hidden className="mt-0.5 size-4 shrink-0 text-mossa" strokeWidth={2.2} />
         <span>{goalSentence(overview, targetKg, today)}</span>
       </p>
+      {status.kind === 'reached' && <SwitchToMaintain />}
     </div>
+  )
+}
+
+/**
+ * Trendvikten ligger under hälsosamt BMI medan målet är att gå ner: ingen mer viktnedgång,
+ * ett tryck för att byta mål och en väg till stöd. Inga siffror – visas även i medvetet läge.
+ */
+function LowWeightNote({ age }: { age: number | undefined }) {
+  const forWhom = age !== undefined && age >= OLDER_ADULT_AGE ? 'för din längd och ålder' : 'för din längd'
+  return (
+    <>
+      <p className="mt-1 text-sm leading-relaxed text-ink-2">
+        Din vikt ligger nu under det som räknas som hälsosamt {forWhom}, så Lagom rekommenderar inte att gå ner mer. Byt gärna
+        mål till att behålla vikten – då räknas dagsmålet utan underskott.
+      </p>
+      <SwitchToMaintain />
+      <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">
+        Känns tankar kring mat, vikt eller kropp tunga? Du är inte ensam – stöd finns hos{' '}
+        <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+          1177
+        </a>{' '}
+        och{' '}
+        <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+          Frisk &amp; Fri
+        </a>
+        .
+      </p>
+    </>
+  )
+}
+
+/** Byt målet till "behålla vikten" med ett tryck (med Ångra). Dagsmålet räknas då utan under-/överskott. */
+function SwitchToMaintain() {
+  const onClick = () => {
+    const { profile, updateProfile } = useProfileStore.getState()
+    if (!profile || profile.goal === 'behalla') return
+    const previous = profile.goal
+    updateProfile({ goal: 'behalla' })
+    toast('Målet är nu att behålla vikten', {
+      tone: 'success',
+      action: { label: 'Ångra', onClick: () => useProfileStore.getState().updateProfile({ goal: previous }) },
+    })
+  }
+  return (
+    <Button variant="soft" size="sm" iconLeft={Scale} onClick={onClick} className="mt-3">
+      Byt till att behålla vikten
+    </Button>
   )
 }
 
@@ -168,7 +229,7 @@ function goalSentence(overview: BodyOverview, targetKg: number, today: string): 
         ? `Du är nästan framme – med nuvarande takt når du ${target} inom en vecka.`
         : `Med nuvarande takt når du ${target} omkring ${goalDateLabel(status.date, today)}.`
     case 'reached':
-      return `Du har nått din målvikt ${target} – starkt jobbat! Vill du nu hålla vikten kan du byta mål i profilen.`
+      return `Du har nått din målvikt ${target} – starkt jobbat! Byt gärna mål till att behålla vikten, så räknas dagsmålet utan underskott eller överskott.`
     case 'early':
       return 'Väg dig några gånger till under ett par veckor, så kan Lagom uppskatta när du når målet.'
     case 'steady':
@@ -194,6 +255,12 @@ export function MindfulHero({ overview, onReveal }: { overview: BodyOverview; on
         <Button variant="secondary" size="sm" iconLeft={Eye} onClick={onReveal} className="mt-4">
           Visa siffror
         </Button>
+      )}
+      {overview.status.kind === 'paused' && overview.status.reason === 'lowBmi' && (
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="eyebrow">Ditt mål</p>
+          <LowWeightNote age={overview.age} />
+        </div>
       )}
     </Card>
   )

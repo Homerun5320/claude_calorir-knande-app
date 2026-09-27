@@ -148,8 +148,9 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
             suffix="kg"
             step={0.1}
             decimals={1}
-            min={MIN_KG}
-            max={MAX_KG}
+            // Bara min 0: fältet ska inte tyst skriva om en felskriven vikt ("7,24" → 20 kg).
+            // Intervallet kontrolleras här och visas som fel.
+            min={0}
             error={value !== undefined && !valid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG} kg` : undefined}
           />
         </form>

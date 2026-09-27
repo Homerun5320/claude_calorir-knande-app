@@ -431,7 +431,7 @@ export function PortionPicker({
             {!kcalKnown && valid && <p className="mt-1 text-xs text-ink-3">Energivärde saknas för det här livsmedlet.</p>}
             {!mindful && kcalKnown && food.nutrients.kcal !== undefined && (
               <p className="mt-1 text-xs text-ink-3">
-                <EnergyValue kcal={food.nutrients.kcal} unitClassName="" /> per 100 {liquid ? 'ml' : 'g'}
+                <EnergyValue kcal={food.nutrients.kcal} unitClassName="" /> per {liquid ? '100\u00A0ml' : '100\u00A0g'}
               </p>
             )}
           </div>
@@ -464,10 +464,10 @@ export function PortionPicker({
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3" aria-hidden>
                 {MACROS.map((m) => (
                   <span key={m.key} className="tabular-nums">
-                    {m.label} {formatNumber(dist[m.key])} E%
+                    {m.label} {formatNumber(dist[m.key])}{'\u00A0'}E%
                   </span>
                 ))}
-                {dist.alcohol > 0 && <span className="tabular-nums">Alkohol {formatNumber(dist.alcohol)} E%</span>}
+                {dist.alcohol > 0 && <span className="tabular-nums">Alkohol {formatNumber(dist.alcohol)}{'\u00A0'}E%</span>}
               </div>
             )}
           </div>

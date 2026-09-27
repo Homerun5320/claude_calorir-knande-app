@@ -20,9 +20,14 @@ export interface AlcoholCardProps {
   mindful: boolean
   /** Gravid eller ammar – visa rådet att avstå. */
   pregnantOrNursing: boolean
+  /**
+   * Under 18 år: rådet är att avstå helt. Vuxnas risknivåer och snabbval för öl, vin och sprit
+   * visas inte.
+   */
+  minor?: boolean
 }
 
-export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantOrNursing }: AlcoholCardProps) {
+export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantOrNursing, minor = false }: AlcoholCardProps) {
   const entries = useDiaryStore((s) => s.entries)
   const week = useMemo(() => weekOf(today), [today])
   const summary = useMemo(() => alcoholSummary(entries, week.filter((d) => d <= today)), [entries, week, today])
@@ -64,11 +69,34 @@ export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantO
           )}
         </>
       )}
-      <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">{ALCOHOL_STATUS_TEXT[status]}</p>
-      {pregnantOrNursing && (
+      {minor ? (
+        <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">
+          Under 18 år är rådet att avstå från alkohol helt – kroppen och hjärnan utvecklas fortfarande. Har du frågor eller funderingar
+          kan du prata med skolsköterskan eller läsa mer på{' '}
+          <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-vinbar underline underline-offset-2">
+            1177
+          </a>
+          .
+        </p>
+      ) : (
+        <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">{ALCOHOL_STATUS_TEXT[status]}</p>
+      )}
+      {pregnantOrNursing && !minor && (
         <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-2">Under graviditet och amning är rådet att avstå från alkohol helt.</p>
       )}
 
+      {!minor && (
+        <AdultAlcoholInfo today={today} mindful={mindful} />
+      )}
+      <p className="mt-2 text-xs leading-relaxed text-ink-3">Källor: Socialstyrelsen, Folkhälsomyndigheten och Alkoholhjälpen.</p>
+    </Card>
+  )
+})
+
+/** Risknivåer för vuxna, snabbval och länk till Alkoholhjälpen (visas inte under 18 år). */
+function AdultAlcoholInfo({ today, mindful }: { today: ISODate; mindful: boolean }) {
+  return (
+    <>
       <details className="group mt-4 rounded-2xl bg-surface/70 px-3.5 py-1 [&_summary::-webkit-details-marker]:hidden">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-[0.875rem] font-semibold text-ink">
           <Info aria-hidden className="size-4 shrink-0 text-vinbar" strokeWidth={2.2} />
@@ -101,7 +129,6 @@ export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantO
         <ExternalLink aria-hidden className="size-4" strokeWidth={2.2} />
         <span className="sr-only">(öppnas i ny flik)</span>
       </a>
-      <p className="text-xs leading-relaxed text-ink-3">Källor: Socialstyrelsen, Folkhälsomyndigheten och Alkoholhjälpen.</p>
-    </Card>
+    </>
   )
-})
+}

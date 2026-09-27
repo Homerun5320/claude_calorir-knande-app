@@ -10,7 +10,7 @@
 import type { ActivityLevel, DietType, GoalType, ISODate, LifeStage, MacroPreset, Profile, Sex } from '../../types'
 import { ACTIVITY_LEVELS } from '../../types'
 import { MONTHS, ageFromBirthYear, diffDays, fromISODate, todayISO } from '../../lib/dates'
-import { KCAL_PER_KG, projectGoalDate } from '../../lib/energy'
+import { KCAL_PER_KG, computeEnergy, projectGoalDate } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 
 // ---------------------------------------------------------------------------
@@ -161,13 +161,25 @@ function currentYear(today: ISODate): number {
   return fromISODate(today).getFullYear()
 }
 
+/**
+ * Lägsta möjliga ålder för ett födelseår. Vi vet bara året, så den som är född i december kan
+ * fortfarande vara ett år yngre än årsskillnaden. Används för säkerhetsreglerna (minsta ålder och
+ * ingen viktnedgång under 18 år) så att ingen släpps igenom för tidigt. Den 31 december har alla
+ * som är födda det året hunnit fylla år.
+ */
+export function minimumAge(birthYear: number, today: ISODate = todayISO()): number {
+  const d = fromISODate(today)
+  const yearDiff = ageFromBirthYear(birthYear, today)
+  return d.getMonth() === 11 && d.getDate() === 31 ? yearDiff : yearDiff - 1
+}
+
 export function validateBirthYear(birthYear: number | undefined, today: ISODate = todayISO()): string | undefined {
   const year = currentYear(today)
   if (birthYear === undefined) return 'Fyll i ditt födelseår.'
   if (!Number.isInteger(birthYear) || birthYear > year || birthYear < year - MAX_AGE) {
     return `Skriv födelseåret med fyra siffror, t.ex. ${year - 35}.`
   }
-  if (ageFromBirthYear(birthYear, today) < MIN_AGE) {
+  if (minimumAge(birthYear, today) < MIN_AGE) {
     return `Lagom är gjord för dig som är ${MIN_AGE} år eller äldre. Prata gärna med en vuxen eller skolsköterskan om mat och hälsa.`
   }
   return undefined
@@ -202,11 +214,15 @@ export function hasErrors(errors: FieldErrors): boolean {
   return Object.values(errors).some(Boolean)
 }
 
-/** Ålder, eller undefined om födelseåret saknas. */
+/**
+ * Lägsta möjliga ålder (se `minimumAge`), eller undefined om födelseåret saknas. Används för
+ * säkerhetsreglerna – visa hellre åldern med `ageFromBirthYear`.
+ */
 export function draftAge(draft: Pick<ProfileDraft, 'birthYear'>, today: ISODate = todayISO()): number | undefined {
-  return draft.birthYear === undefined ? undefined : ageFromBirthYear(draft.birthYear, today)
+  return draft.birthYear === undefined ? undefined : minimumAge(draft.birthYear, today)
 }
 
+/** true om personen kan vara under 18 år (räknat försiktigt, se `minimumAge`). */
 export function isMinor(draft: Pick<ProfileDraft, 'birthYear'>, today: ISODate = todayISO()): boolean {
   const age = draftAge(draft, today)
   return age !== undefined && age >= MIN_AGE && age < 18
@@ -316,13 +332,66 @@ export function validateTarget(draft: ProfileDraft, today: ISODate = todayISO())
   return undefined
 }
 
-/** Ungefärligt datum då målvikten nås med vald takt, eller null. */
-export function projectedGoalDate(draft: ProfileDraft, today: ISODate = todayISO()): ISODate | null {
+export interface EffectiveRate {
+  /** Vald takt (efter begränsningen till tillåtna takter), kg per vecka. */
+  chosen: number
+  /**
+   * Takten som dagsmålet faktiskt ger, kg per vecka (alltid positiv). Lägre än `chosen` när
+   * säkerhetsgolvet (1 200/1 500 kcal) håller uppe dagsmålet.
+   */
+  rate: number
+  /** true när golvet gör att takten blir märkbart lägre än den valda. */
+  limitedByFloor: boolean
+  /** Dagsmålet i kcal, om det gick att räkna fram. */
+  kcal?: number
+}
+
+/**
+ * Takten som dagsmålet faktiskt ger. Säkerhetsgolvet i `computeEnergy` kan hålla uppe
+ * dagsmålet, och då blir underskottet – och takten – mindre än den valda.
+ */
+export function effectiveRate(draft: ProfileDraft, today: ISODate = todayISO(), opts: { adaptiveTdee?: number } = {}): EffectiveRate | null {
+  const goal = effectiveGoal(draft, today)
+  if (goal === 'behalla' || draft.weightKg === undefined) return null
+  const chosen = clampRate(draft.weeklyRateKg, draft.weightKg, goal)
+  if (draft.sex === null || draft.activityLevel === null || draft.birthYear === undefined || draft.heightCm === undefined) {
+    return { chosen, rate: chosen, limitedByFloor: false }
+  }
+  const energy = computeEnergy(
+    {
+      sex: draft.sex,
+      birthYear: draft.birthYear,
+      heightCm: draft.heightCm,
+      startWeightKg: draft.weightKg,
+      activityLevel: draft.activityLevel,
+      goal,
+      weeklyRateKg: chosen,
+      lifeStage: draft.sex === 'man' ? 'ingen' : draft.lifeStage,
+      diet: draft.diet,
+      macroPreset: draft.macroPreset,
+      createdAt: 0,
+    },
+    draft.weightKg,
+    { today, adaptiveTdee: opts.adaptiveTdee },
+  )
+  // Faktiskt över-/underskott per dag = dagsmål − (förbrukning + livsstadietillägg).
+  const perDay = energy.kcal - energy.tdee - energy.lifeStageKcal
+  const actual = Math.max(0, ((goal === 'ga_ner' ? -perDay : perDay) * 7) / KCAL_PER_KG)
+  const rate = Math.min(chosen, Math.round(actual * 100) / 100)
+  return { chosen, rate, limitedByFloor: chosen - rate >= 0.05, kcal: energy.kcal }
+}
+
+/**
+ * Ungefärligt datum då målvikten nås med den takt dagsmålet faktiskt ger (se `effectiveRate`),
+ * eller null.
+ */
+export function projectedGoalDate(draft: ProfileDraft, today: ISODate = todayISO(), opts: { adaptiveTdee?: number } = {}): ISODate | null {
   const goal = effectiveGoal(draft, today)
   if (goal === 'behalla' || draft.weightKg === undefined || draft.targetWeightKg === undefined) return null
   if (validateTarget(draft, today)) return null
-  const rate = clampRate(draft.weeklyRateKg, draft.weightKg, goal)
-  return projectGoalDate(draft.weightKg, goal === 'ga_ner' ? -rate : rate, draft.targetWeightKg, today)
+  const eff = effectiveRate(draft, today, opts)
+  if (!eff || eff.rate <= 0) return null
+  return projectGoalDate(draft.weightKg, goal === 'ga_ner' ? -eff.rate : eff.rate, draft.targetWeightKg, today)
 }
 
 // ---------------------------------------------------------------------------

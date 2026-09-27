@@ -29,6 +29,17 @@ export function mealForTime(meals: MealConfig[], now: Date = new Date()): MealId
   return enabled[0]?.id ?? 'frukost'
 }
 
+/** Standardnamn per måltid – reserv när en måltid saknas i inställningarna. */
+export const DEFAULT_MEAL_NAMES: Record<MealId, string> = {
+  frukost: 'Frukost',
+  lunch: 'Lunch',
+  fika: 'Fika',
+  middag: 'Middag',
+  kvallsmat: 'Kvällsmat',
+  mellanmal: 'Mellanmål',
+}
+
+/** Användarens namn på måltiden (t.ex. "Eftermiddagsfika"), annars standardnamnet – aldrig det interna id:t. */
 export function mealName(meals: MealConfig[], id: MealId): string {
-  return meals.find((m) => m.id === id)?.name ?? id
+  return meals.find((m) => m.id === id)?.name.trim() || DEFAULT_MEAL_NAMES[id] || id
 }

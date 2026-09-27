@@ -2,7 +2,16 @@
  * Små byggstenar för flödet "Lägg till mat": källmärke, måltidsväljare, sökrad med snabbknapp
  * och en hook för att lämna sidan.
  */
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Check, Plus } from 'lucide-react'
@@ -11,7 +20,7 @@ import { Badge, Chip, cx, useMediaQuery } from '../../components/ui'
 import { FoodRow, foodToRow, MEAL_META, useEnergyFormatter } from '../../components/domain'
 import { useProfileStore } from '../../stores/profileStore'
 import { isUsableUnit } from '../../components/domain/PortionPicker'
-import { sourceMeta } from './addLogic'
+import { nutriScoreInfo, sourceMeta } from './addLogic'
 
 // ---------------------------------------------------------------------------
 // Navigering
@@ -43,6 +52,36 @@ export function FoodSourceBadge({ source, short = false, className }: { source: 
     <Badge tone={meta.tone} className={className} title={meta.crowdSourced ? `${meta.label} – användarbidrag` : meta.label}>
       {short ? meta.short : meta.label}
     </Badge>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Nutri-Score
+// ---------------------------------------------------------------------------
+
+type NutriScore = NonNullable<ReturnType<typeof nutriScoreInfo>>
+
+/**
+ * Textfärg på Nutri-Scores fyllda färg. I ljust läge når ljus text bara 1,9:1 på gult (C) och
+ * 3,1:1 på orange (D) – där blir texten mörk. Grönt och rött får vit text (≥ 4,5:1). I mörkt
+ * läge är alla färgerna ljusa och texten mörk.
+ */
+export function nutriScoreTextClass(tone: NutriScore['tone']): string {
+  return tone === 'sol' || tone === 'hjortron' ? 'text-ink dark:text-bg' : 'text-on-gran'
+}
+
+/** Liten fylld etikett "Nutri-Score C" med läsbar kontrast i både ljust och mörkt läge. */
+export function NutriScoreBadge({ score }: { score: NutriScore }) {
+  return (
+    <span
+      style={{ '--tone': `var(--lg-${score.tone})` } as CSSProperties}
+      className={cx(
+        'inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full bg-(--tone) px-2 text-[0.6875rem] font-semibold leading-none',
+        nutriScoreTextClass(score.tone),
+      )}
+    >
+      Nutri-Score {score.grade}
+    </span>
   )
 }
 

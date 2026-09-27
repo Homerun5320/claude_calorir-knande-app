@@ -6,6 +6,7 @@ import {
   caffeineInBody,
   caffeineIntakes,
   caffeineLevel,
+  caffeineLimitMg,
   entryMinutes,
   minutesToTime,
   sleepTip,
@@ -69,6 +70,16 @@ describe('koffein', () => {
     expect(caffeineLevel(320, 400)).toBe('nara')
     expect(caffeineLevel(401, 400)).toBe('over')
     expect(caffeineLevel(250, 0)).toBe('lagom')
+  })
+
+  it('ger ungdomar under 18 år en gräns på 3 mg per kg kroppsvikt', () => {
+    expect(caffeineLimitMg(400, 35, 70)).toBe(400)
+    expect(caffeineLimitMg(200, 30, 70)).toBe(200)
+    expect(caffeineLimitMg(400, undefined, 70)).toBe(400)
+    expect(caffeineLimitMg(400, 15, 55)).toBe(165)
+    expect(caffeineLimitMg(400, 17, 150)).toBe(400)
+    expect(caffeineLimitMg(400, 14, undefined)).toBe(150)
+    expect(caffeineLimitMg(0, 40, 70)).toBe(400)
   })
 
   it('sömntips beror på dagens sista kopp', () => {

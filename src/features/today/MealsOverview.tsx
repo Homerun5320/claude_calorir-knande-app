@@ -7,7 +7,7 @@
  * med rätt måltid och datum. Tomma måltider får en vänlig uppmaning – och om samma måltid
  * finns registrerad igår kan den kopieras med ett tryck (med ångra).
  */
-import { memo, useCallback, useId, useMemo } from 'react'
+import { memo, useCallback, useId, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Copy, Plus } from 'lucide-react'
 import { EnergyValue, MealIcon } from '../../components/domain'
@@ -17,21 +17,23 @@ import { addDays } from '../../lib/dates'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DiaryEntry, ISODate, MealConfig, MealId } from '../../types'
 import { visibleMeals } from '../diary/diaryLogic'
+import { focusAfterRender } from '../diary/focus'
 import { copyableCount, EMPTY_MEAL_HINTS, mealNamesText, newEntryIds, summarizeMeal, type MealSummary } from './todayLogic'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
 
 /**
- * Kopiera gårdagens måltid till idag via butikens `copyMeal` och erbjud ångra.
- * `copyMeal` returnerar bara antalet, så de nya posterna hittas genom att jämföra före/efter.
+ * Kopiera gårdagens måltid till idag via butikens `copyMeal` och erbjud ångra. Returnerar true
+ * om något kopierades. `copyMeal` returnerar bara antalet, så de nya posterna hittas genom att
+ * jämföra före/efter.
  */
-function copyYesterdayMeal(today: ISODate, meal: MealId, mealLabel: string): void {
+function copyYesterdayMeal(today: ISODate, meal: MealId, mealLabel: string): boolean {
   const store = useDiaryStore.getState()
   const before = store.entries[today]
   const count = store.copyMeal(addDays(today, -1), meal, today, meal)
   if (count === 0) {
     toast('Det fanns inget att kopiera')
-    return
+    return false
   }
   const ids = newEntryIds(before, useDiaryStore.getState().entries[today])
   toast(`Gårdagens ${mealLabel.toLowerCase()} är kopierad`, {
@@ -44,6 +46,7 @@ function copyYesterdayMeal(today: ISODate, meal: MealId, mealLabel: string): voi
       },
     },
   })
+  return true
 }
 
 interface MealCardProps {
@@ -53,16 +56,21 @@ interface MealCardProps {
   summary: MealSummary
   copyCount: number
   mindful: boolean
-  onCopy: (meal: MealId, name: string) => void
+  onCopy: (meal: MealId, name: string) => boolean
 }
 
 const MealCard = memo(function MealCard({ meal, name, today, summary, copyCount, mindful, onCopy }: MealCardProps) {
   const empty = summary.count === 0
   const namesText = empty ? EMPTY_MEAL_HINTS[meal] : mealNamesText(summary)
+  const cardLink = useRef<HTMLAnchorElement>(null)
+  const copy = () => {
+    // Kopieringsknappen försvinner när måltiden fylls – fokus till kortet, som nu visar maten.
+    if (onCopy(meal, name)) focusAfterRender(() => cardLink.current)
+  }
   return (
     <li className="card p-3 pr-2.5">
       <div className="flex items-center gap-3">
-        <Link to="/dagbok" className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl">
+        <Link ref={cardLink} to="/dagbok" className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl">
           <MealIcon meal={meal} size="md" variant="emoji" />
           <span className="min-w-0 flex-1">
             <span className="flex items-baseline gap-2">
@@ -82,7 +90,7 @@ const MealCard = memo(function MealCard({ meal, name, today, summary, copyCount,
       </div>
       {empty && copyCount > 0 && (
         <div className="mt-2 pl-14">
-          <Chip size="sm" icon={Copy} onClick={() => onCopy(meal, name)}>
+          <Chip size="sm" icon={Copy} onClick={copy}>
             Kopiera gårdagens {name.toLowerCase()}
           </Chip>
         </div>

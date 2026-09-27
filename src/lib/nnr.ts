@@ -290,7 +290,9 @@ export function referenceIntakes(p: ReferenceProfile): ReferenceMap {
     ri: bySex(700, 800, { gravid: 800, ammar: 1100 }),
     note:
       'Retinolekvivalenter. Övre gränsen 3 000 µg/dag gäller retinol (t.ex. lever och tillskott), inte betakaroten från grönsaker.' +
-      (pregnant ? ' Undvik lever och leverpastej under graviditeten.' : ''),
+      // Livsmedelsverkets råd till gravida: undvik lever och leverrätter. Leverpastej och leverkorv
+      // innehåller mindre lever och går bra att äta.
+      (pregnant ? ' Undvik lever och leverrätter under graviditeten – leverpastej och leverkorv går bra.' : ''),
     source: SRC.nnr,
   })
 
@@ -767,8 +769,10 @@ export function nutrientsToWatch(input: WatchInput): WatchItem[] {
       }
       continue
     }
-    // Övriga ämnen med RI/AI lyfts bara när de är tydligt låga och värdet är tillförlitligt.
-    if (status === 'lagt' && ref.kind !== 'max' && !uncertain) {
+    // Övriga ämnen lyfts bara när de är tydligt låga och värdet är tillförlitligt. Ämnen med
+    // adekvat intag (AI – t.ex. kalium, magnesium, selen, vitamin E och K) tas inte med: ett intag
+    // under AI betyder inte att det är för lågt (NNR 2023, EFSA), så "Lågt" vore att överdriva.
+    if (status === 'lagt' && ref.kind === 'ri' && !uncertain) {
       items.push({
         key,
         status,

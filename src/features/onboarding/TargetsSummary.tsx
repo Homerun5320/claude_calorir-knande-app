@@ -6,7 +6,6 @@ import type { ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { cx, toneVars, type Tone } from '../../components/ui'
 import { useEnergyFormatter } from '../../components/domain/EnergyValue'
-import { formatLiters } from '../../components/domain/WaterGlasses'
 import type { EnergyBreakdown } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 import type { Targets } from '../../types'
@@ -39,14 +38,21 @@ export function energyRows(energy: EnergyBreakdown, fmt: (kcal: number, withUnit
   return rows
 }
 
-function MacroTile({ label, value, tone, sub }: { label: string; value: string; tone: Tone; sub?: string }) {
+/**
+ * Talet i Fraunces och enheten i Inter – i Fraunces liknar ett gement "l" (liter) en etta, så
+ * "1,6 l" skulle läsas som "1,61".
+ */
+function MacroTile({ label, value, unit, tone, sub }: { label: string; value: string; unit: string; tone: Tone; sub?: string }) {
   return (
     <div style={toneVars(tone)} className="min-w-0 rounded-2xl bg-(--tone-soft) px-2.5 py-2.5 min-[400px]:px-3">
       <div className="flex min-w-0 items-center gap-1.5 truncate text-[0.75rem] font-semibold text-(--tone-ink)">
         <span aria-hidden className="hidden size-2 shrink-0 rounded-full bg-(--tone) min-[400px]:inline-block" />
         {label}
       </div>
-      <div className="mt-0.5 font-display text-[1.25rem] font-semibold tabular-nums tracking-tight text-ink">{value}</div>
+      <div className="mt-0.5 text-ink">
+        <span className="font-display text-[1.25rem] font-semibold tabular-nums tracking-tight">{value}</span>
+        <span className="ml-1 text-[0.8125rem] font-medium text-ink-3">{unit}</span>
+      </div>
       {sub && <div className="text-[0.6875rem] text-ink-3">{sub}</div>}
     </div>
   )
@@ -87,12 +93,12 @@ export function TargetsSummary({ energy, targets, showBreakdown = true, extraNot
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        <MacroTile label="Protein" tone="protein" value={`${formatNumber(targets.proteinG)} g`} />
-        <MacroTile label="Kolhydrater" tone="carbs" value={`${formatNumber(targets.carbsG)} g`} />
-        <MacroTile label="Fett" tone="fat" value={`${formatNumber(targets.fatG)} g`} />
-        <MacroTile label="Fibrer" tone="fiber" value={`${formatNumber(targets.fiberG)} g`} sub="minst" />
-        <MacroTile label="Dryck" tone="water" value={formatLiters(targets.waterMl)} sub="per dag" />
-        <MacroTile label="Salt" tone="neutral" value={`${formatNumber(targets.saltMaxG, 1)} g`} sub="högst" />
+        <MacroTile label="Protein" tone="protein" value={formatNumber(targets.proteinG)} unit="g" />
+        <MacroTile label="Kolhydrater" tone="carbs" value={formatNumber(targets.carbsG)} unit="g" />
+        <MacroTile label="Fett" tone="fat" value={formatNumber(targets.fatG)} unit="g" />
+        <MacroTile label="Fibrer" tone="fiber" value={formatNumber(targets.fiberG)} unit="g" sub="minst" />
+        <MacroTile label="Dryck" tone="water" value={formatNumber(targets.waterMl / 1000, 2)} unit="liter" sub="per dag" />
+        <MacroTile label="Salt" tone="neutral" value={formatNumber(targets.saltMaxG, 1)} unit="g" sub="högst" />
       </div>
 
       {notes.length > 0 && (

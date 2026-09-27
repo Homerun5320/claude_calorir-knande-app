@@ -17,8 +17,11 @@ import {
   summarizeClimate,
   summarizeDays,
   topEmitters,
+  reliableReferences,
   topSources,
+  uncertainNutrients,
   weightWindow,
+  withPersonalProtein,
 } from './aggregate'
 import { byDate, exerciseEntry, foodEntry, makeFood, quickEntry, weightEntry } from './testUtils'
 
@@ -137,6 +140,35 @@ describe('näringsämnen', () => {
     expect(r.total).toBeCloseTo(4.8 + 1.4 + 1)
     expect(r.items.reduce((s, x) => s + x.share, 0)).toBeCloseTo(1)
     expect(r.items.map((x) => x.id)).toContain('snabb:kanelbulle')
+  })
+
+  it('mäter protein mot det egna proteinmålet, samma som energikortet', () => {
+    const averages = { protein: 71.6 }
+    const coverage = { protein: 1 }
+    // Mot NNR (0,83 g/kg × 65 kg ≈ 54 g) ser 71,6 g ut som 130 % …
+    expect(rankNutrients(averages, coverage, refs).strongest.map((x) => x.key)).toContain('protein')
+    // … men mot målet 86 g är det 83 % – samma bild som "mål 86 g" i energikortet.
+    const personal = withPersonalProtein(refs, 86)
+    const { strongest, weakest } = rankNutrients(averages, coverage, personal)
+    expect(strongest.map((x) => x.key)).not.toContain('protein')
+    expect(weakest.find((x) => x.key === 'protein')?.percent).toBeCloseTo(83.3, 0)
+    expect(withPersonalProtein(refs, undefined)).toBe(refs)
+    expect(refs.protein?.ri).not.toBe(86) // originalet ändras inte
+  })
+
+  it('tar bort omdömen som bygger på för lite data i tabellen', () => {
+    const averages = { fiber: 12, wholegrain: 40, vitC: 150, salt: 4, iron: 12 }
+    // Fullkorn och salt är kända för under hälften av maten, C-vitamin likaså men över RI.
+    const coverage = { fiber: 0.95, wholegrain: 0.3, vitC: 0.3, salt: 0.4, iron: 0.7 }
+    const reliable = reliableReferences(averages, coverage, refs)
+    expect(reliable.fiber).toBe(refs.fiber) // lågt men säkert
+    expect(reliable.iron).toBe(refs.iron) // täckning över 50 %
+    expect(reliable.wholegrain).toBeUndefined() // "Lågt" vore osäkert
+    expect(reliable.salt).toBeUndefined() // "under maxgränsen" vore osäkert
+    expect(reliable.vitC).toBe(refs.vitC) // redan över RI – stämmer även med okända värden
+    expect(uncertainNutrients(refs, reliable, averages).sort()).toEqual(['salt', 'wholegrain'])
+    // Över maxgränsen stämmer också med låg täckning.
+    expect(reliableReferences({ salt: 9 }, { salt: 0.3 }, refs).salt).toBe(refs.salt)
   })
 
   it('sammanfattar datatäckningen', () => {
