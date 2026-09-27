@@ -164,4 +164,5 @@ export const STORE_KEYS = {
   food: 'lagom-food',
   body: 'lagom-body',
   fasting: 'lagom-fasting',
+  license: 'lagom-license',
 } as const

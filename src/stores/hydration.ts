@@ -4,9 +4,10 @@ import { useDiaryStore } from './diaryStore'
 import { useFastingStore } from './fastingStore'
 import { useFoodStore } from './foodStore'
 import { useProfileStore } from './profileStore'
+import { useLicenseStore } from './licenseStore'
 import { onLateRead, READ_TIMEOUT_MS, STORE_KEYS } from './storage'
 
-const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore]
+const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore]
 
 const BY_KEY: Record<string, (typeof STORES)[number]> = {
   [STORE_KEYS.profile]: useProfileStore,
@@ -14,6 +15,7 @@ const BY_KEY: Record<string, (typeof STORES)[number]> = {
   [STORE_KEYS.food]: useFoodStore,
   [STORE_KEYS.body]: useBodyStore,
   [STORE_KEYS.fasting]: useFastingStore,
+  [STORE_KEYS.license]: useLicenseStore,
 }
 
 // En läsning som tog för lång tid (t.ex. en stor dagbok på en äldre telefon) blev till slut klar:
