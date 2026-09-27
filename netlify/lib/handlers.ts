@@ -3,7 +3,8 @@
  * fetch, klocka, loggning) skickas in, så att funktionerna kan testas utan nätverk.
  *
  * API (se docs/BETALNING.md):
- *   POST /api/create-checkout  { plan: 'ar' | 'livstid', consent?: true } → { url }
+ *   POST /api/create-checkout  { plan: 'ar' | 'livstid', consent: true }  → { url }
+ *                              (400 'samtycke-saknas' utan samtycket om omedelbar leverans)
  *   POST /api/verify-purchase  { sessionId: 'cs_…' }                       → { licenseKey, plan, issuedAt, expiresAt }
  *                              (202 { status: 'pending', pending: true } medan betalningen pågår)
  *   POST /api/stripe-webhook   (anropas av Stripe)                         → { received: true }
@@ -56,6 +57,20 @@ const verifyLimiter = new RateLimiter(30, 60_000)
 // ---------------------------------------------------------------------------
 // Gemensamt
 // ---------------------------------------------------------------------------
+
+/**
+ * Sista skyddsnätet runt varje funktion: ett oväntat fel ger ett lugnt 500-svar på svenska utan
+ * detaljer. Felmeddelanden och stackspår hamnar bara i loggen, aldrig i svaret. För webhooken
+ * betyder 500 att Stripe försöker igen senare.
+ */
+export async function withErrorBoundary(what: string, run: () => Promise<Response>, log: Logger = consoleLogger): Promise<Response> {
+  try {
+    return await run()
+  } catch (e) {
+    log.error(`Oväntat fel i ${what}`, { fel: errorText(e) })
+    return errorResponse(500, 'internt-fel', 'Något gick fel hos oss. Försök igen om en stund.')
+  }
+}
 
 type Prepared =
   | { ok: true; cfg: ServerConfig; origin: OriginCheck; now: number; log: Logger }
@@ -204,6 +219,17 @@ export async function handleCreateCheckout(req: Request, deps: HandlerDeps): Pro
   const planId: unknown = body.value.plan
   if (!isPlanId(planId)) return errorResponse(400, 'ogiltig-plan', 'Välj Årslicens eller Livstidslicens.', h)
   const plan = SERVER_PLANS[planId]
+  // Samtycket till omedelbar leverans (ångerrätten upphör, distansavtalslagen 2 kap. 11 § p. 11)
+  // krävs för varje köp – även från andra klienter än appen. Annars skulle ångerrätten finnas
+  // kvar för en licens som redan har levererats och inte kan återkallas.
+  if (body.value.consent !== true) {
+    return errorResponse(
+      400,
+      'samtycke-saknas',
+      'Kryssa i att licensen levereras direkt och att ångerrätten då upphör, och försök igen. Inga pengar har dragits.',
+      h,
+    )
+  }
 
   if (!origin.returnBase) {
     log.error('APP_URL saknas – vet inte vart kunden ska skickas efter betalningen')
@@ -227,7 +253,7 @@ export async function handleCreateCheckout(req: Request, deps: HandlerDeps): Pro
     plan,
     priceId,
     returnBase: origin.returnBase,
-    consentAt: body.value.consent === true ? new Date(now).toISOString() : undefined,
+    consentAt: new Date(now).toISOString(),
     termsUrl: cfg.termsUrl,
     automaticTax: cfg.automaticTax,
   })
@@ -348,7 +374,9 @@ export async function handleStripeWebhook(req: Request, deps: HandlerDeps): Prom
   let event: StripeEvent
   try {
     event = JSON.parse(new TextDecoder().decode(body.bytes)) as StripeEvent
-    if (typeof event?.type !== 'string' || typeof event.data?.object !== 'object') throw new Error('saknar type/data')
+    if (typeof event?.type !== 'string' || typeof event.data?.object !== 'object' || event.data.object === null) {
+      throw new Error('saknar type/data')
+    }
   } catch {
     return errorResponse(400, 'ogiltig-begaran', 'Händelsen kunde inte tolkas.')
   }

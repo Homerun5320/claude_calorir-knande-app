@@ -51,7 +51,10 @@ export function accessStatus(input: {
     }
   }
   if (trialStartedAt === null) return { kind: 'ny' }
-  const endsAt = trialStartedAt + trialDays * DAY_MS
+  // En provstart i framtiden (klockan gick före när profilen skapades och ställdes sedan tillbaka)
+  // räknas som nu – provperioden kan aldrig bli längre än `trialDays`. Starten rättas även i
+  // butiken (se useAccess), så att den inte fortsätter att flytta fram slutet.
+  const endsAt = Math.min(trialStartedAt, now) + trialDays * DAY_MS
   if (now < endsAt) return { kind: 'prov', daysLeft: Math.max(1, Math.ceil((endsAt - now) / DAY_MS)), endsAt }
   const licenseExpired = Boolean(license && !license.ok && license.reason === 'utgangen')
   return { kind: 'utgangen', endedAt: licenseExpired ? now : endsAt, licenseExpired }
@@ -170,6 +173,12 @@ export function useAccess(): AccessInfo {
     const created = profileCreatedAt && profileCreatedAt > 0 && profileCreatedAt <= Date.now() && !isDemoData() ? profileCreatedAt : Date.now()
     ensureTrialStarted(created)
   }, [onboardingDone, trialStartedAt, profileCreatedAt, ensureTrialStarted])
+
+  // En sparad provstart i framtiden rättas till nu (se accessStatus) – annars skulle man kunna
+  // ställa fram klockan, skapa profilen och sedan ställa tillbaka klockan för en längre provperiod.
+  useEffect(() => {
+    if (trialStartedAt !== null && trialStartedAt > now) ensureTrialStarted(now)
+  }, [trialStartedAt, now, ensureTrialStarted])
 
   // Uppdatera "dagar kvar" när appen återfår fokus och en gång i timmen.
   useEffect(() => {

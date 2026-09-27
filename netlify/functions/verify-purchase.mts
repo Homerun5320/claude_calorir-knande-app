@@ -3,7 +3,7 @@
  * Kropp: { sessionId: 'cs_…' } → { licenseKey, plan, issuedAt, expiresAt }.
  * Samma köp ger alltid samma nyckel. Logiken finns i netlify/lib/handlers.ts.
  */
-import { handleVerifyPurchase, type NetlifyContext } from '../lib/handlers.ts'
+import { handleVerifyPurchase, withErrorBoundary, type NetlifyContext } from '../lib/handlers.ts'
 
 export default (req: Request, context?: NetlifyContext): Promise<Response> =>
-  handleVerifyPurchase(req, { env: process.env, context })
+  withErrorBoundary('verify-purchase', () => handleVerifyPurchase(req, { env: process.env, context }))

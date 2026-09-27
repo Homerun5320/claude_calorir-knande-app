@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { verifyLicense } from '../../src/lib/license.ts'
 import { LICENSE_METADATA_KEY, validatePaidSession } from '../lib/fulfillment.ts'
-import { checkoutParams, handleCreateCheckout, handleStripeWebhook, handleVerifyPurchase, type HandlerDeps } from '../lib/handlers.ts'
+import { checkoutParams, handleCreateCheckout, handleStripeWebhook, handleVerifyPurchase, withErrorBoundary, type HandlerDeps } from '../lib/handlers.ts'
 import { RateLimiter } from '../lib/http.ts'
 import { issueLicense, licensePayloadFor } from '../lib/licensing.ts'
 import { SERVER_PLANS } from '../lib/plans.ts'
@@ -96,7 +96,7 @@ describe('POST /api/create-checkout', () => {
   it('priset kontrolleras mot appens pris innan kunden skickas till Stripe', async () => {
     const { stripe, deps, log } = setup({ STRIPE_PRICE_AR: 'price_ar_fel' })
     stripe.prices.set('price_ar_fel', price('price_ar_fel', { unit_amount: 34900 }))
-    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
     expect(res.status).toBe(503)
     expect(await read(res)).toMatchObject({ code: 'ej-konfigurerad' })
     expect(log.text()).toContain('349 kr men appen visar 299 kr')
@@ -112,25 +112,24 @@ describe('POST /api/create-checkout', () => {
     const id = `price_${_label.replace(/\W/g, '')}`
     const { stripe, deps } = setup({ STRIPE_PRICE_LIVSTID: id })
     stripe.prices.set(id, price(id, overrides))
-    const res = await handleCreateCheckout(post('create-checkout', { plan: 'livstid' }), deps)
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'livstid', consent: true }), deps)
     expect(res.status).toBe(503)
   })
 
   it('ett godkänt livstidspris godkänns inte som årslicens (även när det finns i cachen)', async () => {
     const { deps, stripe } = setup({ STRIPE_PRICE_AR: 'price_livstid' })
-    expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid' }), deps)).status).toBe(200)
-    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)).status).toBe(503)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid', consent: true }), deps)).status).toBe(200)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)).status).toBe(503)
     expect(stripe.calls.filter((c) => c.url.pathname === '/v1/checkout/sessions')).toHaveLength(1)
   })
 
   it('utan pris-id skickas priset från koden (inkl. moms)', async () => {
     const { stripe, deps } = setup({ STRIPE_PRICE_AR: '', STRIPE_PRICE_LIVSTID: '' })
-    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
     expect(res.status).toBe(200)
     const form = lastCreate(stripe)
-    // Utan samtycke från appen påstås inget samtycke på kvittot.
-    expect(form.get('payment_intent_data[description]')).toBe('Lagom Årslicens')
-    expect(form.get('metadata[samtycke]')).toBeNull()
+    expect(form.get('payment_intent_data[description]')).toContain('Lagom Årslicens.')
+    expect(form.get('metadata[samtycke]')).toBe('omedelbar-leverans')
     expect(form.get('line_items[0][price_data][currency]')).toBe('sek')
     expect(form.get('line_items[0][price_data][unit_amount]')).toBe('29900')
     expect(form.get('line_items[0][price_data][tax_behavior]')).toBe('inclusive')
@@ -166,9 +165,22 @@ describe('POST /api/create-checkout', () => {
     expect(await read(bad)).toEqual({ code: 'ogiltig-begaran', error: 'Förfrågan kunde inte tolkas.' })
   })
 
+  it('samtycket om omedelbar leverans och ångerrätt krävs – annars skapas inget köp', async () => {
+    const { deps, stripe } = setup()
+    for (const consent of [undefined, false, 'true', 1, null]) {
+      const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent }), deps)
+      expect(res.status).toBe(400)
+      const data = await read(res)
+      expect(data.code).toBe('samtycke-saknas')
+      expect(String(data.error)).toContain('ångerrätten')
+    }
+    // Varken priset eller någon session hämtas/skapas utan samtycke.
+    expect(stripe.calls).toHaveLength(0)
+  })
+
   it('stora anrop avvisas innan de läses in', async () => {
     const { deps, stripe } = setup()
-    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', fyll: 'x'.repeat(5000) }), deps)
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true, fyll: 'x'.repeat(5000) }), deps)
     expect(res.status).toBe(413)
     expect(stripe.calls).toHaveLength(0)
   })
@@ -180,11 +192,11 @@ describe('POST /api/create-checkout', () => {
     expect(pre.headers.get('Access-Control-Allow-Methods')).toContain('POST')
     expect(pre.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type')
 
-    const extra = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }, { Origin: 'https://www.lagom-appen.se' }), deps)
+    const extra = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { Origin: 'https://www.lagom-appen.se' }), deps)
     expect(extra.status).toBe(200)
     expect(extra.headers.get('Access-Control-Allow-Origin')).toBe('https://www.lagom-appen.se')
 
-    const evil = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }, { Origin: 'https://ond.example' }), deps)
+    const evil = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { Origin: 'https://ond.example' }), deps)
     expect(evil.status).toBe(403)
     expect(evil.headers.get('Access-Control-Allow-Origin')).toBeNull()
 
@@ -198,7 +210,7 @@ describe('POST /api/create-checkout', () => {
     const req = new Request(`${preview}/api/create-checkout`, {
       method: 'POST',
       headers: { Origin: preview, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan: 'ar' }),
+      body: JSON.stringify({ plan: 'ar', consent: true }),
     })
     expect((await handleCreateCheckout(req, deps)).status).toBe(200)
     expect(lastCreate(stripe).get('success_url')).toBe(`${preview}/#/tack?session_id={CHECKOUT_SESSION_ID}`)
@@ -209,7 +221,7 @@ describe('POST /api/create-checkout', () => {
     const req = new Request('https://lagom-api.netlify.app/api/create-checkout', {
       method: 'POST',
       headers: { Origin: 'https://exempel.github.io' },
-      body: JSON.stringify({ plan: 'ar' }),
+      body: JSON.stringify({ plan: 'ar', consent: true }),
     })
     expect((await handleCreateCheckout(req, deps)).status).toBe(200)
     expect(lastCreate(stripe).get('cancel_url')).toBe('https://exempel.github.io/lagom/#/premium')
@@ -217,7 +229,7 @@ describe('POST /api/create-checkout', () => {
 
   it('saknade inställningar ger ett lugnt meddelande och loggar bara namnen', async () => {
     const { deps, log } = setup({ STRIPE_SECRET_KEY: 'pk_test_fel_nyckel' })
-    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
     expect(res.status).toBe(503)
     expect(String((await read(res)).error)).toContain('inga pengar har dragits')
     expect(log.text()).toContain('STRIPE_SECRET_KEY')
@@ -227,11 +239,11 @@ describe('POST /api/create-checkout', () => {
   it('fel hos Stripe: tillfälliga fel → 502, fel nyckel → 503', async () => {
     const { stripe, deps } = setup({ STRIPE_PRICE_AR: '' })
     stripe.failNext.push('network')
-    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)).status).toBe(502)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)).status).toBe(502)
     stripe.failNext.push({ status: 500 })
-    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)).status).toBe(502)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)).status).toBe(502)
     const wrongKey = setup({ STRIPE_SECRET_KEY: 'sk_test_fel', STRIPE_PRICE_AR: '' })
-    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), wrongKey.deps)).status).toBe(503)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), wrongKey.deps)).status).toBe(503)
   })
 
   it('begränsar antalet anrop per IP-adress', async () => {
@@ -239,10 +251,10 @@ describe('POST /api/create-checkout', () => {
     deps.rateLimiter = new RateLimiter(2, 60_000)
     const statuses: number[] = []
     for (let i = 0; i < 3; i++) {
-      statuses.push((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }, { 'x-nf-client-connection-ip': '10.0.0.1' }), deps)).status)
+      statuses.push((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { 'x-nf-client-connection-ip': '10.0.0.1' }), deps)).status)
     }
     expect(statuses).toEqual([200, 200, 429])
-    const other = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }, { 'x-nf-client-connection-ip': '10.0.0.2' }), deps)
+    const other = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { 'x-nf-client-connection-ip': '10.0.0.2' }), deps)
     expect(other.status).toBe(200)
   })
 })
@@ -316,6 +328,7 @@ describe('POST /api/verify-purchase', () => {
     ['ej betald', { payment_status: 'unpaid' as const }, 202, 'ej-betald'],
     ['öppen', { status: 'open' as const, payment_status: 'unpaid' as const }, 202, 'ej-betald'],
     ['utgången session', { status: 'expired' as const, payment_status: 'unpaid' as const }, 410, 'avbruten'],
+    ['gratis (100 % rabatt, ingen betalning)', { payment_status: 'no_payment_required' as const, amount_total: 0 }, 202, 'ej-betald'],
     ['annan produkt (ingen Lagom-metadata)', { metadata: { plan: 'livstid' } }, 422, 'okant-kop'],
     ['okänd plan', { metadata: { app: 'lagom', plan: 'guld' } }, 422, 'okant-kop'],
     ['prenumeration', { mode: 'subscription' as const }, 422, 'okant-kop'],
@@ -501,8 +514,43 @@ describe('POST /api/stripe-webhook', () => {
     expect((await webhook(completed(s), { deps })).status).toBe(500)
   })
 
+  it('en signerad händelse utan objekt avvisas lugnt (ingen krasch)', async () => {
+    const { deps, stripe } = setup()
+    const res = await webhook({ id: 'evt_3', object: 'event', type: 'checkout.session.completed', livemode: false, data: { object: null } }, { deps })
+    expect(res.status).toBe(400)
+    expect(stripe.calls).toHaveLength(0)
+  })
+
+  it('händelsens påstådda betalstatus litas inte på – sessionen hämtas från Stripe', async () => {
+    const { deps, stripe } = setup()
+    const real = paidSession({ status: 'open', payment_status: 'unpaid' })
+    stripe.sessions.set(real.id, real)
+    expect((await webhook(completed(paidSession()), { deps })).status).toBe(200)
+    expect(stripe.intents.get('pi_1')?.metadata?.[LICENSE_METADATA_KEY]).toBeUndefined()
+  })
+
   it('utan STRIPE_WEBHOOK_SECRET är webhooken avstängd', async () => {
     const { deps } = setup({ STRIPE_WEBHOOK_SECRET: '' })
     expect((await webhook(completed(), { deps })).status).toBe(503)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('oväntade fel', () => {
+  it('ger ett lugnt 500-svar utan interna detaljer; detaljerna hamnar bara i loggen', async () => {
+    const log = recordingLogger()
+    const res = await withErrorBoundary(
+      'verify-purchase',
+      async () => {
+        throw new Error('hemlig detalj sk_live_abc LICENSE_PRIVATE_KEY')
+      },
+      log,
+    )
+    expect(res.status).toBe(500)
+    const text = await res.text()
+    expect(text).not.toMatch(/hemlig|sk_live|LICENSE_PRIVATE_KEY|Error|at /)
+    expect(JSON.parse(text)).toMatchObject({ code: 'internt-fel' })
+    expect(log.text()).toContain('hemlig detalj')
   })
 })

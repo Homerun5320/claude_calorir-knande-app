@@ -186,7 +186,7 @@ Webhooken kontrollerar Stripes signatur (HMAC-SHA256, högst fem minuter gammal)
 
 Enligt distansavtalslagen (2 kap. 11 § p. 11) gäller ångerrätten inte digitalt innehåll som levereras direkt, **om** kunden uttryckligen har samtyckt till att leveransen börjar direkt, har bekräftat att ångerrätten då går förlorad, och du har skickat en bekräftelse på avtalet (2 kap. 12 §). Därför:
 
-- **I appen:** köpsidan har en kryssruta för samtycket med länk till köpvillkoren. Skickar appen `consent: true` sparas samtycket och tidpunkten i köpets metadata.
+- **I appen:** köpsidan har en kryssruta för samtycket med länk till köpvillkoren. Appen skickar `consent: true`, och samtycket och tidpunkten sparas i köpets metadata. Servern kräver samtycket: utan `consent: true` skapas inget köp (400 `samtycke-saknas`), inte heller från andra klienter än appen.
 - **I Stripe Checkout:** med `TERMS_URL` satt måste kunden även där kryssa i: *"Jag godkänner köpvillkoren och att licensen levereras direkt efter betalningen. Jag förstår att ångerrätten upphör när leveransen har börjat."* Stripe sparar godkännandet på köpet. Kräver att *Terms of service* är ifylld i Stripe (steg 1).
 - **Bekräftelsen:** betalningens beskrivning innehåller samtycket och följer med Stripes kvitto. Kontrollera ett kvitto från ett skarpt testköp.
 
@@ -298,16 +298,17 @@ Medvetna avvägningar för en app utan konton där all data stannar på enheten:
 
 ## API-referens
 
-Alla svar är JSON och cachas aldrig. Fel har formen `{ "code": "…", "error": "…" }`, där `error` är ett svenskt meddelande som kan visas som det är. Anrop från andra webbplatser än appen (`APP_URL`, `ALLOWED_ORIGINS` eller samma adress som funktionerna) nekas.
+Alla svar är JSON och cachas aldrig. Fel har formen `{ "code": "…", "error": "…" }`, där `error` är ett svenskt meddelande som kan visas som det är. Anrop från andra webbplatser än appen (`APP_URL`, `ALLOWED_ORIGINS` eller samma adress som funktionerna) nekas. Ett oväntat fel ger 500 `internt-fel` utan detaljer – felmeddelandet finns bara i funktionsloggen.
 
 ### `POST /api/create-checkout`
 
-Kropp: `{ "plan": "ar" | "livstid", "consent": true }` (`consent` är valfri och sparas som samtycke i köpets metadata).
+Kropp: `{ "plan": "ar" | "livstid", "consent": true }`. `consent` måste vara exakt `true` (samtycket till omedelbar leverans och att ångerrätten upphör) och sparas i köpets metadata.
 
 | Status | Kod | När |
 | --- | --- | --- |
 | 200 | – | `{ "url": "https://checkout.stripe.com/…" }` – skicka kunden dit |
 | 400 | `ogiltig-plan`, `ogiltig-begaran` | Okänd plan eller ogiltig JSON |
+| 400 | `samtycke-saknas` | `consent: true` saknas – inget köp skapas |
 | 403 | `fel-ursprung` | Anrop från en annan webbplats |
 | 413 | `for-stor` | Kroppen är större än 2 kB |
 | 429 | `for-manga` | För många försök (header `Retry-After`) |

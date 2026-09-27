@@ -36,7 +36,7 @@ describe('Netlify-funktionerna', () => {
   })
 
   it('utan inställningar: 503 med svenskt meddelande, aldrig en krasch', async () => {
-    const body = JSON.stringify({ plan: 'ar' })
+    const body = JSON.stringify({ plan: 'ar', consent: true })
     const a = await createCheckout(req('create-checkout', { method: 'POST', body }), { ip: '127.0.0.1', site: { url: 'https://lagom.example' } })
     expect(a.status).toBe(503)
     expect(await a.json()).toMatchObject({ code: 'ej-konfigurerad' })
