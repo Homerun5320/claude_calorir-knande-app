@@ -114,8 +114,10 @@ export function SegmentedControl<T extends string | number>({
             className={cx(
               'relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors duration-200',
               'focus-visible:outline-offset-0 disabled:opacity-40',
-              size === 'sm' ? 'h-8 px-3 text-[0.8125rem]' : 'h-10 px-4 text-sm',
-              fullWidth && 'flex-1',
+              size === 'sm' ? 'h-8 text-[0.8125rem]' : 'h-10 text-sm',
+              // Full bredd: lika breda segment som får krympa – mindre sidmarginal så att fem val
+              // ryms i 320 px utan att sidan skrollar i sidled.
+              fullWidth ? cx('min-w-0 flex-1', size === 'sm' ? 'px-1.5' : 'px-2') : size === 'sm' ? 'px-3' : 'px-4',
               selected ? (tone === 'gran' ? 'text-on-gran' : 'text-ink') : 'text-ink-3 hover:text-ink-2',
             )}
           >

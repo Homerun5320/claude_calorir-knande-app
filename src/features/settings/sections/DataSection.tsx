@@ -167,7 +167,7 @@ export function DataSection() {
         <Card tone="sol" eyebrow="Exempeldata" title="Du tittar på en exempelvecka">
           <p className="mb-3 text-[0.9375rem] leading-relaxed text-ink-2">Allt i dagboken just nu är påhittat, så att du kan utforska Lagom. Rensa när du vill börja på riktigt.</p>
           <Button variant="secondary" iconLeft={Sparkles} onClick={clearDemo}>
-            Rensa exempeldata och börja om
+            Rensa exempeldata
           </Button>
         </Card>
       )}

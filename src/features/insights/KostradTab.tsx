@@ -85,7 +85,7 @@ export function KostradTab({ data }: { data: InsightsData }) {
         </InfoNote>
       </Card>
 
-      <ul className="grid gap-3 sm:grid-cols-2" aria-label="Kostråden">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Kostråden">
         {results.map((r, i) => (
           <motion.li
             key={r.id}
@@ -125,7 +125,8 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
           {r.emoji}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
+          {/* Får brytas: i smala fönster hamnar märket under rubriken i stället för utanför kortet. */}
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
             <Badge tone={uncertain ? 'neutral' : status.tone} dot className="shrink-0">
               {uncertain ? 'Osäkert' : status.label}

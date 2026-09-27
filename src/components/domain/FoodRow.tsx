@@ -130,6 +130,8 @@ export function FoodRow({
   const [imageFailed, setImageFailed] = useState(false)
   const formatKcal = useEnergyFormatter()
   const subtitle = [brand, amountText].filter(Boolean).join(' · ')
+  // Håll ihop tal och enhet ("450 g", "1 portion") när raden bryts.
+  const subtitleText = subtitle.replace(/(\d) (?=\S)/g, '$1\u00a0')
   const m3: FoodRowMacros = macros ?? {}
   const knownMacros = MACRO_DOTS.filter((m) => m3[m.key] !== undefined && Number.isFinite(m3[m.key]))
   const hasMacros = !hideEnergy && showMacros && knownMacros.length > 0
@@ -157,14 +159,16 @@ export function FoodRow({
         >
           {name}
         </span>
-        {/* Etiketten ligger på raden under namnet – bredvid namnet blev det för trångt i 375 px. */}
+        {/* Etiketten ligger på raden under namnet – bredvid namnet blev det för trångt i 375 px.
+            Mängden flödar efter etiketten och får bryta till en andra rad, så att gramvikten inte
+            klipps bort ("1 portion (450 g)"). */}
         {badge ? (
-          <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0">{badge}</span>
-            {subtitle && <span className="min-w-0 truncate text-xs text-ink-3">{subtitle}</span>}
+          <span className="mt-0.5 line-clamp-2 text-xs leading-5 text-ink-3">
+            <span className="mr-1.5 inline-flex align-top">{badge}</span>
+            {subtitleText}
           </span>
         ) : (
-          subtitle && <span className="mt-0.5 block truncate text-xs text-ink-3">{subtitle}</span>
+          subtitle && <span className="mt-0.5 line-clamp-2 text-xs text-ink-3">{subtitleText}</span>
         )}
       </span>
       {!hideEnergy && (
