@@ -152,7 +152,7 @@ describe('FoodDetailPage', () => {
   it('visar ursprung, portionsväljare och näringsinnehåll', async () => {
     renderAt('/livsmedel/lagom%3Akanelbulle-bageri?maltid=fika&datum=2026-09-26')
     expect(await screen.findByRole('heading', { level: 1, name: 'Kanelbulle, bageri' }, { timeout: 3000 })).toBeInTheDocument()
-    expect(screen.getByText(/Lagoms svenska databas/)).toBeInTheDocument()
+    expect(screen.getByText(/^Värden från Livsmedelsverkets livsmedelsdatabas \(nr \d+\), med svenska portioner/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Tallriksmodellen' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Klimatavtryck' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Lägg till i Fika' }))

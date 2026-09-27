@@ -114,7 +114,12 @@ interface Source {
 }
 
 export const SOURCES: readonly Source[] = [
-  { name: 'Livsmedelsverkets livsmedelsdatabas', use: 'Namn och näringsvärden per 100\u00a0g', license: 'Öppna data', href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
+  {
+    name: 'Livsmedelsverkets livsmedelsdatabas',
+    use: 'Namn och näringsvärden per 100\u00a0g. Hela databasen (2\u00a0606 livsmedel) ingår och fungerar offline.',
+    license: 'Öppna data',
+    href: 'https://soknaringsinnehall.livsmedelsverket.se/',
+  },
   { name: 'Nordiska näringsrekommendationer 2023 (NNR 2023)', use: 'Referensvärden för energi, makron, vitaminer och mineraler', href: 'https://www.norden.org/en/publication/nordic-nutrition-recommendations-2023' },
   { name: 'Livsmedelsverkets kostråd', use: 'Råd om frukt, grönt, fisk, kött, fullkorn och rörelse', href: 'https://www.livsmedelsverket.se/matvanor-halsa--miljo/kostrad/' },
   { name: 'Tallriksmodellen', use: 'Hur en balanserad måltid kan fördelas', href: 'https://www.livsmedelsverket.se/matvanor-halsa--miljo/kostrad/tallriksmodellen/' },

@@ -16,6 +16,9 @@ import { useFastingStore } from '../../stores/fastingStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../../stores/profileStore'
 import type { Profile } from '../../types'
+import { BUILTIN_FOODS } from '../../data/foods'
+import { nutrientsForGrams, standardDrinks } from '../../lib/nutrients'
+import { formatNumber } from '../../lib/format'
 
 const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore]
 
@@ -176,7 +179,11 @@ describe('Dryck', () => {
   it('snabbval för alkohol räknas i standardglas', async () => {
     renderAt('/dryck')
     fireEvent.click(await screen.findByRole('button', { name: /Lägg till Starköl/ }))
-    await waitFor(() => expect(screen.getAllByText('1,1').length).toBeGreaterThan(0))
+    // En burk (33 cl) starköl i standardglas (12 g alkohol) – räknat från databasens värden.
+    const beer = BUILTIN_FOODS.find((f) => f.id === 'lagom:ol-starkol-lager-5')!
+    const can = beer.portions.find((p) => p.id === 'burk')!
+    const expected = formatNumber(standardDrinks(nutrientsForGrams(beer.nutrients, can.grams)), 1)
+    await waitFor(() => expect(screen.getAllByText(expected).length).toBeGreaterThan(0))
     expect(screen.getByRole('link', { name: /Alkoholhjälpen/ })).toHaveAttribute('href', 'https://alkoholhjalpen.se')
     // Vuxna ser riktmärket 400 mg koffein – med mellanslag mellan siffran och enheten.
     expect(screen.getByText(/mg av 400 mg/).parentElement).toHaveTextContent(/^0 mg av 400 mg$/)

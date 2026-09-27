@@ -100,7 +100,8 @@ describe('ThankYouPage', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     onLine.mockReturnValue(true)
     window.dispatchEvent(new Event('online'))
-    expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' })).toBeInTheDocument()
+    // Nytt anrop + verifiering med WebCrypto – ge lite marginal när hela testsviten körs parallellt.
+    expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' }, { timeout: 5000 })).toBeInTheDocument()
   })
 
   it('en nyckel som inte går att verifiera sparas inte men visas så att den kan skickas till supporten', async () => {

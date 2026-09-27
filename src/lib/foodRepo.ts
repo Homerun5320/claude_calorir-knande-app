@@ -11,13 +11,23 @@
  *  3. Ett tillfälligt minne för produkter som hämtats från Open Food Facts under sessionen
  *     (så att en sökträff kan öppnas på detaljsidan utan att sparas permanent).
  *
- * Den inbyggda katalogen publiceras i två steg: först Lagoms egna livsmedel (snabbt), sedan
- * sammanslaget med Livsmedelsverkets data. Prenumerera med `subscribeBuiltinCatalog` eller
- * använd hookarna i `hooks/useFood.ts`.
+ * Lagoms kurerade livsmedel kan länkas till Livsmedelsverkets livsmedel med `lmvNumber` (samma
+ * livsmedel och tillagning). När båda är inlästa:
+ *  - fylls varje näringsämne som saknas i det kurerade livsmedlet i från det länkade
+ *    (`enrichCuratedFoods` – definierade värden skrivs aldrig över),
+ *  - döljs det länkade Livsmedelsverket-livsmedlet i sökningen och listorna (det kurerade har
+ *    svenska portioner och sökord), men det går fortfarande att slå upp på id ('lmv:150') så att
+ *    gamla dagboksposter, favoriter och Senaste fungerar.
+ *
+ * Den inbyggda katalogen publiceras normalt en gång, komplett. Dröjer Livsmedelsverkets fil
+ * publiceras den i två steg: först Lagoms egna livsmedel (så att sökningen fungerar direkt), sedan
+ * berikat och sammanslaget med Livsmedelsverkets data. Prenumerera med `subscribeBuiltinCatalog`
+ * eller använd hookarna i `hooks/useFood.ts`.
  */
-import type { Food, Recipe } from '../types'
+import type { Food, Nutrients, Recipe } from '../types'
 import { FOOD_CATEGORIES } from '../types'
 import { useFoodStore } from '../stores/foodStore'
+import { NUTRIENT_KEYS, saltFromSodiumMg, sodiumMgFromSalt, type NutrientKey } from './nutrients'
 import { recipeFoodId, recipeToFood } from './recipes'
 import { fetchProductByBarcode, normalizeBarcode, searchProducts, type SearchProductsOptions } from './openFoodFacts'
 
@@ -150,14 +160,21 @@ export interface LmvDatasetMeta {
 }
 
 export interface BuiltinCatalog {
-  /** Livsmedel för sökning och bläddring (Livsmedelsverkets dubbletter av kurerade Lagom-livsmedel är dolda). */
+  /**
+   * Livsmedel för sökning och bläddring: Lagoms kurerade (berikade med Livsmedelsverkets värden)
+   * och Livsmedelsverkets övriga. Livsmedelsverkets dubbletter av kurerade livsmedel är dolda.
+   */
   foods: Food[]
   /**
    * Alla inbyggda livsmedel per id, även dolda dubbletter – och de inbyggda recepten som
    * livsmedel ('recipe:klassiker-*').
    */
   byId: ReadonlyMap<string, Food>
-  /** De svenska klassikerna (inbyggda recept), lösta mot Lagoms livsmedel. Samma lista i båda stegen. */
+  /**
+   * De svenska klassikerna (inbyggda recept), lösta mot Lagoms (berikade) livsmedel. Stabil
+   * referens så länge livsmedlen är desamma – räknas om bara när Livsmedelsverkets data kommer
+   * efter att katalogen redan har publicerats.
+   */
   recipes: Recipe[]
   /** Klassikerna som livsmedel (`recipeFood`) – för sökning. Ingår inte i `foods`. */
   recipeFoods: Food[]
@@ -171,6 +188,12 @@ export interface BuiltinCatalog {
 /** Relativ sökväg – fungerar oavsett var appen ligger (Vite `base: './'`). */
 export const LMV_DATA_PATH = 'data/livsmedelsverket.json'
 const LMV_FETCH_TIMEOUT_MS = 20_000
+/**
+ * Så länge väntar vi på Livsmedelsverkets fil innan Lagoms egna livsmedel publiceras ensamma.
+ * Filen ligger i appens förcache och brukar komma långt tidigare – då publiceras katalogen en
+ * gång, berikad, och sökindex och klassiker byggs bara en gång.
+ */
+const LMV_GRACE_MS = 800
 
 let catalog: BuiltinCatalog | null = null
 let loading: Promise<BuiltinCatalog> | null = null
@@ -277,9 +300,105 @@ async function fetchLmvDataset(): Promise<{ foods: Food[]; meta: LmvDatasetMeta 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Berikning av kurerade livsmedel med Livsmedelsverkets värden
+// ---------------------------------------------------------------------------
+
+const FATTY_ACIDS = ['satFat', 'monoFat', 'polyFat'] as const satisfies readonly NutrientKey[]
+const round2 = (v: number) => Math.round(v * 100) / 100
+
+/**
+ * Håll de ifyllda värdena förenliga med det kurerade livsmedlets egna. Märkesvaror och
+ * livsmedel där Lagom medvetet behållit egna värden (t.ex. osaltat) kan skilja sig något från
+ * Livsmedelsverkets post – då får ett ifyllt delvärde aldrig bli större än helheten.
+ * Bara ifyllda värden (`filled`) justeras.
+ */
+function reconcile(n: Nutrients, filled: ReadonlySet<NutrientKey>): void {
+  // Salt och natrium hänger ihop (salt = natrium × 2,5).
+  if (filled.has('salt') && !filled.has('sodium') && n.sodium !== undefined) n.salt = round2(saltFromSodiumMg(n.sodium))
+  if (filled.has('sodium') && !filled.has('salt') && n.salt !== undefined) n.sodium = round2(sodiumMgFromSalt(n.salt))
+  // Sockerarter ≤ kolhydrater, tillsatt socker ≤ sockerarter.
+  if (filled.has('sugars') && n.sugars !== undefined && n.carbs !== undefined && n.sugars > n.carbs) n.sugars = n.carbs
+  if (filled.has('addedSugar') && n.addedSugar !== undefined && n.sugars !== undefined && n.addedSugar > n.sugars) n.addedSugar = n.sugars
+  // Fettsyrorna ≤ fett: skala ner de ifyllda så att summan ryms.
+  if (n.fat !== undefined) {
+    let own = 0
+    let added = 0
+    for (const k of FATTY_ACIDS) {
+      const v = n[k]
+      if (v === undefined) continue
+      if (filled.has(k)) added += v
+      else own += v
+    }
+    if (added > 0 && own + added > n.fat) {
+      const factor = Math.max(0, n.fat - own) / added
+      for (const k of FATTY_ACIDS) {
+        const v = n[k]
+        if (v !== undefined && filled.has(k)) n[k] = round2(v * factor)
+      }
+    }
+  }
+  if (filled.has('omega3') && n.omega3 !== undefined && n.polyFat !== undefined && n.omega3 > n.polyFat) n.omega3 = n.polyFat
+}
+
+/**
+ * Ett kurerat livsmedel kompletterat med värden från det länkade Livsmedelsverket-livsmedlet:
+ * varje näringsämne som saknas (`undefined`) fylls i, definierade värden skrivs aldrig över.
+ * Ren funktion – returnerar samma objekt om inget saknas, annars en ny kopia (originalet ändras inte).
+ */
+export function enrichFood(food: Food, linked: Food | undefined): Food {
+  if (!linked || linked === food) return food
+  const filled = new Set<NutrientKey>()
+  const nutrients: Nutrients = { ...food.nutrients }
+  for (const key of NUTRIENT_KEYS) {
+    if (nutrients[key] !== undefined) continue
+    const v = linked.nutrients[key]
+    if (v === undefined || !Number.isFinite(v) || v < 0) continue
+    nutrients[key] = v
+    filled.add(key)
+  }
+  if (filled.size === 0) return food
+  reconcile(nutrients, filled)
+  return { ...food, nutrients }
+}
+
+const enrichCache = new WeakMap<readonly Food[], WeakMap<readonly Food[], Food[]>>()
+
+/**
+ * Lagoms kurerade livsmedel berikade med Livsmedelsverkets värden via `lmvNumber` (se `enrichFood`).
+ * Memoiserat på listorna – samma indata ger samma (identiska) lista, och indata ändras aldrig.
+ * Utan Livsmedelsverkets data (eller utan något att fylla i) returneras `curated` oförändrad.
+ */
+export function enrichCuratedFoods(curated: Food[], lmvFoods: readonly Food[]): Food[] {
+  if (lmvFoods.length === 0) return curated
+  let byLmv = enrichCache.get(curated)
+  const hit = byLmv?.get(lmvFoods)
+  if (hit) return hit
+  const lmvByNumber = new Map<number, Food>()
+  for (const f of lmvFoods) if (f.lmvNumber !== undefined && !lmvByNumber.has(f.lmvNumber)) lmvByNumber.set(f.lmvNumber, f)
+  let changed = false
+  const out = curated.map((f) => {
+    if (f.lmvNumber === undefined || f.source === 'livsmedelsverket') return f
+    const next = enrichFood(f, lmvByNumber.get(f.lmvNumber))
+    if (next !== f) changed = true
+    return next
+  })
+  const result = changed ? out : curated
+  if (!byLmv) {
+    byLmv = new WeakMap()
+    enrichCache.set(curated, byLmv)
+  }
+  byLmv.set(lmvFoods, result)
+  return result
+}
+
+/**
+ * Sätt ihop katalogen. `curated` ska redan vara berikad (`enrichCuratedFoods`). Livsmedelsverkets
+ * livsmedel som ett kurerat livsmedel länkar till döljs i `foods` men finns kvar i `byId`.
+ */
 function buildCatalog(
-  builtin: Food[],
-  lmvFoods: Food[],
+  curated: Food[],
+  lmvFoods: readonly Food[],
   lmv: LmvDatasetMeta | null,
   complete: boolean,
   recipes: Recipe[] = [],
@@ -288,20 +407,29 @@ function buildCatalog(
   recipeFoods: Food[] = recipes.map(recipeFood),
 ): BuiltinCatalog {
   const byId = new Map<string, Food>()
-  for (const f of builtin) if (!byId.has(f.id)) byId.set(f.id, f)
+  for (const f of curated) if (!byId.has(f.id)) byId.set(f.id, f)
   for (const f of recipeFoods) if (!byId.has(f.id)) byId.set(f.id, f)
-  if (lmvFoods.length === 0) return { foods: builtin, byId, recipes, recipeFoods, complete, lmv }
+  if (lmvFoods.length === 0) return { foods: curated, byId, recipes, recipeFoods, complete, lmv }
   // Kurerade Lagom-livsmedel med känt livsmedelsnummer ersätter Livsmedelsverkets post i sökningen.
-  const curated = new Set<number>()
-  for (const f of builtin) if (f.lmvNumber !== undefined) curated.add(f.lmvNumber)
-  const foods = builtin.slice()
+  const linked = new Set<number>()
+  for (const f of curated) if (f.lmvNumber !== undefined) linked.add(f.lmvNumber)
+  const foods = curated.slice()
   for (const f of lmvFoods) {
     if (byId.has(f.id)) continue
     byId.set(f.id, f)
-    if (f.lmvNumber !== undefined && curated.has(f.lmvNumber)) continue
+    if (f.lmvNumber !== undefined && linked.has(f.lmvNumber)) continue
     foods.push(f)
   }
   return { foods, byId, recipes, recipeFoods, complete, lmv }
+}
+
+/** Värdet om löftet uppfylls inom `ms` millisekunder, annars undefined (löftet får fortsätta). */
+function settleWithin<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
 type RecipesModule = typeof import('../data/recipes')
@@ -316,8 +444,11 @@ function importRecipes(): Promise<RecipesModule | null> {
 
 /**
  * Läs in den inbyggda katalogen (memoiserat). Lagoms databas och klassikerna laddas som separata
- * chunkar och publiceras direkt; Livsmedelsverkets fil hämtas parallellt och slås ihop när den är
- * klar. Vid fel publiceras en tom katalog med `error` och nästa anrop försöker igen.
+ * chunkar och Livsmedelsverkets fil hämtas parallellt. Kommer filen inom en kort stund publiceras
+ * katalogen en gång, berikad och komplett; annars publiceras Lagoms egna livsmedel först och
+ * katalogen berikas (och klassikerna räknas om) när filen kommer. Saknas filen eller är enheten
+ * offline fungerar Lagoms livsmedel ändå. Vid fel publiceras en tom katalog med `error` och nästa
+ * anrop försöker igen.
  */
 export function loadBuiltinCatalog(): Promise<BuiltinCatalog> {
   if (catalog?.complete && !catalog.error) return Promise.resolve(catalog)
@@ -343,13 +474,19 @@ export function loadBuiltinCatalog(): Promise<BuiltinCatalog> {
       publish(failed)
       return failed
     }
-    const recipes = (await recipesPromise)?.loadBuiltinRecipes(builtin) ?? []
-    const recipeFoods = recipes.map(recipeFood)
-    publish(buildCatalog(builtin, [], null, false, recipes, recipeFoods))
-    const lmv = await lmvPromise
-    const full = buildCatalog(builtin, lmv.foods, lmv.meta, true, recipes, recipeFoods)
-    publish(full)
-    return full
+    const recipesModule = await recipesPromise
+    // Klassikerna räknas på samma (berikade) livsmedel som katalogen – memoiserat per lista.
+    const withRecipes = (foods: Food[], lmvFoods: readonly Food[], meta: LmvDatasetMeta | null, complete: boolean) =>
+      buildCatalog(foods, lmvFoods, meta, complete, recipesModule?.loadBuiltinRecipes(foods) ?? [])
+    const finish = (lmv: { foods: Food[]; meta: LmvDatasetMeta | null }) => {
+      const full = withRecipes(enrichCuratedFoods(builtin, lmv.foods), lmv.foods, lmv.meta, true)
+      publish(full)
+      return full
+    }
+    const early = await settleWithin(lmvPromise, LMV_GRACE_MS)
+    if (early) return finish(early)
+    publish(withRecipes(builtin, [], null, false))
+    return finish(await lmvPromise)
   })()
   loading = promise
   return promise

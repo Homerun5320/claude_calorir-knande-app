@@ -250,7 +250,7 @@ function FoodDetail({ food }: { food: Food }) {
               )}
             </div>
           </div>
-          <Provenance source={food.source} note={food.note} lmvNumber={food.lmvNumber} />
+          <Provenance source={food.source} note={food.note} lmvNumber={food.lmvNumber} brand={food.brand} />
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs text-ink-2">
               <span>Näringsdata</span>
@@ -417,15 +417,29 @@ const PROVENANCE_ICON: Record<FoodSource, LucideIcon> = {
   recipe: BookOpen,
 }
 
-function Provenance({ source, note, lmvNumber }: { source: FoodSource; note?: string; lmvNumber?: number }) {
+/**
+ * Var värdena kommer ifrån. Lagoms livsmedel som länkar till Livsmedelsverket har dess värden
+ * (saknade näringsämnen fylls i från den länkade posten); märkesvaror behåller förpackningens.
+ */
+function provenanceText(source: FoodSource, lmvNumber: number | undefined, brand: string | undefined): string {
+  if (source === 'lagom' && lmvNumber !== undefined) {
+    return brand
+      ? `Näringsvärden från förpackningen, kompletterade med Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}).`
+      : `Värden från Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}), med svenska portioner och mått från Lagom.`
+  }
+  return sourceMeta(source).provenance
+}
+
+function Provenance({ source, note, lmvNumber, brand }: { source: FoodSource; note?: string; lmvNumber?: number; brand?: string }) {
   const meta = sourceMeta(source)
   const Icon = PROVENANCE_ICON[source] ?? ShieldCheck
+  const linkedCurated = source === 'lagom' && lmvNumber !== undefined
   return (
     <div className={cx('flex items-start gap-3 rounded-2xl px-4 py-3 text-sm', meta.crowdSourced ? 'bg-hjortron-soft' : 'bg-surface-2')}>
       <Icon className={cx('mt-0.5 size-4 shrink-0', meta.crowdSourced ? 'text-hjortron' : 'text-gran')} aria-hidden />
       <div className="min-w-0 text-ink-2">
-        <p className="text-ink">{meta.provenance}</p>
-        {lmvNumber !== undefined && <p className="mt-1 text-xs">Livsmedelsnummer {lmvNumber} i Livsmedelsverkets databas.</p>}
+        <p className="text-ink">{provenanceText(source, lmvNumber, brand)}</p>
+        {lmvNumber !== undefined && !linkedCurated && <p className="mt-1 text-xs">Livsmedelsnummer {lmvNumber} i Livsmedelsverkets databas.</p>}
         {note && <p className="mt-1 text-xs">{note}</p>}
       </div>
     </div>
