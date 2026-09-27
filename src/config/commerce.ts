@@ -68,6 +68,12 @@ export const SUPPORT_EMAIL = env.VITE_SUPPORT_EMAIL ?? 'support@lagom-appen.se'
 /** Säljarens namn som visas vid köp (krävs enligt distansavtalslagen). */
 export const SELLER_NAME = env.VITE_SELLER_NAME ?? 'Lagom'
 
+/**
+ * Valfri adress till de fullständiga köpvillkoren (med organisationsnummer och adress), t.ex. en
+ * sida på webbplatsen. Köpsidan länkar dit när den är satt; sammanfattningen visas alltid i appen.
+ */
+export const TERMS_URL = (env.VITE_TERMS_URL ?? '').trim()
+
 export function planById(id: string | undefined): Plan | undefined {
   return PLANS.find((p) => p.id === id)
 }

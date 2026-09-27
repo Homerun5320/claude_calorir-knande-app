@@ -84,6 +84,8 @@ describe('POST /api/create-checkout', () => {
     expect(form.get('metadata[samtycke]')).toBe('omedelbar-leverans')
     expect(form.get('metadata[samtycke_tid]')).toBe(new Date(NOW).toISOString())
     expect(form.get('customer_creation')).toBe('if_required')
+    expect(form.get('payment_intent_data[description]')).toContain('ångerrätten därmed upphör')
+    expect(form.get('payment_intent_data[metadata][plan]')).toBe('livstid')
     expect(form.get('custom_text[submit][message]')).toContain('Engångsköp')
     // Betalsätt (kort, Klarna, Swish) styrs från Stripes dashboard.
     expect([...form.keys()].some((k) => k.startsWith('payment_method_types'))).toBe(false)
@@ -114,11 +116,21 @@ describe('POST /api/create-checkout', () => {
     expect(res.status).toBe(503)
   })
 
+  it('ett godkänt livstidspris godkänns inte som årslicens (även när det finns i cachen)', async () => {
+    const { deps, stripe } = setup({ STRIPE_PRICE_AR: 'price_livstid' })
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid' }), deps)).status).toBe(200)
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)).status).toBe(503)
+    expect(stripe.calls.filter((c) => c.url.pathname === '/v1/checkout/sessions')).toHaveLength(1)
+  })
+
   it('utan pris-id skickas priset från koden (inkl. moms)', async () => {
     const { stripe, deps } = setup({ STRIPE_PRICE_AR: '', STRIPE_PRICE_LIVSTID: '' })
     const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar' }), deps)
     expect(res.status).toBe(200)
     const form = lastCreate(stripe)
+    // Utan samtycke från appen påstås inget samtycke på kvittot.
+    expect(form.get('payment_intent_data[description]')).toBe('Lagom Årslicens')
+    expect(form.get('metadata[samtycke]')).toBeNull()
     expect(form.get('line_items[0][price_data][currency]')).toBe('sek')
     expect(form.get('line_items[0][price_data][unit_amount]')).toBe('29900')
     expect(form.get('line_items[0][price_data][tax_behavior]')).toBe('inclusive')

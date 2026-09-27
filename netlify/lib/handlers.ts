@@ -107,7 +107,9 @@ export async function checkStripePrice(
   plan: ServerPlan,
   opts: { secretKey: string; fetch?: FetchLike; now: number },
 ): Promise<string | null> {
-  const cachedUntil = priceCache.get(priceId)
+  // Nyckeln innehåller planen: ett pris som är rätt för livstid får aldrig godkännas för årslicens.
+  const cacheKey = `${plan.id}:${priceId}`
+  const cachedUntil = priceCache.get(cacheKey)
   if (cachedUntil !== undefined && cachedUntil > opts.now) return null
   const price = await stripeRequest<StripePrice>({
     method: 'GET',
@@ -121,8 +123,8 @@ export async function checkStripePrice(
   else if (price.currency !== CURRENCY) problem = `priset är i ${price.currency.toUpperCase()}, inte SEK`
   else if (price.unit_amount !== priceInOre(plan)) problem = `priset i Stripe är ${(price.unit_amount ?? 0) / 100} kr men appen visar ${plan.priceKr} kr`
   else if (price.tax_behavior === 'exclusive') problem = 'momsen måste ingå i priset (Include tax in price)'
-  if (problem === null) priceCache.set(priceId, opts.now + PRICE_CACHE_MS)
-  else priceCache.delete(priceId)
+  if (problem === null) priceCache.set(cacheKey, opts.now + PRICE_CACHE_MS)
+  else priceCache.delete(cacheKey)
   return problem
 }
 
@@ -159,6 +161,12 @@ export function checkoutParams(input: {
     metadata.samtycke = 'omedelbar-leverans'
     metadata.samtycke_tid = consentAt
   }
+  // Beskrivningen syns i Stripes dashboard och på kvittot – bekräftelsen av samtycket
+  // (distansavtalslagen 2 kap. 12 §) följer då med kvittot.
+  const description =
+    consentAt || termsUrl
+      ? `${productName}. Digital licens som levereras direkt efter betalningen. Du har samtyckt till omedelbar leverans och till att ångerrätten därmed upphör.`
+      : productName
   return {
     mode: 'payment',
     locale: 'sv',
@@ -166,7 +174,7 @@ export function checkoutParams(input: {
     success_url: `${returnBase}/#/tack?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${returnBase}/#/premium`,
     metadata,
-    payment_intent_data: { description: productName, metadata: { app: APP_MARKER, plan: plan.id } },
+    payment_intent_data: { description, metadata: { app: APP_MARKER, plan: plan.id } },
     customer_creation: 'if_required',
     billing_address_collection: 'auto',
     submit_type: 'pay',

@@ -14,6 +14,7 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import { useFastingStore } from '../../stores/fastingStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../../stores/profileStore'
+import { useLicenseStore } from '../../stores/licenseStore'
 
 MotionGlobalConfig.skipAnimations = true
 
@@ -63,6 +64,7 @@ beforeEach(() => {
   sessionStorage.clear()
   useBodyStore.getState().clearBody()
   useProfileStore.setState({ profile: null, settings: { ...DEFAULT_SETTINGS } })
+  useLicenseStore.getState().resetLicenseState()
 })
 
 describe('OnboardingPage', () => {
@@ -70,7 +72,10 @@ describe('OnboardingPage', () => {
     renderFlow()
     expect(screen.getByRole('heading', { name: /kaloriräknaren som gör det lätt att äta lagom/ })).toBeInTheDocument()
     expect(screen.getByText('Svenska livsmedel och mått')).toBeInTheDocument()
-    expect(screen.getByText('Gratis, utan reklam')).toBeInTheDocument()
+    // Affärsmodellen: provperiod utan kort, sedan ett tydligt pris utan automatisk förnyelse.
+    expect(screen.getByText('Prova gratis i 14 dagar – inget kort behövs')).toBeInTheDocument()
+    expect(screen.getByText('Sedan 299 kr/år eller 599 kr för alltid. Ingen reklam, ingen automatisk förnyelse.')).toBeInTheDocument()
+    expect(screen.queryByText(/Gratis, utan reklam|ingen betalvägg|inga prenumerationer/i)).not.toBeInTheDocument()
     expect(screen.getByText('Din data stannar på din enhet')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
@@ -104,9 +109,15 @@ describe('OnboardingPage', () => {
     await screen.findByRole('heading', { name: 'Välkommen till Lagom!' })
     expect(screen.getByText('Basalomsättning')).toBeInTheDocument()
     expect(screen.getByText('Ändra när som helst i Inställningar.')).toBeInTheDocument()
+    // Sammanfattningen berättar om provperioden – som inte har startat ännu.
+    expect(screen.getByText(/Din provperiod på 14 dagar startar nu – allt är öppet och inget kort behövs/)).toBeInTheDocument()
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
 
+    const before = Date.now()
     fireEvent.click(screen.getByRole('button', { name: /Börja använda Lagom/ }))
     expect(await screen.findByText('Startsidan')).toBeInTheDocument()
+    // Provperioden startar när profilen är klar.
+    expect(useLicenseStore.getState().trialStartedAt).toBeGreaterThanOrEqual(before)
 
     const { profile, settings } = useProfileStore.getState()
     expect(profile).toMatchObject({ sex: 'kvinna', birthYear: 1990, heightCm: 168, startWeightKg: 72.5, goal: 'ga_ner', weeklyRateKg: 0.5, targetWeightKg: 68, diet: 'flexitarian', activityLevel: 'latt' })

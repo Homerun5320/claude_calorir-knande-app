@@ -30,6 +30,16 @@ type State =
   | { kind: 'error'; code: PurchaseErrorCode | 'license'; message: string; key?: string }
   | { kind: 'missing' }
 
+/** Körs Lagom som installerad app (hemskärmen)? Då delar den inte lagring med webbläsaren. */
+function isStandalone(): boolean {
+  try {
+    const nav = navigator as Navigator & { standalone?: boolean }
+    return nav.standalone === true || (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches)
+  } catch {
+    return false
+  }
+}
+
 function supportMailto(sessionId: string | null): string {
   const body = `Hej!\n\nJag har köpt Lagom men fick ingen licens.\n\nBetalningens id: ${sessionId ?? 'saknas'}\n`
   return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Hjälp med mitt köp av Lagom')}&body=${encodeURIComponent(body)}`
@@ -110,8 +120,18 @@ export default function ThankYouPage() {
       <PageHeader title={state.kind === 'ok' ? 'Tack för ditt köp!' : 'Ditt köp'} backTo="/premium" backLabel="Till Lagom Premium" />
       <Confetti fire={state.kind === 'ok'} fullscreen />
 
-      <div className="mx-auto flex max-w-xl flex-col gap-4">
-        {state.kind === 'ok' && <PurchaseSuccess licenseKey={state.key} planName={plan?.name} next={next} />}
+      <div className="flex max-w-xl flex-col gap-4">
+        {state.kind === 'ok' && (
+          <>
+            <PurchaseSuccess licenseKey={state.key} planName={plan?.name} next={next} />
+            {!isStandalone() && (
+              <p role="note" className="rounded-2xl bg-surface-2 px-4 py-3 text-[0.875rem] leading-relaxed text-ink-2">
+                Har du Lagom på hemskärmen? Webbläsaren och appen sparar data var för sig – öppna appen och klistra in nyckeln under Inställningar →
+                Licens.
+              </p>
+            )}
+          </>
+        )}
 
         {state.kind === 'working' && (
           <Card padding="lg" role="status" aria-busy="true" className="flex items-center gap-3">
@@ -188,13 +208,21 @@ export default function ThankYouPage() {
             <Card padding="lg">
               <h2 className="font-display text-[1.25rem] font-semibold tracking-tight text-ink">Vi hittar inget köp i adressen</h2>
               <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-                Kom du hit från betalningen? Öppna länken från kvittot igen – eller klistra in din licensnyckel på köpsidan.
+                Kom du hit från betalningen men ser inte din licens? Mejla oss med kvittot så hjälper vi dig. Har du redan en licensnyckel kan du klistra
+                in den på köpsidan.
               </p>
               <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">{SAVE_KEY_ADVICE}</p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button to="/premium" variant="secondary">
                   Till Lagom Premium
                 </Button>
+                <a
+                  href={supportMailto(null)}
+                  className="inline-flex h-11 items-center gap-1.5 rounded-2xl px-4 text-[0.9375rem] font-semibold text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+                >
+                  <Mail aria-hidden className="size-4" />
+                  Mejla supporten
+                </a>
               </div>
             </Card>
           ))}

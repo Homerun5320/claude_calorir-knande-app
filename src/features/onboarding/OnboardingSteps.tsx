@@ -33,6 +33,9 @@ import { AboutFields, Note } from './AboutFields'
 import { ChoiceCard, ChoiceGroup } from './ChoiceCard'
 import { MacroSplitBar } from './MacroSplitBar'
 import { TargetsSummary } from './TargetsSummary'
+import { TRIAL_DAYS } from '../../config/commerce'
+import { useAccess, type AccessStatus } from '../../hooks/useAccess'
+import { daysText, priceSummary } from '../premium/premiumLogic'
 import {
   DIET_OPTIONS,
   GOAL_CHOICES,
@@ -96,8 +99,13 @@ export function StepHeading({
 
 const PROMISES: ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
   { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
-  { icon: Gift, tone: 'lingon', title: 'Gratis, utan reklam', text: 'Inga konton, inga prenumerationer och ingen betalvägg.' },
-  { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Ingen server. Exportera eller radera allt när du vill.' },
+  {
+    icon: Gift,
+    tone: 'lingon',
+    title: `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
+    text: `Sedan ${priceSummary()}. Ingen reklam, ingen automatisk förnyelse.`,
+  },
+  { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Inget konto och ingen spårning. Exportera eller radera allt när du vill.' },
 ]
 
 export function WelcomeStep({ today }: { today: ISODate }) {
@@ -449,8 +457,23 @@ export function DietStep({ draft, onChange, focusOnMount, eyebrow }: StepProps) 
 // 6 Sammanfattning
 // ---------------------------------------------------------------------------
 
+/** Provperioden i sammanfattningen – ärligt oavsett om den redan har startat. */
+export function trialNote(status: AccessStatus): string {
+  switch (status.kind) {
+    case 'ny':
+      return `Din provperiod på ${TRIAL_DAYS} dagar startar nu – allt är öppet och inget kort behövs. Sedan väljer du själv: ${priceSummary()}, utan automatisk förnyelse.`
+    case 'prov':
+      return `Du har ${daysText(status.daysLeft)} kvar av provperioden – allt är öppet. Sedan väljer du själv: ${priceSummary()}, utan automatisk förnyelse.`
+    case 'licensierad':
+      return 'Du har en licens – allt i Lagom är öppet.'
+    case 'utgangen':
+      return `Provperioden är slut. Du kan se, exportera och radera din data – för att logga nytt behöver du en licens (${priceSummary()}).`
+  }
+}
+
 export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) {
   const mindful = draft.goalChoice === 'medvetet'
+  const { status } = useAccess()
   const result = useMemo(() => {
     try {
       const profile = buildProfile(draft, { today })
@@ -536,8 +559,11 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
       )}
 
       <div className="mt-4 flex flex-col gap-2.5">
+        <Note tone="sol" icon={Gift}>
+          {trialNote(status)}
+        </Note>
         <Note tone="mossa" icon={ShieldCheck}>
-          Allt du fyllt i sparas bara i den här webbläsaren. Inget konto, ingen server och ingen reklam.
+          Allt du fyllt i sparas bara i den här webbläsaren. Inget konto och ingen reklam.
         </Note>
         <p className="flex items-center gap-2 px-1 text-[0.875rem] text-ink-3">
           <Sparkles aria-hidden className="size-4 shrink-0" />

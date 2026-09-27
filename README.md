@@ -10,7 +10,7 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för
 | --- | --- |
 | Crowdsourcade databaser med dubbletter och 15–30 % fel | Kurerad svensk databas med 1 181 livsmedel baserad på Livsmedelsverkets värden. Varje fil är oberoende faktagranskad, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
 | Okända näringsvärden visas som 0 | Okänt visas som "–", och appen visar hur fullständiga näringsdata är. |
-| Betalvägg för streckkoder, makromål och export | Allt är gratis. Streckkodsläsaren, alla näringsämnen, recept, export och insikter ingår. |
+| Betalvägg för streckkoder, makromål och export – och prenumerationer som är svåra att säga upp | 14 dagar gratis, sedan engångsköp 599 kr eller årslicens 299 kr utan automatisk förnyelse – ingen reklam, inga dolda avgifter. Allt ingår: streckkodsläsaren, alla näringsämnen, recept, export och insikter. Din data låses aldrig – efter provperioden kan du alltid se, exportera och radera den. |
 | Reklam och uppsäljning | Ingen reklam, inga konton, inga prenumerationer. |
 | Krascher, synkfel och dataförlust | Allt lagras lokalt och appen fungerar offline. Säkerhetskopiering till fil (JSON) och export till Excel (CSV). |
 | Engelska mått och utländska livsmedel | Svenska livsmedel och klassiker (knäckebröd, falukorv, kanelbulle, ärtsoppa …) och svenska köksmått omräknade med densitet ("2 dl havregryn" blir rätt vikt). |
@@ -41,6 +41,12 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för
 ## Prova utan att mata in något
 
 Välj **Utforska med exempeldata** på välkomstskärmen. Då fylls appen med två veckor av en påhittad användares svenska vardagsmat. Exempeldata kan rensas under Inställningar → Data.
+
+## Betalning och licenser
+
+Lagom är gratis att prova i 14 dagar. Sedan köper man en **Livstidslicens (599 kr)** eller en **Årslicens (299 kr, 365 dagar, förnyas inte automatiskt)**. Priserna är inklusive moms. Köpet görs via Stripe Checkout (kort, Klarna, Swish) och ger en signerad licensnyckel som appen kontrollerar offline – inget konto behövs. Serverdelen är tre små Netlify Functions utan databas.
+
+Så sätter du upp Stripe och Netlify, testar köpflödet och går live: [`docs/BETALNING.md`](docs/BETALNING.md). Alla miljövariabler finns i [`.env.example`](.env.example).
 
 ## Utveckling
 

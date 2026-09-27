@@ -11,19 +11,14 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, KeyRound, Leaf, Sprout } from 'lucide-react'
 import { Button, Dialog, PageHeader } from '../../components/ui'
-import { PLANS } from '../../config/commerce'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { BLOCKED_ACTION_TEXT, useAccessGateStore, type BlockedAction } from './requireAccess'
-import { formatPrice } from './premiumLogic'
+import { priceSummary } from './premiumLogic'
 
 /** Håller tillgången uppdaterad (licensverifiering, provstart). Renderar inget. */
 export function AccessSync() {
   useAccess()
   return null
-}
-
-function priceLine(): string {
-  return PLANS.map((p) => `${formatPrice(p.priceKr)} ${p.durationDays ? 'för ett år' : 'för alltid'}`).join(' eller ')
 }
 
 export function blockedTitle(status: AccessStatus): string {
@@ -73,7 +68,7 @@ export function AccessBlockedDialog() {
       showClose
       footer={
         <>
-          <p className="mb-4 text-[0.8125rem] leading-snug text-ink-3">{priceLine()} · inkl. moms · ingen automatisk förnyelse</p>
+          <p className="mb-4 text-[0.8125rem] leading-snug text-ink-3">{priceSummary()} · inkl. moms · ingen automatisk förnyelse</p>
           <BlockedActions onNavigate={close} />
         </>
       }
@@ -92,7 +87,7 @@ export function AccessBlockedPage({ action, status }: { action?: BlockedAction; 
         </span>
         <p className="font-display text-[1.25rem] font-semibold leading-snug tracking-tight text-ink">Din data är trygg</p>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">{blockedText(action)}</p>
-        <p className="mt-3 text-[0.8125rem] leading-snug text-ink-3">{priceLine()} · inkl. moms · ingen automatisk förnyelse</p>
+        <p className="mt-3 text-[0.8125rem] leading-snug text-ink-3">{priceSummary()} · inkl. moms · ingen automatisk förnyelse</p>
         <div className="mt-6 w-full">
           <BlockedActions />
         </div>

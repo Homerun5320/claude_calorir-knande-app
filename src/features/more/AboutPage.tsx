@@ -23,6 +23,8 @@ import { Badge, Button, Card, ListGroup, PageHeader, cx, toneVars, type Tone } f
 import { LogoMark, Wordmark } from '../../components/layout/Logo'
 import { useProfileStore } from '../../stores/profileStore'
 import { SupportSheet } from './SupportSheet'
+import { TRIAL_DAYS } from '../../config/commerce'
+import { priceSummary } from '../premium/premiumLogic'
 
 /** Appens version (samma som package.json). */
 export const APP_VERSION = '1.0.0'
@@ -44,8 +46,9 @@ export const SOLUTIONS: readonly Solution[] = [
   {
     icon: CircleSlash,
     tone: 'lingon',
-    problem: 'Betalväggar och reklam',
-    solution: 'Allt är gratis – streckkoder, alla näringsämnen, recept, export och insikter. Ingen reklam, inga konton och inga prenumerationer.',
+    problem: 'Låsta funktioner, reklam och prenumerationer som förnyas',
+    solution:
+      `${TRIAL_DAYS} dagar gratis, sedan ett tydligt engångsköp eller en årslicens utan automatisk förnyelse. Ingen reklam, inga dolda avgifter – streckkodsläsaren och alla näringsämnen ingår.`,
   },
   {
     icon: WifiOff,
@@ -93,7 +96,7 @@ export const SOLUTIONS: readonly Solution[] = [
     icon: ShieldCheck,
     tone: 'gran',
     problem: 'Integritet och spårning',
-    solution: 'Ingen server och inget konto. Din data stannar på din enhet (GDPR) och du kan exportera eller radera allt när som helst.',
+    solution: 'Inget konto och ingen spårning. Din dagbok stannar på din enhet (GDPR) och du kan exportera eller radera allt när som helst.',
   },
   {
     icon: Leaf,
@@ -160,14 +163,15 @@ export default function AboutPage() {
             Kaloriräknaren som gör det lätt att äta lagom – varken för mycket eller för lite.
           </p>
           <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2">
-            Lagom är en svensk kalori- och näringsdagbok byggd på svenska livsmedel, svenska mått och de nordiska näringsrekommendationerna. Den är gratis,
-            fungerar utan uppkoppling och all data stannar på din enhet.
+            Lagom är en svensk kalori- och näringsdagbok byggd på svenska livsmedel, svenska mått och de nordiska näringsrekommendationerna. Den
+            fungerar utan uppkoppling och all data stannar på din enhet. Prova gratis i {TRIAL_DAYS} dagar – sedan {priceSummary()}.
           </p>
-          {!onboarded && (
-            <Button to="/valkommen" className="mt-5">
-              Kom igång
+          <div className="mt-5 flex flex-wrap gap-2">
+            {!onboarded && <Button to="/valkommen">Kom igång</Button>}
+            <Button to="/premium" variant={onboarded ? 'soft' : 'secondary'}>
+              Priser och köpvillkor
             </Button>
-          )}
+          </div>
         </Card>
 
         <section aria-labelledby="losningar">
@@ -207,9 +211,10 @@ export default function AboutPage() {
 
         <Card eyebrow="Integritet" title="Din data är din">
           <p className="text-[0.9375rem] leading-relaxed text-ink-2">
-            Lagom har ingen server, inga konton, ingen reklam och ingen spårning. Allt du loggar sparas lokalt i den här webbläsaren. Det enda som lämnar
-            enheten är det du själv söker eller skannar hos Open Food Facts (sökordet eller streckkoden), och om du väljer att hämta Livsmedelsverkets
-            databas. Du kan exportera eller radera allt under Inställningar → Data.
+            Lagom har inga konton, ingen reklam och ingen spårning. Allt du loggar sparas lokalt i den här webbläsaren. Det enda som lämnar enheten är det
+            du själv söker eller skannar hos Open Food Facts (sökordet eller streckkoden), om du väljer att hämta Livsmedelsverkets databas – och när du
+            köper en licens: då sköter Stripe betalningen. Licensnyckeln innehåller inga personuppgifter. Du kan exportera eller radera allt under
+            Inställningar → Data.
           </p>
           {onboarded && (
             <Button to="/installningar/data" variant="secondary" size="sm" className="mt-4">

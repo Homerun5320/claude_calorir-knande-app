@@ -11,6 +11,7 @@ import {
   ChartNoAxesColumn,
   Copy,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FlaskConical,
@@ -26,11 +27,11 @@ import {
 } from 'lucide-react'
 import { Badge, Button, Card, ProgressBar, Sheet, TextField, confirmDialog, cx, toast, toneVars, type Tone } from '../../components/ui'
 import { LogoMark } from '../../components/layout/Logo'
-import { COMMERCE_MODE, SELLER_NAME, SUPPORT_EMAIL, TRIAL_DAYS, type Plan } from '../../config/commerce'
+import { COMMERCE_MODE, SELLER_NAME, SUPPORT_EMAIL, TERMS_URL, TRIAL_DAYS, type Plan } from '../../config/commerce'
 import { formatNumber } from '../../lib/format'
 import type { AccessStatus } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
-import { activateLicense, copyText, formatPrice, licenseMailto, perMonthText, statusSummary, type ActivationResult } from './premiumLogic'
+import { activateLicense, copyText, formatKronor, formatPrice, licenseMailto, perMonthText, statusSummary, type ActivationResult } from './premiumLogic'
 
 /** Etiketten på det framlyfta alternativet. Ärlig: livstid blir billigare än årslicens efter två år. */
 export const FEATURED_LABEL = 'Bäst värde'
@@ -218,6 +219,18 @@ export function TermsContent({ headingLevel = 3 }: { headingLevel?: 3 | 4 }) {
           <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">{t.text}</p>
         </div>
       ))}
+      {TERMS_URL && (
+        <a
+          href={TERMS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 items-center gap-1.5 self-start text-[0.9375rem] font-semibold text-gran underline-offset-2 hover:underline"
+        >
+          Hela köpvillkoren
+          <ExternalLink aria-hidden className="size-4" />
+          <span className="sr-only">(öppnas i ny flik)</span>
+        </a>
+      )}
     </div>
   )
 }
@@ -310,7 +323,7 @@ export function CheckoutSheet({
             </div>
             <div className="mt-1 flex items-baseline justify-between gap-3 text-[0.8125rem] text-ink-3">
               <dt>varav moms 25 %</dt>
-              <dd className="tabular-nums">{formatNumber(vatOf(plan.priceKr), 2)}&nbsp;kr</dd>
+              <dd className="tabular-nums">{formatKronor(vatOf(plan.priceKr))}</dd>
             </div>
             <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3 text-[0.8125rem] text-ink-2">
               <dt>Giltighet</dt>

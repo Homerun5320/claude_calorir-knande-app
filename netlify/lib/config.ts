@@ -80,7 +80,8 @@ function normalizeTermsUrl(value: string | undefined): string {
   if (!raw) return ''
   try {
     const u = new URL(raw)
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : ''
+    // Parenteser kodas så att adressen fungerar i en Markdown-länk i Stripe Checkout.
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href.replace(/\(/g, '%28').replace(/\)/g, '%29') : ''
   } catch {
     return ''
   }

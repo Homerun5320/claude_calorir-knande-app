@@ -13,6 +13,7 @@ import {
   HardDrive,
   HeartHandshake,
   Info,
+  KeyRound,
   Palette,
   Target,
   UserRound,
@@ -37,9 +38,12 @@ import { GoalsSection } from './sections/GoalsSection'
 import { MealsSection } from './sections/MealsSection'
 import { ProfileSection } from './sections/ProfileSection'
 import { TrainingSection } from './sections/TrainingSection'
+import { LicenseSection } from './sections/LicenseSection'
+import { useAccess } from '../../hooks/useAccess'
+import { premiumStatusLine } from '../premium/TrialBanner'
 import { overrideCount } from './settingsLogic'
 
-export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'data' | 'databas'
+export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'data' | 'databas' | 'licens'
 
 interface SectionMeta {
   title: string
@@ -57,6 +61,7 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   traning: { title: 'Träning och vatten', description: 'Träningskalorier och glasstorlek.', icon: Dumbbell, tone: 'fjall', component: TrainingSection },
   data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger på din enhet.', icon: HardDrive, tone: 'gran', component: DataSection },
   databas: { title: 'Livsmedelsdatabas', description: 'Vad som finns inbyggt, källor och import.', icon: Database, tone: 'mossa', component: DatabaseSection },
+  licens: { title: 'Licens', description: 'Provperiod, licensnyckel och köp.', icon: KeyRound, tone: 'sol', component: LicenseSection },
 }
 
 function isSection(s: string | undefined): s is SectionId {
@@ -107,6 +112,7 @@ function SettingsIndex() {
   const lastBackup = useLastBackup()
   const memoryOnly = useMemoryOnlyStorage()
   const [support, setSupport] = useState(false)
+  const { status, checking } = useAccess()
   const today = toISODate(new Date())
 
   const preset =
@@ -163,7 +169,9 @@ function SettingsIndex() {
           {row('traning', `${trainingSub} · glas ${formatNumber(settings.waterGlassMl / 100, 1)}\u00a0dl`)}
         </ListGroup>
 
-        <ListGroup title="Data och integritet" footer="Lagom har ingen server och inga konton. Din data lämnar aldrig din enhet om du inte själv exporterar den.">
+        <ListGroup title="Lagom Premium">{row('licens', checking ? 'Kontrollerar licensen …' : premiumStatusLine(status))}</ListGroup>
+
+        <ListGroup title="Data och integritet" footer="Lagom har inga konton och din dagbok finns inte på någon server. Din data lämnar aldrig din enhet om du inte själv exporterar den.">
           {row('data', backupSub)}
           {row('databas', 'Källor, import och sparade livsmedel')}
         </ListGroup>

@@ -21,6 +21,7 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
+import { useLicenseStore } from '../../stores/licenseStore'
 import { backupDateLabel, restoreBackupSafely } from '../settings/backupImport'
 import { ImportSummaryList } from '../settings/ImportSummaryList'
 import { focusFirstInvalid } from './focusFirstInvalid'
@@ -195,6 +196,8 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
         onLeaving()
         navigate(-depth)
       }
+      // Provperioden startar när den första profilen är klar (en tidigare start gäller om den finns).
+      useLicenseStore.getState().ensureTrialStarted()
       setProfile(profile)
       logWeight(today, Math.round((draft.weightKg as number) * 10) / 10)
       updateSettings({ onboardingDone: true, mindfulMode: draft.goalChoice === 'medvetet' })
@@ -234,9 +237,11 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
     setDemoLoading(true)
     try {
       const { seedDemoData } = await import('../../lib/demo')
+      // Provperioden räknas från nu – aldrig från exempelprofilens bakdaterade start.
+      useLicenseStore.getState().ensureTrialStarted()
       await seedDemoData()
       save(null)
-      toast('Exempeldata är inlagd – rensa den när du vill under Inställningar → Data.', { tone: 'success' })
+      toast('Exempeldata är inlagd – tryck på ”Börja med min egen profil” när du vill börja på riktigt.', { tone: 'success' })
       navigate('/', { replace: true })
     } catch {
       setDemoLoading(false)

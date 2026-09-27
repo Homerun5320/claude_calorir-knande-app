@@ -5,7 +5,7 @@
  * Checkout → tillbaka till #/tack?session_id=… → `verifyPurchase` → POST /api/verify-purchase
  * { sessionId } → { licenseKey } → nyckeln verifieras lokalt (ECDSA) och sparas.
  */
-import { API_BASE, COMMERCE_MODE, LICENSE_PUBLIC_KEY, SUPPORT_EMAIL, TRIAL_DAYS, type Plan, type PlanId } from '../../config/commerce'
+import { API_BASE, COMMERCE_MODE, LICENSE_PUBLIC_KEY, PLANS, SUPPORT_EMAIL, TRIAL_DAYS, type Plan, type PlanId } from '../../config/commerce'
 import { LICENSE_ERRORS, createTestLicense, normalizeLicenseKey, verifyLicense, type LicensePayload } from '../../lib/license'
 import { MONTHS } from '../../lib/dates'
 import { formatNumber, plural } from '../../lib/format'
@@ -28,9 +28,21 @@ export function formatLongDate(ms: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
+const kronorFormat = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** 119.8 → "119,80 kr" (med ören, t.ex. momsen). */
+export function formatKronor(kr: number): string {
+  return `${kronorFormat.format(kr)}\u00a0kr`
+}
+
 /** "11 dagar" / "1 dag". */
 export function daysText(n: number): string {
   return plural(n, 'dag', 'dagar')
+}
+
+/** "299 kr/år eller 599 kr för alltid" – planerna i en mening. */
+export function priceSummary(plans: readonly Plan[] = PLANS): string {
+  return plans.map((p) => `${formatPrice(p.priceKr)}${p.durationDays ? '/år' : ' för alltid'}`).join(' eller ')
 }
 
 /** Pris per månad för en årslicens, avrundat ("25 kr/mån"). */
@@ -84,11 +96,11 @@ export function statusSummary(status: AccessStatus): StatusSummary {
     case 'licensierad': {
       const name = status.plan?.name ?? 'Licens'
       if (status.expiresAt === undefined) {
-        return { label: name, title: `${name} – Lagom är ditt`, text: 'Gäller för alltid, med alla framtida uppdateringar. Tack för att du stödjer Lagom!', tone: 'mossa' }
+        return { label: name, title: 'Lagom är ditt – för alltid', text: 'Gäller utan tidsgräns, med alla framtida uppdateringar. Tack för att du stödjer Lagom!', tone: 'mossa' }
       }
       return {
         label: name,
-        title: `${name} – giltig till ${formatLongDate(status.expiresAt)}`,
+        title: `Giltig till ${formatLongDate(status.expiresAt)}`,
         text: `${daysText(status.daysLeft ?? 0)} kvar. Licensen förnyas inte automatiskt – du väljer själv om du vill fortsätta.`,
         tone: 'mossa',
       }
@@ -196,12 +208,25 @@ async function postJson(path: string, body: unknown): Promise<{ status: number; 
   return { status: res.status, json }
 }
 
-/** Skapa en Stripe Checkout-session för planen. Returnerar adressen att skicka användaren till. */
+/**
+ * Serverns eget meddelande (`{ code, error }`, svensk text som kan visas direkt) – om det finns
+ * och ser rimligt ut. Annars appens eget.
+ */
+function serverMessage(json: Record<string, unknown> | null, fallback: string): string {
+  const msg = json?.error
+  return typeof msg === 'string' && msg.trim().length > 0 && msg.length <= 400 ? msg.trim() : fallback
+}
+
+/**
+ * Skapa en Stripe Checkout-session för planen. Returnerar adressen att skicka användaren till.
+ * `consent: true` = köparen har kryssat i samtycket om direkt leverans och att ångerrätten då
+ * upphör (servern sparar samtycket och tidpunkten på köpet).
+ */
 export async function createCheckout(plan: PlanId): Promise<string> {
-  const { status, json } = await postJson('/api/create-checkout', { plan })
-  if (status < 200 || status >= 300) throw new PurchaseError('server', PURCHASE_ERRORS.server)
+  const { status, json } = await postJson('/api/create-checkout', { plan, consent: true })
+  if (status < 200 || status >= 300) throw new PurchaseError('server', serverMessage(json, PURCHASE_ERRORS.server))
   const url = json?.url
-  if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw new PurchaseError('invalid', PURCHASE_ERRORS.invalid)
+  if (typeof url !== 'string' || !url.startsWith('https://')) throw new PurchaseError('invalid', PURCHASE_ERRORS.invalid)
   return url
 }
 
@@ -211,8 +236,9 @@ export type VerifyPurchaseResult = { kind: 'ok'; licenseKey: string } | { kind: 
 export async function verifyPurchase(sessionId: string): Promise<VerifyPurchaseResult> {
   const { status, json } = await postJson('/api/verify-purchase', { sessionId })
   if (status === 202 || json?.status === 'pending' || json?.pending === true) return { kind: 'pending' }
-  if (status >= 500) throw new PurchaseError('server', PURCHASE_ERRORS.server)
-  if (status < 200 || status >= 300) throw new PurchaseError('not-found', PURCHASE_ERRORS['not-found'])
+  // Tillfälliga fel (serverfel, för många försök) går att försöka igen – övriga gäller själva köpet.
+  if (status >= 500 || status === 429) throw new PurchaseError('server', serverMessage(json, PURCHASE_ERRORS.server))
+  if (status < 200 || status >= 300) throw new PurchaseError('not-found', serverMessage(json, PURCHASE_ERRORS['not-found']))
   const key = json?.licenseKey
   if (typeof key !== 'string' || !key) throw new PurchaseError('invalid', PURCHASE_ERRORS.invalid)
   return { kind: 'ok', licenseKey: key }

@@ -387,7 +387,8 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - interface `ImportSummary`
 - `summarizeBackup(b: BackupFile): ImportSummary`
 - `restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void`
-- `wipeAllData(): void`
+- `wipeAllData({ removeLicense? }): void` – provperiodens start finns alltid kvar; licensen behålls om man inte uttryckligen väljer annat
+- `mergeLicense(local, incoming, now?)`, `licenseRank(key)` – säkerhetskopians licens: tidigaste provstarten gäller, en giltig licens på enheten behålls
 - `diaryToCsv(entries: Record<ISODate, DiaryEntry[]>, meals: MealConfig[] = profilens måltider): string` – måltidsnamn (inte id:n), skydd mot formelinjektion
 - `downloadFile(filename: string, content: string, mime = 'application/json'): void`
 - `backupFilename(): string`
@@ -416,6 +417,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - interface `SwapSuggestion`
 - const `MIN_SWAP_SAVING_KG`
 - `swapSuggestions(entries: readonly DiaryEntry[], limit = 3): SwapSuggestion[]`
+
+### `src/lib/demoFlag.ts`
+- `isDemoData()`, `setDemoFlag()`, `clearDemoFlag()`, `subscribeDemoFlag(listener)` – markeringen för exempeldata (exempelprofilen har inget namn)
 
 ### `src/lib/dates.ts`
 - `toISODate(d: Date): ISODate`
@@ -818,6 +822,45 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/hooks/useToday.ts`
 - `useToday(): string`
 
+### `src/hooks/useAccess.ts`
+- type `AccessStatus` – `'ny' | 'prov' (daysLeft, endsAt) | 'licensierad' (plan, expiresAt, daysLeft, test) | 'utgangen' (licenseExpired)`
+- `accessStatus({ trialStartedAt, license, now, trialDays? })` – ren funktion; en licens som hunnit gå ut räknas som utgången
+- `canLog(status)`, `useAccess(): { status, canLog, checking }` – verifierar licensen (delad cache) och startar provperioden för profiler som saknar start (exempeldatans bakdaterade profil räknas från nu)
+- `currentAccess(now?)` – samma sak synkront, för kod utanför React
+- `verifyLicenseCached(key)`, `primeLicenseCheck(key, result)`, `resetLicenseChecks()` (tester)
+
+### `src/hooks/useDemoData.ts`
+- `useDemoData(): boolean` – true medan exempeldata visas (reaktiv)
+
+
+## Lagom Premium (provperiod och licens)
+
+Efter provperioden låses aldrig användarens data: att se, ändra, exportera och radera fungerar
+alltid. Bara NY loggning kräver en licens.
+
+### `src/features/premium/requireAccess.ts`
+- `requireAccess(action?: BlockedAction): boolean` – anropa precis innan något nytt skapas (mat, snabbregistrering, kopiera måltid/dag, vatten, träning, vikt, mått, fasta, nytt livsmedel/recept). Returnerar false och visar dialogen "Provperioden är slut" när det är spärrat
+- `hasLoggingAccess()`, `useAccessGateStore` (dialogens tillstånd), `BLOCKED_ACTION_TEXT`
+
+### `src/features/premium/AccessGate.tsx`
+- `<AccessGate action>` – omsluter sidor som bara skapar nytt (/lagg-till, /skanna, /nytt-livsmedel, /recept/nytt)
+- `<AccessSync />`, `<AccessBlockedDialog />` – monteras i AppShell
+
+### `src/features/premium/premiumLogic.ts`
+- `statusSummary(status)`, `trialBannerLevel(status)` (`'none' | 'chip' | 'soon' | 'expired'`), `plansToOffer(status, plans)`
+- `formatPrice(kr)` ("599 kr"), `formatKronor(kr)` ("119,80 kr"), `priceSummary()` ("299 kr/år eller 599 kr för alltid"), `formatLongDate(ms)`, `daysText(n)`
+- `activateLicense(input)` – verifierar och sparar en inklistrad nyckel; `buyInTestMode(plan)`
+- `createCheckout(plan)` → Stripe-adress (POST /api/create-checkout { plan, consent: true }), `verifyPurchase(sessionId)` → `{ kind: 'ok', licenseKey } | { kind: 'pending' }`; fel som `PurchaseError` (`offline | server | not-found | invalid`) med svensk text (serverns eget meddelande när det finns)
+- `redirectTo(url)`, `sessionIdFrom(params)`, `licenseMailto(key)`, `copyText(text)`
+
+### `src/features/premium/components.tsx`
+- `StatusHero`, `PlanCard`, `FeatureList`, `CheckoutSheet` (sammanfattning med moms, samtycke om ångerrätt, köpknapp), `TermsContent` (köpvillkor i korthet), `LicenseActivation`, `LicenseKeyBox`, `LicenseManage` (visa/ta bort nyckel), `PurchaseSuccess`, `TestModeBanner`, `SellerFooter`
+
+### `src/features/premium/TrialBanner.tsx`
+- `TrialBanner` (Idag), `PremiumHubCard` (Mer), `premiumStatusLine(status)`
+
+### Sidor
+- `/premium` (`PremiumPage`), `/tack?session_id=…` (`ThankYouPage`) – båda nås före välkomstflödet och efter provperioden; Inställningar → Licens (`/installningar/licens`)
 
 ## Butiker
 
@@ -841,6 +884,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 
 ### `src/stores/hydration.ts`
 - `useHydrated(): boolean`
+
+### `src/stores/licenseStore.ts`
+- const `useLicenseStore` – `trialStartedAt`, `licenseKey`, `activatedAt`; `ensureTrialStarted(at?)` (tidigaste starten gäller), `setLicense(key)`, `clearLicense()` (provstarten finns kvar)
 
 ### `src/stores/profileStore.ts`
 - const `DEFAULT_MEALS : MealConfig[]`

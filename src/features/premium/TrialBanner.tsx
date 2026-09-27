@@ -9,13 +9,9 @@ import { memo, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Download, Sprout } from 'lucide-react'
 import { Button, Card, cx } from '../../components/ui'
-import { PLANS } from '../../config/commerce'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
-import { daysText, formatLongDate, formatPrice, trialBannerLevel } from './premiumLogic'
-
-function pricesText(): string {
-  return PLANS.map((p) => `${formatPrice(p.priceKr)} ${p.durationDays ? 'för ett år' : 'för alltid'}`).join(' eller ')
-}
+import { daysText, formatLongDate, priceSummary, trialBannerLevel } from './premiumLogic'
+import { TRIAL_DAYS } from '../../config/commerce'
 
 export const TrialBanner = memo(function TrialBanner({ className }: { className?: string }) {
   const { status, checking } = useAccess()
@@ -52,7 +48,7 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
             <div className="min-w-0">
               <p className="font-semibold text-ink">{daysText(status.daysLeft)} kvar av provperioden</p>
               <p className="mt-0.5 text-[0.875rem] leading-snug text-ink-2">
-                All din data finns kvar efter provperioden. Vill du fortsätta logga: {pricesText()}.
+                All din data finns kvar efter provperioden. Vill du fortsätta logga: {priceSummary()}.
               </p>
             </div>
           </div>
@@ -71,7 +67,7 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
         {status.kind === 'utgangen' && status.licenseExpired ? 'Årslicensen har gått ut' : 'Provperioden är slut'} – din data finns kvar
       </h2>
       <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        Du kan se, exportera och radera allt som vanligt. För att logga nytt behöver du en licens: {pricesText()}, utan automatisk förnyelse.
+        Du kan se, exportera och radera allt som vanligt. För att logga nytt behöver du en licens: {priceSummary()}, utan automatisk förnyelse.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button to="/premium" size="sm" iconLeft={Sprout}>
@@ -89,7 +85,7 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
 export function premiumStatusLine(status: AccessStatus): string {
   switch (status.kind) {
     case 'ny':
-      return 'Prova gratis i 14 dagar'
+      return `Prova gratis i ${TRIAL_DAYS} dagar`
     case 'prov':
       return `Provperiod · ${daysText(status.daysLeft)} kvar`
     case 'utgangen':

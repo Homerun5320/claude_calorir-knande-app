@@ -83,7 +83,7 @@ export default function FastingPage() {
         ) : caution && !showAnyway ? (
           <FastingCautionCard reason={caution} onShowAnyway={() => setShowAnyway(true)} />
         ) : (
-          <StartFastCard protocolId={protocolId} onProtocol={setProtocolId} onStartEarlier={() => openSheet('new')} today={today} />
+          <StartFastCard protocolId={protocolId} onProtocol={setProtocolId} onStartEarlier={() => requireAccess('fasta') && openSheet('new')} today={today} />
         )}
         <FastingWeekCard history={history} today={today} />
         <FastHistory history={history} today={today} />
