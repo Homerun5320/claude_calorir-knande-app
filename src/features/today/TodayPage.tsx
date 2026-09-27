@@ -14,6 +14,9 @@
  * 10. Sammanhangskort (fasta, träning, koffein, alkohol)
  * 11. Kvällsreflektion
  *
+ * Överst (när det behövs): markeringen för exempeldata och provperioden – diskret som ett chip,
+ * tydligare de sista dagarna och som ett lugnt kort när den är slut.
+ *
  * På bredare skärmar (≥ 768 px) ligger Dagsringen över två kolumner.
  *
  * Varje sektion prenumererar själv på det den behöver ur butikerna och är memoiserad, så att
@@ -41,6 +44,8 @@ import { WeekCard } from './WeekCard'
 import { GoalCareCard, WeightCard } from './WeightCard'
 import { WelcomeCard } from './WelcomeCard'
 import { isDiaryEmpty } from './todayLogic'
+import { TrialBanner } from '../premium/TrialBanner'
+import { DemoBanner } from '../onboarding/DemoBanner'
 
 type SectionId = 'welcome' | 'ring' | 'meals' | 'water' | 'plate' | 'week' | 'weight' | 'kostrad' | 'tip' | 'context' | 'evening'
 
@@ -141,6 +146,10 @@ export default function TodayPage() {
     <div className="pb-6">
       <TodayHeader today={today} />
       <div className="px-4 pt-1">
+        <div className="mb-4 flex flex-col gap-3 empty:hidden">
+          <DemoBanner />
+          <TrialBanner />
+        </div>
         {wide ? (
           <div className="flex flex-col gap-4">
             {column(WIDE_TOP)}

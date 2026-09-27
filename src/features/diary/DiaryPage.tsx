@@ -52,6 +52,7 @@ import { addFoodLink, firstAddFoodLink, focusAfterClose } from './focus'
 import { MealSection } from './MealSection'
 import { CopyMealSheet, SaveTemplateDialog, type MealSource } from './MealSheets'
 import { shareOrCopy } from './share'
+import { DemoBanner } from '../onboarding/DemoBanner'
 import { requireAccess } from '../premium/requireAccess'
 
 export default function DiaryPage() {
@@ -357,6 +358,8 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
           <DateNavigator date={date} onChange={goTo} today={today} maxFutureDays={MAX_FUTURE_DAYS} />
         </div>
       </PageHeader>
+
+      <DemoBanner className="mb-4" />
 
       {!hydrated ? (
         <DiarySkeleton />
