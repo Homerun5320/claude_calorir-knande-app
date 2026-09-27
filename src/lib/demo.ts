@@ -136,7 +136,8 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   const entries: Record<ISODate, DiaryEntry[]> = {}
   const water: Record<ISODate, number> = {}
   const exercise: ReturnType<typeof useDiaryStore.getState>['exercise'] = {}
-  const hour = now.getHours() + now.getMinutes() / 60
+  // Visa alltid minst frukost och lunch för idag, även tidigt på dagen (det är exempeldata).
+  const hour = Math.max(12.5, now.getHours() + now.getMinutes() / 60)
   for (let i = days - 1; i >= 0; i--) {
     const date = addDays(today, -i)
     const wd = weekdayIndex(date)
