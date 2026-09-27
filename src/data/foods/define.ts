@@ -40,6 +40,11 @@ export interface FoodSeed {
   plate?: PlateSplit
   kostrad?: KostradContrib
   note?: string
+  /**
+   * Livsmedelsverkets livsmedelsnummer för SAMMA livsmedel (samma tillagning). Kopplingen används för
+   * att fylla i näringsämnen som saknas här och för att inte visa dubbletter i sökningen.
+   */
+  lmv?: number
 }
 
 export function defineFood(s: FoodSeed): Food {
@@ -72,6 +77,7 @@ export function defineFood(s: FoodSeed): Food {
     plate: s.plate,
     kostrad: s.kostrad,
     note: s.note,
+    lmvNumber: s.lmv,
   }
 }
 
