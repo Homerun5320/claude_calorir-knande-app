@@ -35,6 +35,7 @@ import {
   type ImportSummary,
 } from '../../../lib/backup'
 import { clearDemoFlag, isDemoData } from '../../../lib/demo'
+import { useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
@@ -75,6 +76,8 @@ export function DataSection() {
   const navigate = useNavigate()
   const lastBackup = useLastBackup()
   const hasDiary = useDiaryStore((s) => Object.values(s.entries).some((l) => l.length > 0))
+  // Sparas inget på enheten just nu flyttas lagringskortet överst, så att det syns direkt.
+  const memoryOnly = useMemoryOnlyStorage()
   const fileRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<{ backup: BackupFile; summary: ImportSummary; fileName: string } | null>(null)
   const [demo, setDemo] = useState(isDemoData)
@@ -163,6 +166,7 @@ export function DataSection() {
 
   return (
     <div className="flex flex-col gap-5">
+      {memoryOnly && <StorageCard lastBackup={lastBackup} />}
       {demo && (
         <Card tone="sol" eyebrow="Exempeldata" title="Du tittar på en exempelvecka">
           <p className="mb-3 text-[0.9375rem] leading-relaxed text-ink-2">Allt i dagboken just nu är påhittat, så att du kan utforska Lagom. Rensa när du vill börja på riktigt.</p>
@@ -174,7 +178,7 @@ export function DataSection() {
 
       <Card eyebrow="Säkerhetskopia" title="Spara och återställ">
         <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-          En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny telefon
+          En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
           eller återställa om något händer.
         </p>
         <p className="mt-2 text-[0.8125rem] text-ink-3" aria-live="polite">
@@ -201,7 +205,7 @@ export function DataSection() {
         {!hasDiary && <p className="mt-2 text-[0.8125rem] text-ink-3">Dagboken är tom än så länge.</p>}
       </Card>
 
-      <StorageCard />
+      {!memoryOnly && <StorageCard lastBackup={lastBackup} />}
 
       <Card eyebrow="Integritet" title="Din data är din">
         <ul className="flex flex-col gap-3 text-[0.9375rem] leading-relaxed text-ink-2">
@@ -297,7 +301,49 @@ export function DataSection() {
   )
 }
 
-function StorageCard() {
+/**
+ * Sparas ändringarna på enheten just nu? Normalt ja (IndexedDB). Om webbläsaren blockerar
+ * lagringen (privat läge, full lagring, avstängda webbplatsdata) ligger ändringarna bara i minnet
+ * tills fliken stängs – då är en säkerhetskopia det enda sättet att behålla dem.
+ */
+export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
+  const memoryOnly = useMemoryOnlyStorage()
+  if (memoryOnly) {
+    return (
+      <div role="status" className="flex flex-col items-start gap-3 rounded-2xl bg-sol-soft p-3.5">
+        <div className="flex items-start gap-3">
+          <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0 text-ink-2" />
+          <div className="min-w-0">
+            <p className="text-[0.9375rem] font-semibold text-ink">Sparas inte på enheten just nu</p>
+            <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-2">
+              Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns
+              kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.
+            </p>
+          </div>
+        </div>
+        <Button size="sm" iconLeft={Download} onClick={exportBackup}>
+          Spara säkerhetskopia nu
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <div role="status" className="flex items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
+      <CircleCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-good" />
+      <div className="min-w-0">
+        <p className="text-[0.9375rem] font-semibold text-ink">Sparas på enheten</p>
+        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-3">
+          Allt du gör sparas direkt i den här webbläsaren.{' '}
+          {lastBackup === null
+            ? 'Exportera gärna en säkerhetskopia – den är ditt enda moln om du byter enhet eller webbläsarens data rensas.'
+            : 'Exportera gärna en ny säkerhetskopia då och då – den är ditt enda moln om du byter enhet eller webbläsarens data rensas.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function StorageCard({ lastBackup }: { lastBackup: number | null }) {
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null | undefined>(undefined)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [asking, setAsking] = useState(false)
@@ -328,6 +374,9 @@ function StorageCard() {
 
   return (
     <Card eyebrow="Lagring" title="På den här enheten">
+      <div className="mb-4">
+        <StorageStatus lastBackup={lastBackup} />
+      </div>
       {estimate === undefined ? (
         <div className="h-10 animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Läser lagring" />
       ) : estimate ? (

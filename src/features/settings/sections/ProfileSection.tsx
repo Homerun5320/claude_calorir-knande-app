@@ -11,7 +11,8 @@ import { Button, Card, EmptyState, NumberField, SegmentedControl, Select, confir
 import { useEnergyUnit } from '../../../components/domain/EnergyValue'
 import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
-import { computeEnergy, computeTargets } from '../../../lib/energy'
+import { ageFromBirthYear } from '../../../lib/dates'
+import { computeEnergy, computeTargets, goalPauseNote } from '../../../lib/energy'
 import { formatEnergy, formatNumber } from '../../../lib/format'
 import { useBodyStore } from '../../../stores/bodyStore'
 import { useProfileStore } from '../../../stores/profileStore'
@@ -69,7 +70,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
   const overrides = useProfileStore((s) => s.settings.targetOverrides)
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const logWeight = useBodyStore((s) => s.logWeight)
-  const { adaptive } = useTargets(today)
+  const { adaptive, trendKg, energy: savedEnergy } = useTargets(today)
   const unit = useEnergyUnit()
   const goalLabelId = useId()
   const rateLabelId = useId()
@@ -100,7 +101,9 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
     try {
       const p = buildProfile(draft, { today, base: profile })
       const w = draft.weightKg as number
-      const opts = { today, adaptiveTdee: adaptive?.tdee }
+      // Oförändrad vikt: bedöm viktmålet mot trendvikten, precis som Idag och Vikt gör.
+      const sameWeight = Math.abs(w - currentWeight) < 0.05
+      const opts = { today, adaptiveTdee: adaptive?.tdee, trendKg: sameWeight ? (trendKg ?? undefined) : undefined }
       const energy = computeEnergy(p, w, opts)
       const floor = kcalOverrideFloor(p, energy, today)
       const safeOverrides = clampKcalOverride(overrides, floor.kcal)
@@ -108,7 +111,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
     } catch {
       return null
     }
-  }, [complete, draft, today, profile, adaptive, overrides])
+  }, [complete, draft, today, profile, adaptive, overrides, currentWeight, trendKg])
 
   // Fråga innan osparade ändringar går förlorade (tillbaka-knapp, bottenmeny, länkar).
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
@@ -170,7 +173,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
           today={today}
         />
         <p className="mt-3 text-[0.8125rem] leading-snug text-ink-3">
-          Ändrar du vikten sparas den i viktloggen för idag. Startvikt: {formatNumber(profile.startWeightKg, 1)} kg.
+          Ändrar du vikten sparas den i viktloggen för idag. Startvikt: {formatNumber(profile.startWeightKg, 1)}{'\u00a0'}kg.
         </p>
       </Card>
 
@@ -202,6 +205,9 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
             />
           </div>
           {blocked && <Note>{blocked}</Note>}
+          {!dirty && !blocked && savedEnergy?.goalPause && (savedEnergy.goalPause === 'reached' || savedEnergy.goalPause === 'lowBmi') && (
+            <Note>{goalPauseNote(savedEnergy.goalPause, ageFromBirthYear(profile.birthYear, today))}</Note>
+          )}
 
           {goal !== 'behalla' && (
             <>
@@ -214,11 +220,11 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
                   fullWidth
                   value={rate}
                   onChange={(weeklyRateKg) => change({ weeklyRateKg })}
-                  options={options.map((o) => ({ value: o.value, label: `${formatNumber(o.value, 2)} kg`, disabled: o.disabled }))}
+                  options={options.map((o) => ({ value: o.value, label: `${formatNumber(o.value, 2)}\u00a0kg`, disabled: o.disabled }))}
                 />
                 <p className="mt-1.5 text-[0.8125rem] leading-snug text-ink-3">
-                  {options.find((o) => o.value === rate)?.label} – {options.find((o) => o.value === rate)?.description}.{' '}
-                  {goal === 'ga_ner' ? 'Högst 1 % av kroppsvikten per vecka.' : 'Högst 0,5 kg per vecka.'}
+                  {options.find((o) => o.value === rate)?.label}: {options.find((o) => o.value === rate)?.description}.{' '}
+                  {goal === 'ga_ner' ? 'Högst 1\u00a0% av kroppsvikten per vecka.' : 'Högst 0,5\u00a0kg per vecka.'}
                 </p>
               </div>
               <NumberField
@@ -234,14 +240,14 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
               {goal === 'ga_ner' && eff?.limitedByFloor && eff.kcal !== undefined && (
                 <Note>
                   Lagom sätter aldrig dagsmålet under {formatEnergy(eff.kcal, unit)}, så att du får i dig tillräckligt med näring. För dig blir takten därför
-                  ungefär {formatNumber(eff.rate, 2)} kg i veckan – och det är helt okej.
+                  ungefär {formatNumber(eff.rate, 2)}{'\u00a0'}kg i veckan – och det är helt okej.
                 </Note>
               )}
               {projection && !targetError && (
                 <p className="flex items-start gap-2 text-[0.875rem] leading-relaxed text-ink-2">
                   <CalendarHeart aria-hidden className="mt-0.5 size-4 shrink-0 text-hjortron" />
                   <span>
-                    Med {eff?.limitedByFloor ? `ungefär ${formatNumber(eff.rate, 2)} kg i veckan` : 'den takten'} når du {formatNumber(draft.targetWeightKg, 1)} kg{' '}
+                    Med {eff?.limitedByFloor ? `ungefär ${formatNumber(eff.rate, 2)}\u00a0kg i veckan` : 'den takten'} når du {formatNumber(draft.targetWeightKg, 1)}{'\u00a0'}kg{' '}
                     {describeProjection(projection, today)}.
                   </span>
                 </p>
@@ -304,7 +310,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
 
       <p className="flex items-center gap-2 px-1 text-[0.8125rem] text-ink-3">
         <UserRound aria-hidden className="size-4 shrink-0" />
-        Uppgifterna används bara för att räkna ut dina mål och lämnar aldrig telefonen.
+        Uppgifterna används bara för att räkna ut dina mål och lämnar aldrig din enhet.
       </p>
     </form>
   )

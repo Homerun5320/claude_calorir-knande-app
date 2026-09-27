@@ -82,7 +82,7 @@ export const KostradCard = memo(function KostradCard({ today, mindful }: { today
     >
       {highlights.length === 0 ? (
         <p className="text-sm leading-relaxed text-ink-2">
-          När du har registrerat lite mat den här veckan ser du här hur det går med Livsmedelsverkets kostråd – grönt, fisk,
+          När du har loggat lite mat den här veckan ser du här hur det går med Livsmedelsverkets kostråd – grönt, fisk,
           fullkorn och mer.
         </p>
       ) : (

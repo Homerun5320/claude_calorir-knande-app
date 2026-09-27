@@ -132,7 +132,7 @@ export default function RecipesPage() {
                 compact
                 illustration="search"
                 title="Inga klassiker hittades"
-                text={searching ? `Inget matchar "${deferredQuery.trim()}". Prova ett annat ord eller en annan grupp.` : 'Prova en annan grupp.'}
+                text={searching ? `Inget matchar ”${deferredQuery.trim()}”. Prova ett annat ord eller en annan grupp.` : 'Prova en annan grupp.'}
                 action={
                   <Button
                     variant="soft"
@@ -249,7 +249,7 @@ function OwnRecipes({
         compact
         illustration="search"
         title="Inga recept matchar"
-        text={searching ? `Inget av dina recept innehåller "${query.trim()}".` : undefined}
+        text={searching ? `Inget av dina recept innehåller ”${query.trim()}”.` : undefined}
       />
     )
   }

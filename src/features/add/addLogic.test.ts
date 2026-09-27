@@ -173,7 +173,14 @@ describe('kostradContributions', () => {
     expect(list).toHaveLength(1)
     expect(list[0].key).toBe('fisk')
     expect(list[0].grams).toBeCloseTo(125)
-    expect(list[0].text).toContain('125 g av 300–450 g i veckan')
+    // Hårt mellanslag mellan tal och enhet, så att "125 g" aldrig delas mellan två rader.
+    expect(list[0].text).toBe('125\u00a0g av 300–450\u00a0g i veckan')
+  })
+
+  it('anger mejeri i dl, som kostrådet (3,5–5 dl om dagen)', () => {
+    const mejeri = kostradContributions(mjolk, 206).find((c) => c.key === 'mejeri')
+    expect(mejeri?.text).toBe('2,1\u00a0dl av 3,5–5\u00a0dl om dagen')
+    expect(mejeri?.text).not.toMatch(/\bg\b|ml/)
   })
 
   it('räknar fullkorn från näringsvärdet', () => {

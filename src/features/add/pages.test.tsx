@@ -197,6 +197,18 @@ describe('CustomFoodPage', () => {
     expect(Object.keys(useFoodStore.getState().customFoods)).toHaveLength(0)
   })
 
+  it('har fälten i samma ordning som en svensk näringsdeklaration', () => {
+    renderAt('/nytt-livsmedel')
+    const order = ['Energi', 'Fett', 'varav mättat fett', 'Kolhydrat', 'varav sockerarter', 'Fiber', 'Protein', 'Salt']
+    const fields = order.map((label) => screen.getByLabelText(label))
+    for (let i = 1; i < fields.length; i++) {
+      // Varje fält ligger efter det förra i dokumentet (och därmed i tabbordningen).
+      expect(fields[i - 1].compareDocumentPosition(fields[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+    // Tillsatt socker står inte på förpackningar – det ligger under "Fler näringsämnen".
+    expect(screen.queryByLabelText('Tillsatt socker')).not.toBeInTheDocument()
+  })
+
   it('varnar när energin inte stämmer med makronäringsämnena', () => {
     renderAt('/nytt-livsmedel?namn=Test')
     fireEvent.change(screen.getByLabelText('Energi'), { target: { value: '800' } })

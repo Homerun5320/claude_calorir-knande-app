@@ -177,14 +177,17 @@ describe('SettingsPage – sektioner', () => {
     const kcal = screen.getByRole('spinbutton', { name: /Energi per dag/ })
     fireEvent.change(kcal, { target: { value: '900' } })
     fireEvent.blur(kcal)
-    // Golvet för kvinnor är 1 200 kcal
-    await waitFor(() => expect(useProfileStore.getState().settings.targetOverrides.kcal).toBe(1200))
+    // Förbrukningen ≈ 2 246 kcal och högst 1 % av 74 kg i veckan (≈ 814 kcal/dag) → golvet 1 430 kcal
+    // (över säkerhetsgolvet 1 200 kcal för kvinnor).
+    await waitFor(() => expect(useProfileStore.getState().settings.targetOverrides.kcal).toBe(1430))
+    expect(screen.getAllByText(/Lägst 1\s430 kcal – så att du går ner högst 1 % av din vikt i veckan/).length).toBeGreaterThan(0)
+    expect(lastToast()).toMatch(/Energimålet är höjt till 1\s430 kcal/)
     const protein = screen.getByRole('spinbutton', { name: /^Protein/ })
     fireEvent.change(protein, { target: { value: '130' } })
     fireEvent.blur(protein)
     await waitFor(() => expect(useProfileStore.getState().settings.targetOverrides.proteinG).toBe(130))
     fireEvent.click(screen.getByRole('button', { name: /Återställ protein/ }))
-    expect(useProfileStore.getState().settings.targetOverrides).toEqual({ kcal: 1200 })
+    expect(useProfileStore.getState().settings.targetOverrides).toEqual({ kcal: 1430 })
   })
 
   it('Mål: vid graviditet går energimålet inte att sätta under förbrukningen', async () => {
@@ -204,10 +207,57 @@ describe('SettingsPage – sektioner', () => {
     expect(screen.getAllByText(/under graviditeten rekommenderas ingen viktnedgång/).length).toBeGreaterThan(0)
   })
 
-  it('Mål: säger till när egna makromål inte går ihop med energimålet', async () => {
+  it('Mål: med eget protein får kolhydraterna resten av energin – platshållaren visar samma tal', () => {
+    // 1 800 kcal, 120 g protein (480 kcal) och NNR:s fett 64 g (576 kcal) → (1 800 − 480 − 576) / 4 = 186 g kolhydrater.
     useProfileStore.setState((s) => ({ settings: { ...s.settings, targetOverrides: { kcal: 1800, proteinG: 120 } } }))
     renderAt('/installningar/mal')
-    expect(screen.getByText(/Makromålen motsvarar tillsammans/)).toHaveTextContent(/mer än dagsmålet på 1\s800 kcal/)
+    expect(screen.queryByText(/Makromålen motsvarar tillsammans/)).not.toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: /^Kolhydrater/ })).toHaveAttribute('placeholder', '186')
+  })
+
+  it('Mål: säger till när egna makromål inte går ihop med energimålet', () => {
+    // Egna kolhydrater: 480 + 900 + 576 = 1 956 kcal mot 1 800 kcal.
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, targetOverrides: { kcal: 1800, proteinG: 120, carbsG: 225 } } }))
+    renderAt('/installningar/mal')
+    const note = screen.getByText(/Makromålen motsvarar tillsammans/)
+    expect(note).toHaveTextContent(/mer än dagsmålet på 1\s800 kcal/)
+    expect(note).toHaveTextContent(/Lämna gärna kolhydraterna tomma/)
+  })
+
+  it('Mål: ett för lågt eget energimål (t.ex. från en säkerhetskopia) används aldrig', () => {
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, targetOverrides: { kcal: 900 } } }))
+    renderAt('/installningar/mal')
+    // Golvet följer samma regler som dagsmålet: högst 1 % av vikten i veckan (här 1 430 kcal).
+    expect(screen.getByText(/lägre än vad Lagom rekommenderar för dig nu, så dagsmålet är/)).toHaveTextContent(/1\s430 kcal tills vidare/)
+  })
+
+  it('Mål: säkerhetsgolvet 1 200 kcal gäller när underskottstaket ligger lägre', () => {
+    // 60 år, 155 cm, 52 kg, stillasittande: förbrukning ≈ 1 330 kcal – taket ligger under 1 200 kcal.
+    useProfileStore.setState((s) => ({
+      profile: { ...PROFILE, birthYear: 1966, heightCm: 155, activityLevel: 'stillasittande', targetWeightKg: 50 },
+      settings: { ...s.settings, targetOverrides: { kcal: 900 } },
+    }))
+    useBodyStore.setState({ weights: [{ id: 'w1', date: todayISO(), kg: 52, createdAt: 0 }], measurements: [] })
+    renderAt('/installningar/mal')
+    const note = screen.getByText(/lägre än vad Lagom rekommenderar för dig nu, så dagsmålet är/)
+    expect(note).toHaveTextContent(/1\s200 kcal tills vidare/)
+    expect(note).toHaveTextContent(/tillräckligt med näring/)
+  })
+
+  it('Mål: adaptiv förbrukning går inte att slå på under graviditet', () => {
+    useProfileStore.setState((s) => ({ profile: { ...PROFILE, goal: 'behalla', lifeStage: 'gravid' }, settings: { ...s.settings, adaptiveTargets: true } }))
+    renderAt('/installningar/mal')
+    const sw = screen.getByRole('switch', { name: /Räkna förbrukningen ur min vikttrend/ })
+    expect(sw).toBeDisabled()
+    expect(sw).not.toBeChecked()
+    expect(screen.getByText(/Under graviditeten ändras vikten av naturliga skäl/)).toBeInTheDocument()
+  })
+
+  it('Mål: nådd målvikt ger mål att behålla vikten – med samma besked som Idag och Vikt', () => {
+    useBodyStore.setState({ weights: [{ id: 'w1', date: todayISO(), kg: 67.5, createdAt: 0 }], measurements: [] })
+    renderAt('/installningar/mal')
+    expect(screen.getByText(/Du har nått din målvikt\. Dagsmålet räknas nu för att behålla vikten/)).toBeInTheDocument()
+    expect(screen.getByText('Du behåller vikten')).toBeInTheDocument()
   })
 
   it('Mål: adaptiv förbrukning visar hur mycket underlag som saknas', async () => {
@@ -254,13 +304,13 @@ describe('SettingsPage – sektioner', () => {
   it('Träning och vatten: glasstorlek', () => {
     renderAt('/installningar/traning')
     expect(screen.getByText(/Loggar du ett pass på 300 kcal får du 150 kcal extra/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: '3,3 dl' }))
+    fireEvent.click(screen.getByRole('radio', { name: '3,3\u00a0dl' }))
     expect(useProfileStore.getState().settings.waterGlassMl).toBe(330)
   })
 
   it('Livsmedelsdatabas: visar den inbyggda databasen och källor', async () => {
     renderAt('/installningar/databas')
-    expect(await screen.findByText(/kurerade svenska livsmedel/, {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText(/granskade svenska livsmedel/, {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Hämta från Livsmedelsverket/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Open Food Facts/ })).toHaveAttribute('href', 'https://se.openfoodfacts.org/')
   })
@@ -285,9 +335,8 @@ describe('SettingsPage – data', () => {
     expect(lastToast()).toMatch(/ihopslagen/)
   })
 
-  it('en trasig säkerhetskopia ändrar ingenting och visar "okänt datum"', async () => {
+  it('en skadad säkerhetskopia: skadade delar hoppas över, resten slås ihop och datumet är "okänt datum"', async () => {
     const before = {
-      entries: useDiaryStore.getState().entries,
       weights: useBodyStore.getState().weights,
       profile: useProfileStore.getState().profile,
     }
@@ -298,8 +347,8 @@ describe('SettingsPage – data', () => {
       data: {
         profile: { profile: null, settings: {} },
         diary: { entries: { '2026-09-01': [{ id: 'x1', kind: 'quick', meal: 'lunch', date: '2026-09-01', name: 'Soppa', nutrients: { kcal: 300 } }] } },
-        food: { customFoods: { c1: { id: 'c1', name: 'Test' } } },
-        // Fel form – kastar mitt i sammanslagningen, efter att dagboken redan skrivits.
+        food: {},
+        // Fel form – vikterna som ett objekt i stället för en lista. Avsnittet läses in tomt.
         body: { weights: { date: '2026-09-01', kg: 70 } },
       },
     }
@@ -310,12 +359,12 @@ describe('SettingsPage – data', () => {
     })
     const sheet = await screen.findByRole('dialog', { name: /Importera säkerhetskopia/ })
     expect(within(sheet).getByText('trasig.json · skapad okänt datum')).toBeInTheDocument()
+    expect(within(sheet).getByText(/En del av filen är skadad och hoppas över: .*fel format/)).toBeInTheDocument()
     fireEvent.click(within(sheet).getByRole('button', { name: /Slå ihop med min data/ }))
-    await waitFor(() => expect(lastToast()).toBe('Importen misslyckades. Ingen data har ändrats.'))
-    expect(useDiaryStore.getState().entries).toBe(before.entries)
-    expect(useBodyStore.getState().weights).toBe(before.weights)
+    await waitFor(() => expect(lastToast()).toMatch(/ihopslagen/))
+    expect(useDiaryStore.getState().entries['2026-09-01']?.map((e) => e.id)).toEqual(['x1'])
+    expect(useBodyStore.getState().weights).toEqual(before.weights)
     expect(useProfileStore.getState().profile).toBe(before.profile)
-    expect(useFoodStore.getState().customFoods).toEqual({})
   })
 
   it('visar ett vänligt fel för fel sorts fil', async () => {

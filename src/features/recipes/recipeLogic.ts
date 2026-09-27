@@ -7,7 +7,7 @@
  */
 import type { Food, FoodTag, Nutrients, PlateSplit, Recipe, RecipeIngredient, UnitKey } from '../../types'
 import { EXTRAS_PREFIX, builtinRecipeInfo } from '../../data/recipes'
-import { UNIT_LABELS, gramsFor, isPortionUnit, unitLabel } from '../../lib/units'
+import { PORTION_PLURALS, UNIT_LABELS, gramsFor, isPortionUnit, unitLabel } from '../../lib/units'
 import { formatGrams, formatNumber, plural } from '../../lib/format'
 import { foldSv } from '../../lib/search'
 import { uid } from '../../lib/id'
@@ -120,51 +120,6 @@ export function formatFractionAmount(value: number): string {
   return formatNumber(value, 2)
 }
 
-/** Pluralformer för vanliga portionsord i livsmedelsdatabasen. */
-const PLURALS: Record<string, string> = {
-  st: 'st',
-  ägg: 'ägg',
-  äggula: 'äggulor',
-  äggvita: 'äggvitor',
-  klyfta: 'klyftor',
-  förpackning: 'förpackningar',
-  portion: 'portioner',
-  tortilla: 'tortillas',
-  platta: 'plattor',
-  påse: 'påsar',
-  tärning: 'tärningar',
-  knippe: 'knippen',
-  skiva: 'skivor',
-  burk: 'burkar',
-  bit: 'bitar',
-  kaka: 'kakor',
-  stjälk: 'stjälkar',
-  klick: 'klickar',
-  filé: 'filéer',
-  kruka: 'krukor',
-  ask: 'askar',
-  huvud: 'huvuden',
-  kvist: 'kvistar',
-  nypa: 'nypor',
-  kopp: 'koppar',
-  flaska: 'flaskor',
-  paket: 'paket',
-  tub: 'tuber',
-  kula: 'kulor',
-  skopa: 'skopor',
-  handfull: 'handfullar',
-  näve: 'nävar',
-  blad: 'blad',
-  bukett: 'buketter',
-  ring: 'ringar',
-  rad: 'rader',
-  glas: 'glas',
-  dl: 'dl',
-  msk: 'msk',
-  tsk: 'tsk',
-  krm: 'krm',
-}
-
 /** Adjektiv som inleder vissa portionsetiketter ("1 hel gurka", "1 liten burk"). */
 const LEADING_ADJECTIVES = new Set(['hel', 'helt', 'halv', 'liten', 'litet', 'stor', 'stort'])
 
@@ -184,7 +139,8 @@ export function portionAmountText(label: string, amount: number): string {
     return amount <= 1 ? `${qty} ${phrase}` : `${qty} × ${phrase}`
   }
   if (amount <= 1) return `${qty} ${first}`
-  const many = PLURALS[first.toLocaleLowerCase('sv-SE')]
+  // Samma pluralformer som i dagboken (`formatAmount`).
+  const many = PORTION_PLURALS[first.toLocaleLowerCase('sv-SE')]
   return many ? `${qty} ${many}` : `${qty} × ${core}`
 }
 
@@ -285,7 +241,7 @@ export function validateDraft(draft: RecipeDraft): DraftErrors {
   if (!draft.name.trim()) errors.name = 'Ge receptet ett namn.'
   if (draft.ingredients.length === 0) errors.ingredients = 'Lägg till minst en ingrediens.'
   if (!Number.isFinite(draft.servings) || draft.servings < 1) errors.servings = 'Receptet behöver minst en portion.'
-  if (draft.cookedWeightG !== undefined && !(draft.cookedWeightG > 0)) errors.cookedWeightG = 'Ange en vikt större än 0 g – eller lämna fältet tomt.'
+  if (draft.cookedWeightG !== undefined && !(draft.cookedWeightG > 0)) errors.cookedWeightG = 'Ange en vikt större än 0\u00a0g – eller lämna fältet tomt.'
   if (draft.prepMinutes !== undefined && !(draft.prepMinutes >= 0)) errors.prepMinutes = 'Ange tiden i minuter.'
   return errors
 }
@@ -453,12 +409,12 @@ export function cookedWeightText(info: WeightInfo): string {
   const change = info.changePct ?? 0
   if (Math.abs(change) < 2) return 'Rätten väger ungefär lika mycket färdig som rå.'
   const pct = formatNumber(Math.abs(change))
-  if (change < 0) return `Rätten har tappat ${pct} % i vikt (mest vatten som kokat bort) – varje gram innehåller därför mer näring.`
+  if (change < 0) return `Rätten har tappat ${pct}\u00a0% i vikt (mest vatten som kokat bort) – varje gram innehåller därför mer näring.`
   // Viktökning kommer av vätska: antingen sådan som torra råvaror sugit upp, eller vatten och buljong
   // som inte står bland ingredienserna. Påstå inte att det är ris eller pasta om receptet saknar det.
   return info.absorbs
-    ? `Rätten väger ${pct} % mer färdig – torra råvaror som ris, pasta, gryn och baljväxter suger upp vatten när de kokas.`
-    : `Rätten väger ${pct} % mer färdig – troligen av vätska som inte står bland ingredienserna, till exempel vatten eller buljong.`
+    ? `Rätten väger ${pct}\u00a0% mer färdig – torra råvaror som ris, pasta, gryn och baljväxter suger upp vatten när de kokas.`
+    : `Rätten väger ${pct}\u00a0% mer färdig – troligen av vätska som inte står bland ingredienserna, till exempel vatten eller buljong.`
 }
 
 /** Mild varning om den tillagade vikten verkar orimlig jämfört med råvikten. */
@@ -495,7 +451,7 @@ export function servingClimate(recipe: Pick<Recipe, 'ingredients' | 'cookedWeigh
   const kg = (perKg * grams) / 1000
   const meal = CLIMATE_REFERENCE.onePlanetMealKg
   const km = kg / CAR_KG_CO2E_PER_KM
-  const carText = km < 1 ? `${formatNumber(Math.max(10, Math.round((km * 1000) / 10) * 10))} meter` : `${formatNumber(km, 1)} km`
+  const carText = km < 1 ? `${formatNumber(Math.max(10, Math.round((km * 1000) / 10) * 10))}\u00a0meter` : `${formatNumber(km, 1)}\u00a0km`
   if (kg <= meal) return { kg, level: 'lag', label: 'Låg klimatpåverkan', tone: 'mossa', carText }
   if (kg <= meal * 3) return { kg, level: 'medel', label: 'Medelhög klimatpåverkan', tone: 'sol', carText }
   return { kg, level: 'hog', label: 'Hög klimatpåverkan', tone: 'hjortron', carText }

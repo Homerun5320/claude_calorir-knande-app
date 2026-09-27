@@ -18,12 +18,15 @@ export interface ExerciseDayCardProps {
   isToday: boolean
   list: readonly ExerciseEntry[]
   mindful: boolean
+  /** Andel av träningen som läggs till budgeten (0 när den redan ingår i dagsmålet). */
   addBackPct: number
+  /** Adaptiv förbrukning: träningen ingår redan i dagsmålet och läggs inte till. */
+  inTarget?: boolean
   onAdd: () => void
   onEdit: (entry: ExerciseEntry) => void
 }
 
-export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, list, mindful, addBackPct, onAdd, onEdit }: ExerciseDayCardProps) {
+export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, list, mindful, addBackPct, inTarget = false, onAdd, onEdit }: ExerciseDayCardProps) {
   const reduce = useReducedMotion() ?? false
   const minutes = list.reduce((s, x) => s + (Number.isFinite(x.minutes) ? x.minutes : 0), 0)
   const kcal = list.reduce((s, x) => s + (x.kcal || 0), 0)
@@ -66,7 +69,7 @@ export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, li
             ) : (
               <>
                 <Stat size="sm" label="Netto" value={<EnergyValue kcal={kcal} />} />
-                <Stat size="sm" label="Till budget" value={<EnergyValue kcal={added} />} sublabel={formatPercent(addBackPct)} />
+                <Stat size="sm" label="Till budget" value={<EnergyValue kcal={added} />} sublabel={inTarget ? 'ingår i målet' : formatPercent(addBackPct)} />
               </>
             )}
           </div>
@@ -75,7 +78,7 @@ export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, li
               {list.map((x) => {
                 const intensity = entryIntensity(x)
                 // En rad: tid, sträcka eller anteckning, annars intensitet.
-                const extra = x.distanceKm ? `${formatNumber(x.distanceKm, 1)} km` : (x.note ?? (intensity ? intensityLabel(intensity) : undefined))
+                const extra = x.distanceKm ? `${formatNumber(x.distanceKm, 1)}\u00a0km` : (x.note ?? (intensity ? intensityLabel(intensity) : undefined))
                 const details = [formatDuration(x.minutes), extra].filter(Boolean).join(' · ')
                 return (
                   <motion.li

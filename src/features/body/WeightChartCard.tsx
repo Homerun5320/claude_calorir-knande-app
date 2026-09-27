@@ -48,7 +48,7 @@ export function WeightChartCard({ weights, points, targetKg, today }: WeightChar
     () =>
       targetKg === undefined || !placement
         ? undefined
-        : { value: targetKg, label: `Mål ${formatNumber(targetKg, 1)} kg`, color: 'var(--lg-mossa)', includeInDomain: placement.includeInDomain },
+        : { value: targetKg, label: `Mål ${formatNumber(targetKg, 1)}\u00a0kg`, color: 'var(--lg-mossa)', includeInDomain: placement.includeInDomain },
     [targetKg, placement],
   )
 

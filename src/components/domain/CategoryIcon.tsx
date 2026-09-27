@@ -1,6 +1,9 @@
 /**
  * Ikon för en livsmedelskategori: emoji på en mjukt tonad, rundad ruta.
  *
+ * Med `name` väljs emojin efter vad maten heter när kategorin är för grov – "Smörgås, grovt bröd
+ * med smör och ost" ligger bland färdigrätterna men ska visa 🥪, inte 🍲 (`foodEmoji`).
+ *
  * `CATEGORY_META` innehåller även svenska namn för kategorierna och kan användas i filter och listor.
  * `TINT_CLASSES` delas med `MealIcon` (och får gärna användas av andra komponenter).
  */
@@ -21,7 +24,8 @@ export const TINT_CLASSES: Record<Tint, { soft: string; text: string; solid: str
   mossa: { soft: 'bg-mossa-soft', text: 'text-mossa', solid: 'bg-mossa' },
   vinbar: { soft: 'bg-vinbar-soft', text: 'text-vinbar', solid: 'bg-vinbar' },
   fjall: { soft: 'bg-fjall-soft', text: 'text-fjall', solid: 'bg-fjall' },
-  sol: { soft: 'bg-sol-soft', text: 'text-sol', solid: 'bg-sol' },
+  // Solgult syns knappt mot sol-soft – ikoner i den tonen använder textvarianten (mörkare bärnsten).
+  sol: { soft: 'bg-sol-soft', text: 'text-(--lg-sol-text)', solid: 'bg-sol' },
   neutral: { soft: 'bg-surface-2', text: 'text-ink-2', solid: 'bg-ink-3' },
 }
 
@@ -83,6 +87,119 @@ export const CATEGORY_META: Record<FoodCategory, CategoryMeta> = {
   ovrigt: { emoji: '🍽️', tint: 'neutral', label: 'Övrigt' },
 }
 
+/**
+ * Emoji efter namnets huvudord. I svenska sammansättningar står huvudordet sist ("kycklinggryta",
+ * "räksmörgås", "blåbärspaj") och i "X med Y" är X huvudordet ("Smulpaj med äpple"), så reglerna
+ * matchar slutet av ledet före första kommat och före "med"/"i"/"och". Korta ord som lätt ingår i
+ * andra ord kräver ett helt ord eller en känd sammansättning. Ordningen spelar roll: rätter före
+ * råvaror. Det tredje fältet är kategorier där regeln inte gäller (en "tekaka" är bröd, inte kaka).
+ */
+type EmojiRule = readonly [RegExp, string, (readonly FoodCategory[])?]
+
+/** Rätter som ofta står först i namnet: "Pizza vesuvio", "Kebab i pitabröd". */
+const LEAD_DISH = /^(pizza|sushi|tacos?|burrito|hamburgare|cheeseburgare|lasagne|pad thai|ramen|kebab|nachos)(?=\s|$)/
+
+const BREAD = /(bröd|knäckebröd|fralla|frallor|baguette|ciabatta|tunnbröd|pitabröd)$/
+
+const NAME_EMOJI: readonly EmojiRule[] = [
+  [/(smörgås|smörgåsar|smörgåstårta|macka|mackor|toast)$/, '🥪'],
+  [/(pizza|pizzor)$/, '🍕'],
+  [/(hamburgare|burgare)$/, '🍔'],
+  [/(pommes frites|pommes)$/, '🍟'],
+  [/(korv|korvar|hotdog)$/, '🌭'],
+  [/(tacos?|nachos)$/, '🌮'],
+  [/(burritos?|wrap|wraps)$/, '🌯'],
+  [/kebab$/, '🥙'],
+  [/(piroger?|dumplings|dumpling)$/, '🥟'],
+  [/sushi$/, '🍣'],
+  [/(nudlar|ramen|nudelsoppa|pad thai)$/, '🍜'],
+  [/(gröt|välling|müsli|granola)$/, '🥣'],
+  [/(sallad|sallader)$/, '🥗'],
+  [/(soppa|soppor)$/, '🍲', ['glass_dessert']],
+  [/(gryta|grytor|curry|stuvning)$/, '🍲'],
+  [/(paj|pajer)$/, '🥧'],
+  [/(pannkaka|pannkakor|plättar|crêpe|crêpes)$/, '🥞'],
+  [/(våffla|våfflor)$/, '🧇'],
+  // "Kaka" är tårta i bakverk men bröd i Hönökaka och en rätt i äggakaka/kroppkakor.
+  [/(tårta|tårtor|bakelse|cheesecake|kaka)$/, '🍰', ['brod', 'spannmal', 'snacks', 'fardigratt']],
+  [/(kakor|kex|cookie|cookies)$/, '🍪', ['brod', 'spannmal', 'fardigratt']],
+  [/(choklad|praliner)$/, '🍫'],
+  [/(glass|sorbet)$/, '🍨'],
+  [/(lasagne|spaghetti|pasta|makaroner|penne|tagliatelle|gnocchi)$/, '🍝', ['sas_krydda']],
+  [/(risotto|(?:^|\s|jasmin|basmati|fullkorns|parboiled|rå|vit)ris)$/, '🍚', ['spannmal']],
+  [/(omelett|äggröra|stekt ägg|pocherat ägg)$/, '🍳'],
+  [/(?<![lr])ägg$/, '🥚'],
+  [/(bacon|fläsk)$/, '🥓'],
+  [/(kyckling|kycklingfilé|kycklinglår|kycklingbröst|grillkyckling|kalkon)$/, '🍗'],
+  [/bläckfisk$/, '🦑'],
+  [/((?:^|\s|grav|kall)lax|torsk|sej|sill|strömming|makrill|tonfisk|fisk|fiskpinnar|fiskbullar|abborre|gös|rödspätta|kolja)$/, '🐟'],
+  [/(räkor|räka|kräftor|hummer|(?<!mandel)musslor)$/, '🦐'],
+  [/(köttbullar|vegobullar)$/, '🧆'],
+  [/(köttfärslimpa)$/, '🍲'],
+  [/(biff|entrecôte|oxfilé|fläskfilé|kotlett|kött|köttfärs|nötfärs|fläskkarré|revbensspjäll)$/, '🥩', ['vegoprotein']],
+  [/((?<![kr])ost|brie|halloumi|mozzarella|parmesan|cheddar)$/, '🧀'],
+  [/(?:^|\s)(smör|bregott)$/, '🧈'],
+  [/(kokosmjölk|kokosgrädde)$/, '🥥'],
+  [/(mjölk|filmjölk|kefir)$/, '🥛'],
+  [/croissant$/, '🥐'],
+  [BREAD, '🍞', ['bakverk', 'sotsaker']],
+  [/(banan|bananer)$/, '🍌'],
+  [/(äpple|äpplen)$/, '🍎'],
+  [/päron$/, '🍐'],
+  [/(apelsin|apelsiner|clementin|clementiner|mandarin)$/, '🍊'],
+  [/(citron|lime)$/, '🍋'],
+  [/(vindruvor|druvor)$/, '🍇'],
+  [/(jordgubbar|jordgubbe)$/, '🍓'],
+  [/körsbär$/, '🍒'],
+  [/melon$/, '🍉'],
+  [/ananas$/, '🍍'],
+  [/kiwi$/, '🥝'],
+  [/mango$/, '🥭'],
+  [/avokado$/, '🥑'],
+  [/(tomat|tomater)$/, '🍅'],
+  [/gurka$/, '🥒'],
+  [/paprika$/, '🫑'],
+  [/majs$/, '🌽'],
+  [/(morot|morötter)$/, '🥕'],
+  [/broccoli$/, '🥦'],
+  [/vitlök$/, '🧄', ['ost', 'mejeri', 'sas_krydda']],
+  [/lök$/, '🧅', ['ost', 'mejeri', 'sas_krydda']],
+  [/(svamp|champinjoner|kantareller)$/, '🍄'],
+  [/(bönor|linser|kikärter)$/, '🫘'],
+  [/sötpotatis$/, '🍠'],
+  [/(potatis|potatismos|klyftpotatis)$/, '🥔'],
+  [/(nötter|jordnötter|cashewnötter|mandlar)$/, '🥜'],
+  [/popcorn$/, '🍿'],
+  [/honung$/, '🍯'],
+  [/(kaffe|latte|cappuccino|espresso)$/, '☕'],
+  [/(?:^|\s)(te|grönt te|örtte)$/, '🍵'],
+  [/(?:^|\s)(vatten|kranvatten|mineralvatten)$/, '💧'],
+  [/juice$/, '🧃'],
+  [/(smoothie|(?<!f)läsk|saft|lemonad)$/, '🥤'],
+  [/(?:^|\s|lätt|folk|stark|mellan)öl$/, '🍺'],
+  [/(?:^|\s|röd|vit|rosé)vin$/, '🍷'],
+  [/(champagne|cava|prosecco|mousserande vin)$/, '🥂'],
+]
+
+/**
+ * Emoji för ett livsmedel: efter namnet om det känns igen, annars kategorins.
+ * `foodEmoji('Smörgås, grovt bröd med smör och ost', 'fardigratt')` → '🥪'.
+ */
+export function foodEmoji(name: string | undefined, category: FoodCategory | undefined): string {
+  const meta = CATEGORY_META[category ?? 'ovrigt'] ?? CATEGORY_META.ovrigt
+  if (!name) return meta.emoji
+  const head = name.split(/[,(]/)[0].trim().toLocaleLowerCase('sv-SE')
+  // "Pizza vesuvio" → "pizza"; "Smulpaj med äpple" → "smulpaj".
+  const [subject, filling] = (LEAD_DISH.exec(head)?.[1] ?? head).split(/\s+(?:med|i|och|på|utan)\s+/)
+  // Bröd med pålägg är en smörgås ("Fralla med ost", "Baguette med kyckling") – men "Grovt bröd
+  // med frön" i brödhyllan är fortfarande bröd.
+  if (filling !== undefined && category !== 'brod' && BREAD.test(subject)) return '🥪'
+  for (const [re, emoji, not] of NAME_EMOJI) {
+    if (re.test(subject) && !(category && not?.includes(category))) return emoji
+  }
+  return meta.emoji
+}
+
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
 /** Storlek, rundning och emoji-storlek per ikonstorlek (minst 44 px för "md" och uppåt). */
@@ -99,6 +216,8 @@ export interface CategoryIconProps {
   size?: IconSize
   /** Egen emoji (t.ex. från ett recept) i stället för kategorins. */
   emoji?: string
+  /** Livsmedlets namn – ger en träffsäkrare emoji när kategorin är grov (se `foodEmoji`). */
+  name?: string
   /**
    * Läs upp kategorinamnet för skärmläsare. Standard false – ikonen är oftast dekoration
    * bredvid livsmedlets namn.
@@ -107,8 +226,11 @@ export interface CategoryIconProps {
   className?: string
 }
 
+/** Emoji-glyfen – delas med MealIcon så att båda ser likadana ut. */
+export const EMOJI_CLASS = 'translate-y-[0.02em] drop-shadow-[0_1px_0_rgb(0_0_0/0.06)]'
+
 /** Emoji på tonad rundad ruta, t.ex. 🥕 på hjortronton för rotfrukter. */
-export function CategoryIcon({ category, size = 'md', emoji, labelled = false, className = '' }: CategoryIconProps) {
+export function CategoryIcon({ category, size = 'md', emoji, name, labelled = false, className = '' }: CategoryIconProps) {
   const meta = CATEGORY_META[category ?? 'ovrigt'] ?? CATEGORY_META.ovrigt
   return (
     <span
@@ -117,7 +239,7 @@ export function CategoryIcon({ category, size = 'md', emoji, labelled = false, c
       aria-label={labelled ? meta.label : undefined}
       aria-hidden={labelled ? undefined : true}
     >
-      <span className="translate-y-[0.02em] drop-shadow-[0_1px_0_rgb(0_0_0/0.06)]">{emoji ?? meta.emoji}</span>
+      <span className={EMOJI_CLASS}>{emoji ?? foodEmoji(name, category)}</span>
     </span>
   )
 }

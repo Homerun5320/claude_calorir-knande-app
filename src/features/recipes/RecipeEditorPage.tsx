@@ -378,7 +378,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
         <motion.div {...section(1)}>
           <Card
             title="Ingredienser"
-            eyebrow={draft.ingredients.length > 0 ? `${draft.ingredients.length} st` : 'Börja här'}
+            eyebrow={draft.ingredients.length > 0 ? `${draft.ingredients.length} tillagda` : 'Börja här'}
             action={<UtensilsCrossed aria-hidden className="size-5 text-ink-3" />}
           >
             {draft.ingredients.length > 0 ? (
@@ -473,7 +473,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
               <ol className="mt-2.5 flex list-decimal flex-col gap-1 pl-5 text-sm leading-relaxed text-ink-2 marker:font-semibold marker:text-fjall">
                 <li>Väg kastrullen tom (eller nollställ vågen med kastrullen på).</li>
                 <li>Väg igen när rätten är klar och dra av kastrullens vikt.</li>
-                <li>Skriv in vikten här – Lagom räknar om näringen per portion och per 100 g.</li>
+                <li>Skriv in vikten här – Lagom räknar om näringen per portion och per 100{'\u00a0'}g.</li>
               </ol>
             </div>
             <NumberField
@@ -506,7 +506,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                 {weight.cooked && weight.changePct !== undefined && Math.abs(weight.changePct) >= 2 && (
                   <span className="text-ink-3">
                     {' '}
-                    ({weight.changePct < 0 ? 'vatten har kokat bort' : 'vatten har sugits upp'}: {formatNumber(Math.abs(weight.changePct))} %)
+                    ({weight.changePct < 0 ? 'vatten har kokat bort' : 'vatten har sugits upp'}: {formatNumber(Math.abs(weight.changePct))}{'\u00a0'}%)
                   </span>
                 )}
                 .
@@ -580,7 +580,7 @@ function Macro({ label, dot, value }: { label: string; dot: string; value: numbe
         <span aria-hidden className={cx('size-1.5 shrink-0 rounded-full', dot)} />
         {label}
       </dt>
-      <dd className="mt-0.5 text-sm font-semibold text-ink tabular-nums">{value !== undefined ? `${formatNumber(value, value < 10 ? 1 : 0)} g` : '–'}</dd>
+      <dd className="mt-0.5 text-sm font-semibold text-ink tabular-nums">{value !== undefined ? `${formatNumber(value, value < 10 ? 1 : 0)}\u00a0g` : '–'}</dd>
     </div>
   )
 }

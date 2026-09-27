@@ -1,4 +1,4 @@
-import type { Food } from '../../types'
+import type { Food, Profile } from '../../types'
 import { DEFAULT_MEALS } from '../../stores/profileStore'
 import { MACRO_PRESETS } from '../../lib/energy'
 import { backupDue } from './backupStatus'
@@ -6,6 +6,7 @@ import {
   MACRO_BOUNDS,
   cachedFoodStats,
   clampKcalOverride,
+  computedDefaults,
   kcalFloorText,
   kcalOverrideFloor,
   macroEnergyMismatch,
@@ -85,7 +86,7 @@ describe('makrofördelning', () => {
   it('påpekar vänligt avvikelser från NNR', () => {
     expect(nnrNote({ protein: 18, carbs: 50, fat: 32 })).toBeNull()
     expect(outsideNnr(MACRO_PRESETS.lchf)).toEqual(['carbs', 'fat'])
-    expect(nnrNote(MACRO_PRESETS.lchf)).toMatch(/kolhydrater \(45–60 %\) och fett \(25–40 %\)/)
+    expect(nnrNote(MACRO_PRESETS.lchf)).toMatch(/kolhydrater \(45–60\s%\) och fett \(25–40\s%\)/)
     expect(nnrNote(MACRO_PRESETS.lchf)).toMatch(/helt okej/)
   })
 })
@@ -130,9 +131,9 @@ describe('visning', () => {
   })
 
   it('glasstorlekar i deciliter med decimalkomma', () => {
-    expect(glassLabel(200)).toBe('2 dl')
-    expect(glassLabel(250)).toBe('2,5 dl')
-    expect(glassLabel(330)).toBe('3,3 dl')
+    expect(glassLabel(200)).toBe('2\u00a0dl')
+    expect(glassLabel(250)).toBe('2,5\u00a0dl')
+    expect(glassLabel(330)).toBe('3,3\u00a0dl')
   })
 })
 
@@ -197,12 +198,19 @@ describe('golv för eget energimål', () => {
   })
 
   it('följer förbrukningen vid graviditet, amning och under 18 år', () => {
-    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'gravid', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 300 }, TODAY)).toEqual({ kcal: 2390, reason: 'gravid' })
-    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'ammar', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 500 }, TODAY)).toEqual({ kcal: 2590, reason: 'ammar' })
+    // Avrundas som dagsmålet (jämna 10 kcal), så att det beräknade målet aldrig hamnar under golvet.
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'gravid', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 300 }, TODAY)).toEqual({ kcal: 2380, reason: 'gravid' })
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'ammar', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 500 }, TODAY)).toEqual({ kcal: 2580, reason: 'ammar' })
+    // Med `maintenanceKcal` från computeEnergy används exakt samma tal som dagsmålet.
+    expect(kcalOverrideFloor({ sex: 'kvinna', lifeStage: 'gravid', birthYear: 1990 }, { tdee: 2083, lifeStageKcal: 300, maintenanceKcal: 2390 }, TODAY)).toEqual({ kcal: 2390, reason: 'gravid' })
     // Född 2008 kan vara 17 år i september 2026.
-    expect(kcalOverrideFloor({ sex: 'man', lifeStage: 'ingen', birthYear: 2008 }, energy, TODAY)).toEqual({ kcal: 2090, reason: 'ung' })
+    expect(kcalOverrideFloor({ sex: 'man', lifeStage: 'ingen', birthYear: 2008 }, energy, TODAY)).toEqual({ kcal: 2080, reason: 'ung' })
     expect(kcalFloorText({ kcal: 2390, reason: 'gravid' }, 'kcal')).toMatch(/^Lägst 2\s390 kcal – under graviditeten rekommenderas ingen viktnedgång/)
     expect(kcalFloorText({ kcal: 1200, reason: 'golv' }, 'kcal')).toMatch(/tillräckligt med näring/)
+    // Varje skäl har sin egen förklaring – underskottstaket är inte "tillräckligt med näring".
+    expect(kcalFloorText({ kcal: 1430, reason: 'underskott' }, 'kcal')).toMatch(/^Lägst 1\s430 kcal – så att du går ner högst 1 % av din vikt i veckan/)
+    expect(kcalFloorText({ kcal: 1900, reason: 'lagtBmi' }, 'kcal')).toMatch(/under det som räknas som hälsosamt/)
+    expect(kcalFloorText({ kcal: 1900, reason: 'malvikt' }, 'kcal')).toMatch(/vid eller under din målvikt/)
   })
 
   it('höjer ett för lågt eget mål men lämnar resten orört', () => {
@@ -219,5 +227,39 @@ describe('makromål mot energimål', () => {
     // 120 g protein, 225 g kolhydrater och 64 g fett = 1 956 kcal mot 1 800 kcal.
     expect(macroEnergyMismatch({ kcal: 1800, proteinG: 120, carbsG: 225, fatG: 64 })).toEqual({ macroKcal: 1956, diff: 156 })
     expect(macroEnergyMismatch({ kcal: 1800, proteinG: 81, carbsG: 225, fatG: 64 })).toBeNull()
+  })
+})
+
+describe('platshållare för egna mål', () => {
+  const profile: Profile = {
+    sex: 'kvinna',
+    birthYear: 1990,
+    heightCm: 168,
+    startWeightKg: 70,
+    activityLevel: 'stillasittande',
+    goal: 'behalla',
+    weeklyRateKg: 0.5,
+    lifeStage: 'ingen',
+    diet: 'allatare',
+    macroPreset: 'nnr',
+    createdAt: 0,
+  }
+  const opts = { today: '2026-09-26' }
+
+  it('visar kolhydraterna som blir kvar när proteinet är eget', () => {
+    const d = computedDefaults(profile, 70, { proteinG: 150 }, opts)
+    // Kolhydratfältet visar samma värde som dagsmålen faktiskt använder.
+    expect(d.carbsG).toBe(Math.round((d.kcal - 150 * 4 - d.fatG * 9) / 4))
+    expect(Math.abs(150 * 4 + d.carbsG * 4 + d.fatG * 9 - d.kcal)).toBeLessThan(10)
+    // Proteinfältet visar det beräknade värdet (utan det egna).
+    const plain = computedDefaults(profile, 70, {}, opts)
+    expect(d.proteinG).toBe(plain.proteinG)
+  })
+
+  it('räknar makrona på det egna energimålet men visar Lagoms beräknade energi', () => {
+    const plain = computedDefaults(profile, 70, {}, opts)
+    const d = computedDefaults(profile, 70, { kcal: 2400 }, opts)
+    expect(d.kcal).toBe(plain.kcal)
+    expect(d.fatG).toBeGreaterThan(plain.fatG)
   })
 })

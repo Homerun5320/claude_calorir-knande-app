@@ -110,7 +110,7 @@ export const QuickDrinks = memo(function QuickDrinks({ options, kind, date, mind
             ? undefined
             : kind === 'caffeine'
               ? formatNutrient('caffeine', item.amount)
-              : `${formatNumber(item.amount, 1)} glas`
+              : `${formatNumber(item.amount, 1)}\u00a0glas`
         return (
           <button
             key={item.option.slug}

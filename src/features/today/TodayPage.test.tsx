@@ -182,6 +182,48 @@ describe('TodayPage', () => {
     expect(document.activeElement?.closest('[inert], [aria-hidden="true"]')).toBeNull()
   })
 
+  it('nådd målvikt: dagsmålet räknas för att behålla vikten – samma besked som under Vikt', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    useBodyStore.getState().logWeight(today, 64.8)
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'ga_ner', targetWeightKg: 65 } })
+    renderPage()
+    expect(await screen.findByText(/Du har nått din målvikt\. Dagsmålet räknas nu för att behålla vikten/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Byt till att behålla vikten' }))
+    expect(useProfileStore.getState().profile?.goal).toBe('behalla')
+  })
+
+  it('låg vikt vid 70 år (BMI 21): varsamt besked om att behålla vikten, även i medvetet läge', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    // 168 cm och 59 kg ≈ BMI 20,9 – under 22 som gäller från 70 år.
+    useBodyStore.getState().logWeight(today, 59)
+    const birthYear = Number(today.slice(0, 4)) - 70
+    useProfileStore.setState({ profile: { ...PROFILE, birthYear, goal: 'ga_ner' }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
+    renderPage()
+    expect(await screen.findByText(/under det som räknas som hälsosamt för din längd och ålder/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '1177' })).toBeInTheDocument()
+    // Inga siffror i medvetet läge.
+    expect(screen.queryByRole('button', { name: /Väg dig/ })).not.toBeInTheDocument()
+  })
+
+  it('räknar inte träningen två gånger med adaptiv förbrukning', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addExercise({ date: today, activityId: 'promenad', name: 'Promenad', minutes: 40, kcal: 160 })
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, adaptiveTargets: true } })
+    // Fyra veckor med loggat intag och vägningar ger en adaptiv skattning.
+    const { addEntry } = useDiaryStore.getState()
+    for (let i = 1; i <= 27; i++) {
+      const date = addDays(today, -i)
+      addEntry({ kind: 'quick', name: 'Dag', nutrients: { kcal: 2000 }, date, meal: 'middag' })
+      if (i % 3 === 0) useBodyStore.getState().logWeight(date, 68)
+    }
+    renderPage()
+    expect(await screen.findByText('Träning idag')).toBeInTheDocument()
+    expect(screen.getByText(/ingår redan i dagsmålet/)).toBeInTheDocument()
+    expect(screen.queryByText(/till budgeten/)).not.toBeInTheDocument()
+  })
+
   it('visar pågående fasta och träning som sammanhangskort', async () => {
     const today = todayISO()
     useFastingStore.getState().startFast(16, '16:8', Date.now() - 2 * 3_600_000)

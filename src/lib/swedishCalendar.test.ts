@@ -129,6 +129,18 @@ describe('matkalendern', () => {
     expect(byKey['skartorsdagen']).toBe('2026-04-02')
   })
 
+  it('har emoji som stämmer med dagen', () => {
+    const emoji = (key: string) => year.find((d) => d.key === key)?.emoji
+    expect(emoji('prinsesstartans-vecka')).toBe('🍰')
+    expect(emoji('vasaloppet')).toBe('🎿')
+    expect(emoji('knackebrodets-dag')).toBe('🫓')
+    expect(emoji('chokladbollens-dag')).toBe('🥥')
+    expect(emoji('lingonsasong')).toBe('🌲')
+    expect(emoji('hummerpremiar')).toBe('🦞')
+    // Inga abstrakta symboler som kan läsas som status eller varning.
+    for (const d of year) expect(d.emoji).not.toMatch(/[🔴🟠🟡🟢🔵🟣⚫⚪❗❓⚠]/u)
+  })
+
   it('är sorterad, har unika id:n och fullständigt innehåll', () => {
     const ids = new Set(year.map((d) => d.id))
     expect(ids.size).toBe(year.length)

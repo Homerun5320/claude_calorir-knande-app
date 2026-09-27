@@ -9,7 +9,13 @@
  *
  * Portionsvikter: lunchtallrik ca 400–450 g, soppa ca 3 dl. Tallriksmodellen (plate) anger andelen
  * grönsaker/kolhydratdel/proteindel av rättens vikt och kostråd (kostrad) gram per 100 g som räknas som
- * frukt och grönt, rött kött och chark respektive fisk.
+ * frukt och grönt, baljväxter, rött kött och chark respektive fisk.
+ *
+ * Baljväxter (bönor, linser, gula ärtor, kikärtor och produkter av soja eller ärtprotein, tillagad
+ * vikt) är sedan kostråden 2025 ett eget råd och ingår inte i frukt och grönt. I rätter med
+ * baljväxter står de därför i `baljvaxter`, medan `fruktGront` bara är grönsaker, frukt och bär
+ * (samma andel som tallrikens grönsaksdel). Falafel räknas som hälften kikärtor, hummus som 60 %.
+ * Gröna ärtor, sockerärtor, haricots verts och böngroddar är grönsaker.
  *
  * Klimatavtryck (co2e) i kg CO2e per kg färdig rätt, beräknat från ingrediensernas ungefärliga
  * klimatavtryck enligt RISE/Livsmedelsverket (exklusive tillagningsenergi).
@@ -93,7 +99,7 @@ const husmanskost: FoodSeed[] = [
     syn: ['ärtsoppa', 'ärter och fläsk', 'gul ärtsoppa', 'artsoppa', 'torsdagssoppa', 'ärtsoppa med fläsk och senap', 'ärtsoppa fläsk', 'ärtsoppa med senap', 'artsoppa med flask'],
     co2e: 0.9,
     plate: { veg: 0.04, carb: 0, protein: 0.54 },
-    kostrad: { fruktGront: 48, rottKott: 10 },
+    kostrad: { fruktGront: 4, baljvaxter: 44, rottKott: 10 },
     note: 'Gula ärtor kokta med rimmat fläsk, lök, timjan och mejram. Senap räknas separat.',
   },
   {
@@ -112,7 +118,7 @@ const husmanskost: FoodSeed[] = [
     syn: ['vegetarisk ärtsoppa', 'vegansk ärtsoppa', 'ärtsoppa utan fläsk', 'ärtsoppa vegan', 'veganska ärter'],
     co2e: 0.4,
     plate: { veg: 0.08, carb: 0, protein: 0.44 },
-    kostrad: { fruktGront: 52 },
+    kostrad: { fruktGront: 8, baljvaxter: 44 },
     note: 'Gula ärtor kokta med lök, morot, timjan och mejram.',
   },
   {
@@ -900,7 +906,7 @@ const kottFagelRatter: FoodSeed[] = [
     syn: ['chili', 'chilli con carne', 'köttfärschili', 'chiligryta', 'chili med bönor', 'chili con carne'],
     co2e: 10,
     plate: { veg: 0.48, carb: 0, protein: 0.49 },
-    kostrad: { fruktGront: 71, rottKott: 26 },
+    kostrad: { fruktGront: 48, baljvaxter: 23, rottKott: 26 },
     note: 'Nötfärs, kidneybönor, krossade tomater, lök och paprika. Utan ris.',
   },
   {
@@ -954,7 +960,7 @@ const kottFagelRatter: FoodSeed[] = [
     syn: ['bruna bönor och fläsk', 'fläsk och bruna bönor', 'stuvade bruna bönor med fläsk', 'bruna bönor med fläsk'],
     co2e: 2.3,
     plate: { veg: 0, carb: 0, protein: 0.85 },
-    kostrad: { fruktGront: 59, rottKott: 26 },
+    kostrad: { baljvaxter: 59, rottKott: 26 },
     note: 'Beräknat på en portion med 200 g stuvade bruna bönor och 70 g stekt rimmat sidfläsk.',
   },
   {
@@ -1269,7 +1275,7 @@ const soppor: FoodSeed[] = [
     syn: ['linssoppa', 'röd linssoppa', 'linsoppa', 'soppa på röda linser', 'linssoppa med kokos'],
     co2e: 0.3,
     plate: { veg: 0.19, carb: 0, protein: 0.18 },
-    kostrad: { fruktGront: 37 },
+    kostrad: { fruktGront: 19, baljvaxter: 18 },
   },
 ]
 
@@ -1782,7 +1788,7 @@ const internationellt: FoodSeed[] = [
     syn: ['poké', 'poke bowl', 'pokebowl', 'poké bowl', 'laxbowl', 'sushibowl', 'poke'],
     co2e: 1.6,
     plate: { veg: 0.29, carb: 0.37, protein: 0.28 },
-    kostrad: { fruktGront: 37, fisk: 19 },
+    kostrad: { fruktGront: 29, baljvaxter: 8, fisk: 19 },
     note: 'Sushiris med rå lax, edamame, avokado, gurka, mango, morot och krämig chilidressing.',
   },
   {
@@ -1905,7 +1911,7 @@ const internationellt: FoodSeed[] = [
     syn: ['burrito', 'kycklingburrito', 'burrito kyckling', 'mexikansk wrap', 'burritos'],
     co2e: 2.2,
     plate: { veg: 0.08, carb: 0.39, protein: 0.37 },
-    kostrad: { fruktGront: 20 },
+    kostrad: { fruktGront: 8, baljvaxter: 13 },
     note: 'Beräknat på en portion med 75 g tortillabröd, 80 g kokt ris, 50 g kokta bönor, 70 g stekt kycklingfilé, 25 g hårdost, 40 g tacosås, 25 g gräddfil, 15 g isbergssallad och 15 g majs.',
   },
   {
@@ -2015,7 +2021,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['linsgryta', 'röd linsgryta', 'linsgryta kokos', 'vegansk gryta', 'vegetarisk gryta', 'linsgryta med tomat'],
     co2e: 0.8,
     plate: { veg: 0.41, carb: 0, protein: 0.35 },
-    kostrad: { fruktGront: 76 },
+    kostrad: { fruktGront: 41, baljvaxter: 35 },
     note: 'Röda linser med krossade tomater, kokosmjölk, lök och morot. Utan ris.',
   },
   {
@@ -2033,7 +2039,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['dagens vegetariska', 'vegetarisk lunch', 'linsgryta och ris', 'vegansk lunch', 'dagens vego', 'linsgryta med ris'],
     co2e: 0.9,
     plate: { veg: 0.24, carb: 0.42, protein: 0.2 },
-    kostrad: { fruktGront: 44 },
+    kostrad: { fruktGront: 24, baljvaxter: 20 },
     note: 'Beräknat på en portion med 250 g linsgryta och 180 g kokt ris.',
   },
   {
@@ -2052,7 +2058,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['vegetarisk chili', 'vegochili', 'chili sin carne', 'bönchili', 'bongryta', 'vegansk chili'],
     co2e: 0.7,
     plate: { veg: 0.59, carb: 0, protein: 0.35 },
-    kostrad: { fruktGront: 94 },
+    kostrad: { fruktGront: 59, baljvaxter: 35 },
     note: 'Kidneybönor och svarta bönor med tomat, paprika, majs och lök. Utan ris.',
   },
   {
@@ -2087,7 +2093,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['vegetarisk wok', 'grönsakswok', 'nudelwok', 'wok med nudlar', 'tofuwok', 'wokade nudlar', 'vegowok'],
     co2e: 0.7,
     plate: { veg: 0.38, carb: 0.43, protein: 0.11 },
-    kostrad: { fruktGront: 38 },
+    kostrad: { fruktGront: 38, baljvaxter: 11 },
   },
   {
     id: 'dal-linsgryta',
@@ -2105,7 +2111,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['dahl', 'daal', 'dal', 'linsdal', 'tarka dal', 'indisk linsgryta'],
     co2e: 0.6,
     plate: { veg: 0.13, carb: 0, protein: 0.56 },
-    kostrad: { fruktGront: 69 },
+    kostrad: { fruktGront: 13, baljvaxter: 56 },
     note: 'Röda linser kokta med lök, tomat, gurkmeja, spiskummin och ingefära. Utan ris.',
   },
   {
@@ -2123,7 +2129,7 @@ const vegetariskt: FoodSeed[] = [
     syn: ['falafel tallrik', 'falafel med bulgur', 'falafelplatta', 'mezetallrik', 'falafellunch', 'falafeltallrik'],
     co2e: 1,
     plate: { veg: 0.26, carb: 0.28, protein: 0.37 },
-    kostrad: { fruktGront: 45 },
+    kostrad: { fruktGront: 26, baljvaxter: 20 },
     note: 'Beräknat på en portion med 120 g falafel, 120 g kokt bulgur, 40 g hummus, 30 g isbergssallad, 40 g tomat, 30 g gurka, 10 g lök och 40 g tzatziki.',
   },
 ]
@@ -2390,7 +2396,7 @@ const kebabFalafel: FoodSeed[] = [
     syn: ['falafel rulle', 'falafelwrap', 'falafel i bröd', 'falafel dürüm', 'felafelrulle', 'falafelrulle'],
     co2e: 1.1,
     plate: { veg: 0.26, carb: 0.29, protein: 0.32 },
-    kostrad: { fruktGront: 42 },
+    kostrad: { fruktGront: 26, baljvaxter: 16 },
     note: 'Beräknat på en portion med 90 g mjukt tunnbröd, 100 g falafel, 25 g isbergssallad, 25 g tomat, 20 g gurka, 10 g lök, 30 g vitlökssås och 10 g tacosås.',
   },
 ]
@@ -2516,7 +2522,7 @@ const hamburgare: FoodSeed[] = [
     syn: ['vegoburgare', 'vegburgare', 'vegetarisk hamburgare', 'veggieburger', 'växtbaserad burgare', 'plant burger'],
     co2e: 1.1,
     plate: { veg: 0.21, carb: 0.38, protein: 0.33 },
-    kostrad: { fruktGront: 21 },
+    kostrad: { fruktGront: 21, baljvaxter: 33 },
     note: 'Växtbaserad biff (soja- eller ärtprotein) i hamburgerbröd med dressing och grönsaker.',
   },
   {

@@ -1,7 +1,8 @@
 /**
  * Rad för ett livsmedel eller en dagbokspost: ikon (eller bild), namn, märke/mängd, energi till
- * höger och små makroprickar. Långa svenska namn ("Mjölk mellan 1,5 % fett, laktosfri") bryts
- * på högst två rader.
+ * höger och makron (P/K/F med färgprick – bokstaven bär betydelsen, färgen är extra stöd).
+ * Långa svenska namn ("Mjölk mellan 1,5 % fett, laktosfri") bryts på högst två rader
+ * (`nameLines={3}` för tre).
  *
  * Använd `entryToRow(entry)` eller `foodToRow(food, …)` för att få fram props från domändata.
  */
@@ -46,6 +47,8 @@ export interface FoodRowProps extends FoodRowData {
   showMacros?: boolean
   /** Tätare rad (mindre ikon). */
   compact?: boolean
+  /** Högsta antal rader för namnet innan det klipps med "…". Standard 2. */
+  nameLines?: 2 | 3
   /** Dölj energi- och makrokolumnen helt (medvetet läge). */
   hideEnergy?: boolean
   className?: string
@@ -124,6 +127,7 @@ export function FoodRow({
   badge,
   showMacros = true,
   compact = false,
+  nameLines = 2,
   hideEnergy = false,
   className = '',
 }: FoodRowProps) {
@@ -150,11 +154,11 @@ export function FoodRow({
           className={`${imageBox} shrink-0 bg-surface-2 object-cover`}
         />
       ) : (
-        <CategoryIcon category={category} emoji={emoji} size={iconSize} />
+        <CategoryIcon category={category} emoji={emoji} name={name} size={iconSize} />
       )}
       <span className="min-w-0 flex-1">
         <span
-          className={`line-clamp-2 break-words font-medium leading-snug text-ink [hyphens:auto] ${compact ? 'text-sm' : 'text-[0.95rem]'}`}
+          className={`${nameLines === 3 ? 'line-clamp-3' : 'line-clamp-2'} break-words font-medium leading-snug text-ink [hyphens:auto] ${compact ? 'text-sm' : 'text-[0.95rem]'}`}
           lang="sv"
         >
           {name}
@@ -177,13 +181,19 @@ export function FoodRow({
             {kcal !== undefined ? <EnergyValue kcal={kcal} /> : <span className="text-ink-3">–</span>}
           </span>
           {hasMacros && (
-            <span className="mt-0.5 inline-flex items-center gap-1.5 text-[10.5px] text-ink-3 tabular-nums" aria-hidden="true">
+            // Bokstaven (P/K/F) bär betydelsen – färgpricken är bara ett extra stöd (WCAG 1.4.1).
+            // Skärmläsare får makrona i radens etikett i stället.
+            <span className="mt-0.5 inline-flex items-center gap-1.5 whitespace-nowrap text-[10.5px] text-ink-3 tabular-nums" aria-hidden="true">
               {knownMacros.map((m) => {
                 const v = m3[m.key] ?? 0
                 return (
-                  <span key={m.key} className="inline-flex items-center gap-[3px]" title={m.label}>
+                  <span key={m.key} className="inline-flex items-center gap-[3px]" title={`${m.label} ${formatNumber(v, 1)} g`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
-                    {formatNumber(v, v < 10 ? 1 : 0)}
+                    <span>
+                      <span className="font-semibold text-ink-2">{m.short}</span>
+                      {'\u2009'}
+                      {formatNumber(v, v < 10 ? 1 : 0)}
+                    </span>
                   </span>
                 )
               })}

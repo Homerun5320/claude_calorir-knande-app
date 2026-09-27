@@ -60,7 +60,7 @@ export const FiveTwoCard = memo(function FiveTwoCard({ mindful }: { mindful: boo
     <Card variant="flat" eyebrow="Ett annat upplägg" title="Om 5:2">
       <p className="text-[0.875rem] leading-relaxed text-ink-2">
         Vid 5:2 äter man som vanligt fem dagar i veckan och ungefär en fjärdedel av sitt vanliga energibehov
-        {mindful ? '' : ' (runt 500–600 kcal)'} två dagar som inte ligger i rad. Lagom har ingen timer för 5:2 – dagboken räcker. Rådgör
+        {mindful ? '' : ' (runt 500–600\u00a0kcal)'} två dagar som inte ligger i rad. Lagom har ingen timer för 5:2 – dagboken räcker. Rådgör
         gärna med vården först, och välj hellre ett upplägg som känns hållbart än ett som känns strängt.
       </p>
     </Card>

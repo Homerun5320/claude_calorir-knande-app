@@ -316,7 +316,10 @@ export function kostradContributions(food: Food, grams: number): KostradContribu
   if (!(grams > 0)) return []
   const k = foodKostrad(food)
   const f = grams / 100
-  const g = (v: number) => formatNumber(v, v < 10 ? 1 : 0)
+  // Hårt mellanslag mellan tal och enhet – "120 g" delas aldrig mellan två rader.
+  const g = (v: number) => `${formatNumber(v, v < 10 ? 1 : 0)}\u00a0g`
+  // Mejeri anges i dl, precis som kostrådet (3,5–5 dl om dagen); 1 g mejeriprodukt ≈ 1 ml.
+  const dl = (ml: number) => `${formatNumber(ml / 100, 1)}\u00a0dl`
   const out: KostradContribution[] = []
   const add = (c: KostradContribution) => {
     if (c.grams >= 0.5) out.push(c)
@@ -324,38 +327,38 @@ export function kostradContributions(food: Food, grams: number): KostradContribu
   if (k.fruktGront) {
     const v = k.fruktGront * f
     const t = KOSTRAD_TARGETS.fruktGrontPerDay
-    add({ key: 'fruktGront', label: 'Grönsaker, frukt och bär', grams: v, share: v / t, text: `${g(v)} g av rekommenderade ${t} g om dagen`, tone: 'mossa' })
+    add({ key: 'fruktGront', label: 'Grönsaker, frukt och bär', grams: v, share: v / t, text: `${g(v)} av rekommenderade ${g(t)} om dagen`, tone: 'mossa' })
   }
   if (k.baljvaxter) {
     const v = k.baljvaxter * f
     const t = KOSTRAD_TARGETS.baljvaxterDayMinG
-    add({ key: 'baljvaxter', label: 'Baljväxter', grams: v, share: v / t, text: `${g(v)} g – från ${t} g räknas dagen som en baljväxtdag`, tone: 'mossa' })
+    add({ key: 'baljvaxter', label: 'Baljväxter', grams: v, share: v / t, text: `${g(v)} – från ${g(t)} räknas dagen som en baljväxtdag`, tone: 'mossa' })
   }
   const wholegrain = food.nutrients.wholegrain
   if (wholegrain !== undefined && wholegrain > 0) {
     const v = wholegrain * f
     const t = KOSTRAD_TARGETS.fullkornPerDay
-    add({ key: 'fullkorn', label: 'Fullkorn', grams: v, share: v / t, text: `${g(v)} g av rekommenderade ${t} g om dagen`, tone: 'mossa' })
+    add({ key: 'fullkorn', label: 'Fullkorn', grams: v, share: v / t, text: `${g(v)} av rekommenderade ${g(t)} om dagen`, tone: 'mossa' })
   }
   if (k.fisk) {
     const v = k.fisk * f
     const t = KOSTRAD_TARGETS.fiskPerWeek
-    add({ key: 'fisk', label: 'Fisk och skaldjur', grams: v, share: v / t, text: `${g(v)} g av ${t}–450 g i veckan`, tone: 'fjall' })
+    add({ key: 'fisk', label: 'Fisk och skaldjur', grams: v, share: v / t, text: `${g(v)} av ${t}–${g(450)} i veckan`, tone: 'fjall' })
   }
   if (k.notter) {
     const v = k.notter * f
     const t = KOSTRAD_TARGETS.notterPerDay
-    add({ key: 'notter', label: 'Nötter och frön', grams: v, share: v / t, text: `${g(v)} g av ${t}–30 g om dagen`, tone: 'mossa' })
+    add({ key: 'notter', label: 'Nötter och frön', grams: v, share: v / t, text: `${g(v)} av ${t}–${g(30)} om dagen`, tone: 'mossa' })
   }
   if (k.mejeri) {
     const v = k.mejeri * f
     const t = KOSTRAD_TARGETS.mejeriPerDay
-    add({ key: 'mejeri', label: 'Mejeriprodukter', grams: v, share: v / t, text: `${g(v)} g av ${t}–${KOSTRAD_TARGETS.mejeriMaxPerDay} ml om dagen`, tone: 'fjall' })
+    add({ key: 'mejeri', label: 'Mejeriprodukter', grams: v, share: v / t, text: `${dl(v)} av ${formatNumber(t / 100, 1)}–${dl(KOSTRAD_TARGETS.mejeriMaxPerDay)} om dagen`, tone: 'fjall' })
   }
   if (k.rottKott) {
     const v = k.rottKott * f
     const t = KOSTRAD_TARGETS.rottKottPerWeek
-    add({ key: 'rottKott', label: 'Rött kött och chark', grams: v, text: `${g(v)} g – rådet är högst ${t} g tillagat i veckan`, tone: 'sol' })
+    add({ key: 'rottKott', label: 'Rött kött och chark', grams: v, text: `${g(v)} – rådet är högst ${g(t)} tillagat i veckan`, tone: 'sol' })
   }
   return out
 }

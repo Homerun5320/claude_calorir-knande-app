@@ -12,6 +12,7 @@ import {
   defaultMealForDay,
   diaryPath,
   entryNameInSentence,
+  entrySubtitle,
   exerciseAddBack,
   isValidISODate,
   mealAriaSummary,
@@ -125,7 +126,7 @@ describe('måltider', () => {
     const entries = [food(LAX, 125, 'middag')]
     expect(mealAriaSummary('Middag', entries, 'kcal', false)).toBe('Middag: 250 kcal, 1 post')
     expect(mealAriaSummary('Middag', entries, 'kcal', true)).toBe('Middag: 1 post')
-    expect(mealAriaSummary('Fika', [], 'kcal', false)).toBe('Fika: inget registrerat')
+    expect(mealAriaSummary('Fika', [], 'kcal', false)).toBe('Fika: inget loggat')
   })
 
   it('beskriver kopieringsmål', () => {
@@ -232,6 +233,13 @@ describe('poster', () => {
     expect(normalizeNote('  ')).toBeUndefined()
     expect(normalizeNote(' god ')).toBe('god')
   })
+
+  it('sätter klockslaget först i undertexten så att det aldrig klipps bort', () => {
+    expect(entrySubtitle({ time: '07:10', note: 'god' }, '1 portion (på 1 dl gryn, 240 g)')).toBe('07:10 · 1 portion (på 1 dl gryn, 240 g) · anteckning')
+    expect(entrySubtitle({}, '2 dl (206 g)')).toBe('2 dl (206 g)')
+    expect(entrySubtitle({ time: '12:30' }, undefined)).toBe('12:30')
+    expect(entrySubtitle({}, undefined)).toBe('')
+  })
 })
 
 describe('sparade måltider', () => {
@@ -309,7 +317,7 @@ describe('daySummaryText', () => {
     expect(text).toContain('• Något gott – –')
     expect(text).toContain('Planerat 0 kcal')
     const empty = daySummaryText({ date: '2026-09-20', today: TODAY, meals: DEFAULT_MEALS, entries: [], complete: true })
-    expect(empty).toContain('Inget registrerat.')
+    expect(empty).toContain('Inget loggat.')
     expect(empty).toContain('Dagen är markerad som klar')
   })
 })

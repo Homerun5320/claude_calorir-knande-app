@@ -30,16 +30,16 @@ describe('klockslag och dagsljus', () => {
   })
 
   it('dagsljusets längd i timmar och minuter', () => {
-    expect(formatDaylight(11.7)).toBe('11 h 42 min')
-    expect(formatDaylight(6)).toBe('6 h')
-    expect(formatDaylight(0.5)).toBe('30 min')
+    expect(formatDaylight(11.7)).toBe('11\u00a0h 42\u00a0min')
+    expect(formatDaylight(6)).toBe('6\u00a0h')
+    expect(formatDaylight(0.5)).toBe('30\u00a0min')
   })
 
   it('dagarna blir längre på våren och kortare på hösten', () => {
     expect(daylightDeltaMinutes('2026-03-20')).toBeGreaterThan(0)
     expect(daylightDeltaMinutes('2026-09-26')).toBeLessThan(0)
-    expect(describeDaylightDelta(4)).toBe('4 minuter längre än igår')
-    expect(describeDaylightDelta(-1)).toBe('1 minut kortare än igår')
+    expect(describeDaylightDelta(4)).toBe('4\u00a0minuter längre än igår')
+    expect(describeDaylightDelta(-1)).toBe('1\u00a0minut kortare än igår')
     expect(describeDaylightDelta(0)).toBe('Ungefär lika lång som igår')
   })
 
@@ -87,9 +87,9 @@ describe('matkalendern', () => {
 
 describe('nyckeltal', () => {
   it('formaterar pågående fasta', () => {
-    expect(formatElapsed(5 * 60_000)).toBe('5 min')
-    expect(formatElapsed((12 * 60 + 5) * 60_000)).toBe('12 h 5 min')
-    expect(formatElapsed(-10)).toBe('0 min')
+    expect(formatElapsed(5 * 60_000)).toBe('5\u00a0min')
+    expect(formatElapsed((12 * 60 + 5) * 60_000)).toBe('12\u00a0h 5\u00a0min')
+    expect(formatElapsed(-10)).toBe('0\u00a0min')
   })
 
   it('räknar loggade dagar den senaste veckan', () => {

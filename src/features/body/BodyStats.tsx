@@ -40,7 +40,7 @@ function Tile({ children, footer }: { children: ReactNode; footer?: ReactNode })
 }
 
 export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, waist, onMeasureWaist }: BodyStatsProps) {
-  const { trendKg, startKg, startDate, rate, good, age } = overview
+  const { trendKg, startKg, startDate, rate, good, age, status } = overview
   if (trendKg === undefined) return null
 
   // Klassningen görs på det visade (avrundade) värdet och tar hänsyn till åldern.
@@ -53,7 +53,10 @@ export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, 
   const ratio = waist && heightCm ? waistToHeight(waist.value, heightCm) : undefined
   const whtr = ratio !== undefined ? whtrCategory(ratio) : undefined
   const sinceStart = startKg !== undefined ? trendKg - startKg : undefined
-  const showPlan = plannedRateKg !== undefined && plannedRateKg > 0 && (goal === 'ga_ner' || goal === 'ga_upp') && good !== undefined
+  // Planen visas bara när viktmålet faktiskt gäller (inte pausat eller nått). Tonen är neutral –
+  // viktnedgång tonas aldrig grönt (`good` är bara 'up' vid ett mål om att gå upp).
+  const planActive = status.kind !== 'paused' && status.kind !== 'reached'
+  const showPlan = plannedRateKg !== undefined && plannedRateKg > 0 && (goal === 'ga_ner' || goal === 'ga_upp') && planActive
 
   return (
     <section aria-labelledby="body-stats-title">
@@ -120,7 +123,7 @@ export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, 
           footer={
             rate
               ? showPlan
-                ? `Per vecka, senaste 4 v. Plan: ${formatNumber(plannedRateKg, 2)} kg`
+                ? `Per vecka, senaste 4 v. Plan: ${formatNumber(plannedRateKg, 2)}\u00a0kg`
                 : 'Per vecka, senaste 4 veckorna'
               : 'Väg dig några gånger under ett par veckor'
           }

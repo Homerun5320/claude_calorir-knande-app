@@ -1,7 +1,7 @@
 /**
  * Livsmedelssök i React: användarens egna livsmedel, recept och sparade produkter + den
- * inbyggda databasen, rankat med personlig relevans (användning, senast använd, favoriter
- * och vilken måltid livsmedlet brukar ätas till).
+ * inbyggda databasen och de svenska klassikerna, rankat med personlig relevans (användning,
+ * senast använd, favoriter och vilken måltid livsmedlet brukar ätas till).
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { Food, FoodCategory, MealId } from '../types'
@@ -103,16 +103,19 @@ export function useFoodSearch(query: string, opts: UseFoodSearchOptions = {}): U
 
   const userIndex = useMemo(() => indexFor(userFoodCatalog(customFoods, recipes, cachedFoods).list), [customFoods, recipes, cachedFoods])
   const builtinIndex = useMemo(() => (catalog ? indexFor(catalog.foods) : null), [catalog])
+  // Klassikerna (recept) söks i ett eget index – samma lista i båda stegen av inläsningen.
+  const recipeFoods = catalog?.recipeFoods
+  const recipeIndex = useMemo(() => (recipeFoods && recipeFoods.length > 0 ? indexFor(recipeFoods) : null), [recipeFoods])
   const boost = useMemo(() => createUsageBoost(usage, favorites, meal), [usage, favorites, meal])
   // Stabil nyckel så att en ny array med samma kategorier inte ger en ny sökning.
   const catKey = categories && categories.length > 0 ? [...categories].sort().join(',') : ''
 
   const results = useMemo(() => {
     if (!effective && !catKey) return EMPTY_RESULTS
-    const indexes = builtinIndex ? [userIndex, builtinIndex] : [userIndex]
+    const indexes = [userIndex, builtinIndex, recipeIndex].filter((ix): ix is SearchIndex => ix !== null)
     const cats = catKey ? (catKey.split(',') as FoodCategory[]) : undefined
     return searchFoods(indexes, effective, { limit, categories: cats, boost })
-  }, [effective, catKey, userIndex, builtinIndex, limit, boost])
+  }, [effective, catKey, userIndex, builtinIndex, recipeIndex, limit, boost])
 
   const loading = catalog === null && (effective !== '' || catKey !== '')
   const pending = q !== effective

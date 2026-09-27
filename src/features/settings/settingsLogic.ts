@@ -1,12 +1,10 @@
 /**
  * Ren logik för Inställningar: makrofördelning, egna mål, måltider, lagring och cache.
  */
-import type { Food, ISODate, MealConfig, MealId, NutrientKey, Profile, Targets } from '../../types'
+import type { Food, MealConfig, MealId, NutrientKey, Profile, Targets } from '../../types'
 import { DEFAULT_MEALS } from '../../stores/profileStore'
-import { MIN_KCAL, type EnergyBreakdown } from '../../lib/energy'
-import { todayISO } from '../../lib/dates'
+import { computeTargets, kcalFloorReasonText, type EnergyOptions, type KcalFloor } from '../../lib/energy'
 import { formatEnergy, formatNumber } from '../../lib/format'
-import { minimumAge } from '../onboarding/profileLogic'
 
 // ---------------------------------------------------------------------------
 // Makrofördelning (energiprocent)
@@ -112,7 +110,7 @@ export function outsideNnr(pct: MacroPct): MacroKey[] {
 export function nnrNote(pct: MacroPct): string | null {
   const keys = outsideNnr(pct)
   if (keys.length === 0) return null
-  const parts = keys.map((k) => `${MACRO_LABELS[k].toLocaleLowerCase('sv-SE')} (${NNR_RANGES[k][0]}–${NNR_RANGES[k][1]} %)`)
+  const parts = keys.map((k) => `${MACRO_LABELS[k].toLocaleLowerCase('sv-SE')} (${NNR_RANGES[k][0]}–${NNR_RANGES[k][1]}\u00a0%)`)
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]}`
   return `Utanför de nordiska rekommendationernas intervall för ${list}. Det är helt okej om det är ett medvetet val – tänk på att få i dig fibrer, grönsaker och omättat fett.`
 }
@@ -139,56 +137,39 @@ export const OVERRIDE_FIELDS: readonly OverrideField[] = [
   { key: 'proteinG', label: 'Protein', unit: 'g', step: 1, decimals: 0, min: 20, max: 400 },
   { key: 'carbsG', label: 'Kolhydrater', unit: 'g', step: 5, decimals: 0, min: 0, max: 800 },
   { key: 'fatG', label: 'Fett', unit: 'g', step: 1, decimals: 0, min: 20, max: 400 },
-  { key: 'fiberG', label: 'Fibrer', unit: 'g', step: 1, decimals: 0, min: 10, max: 100, hint: 'NNR: minst 25 g (kvinnor) och 35 g (män)' },
+  { key: 'fiberG', label: 'Fibrer', unit: 'g', step: 1, decimals: 0, min: 10, max: 100, hint: 'NNR: minst 25\u00a0g (kvinnor) och 35\u00a0g (män)' },
   { key: 'waterMl', label: 'Dryck', unit: 'ml', step: 100, decimals: 0, min: 500, max: 6000, hint: 'Vatten och annan dryck' },
-  { key: 'saltMaxG', label: 'Salt, högst', unit: 'g', step: 0.5, decimals: 1, min: 1, max: 15, hint: 'Rekommendationen är högst 6 g per dag' },
+  { key: 'saltMaxG', label: 'Salt, högst', unit: 'g', step: 0.5, decimals: 1, min: 1, max: 15, hint: 'Rekommendationen är högst 6\u00a0g per dag' },
 ]
 
-export type KcalFloorReason = 'golv' | 'gravid' | 'ammar' | 'ung'
-
-export interface KcalFloor {
-  /** Lägsta tillåtna egna energimål i kcal. */
-  kcal: number
-  reason: KcalFloorReason
-}
-
 /**
- * Lägsta egna energimål. Aldrig under säkerhetsgolvet (1 200/1 500 kcal), och vid graviditet,
- * amning eller under 18 år aldrig under förbrukningen – då rekommenderas ingen viktnedgång.
- * Samma regler som `computeEnergy`; åldern räknas försiktigt (se `minimumAge`).
+ * Lägsta egna energimål – regeln finns i lib/energy så att `computeTargets` aldrig använder ett
+ * lägre värde (t.ex. från en säkerhetskopia), och fältet här visar samma golv.
  */
-export function kcalOverrideFloor(
-  profile: Pick<Profile, 'sex' | 'lifeStage' | 'birthYear'>,
-  energy: Pick<EnergyBreakdown, 'tdee' | 'lifeStageKcal'>,
-  today: ISODate = todayISO(),
-): KcalFloor {
-  const base = MIN_KCAL[profile.sex]
-  const reason: KcalFloorReason | null =
-    profile.lifeStage === 'gravid' ? 'gravid' : profile.lifeStage === 'ammar' ? 'ammar' : minimumAge(profile.birthYear, today) < 18 ? 'ung' : null
-  if (reason === null) return { kcal: base, reason: 'golv' }
-  const maintenance = Math.ceil((energy.tdee + energy.lifeStageKcal) / 10) * 10
-  return maintenance > base ? { kcal: maintenance, reason } : { kcal: base, reason: 'golv' }
-}
+export { kcalOverrideFloor, type KcalFloor, type KcalFloorReason } from '../../lib/energy'
 
-/** Förklaring till golvet för egna energimål (visas under fältet). */
+/** Förklaring till golvet för egna energimål (visas under fältet). Samma skäl som i lib/energy. */
 export function kcalFloorText(floor: KcalFloor, unit: 'kcal' | 'kJ'): string {
-  const value = formatEnergy(floor.kcal, unit)
-  switch (floor.reason) {
-    case 'gravid':
-      return `Lägst ${value} – under graviditeten rekommenderas ingen viktnedgång, så målet följer din förbrukning.`
-    case 'ammar':
-      return `Lägst ${value} – när du ammar rekommenderas ingen viktnedgång, så målet följer din förbrukning.`
-    case 'ung':
-      return `Lägst ${value} – under 18 år rekommenderas inget kaloriunderskott, så målet följer din förbrukning.`
-    default:
-      return `Lägst ${value} – så att kroppen får tillräckligt med näring.`
-  }
+  return `Lägst ${formatEnergy(floor.kcal, unit)} – ${kcalFloorReasonText(floor.reason)}`
 }
 
 /** Egna mål där ett för lågt energimål har höjts till golvet. Samma objekt om inget behövde ändras. */
 export function clampKcalOverride(overrides: Partial<Targets>, floorKcal: number): Partial<Targets> {
   if (overrides.kcal === undefined || overrides.kcal >= floorKcal) return overrides
   return { ...overrides, kcal: floorKcal }
+}
+
+/**
+ * Beräknade värden att visa som platshållare i "Egna mål": för varje fält det värde som skulle
+ * gälla om just det fältet lämnades tomt – med alla andra egna mål inräknade. Sätter man t.ex.
+ * eget protein visar kolhydratfältet de kolhydrater som blir kvar av energin (samma regel som
+ * `computeTargets`). Energifältet visar Lagoms beräknade dagsmål.
+ */
+export function computedDefaults(profile: Profile, weightKg: number, overrides: Partial<Targets>, opts: EnergyOptions = {}): Targets {
+  const without = (key: keyof Targets) => computeTargets(profile, weightKg, withOverride(overrides, key, undefined), opts)
+  const out = computeTargets(profile, weightKg, overrides, opts)
+  for (const f of OVERRIDE_FIELDS) out[f.key] = without(f.key)[f.key]
+  return out
 }
 
 /**
@@ -257,7 +238,7 @@ export const GLASS_SIZES: readonly number[] = [200, 250, 300, 330]
 
 /** 250 → "2,5 dl" */
 export function glassLabel(ml: number): string {
-  return `${formatNumber(ml / 100, 1)} dl`
+  return `${formatNumber(ml / 100, 1)}\u00a0dl`
 }
 
 // ---------------------------------------------------------------------------

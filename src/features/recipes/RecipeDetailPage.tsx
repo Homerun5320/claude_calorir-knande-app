@@ -277,7 +277,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
 
         {parsed.steps.length > 0 && (
           <motion.div {...enter(2)}>
-            <Card title="Så gör du" eyebrow={`${parsed.steps.length} steg`} action={<ListOrdered aria-hidden className="size-5 text-ink-3" />}>
+            <Card title="Så gör du" eyebrow={`${parsed.steps.length}\u00a0steg`} action={<ListOrdered aria-hidden className="size-5 text-ink-3" />}>
               <ol className="flex flex-col gap-3.5">
                 {parsed.steps.map((step, i) => (
                   <li key={i} className="flex gap-3">
@@ -321,7 +321,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
                   <span>Ungefär som att köra {climate.carText} med en genomsnittlig svensk personbil.</span>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-ink-3">
-                  En klimatsmart måltid ligger kring 0,5 kg CO₂e (WWF One Planet Plate). Beräknat från ingrediensernas schabloner.
+                  En klimatsmart måltid ligger kring 0,5{'\u00a0'}kg CO₂e (WWF One Planet Plate). Beräknat från ingrediensernas schabloner.
                 </p>
               </Card>
             )}
@@ -346,7 +346,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
                   {references
                     ? 'Staplarna visar hur stor del av ditt dagliga referensintag (NNR 2023) en portion ger. En enskild rätt behöver inte täcka allt.'
                     : 'Fyll i din profil för att jämföra med dina referensvärden enligt NNR 2023.'}{' '}
-                  Okända värden visas som "–" och räknas inte som noll.
+                  Okända värden visas som ”–” och räknas inte som noll.
                 </p>
               </>
             )}
@@ -441,7 +441,7 @@ function NutritionCard({
           thickness={15}
           legend="none"
           title="Energifördelning"
-          formatValue={(v) => `${formatNumber(v)} E%`}
+          formatValue={(v) => `${formatNumber(v)}\u00a0E%`}
         >
           <div className="flex flex-col items-center px-3 text-center">
             {numbersHidden ? (
@@ -465,9 +465,9 @@ function NutritionCard({
                   <span className="flex-1 text-sm font-medium text-ink">{m.label}</span>
                   {!numbersHidden && (
                     <>
-                      <span className="text-xs text-ink-3 tabular-nums">{hasEnergy ? `${formatNumber(dist[m.key])} E%` : ''}</span>
+                      <span className="text-xs text-ink-3 tabular-nums">{hasEnergy ? `${formatNumber(dist[m.key])}\u00a0E%` : ''}</span>
                       <span className="w-16 text-right text-sm font-semibold text-ink tabular-nums">
-                        {grams !== undefined ? `${formatNumber(grams, grams < 10 ? 1 : 0)} g` : '–'}
+                        {grams !== undefined ? `${formatNumber(grams, grams < 10 ? 1 : 0)}\u00a0g` : '–'}
                       </span>
                     </>
                   )}
@@ -480,7 +480,7 @@ function NutritionCard({
                 <span aria-hidden className="size-2.5 shrink-0 rounded-full bg-fiber" />
                 <span className="flex-1 text-sm font-medium text-ink">Fibrer</span>
                 <span className="w-16 text-right text-sm font-semibold text-ink tabular-nums">
-                  {perServing.fiber !== undefined ? `${formatNumber(perServing.fiber, 1)} g` : '–'}
+                  {perServing.fiber !== undefined ? `${formatNumber(perServing.fiber, 1)}\u00a0g` : '–'}
                 </span>
               </li>
             )}

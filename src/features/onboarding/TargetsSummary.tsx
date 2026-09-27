@@ -5,9 +5,10 @@
 import type { ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { cx, toneVars, type Tone } from '../../components/ui'
-import { useEnergyFormatter } from '../../components/domain/EnergyValue'
+import { useEnergyUnit } from '../../components/domain/EnergyValue'
 import type { EnergyBreakdown } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
+import { KJ_PER_KCAL } from '../../lib/nutrients'
 import type { Targets } from '../../types'
 
 interface Row {
@@ -17,25 +18,61 @@ interface Row {
   strong?: boolean
 }
 
-export function energyRows(energy: EnergyBreakdown, fmt: (kcal: number, withUnit?: boolean) => string): Row[] {
+export interface EnergyRows {
+  /** Raderna i uträkningen (förbrukning, tillägg, justering …). */
+  rows: Row[]
+  /** Dagsmålet som raderna summerar till. */
+  total: string
+}
+
+/** Energi i visningsenheten, avrundad till heltal – samma avrundning som `formatEnergy`. */
+function toUnit(kcal: number, unit: 'kcal' | 'kJ'): number {
+  return Math.round(unit === 'kJ' ? kcal * KJ_PER_KCAL : kcal)
+}
+
+function signed(v: number, unit: 'kcal' | 'kJ'): string {
+  if (v === 0) return '±0'
+  return `${v > 0 ? '+' : '−'}${formatNumber(Math.abs(v))} ${unit}`
+}
+
+/**
+ * Uträkningen av dagsmålet, steg för steg. De visade talen går alltid jämnt upp med dagsmålet:
+ * dagsmålet avrundas till jämna 10 kcal (och kJ räknas om per rad), så avrundningen läggs på
+ * justeringsraden – eller på förbrukningen när ingen justering görs – i stället för att summan
+ * blir fel ("2 223 − 550 = 1 670"). När säkerhetsgolvet höjer målet visas det som en egen rad.
+ */
+export function energyRows(energy: EnergyBreakdown, unit: 'kcal' | 'kJ' = 'kcal'): EnergyRows {
+  const u = (kcal: number) => toUnit(kcal, unit)
+  const total = u(energy.kcal)
+  const life = energy.lifeStageKcal > 0 ? u(energy.lifeStageKcal) : 0
+  let tdee = u(energy.tdee)
+  let adjustment = energy.adjustment === 0 ? 0 : u(energy.adjustment)
+  let floorRaise = 0
+  if (energy.atFloor) floorRaise = total - tdee - life - adjustment
+  else if (adjustment !== 0) adjustment = total - tdee - life
+  else tdee = total - life
+
   const rows: Row[] = [
-    { label: 'Basalomsättning', hint: 'Energin kroppen gör av med i vila', value: fmt(energy.bmr) },
+    { label: 'Basalomsättning', hint: 'Energin kroppen gör av med i vila', value: `${formatNumber(u(energy.bmr))} ${unit}` },
     {
       label: energy.tdeeSource === 'adaptiv' ? 'Förbrukning (adaptiv)' : 'Förbrukning per dag',
       hint:
         energy.tdeeSource === 'adaptiv'
           ? 'Räknad ur din vikttrend och ditt faktiska intag'
           : `Basalomsättning × ${formatNumber(energy.pal, 2)} för din vardagsaktivitet`,
-      value: fmt(energy.tdee),
+      value: `${formatNumber(tdee)} ${unit}`,
     },
   ]
-  if (energy.lifeStageKcal > 0) rows.push({ label: 'Graviditet/amning', hint: 'Extra energi till dig och barnet', value: `+${fmt(energy.lifeStageKcal)}` })
+  if (life > 0) rows.push({ label: 'Graviditet/amning', hint: 'Extra energi till dig och barnet', value: signed(life, unit) })
   rows.push({
     label: 'Justering för ditt mål',
-    hint: energy.adjustment === 0 ? 'Du behåller vikten' : energy.adjustment < 0 ? 'Ett lagom underskott' : 'Ett lagom överskott',
-    value: energy.adjustment === 0 ? '±0' : `${energy.adjustment > 0 ? '+' : '−'}${fmt(Math.abs(energy.adjustment))}`,
+    hint: adjustment === 0 ? 'Du behåller vikten' : adjustment < 0 ? 'Ett lagom underskott' : 'Ett lagom överskott',
+    value: signed(adjustment, unit),
   })
-  return rows
+  if (floorRaise > 0) {
+    rows.push({ label: 'Säkerhetsgolv', hint: 'Dagsmålet går aldrig under den lägsta rekommenderade nivån', value: signed(floorRaise, unit) })
+  }
+  return { rows, total: `${formatNumber(total)} ${unit}` }
 }
 
 /**
@@ -69,8 +106,10 @@ export interface TargetsSummaryProps {
 }
 
 export function TargetsSummary({ energy, targets, showBreakdown = true, extraNotes = [], className }: TargetsSummaryProps) {
-  const fmt = useEnergyFormatter()
-  const rows = energyRows(energy, (k, u) => fmt(k, u))
+  const unit = useEnergyUnit()
+  const { rows, total } = energyRows(energy, unit)
+  // Ett eget energimål (Inställningar → Mål och makron) går före det beräknade.
+  const custom = targets.kcal !== energy.kcal
   const notes: ReactNode[] = [...extraNotes, ...energy.notes]
   return (
     <div className={cx('flex flex-col gap-4', className)}>
@@ -85,9 +124,18 @@ export function TargetsSummary({ energy, targets, showBreakdown = true, extraNot
               <dd className="shrink-0 text-[0.9375rem] font-semibold tabular-nums text-ink">{r.value}</dd>
             </div>
           ))}
+          {custom && (
+            <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5">
+              <dt className="min-w-0">
+                <span className="block text-[0.9375rem] text-ink">Beräknat dagsmål</span>
+                <span className="block text-[0.75rem] leading-snug text-ink-3">Du har ett eget energimål som gäller i stället</span>
+              </dt>
+              <dd className="shrink-0 text-[0.9375rem] font-semibold tabular-nums text-ink">{total}</dd>
+            </div>
+          )}
           <div className="flex items-baseline justify-between gap-3 pt-3">
-            <dt className="font-display text-[1.0625rem] font-semibold text-ink">Dagsmål</dt>
-            <dd className="display-num text-[1.75rem] font-semibold text-gran">{fmt(targets.kcal)}</dd>
+            <dt className="font-display text-[1.0625rem] font-semibold text-ink">{custom ? 'Ditt dagsmål' : 'Dagsmål'}</dt>
+            <dd className="display-num text-[1.75rem] font-semibold text-gran">{custom ? `${formatNumber(Math.round(unit === 'kJ' ? targets.kcal * KJ_PER_KCAL : targets.kcal))} ${unit}` : total}</dd>
           </div>
         </dl>
       )}

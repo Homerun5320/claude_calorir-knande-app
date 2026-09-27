@@ -24,7 +24,7 @@ export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISO
 
   const addWithUndo = (ml: number) => {
     addWater(ml)
-    toast(`${formatNumber(ml)} ml vatten tillagt`, {
+    toast(`${formatNumber(ml)}\u00a0ml vatten tillagt`, {
       tone: 'success',
       action: { label: 'Ångra', onClick: () => addWater(-ml) },
     })

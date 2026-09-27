@@ -45,7 +45,7 @@ export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basi
       kcal: est.extraKcal,
       met: STEPS_MET,
       distanceKm: Math.round(est.extraKm * 100) / 100,
-      note: `${formatNumber(est.extraSteps)} steg utöver vardagens ${formatNumber(est.baseline)}`,
+      note: `${formatNumber(est.extraSteps)}\u00a0steg utöver vardagens ${formatNumber(est.baseline)}`,
     }
     const store = useDiaryStore.getState()
     if (existing) {
@@ -85,7 +85,7 @@ export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basi
             {!mindful && <Stat size="sm" label="Netto" value={`≈ ${formatEnergy(est.kcal, unit, false)}`} unit={unit} />}
           </div>
           <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">
-            Din aktivitetsnivå ({levelLabel}) räknar redan med ungefär {formatNumber(est.baseline)} steg om dagen.{' '}
+            Din aktivitetsnivå ({levelLabel}) räknar redan med ungefär {formatNumber(est.baseline)}{'\u00a0'}steg om dagen.{' '}
             {est.extraSteps > 0
               ? mindful
                 ? `De ${formatNumber(est.extraSteps)} stegen utöver det kan läggas till som extra rörelse.`

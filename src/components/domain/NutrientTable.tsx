@@ -3,17 +3,21 @@
  * kolhydrater, fett, övrigt (salt, alkohol, koffein), vitaminer och mineraler.
  *
  * - Okända värden visas som "–" (okänt är inte noll) och täckningsgraden visas överst.
+ * - Med `coverage` visas värden som bara är kända för en del av maten som "minst 48,7 g".
  * - Med `references` visas en stapel med procent av referensintaget (RI) eller maxgränsen,
  *   färgad efter status (samma regler och etiketter som `lib/nnr.ts`).
  * - Grupperna går att fälla ut/ihop. Per portion eller per 100 g hanteras av föräldern.
+ * - Grupprubrikerna får nivån efter föregående rubrik (h3 i ett kort med h2-rubrik).
  */
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ChevronDown } from 'lucide-react'
 import type { Nutrients } from '../../types'
 import { NUTRIENT_KEYS, NUTRIENTS, type NutrientKey } from '../../lib/nutrients'
 import { formatEnergy, formatNumber, formatNutrient } from '../../lib/format'
 import { LOW_THRESHOLD, STATUS_LABELS, type NutrientStatus, type StatusTone } from '../../lib/nnr'
+import { headingTag, useHeadingLevel, type HeadingLevel } from '../ui/headingLevel'
+import { useEnergyUnit } from './EnergyValue'
 
 /** Referensvärde per dag. `ri` = rekommenderat/adekvat intag, `ul` = övre gräns, `max` = rekommenderad högsta nivå. */
 export interface NutrientReference {
@@ -101,8 +105,19 @@ export interface NutrientTableProps {
   showCompleteness?: boolean
   /** Dölj rader med okänt värde (täckningsgraden räknas ändå). */
   hideUnknown?: boolean
-  /** Liten etikett överst till höger, t.ex. "Per 100 g" eller "Per portion (150 g)". */
-  caption?: string
+  /**
+   * Liten etikett överst till höger, t.ex. "Per 100 g" eller "Per portion (150 g)". Visas som
+   * den skrivs (inga versaler – "g" ska inte bli "G").
+   */
+  caption?: ReactNode
+  /**
+   * Andel (0–1) av maten där värdet är känt, per ämne – t.ex. från ett snitt över flera dagar.
+   * Under 100 % visas värdet som "minst 48,7 g" (det verkliga värdet är troligen högre);
+   * 0 % visas som okänt.
+   */
+  coverage?: Partial<Record<NutrientKey, number>>
+  /** Rubriknivå för grupperna. Standard: efter föregående rubrik (h3 under ett korts h2). */
+  headingLevel?: HeadingLevel
   /**
    * Visa status (Lågt/Nästan/Bra/Över) och statusfärger. Standard true – passar dagens eller
    * veckans intag. Sätt false för ett enskilt livsmedel: då visas bara "% av RI" som på en
@@ -122,11 +137,19 @@ export function NutrientTable({
   showCompleteness = true,
   hideUnknown = false,
   caption,
+  coverage,
+  headingLevel,
   showStatus = true,
   className = '',
 }: NutrientTableProps) {
   const reduced = useReducedMotion() ?? false
   const baseId = useId()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const Heading = headingTag(useHeadingLevel(rootRef, headingLevel))
+  const energyUnit = useEnergyUnit()
+  // Känt för bara en del av maten → "minst …". Ingen täckning alls → okänt.
+  const partial = (k: NutrientKey) => coverage?.[k] !== undefined && (coverage[k] as number) < PARTIAL_BELOW
+  const valueOf = (k: NutrientKey): number | undefined => (coverage?.[k] !== undefined && (coverage[k] as number) <= 0 ? undefined : nutrients[k])
   const [expanded, setExpanded] = useState<ReadonlySet<NutrientTableGroupId>>(() => new Set(defaultExpanded))
 
   const grouped = useMemo(() => {
@@ -137,7 +160,8 @@ export function NutrientTable({
   }, [keys, groups])
 
   const shownKeys = grouped.flatMap((g) => g.keys)
-  const known = shownKeys.filter((k) => isKnown(nutrients[k])).length
+  const known = shownKeys.filter((k) => isKnown(valueOf(k))).length
+  const anyPartial = shownKeys.some((k) => isKnown(valueOf(k)) && partial(k))
   const hasRefs = !!references && Object.keys(references).length > 0
 
   const toggle = (g: NutrientTableGroupId) =>
@@ -149,8 +173,8 @@ export function NutrientTable({
     })
 
   return (
-    <div className={className}>
-      {(showCompleteness || caption) && (
+    <div ref={rootRef} className={className}>
+      {(showCompleteness || caption !== undefined) && (
         <div className="mb-3 flex items-end justify-between gap-3">
           {showCompleteness && shownKeys.length > 0 ? (
             <div className="min-w-0 flex-1">
@@ -165,34 +189,41 @@ export function NutrientTable({
           ) : (
             <span />
           )}
-          {caption && <span className="eyebrow shrink-0">{caption}</span>}
+          {caption !== undefined && <span className="shrink-0 text-xs font-semibold text-ink-3">{caption}</span>}
         </div>
       )}
 
       <div className="divide-y divide-line">
         {grouped.map((g) => {
           if (g.id === 'energi') {
-            const kcal = nutrients.kcal
+            const kcal = valueOf('kcal')
+            const other = energyUnit === 'kcal' ? 'kJ' : 'kcal'
             return (
               <div key={g.id} className="flex items-baseline justify-between gap-3 py-3">
                 <span className="text-sm font-semibold text-ink">Energi</span>
+                {/* "387 kcal (1 620 kJ)" – med riktiga mellanslag, så att det läses rätt. */}
                 <span className="text-right">
-                  <span className="font-display text-xl font-semibold text-ink tabular-nums">{formatEnergy(kcal, 'kcal', false)}</span>
-                  {isKnown(kcal) && <span className="text-xs font-medium text-ink-3"> kcal</span>}
-                  {isKnown(kcal) && <span className="ml-2 text-xs text-ink-3 tabular-nums">{formatEnergy(kcal, 'kJ')}</span>}
+                  {isKnown(kcal) && partial('kcal') && <span className="text-xs text-ink-3">minst </span>}
+                  <span className="font-display text-xl font-semibold text-ink tabular-nums">{formatEnergy(kcal, energyUnit, false)}</span>
+                  {isKnown(kcal) && (
+                    <>
+                      <span className="text-xs font-medium text-ink-3">{`\u00a0${energyUnit}`}</span>{' '}
+                      <span className="text-xs text-ink-3 tabular-nums">({formatEnergy(kcal, other)})</span>
+                    </>
+                  )}
                 </span>
               </div>
             )
           }
           const open = !collapsible || expanded.has(g.id)
           const panelId = `${baseId}-${g.id}`
-          const rows = hideUnknown ? g.keys.filter((k) => isKnown(nutrients[k])) : g.keys
-          const knownInGroup = g.keys.filter((k) => isKnown(nutrients[k])).length
+          const rows = hideUnknown ? g.keys.filter((k) => isKnown(valueOf(k))) : g.keys
+          const knownInGroup = g.keys.filter((k) => isKnown(valueOf(k))).length
           const heading = NUTRIENT_GROUP_LABELS[g.id]
           return (
             <section key={g.id} aria-label={heading}>
               {collapsible ? (
-                <h4>
+                <Heading>
                   <button
                     type="button"
                     aria-expanded={open}
@@ -209,9 +240,9 @@ export function NutrientTable({
                       aria-hidden="true"
                     />
                   </button>
-                </h4>
+                </Heading>
               ) : (
-                <h4 className="pb-1 pt-3 text-sm font-semibold text-ink">{heading}</h4>
+                <Heading className="pb-1 pt-3 text-sm font-semibold text-ink">{heading}</Heading>
               )}
               <AnimatePresence initial={false}>
                 {open && (
@@ -232,7 +263,8 @@ export function NutrientTable({
                           <NutrientRow
                             key={k}
                             nutrientKey={k}
-                            value={nutrients[k]}
+                            value={valueOf(k)}
+                            atLeast={partial(k)}
                             reference={hasRefs ? references?.[k] : undefined}
                             showStatus={showStatus}
                           />
@@ -246,9 +278,17 @@ export function NutrientTable({
           )
         })}
       </div>
+      {anyPartial && (
+        <p className="mt-2 text-xs leading-relaxed text-ink-3">
+          ”Minst” betyder att värdet saknas för en del av maten – det verkliga värdet är troligen något högre.
+        </p>
+      )}
     </div>
   )
 }
+
+/** Täckning under så här mycket räknas som ofullständig ("minst …"). */
+const PARTIAL_BELOW = 0.995
 
 function isKnown(v: number | undefined): v is number {
   return v !== undefined && Number.isFinite(v)
@@ -257,11 +297,14 @@ function isKnown(v: number | undefined): v is number {
 function NutrientRow({
   nutrientKey,
   value,
+  atLeast,
   reference,
   showStatus,
 }: {
   nutrientKey: NutrientKey
   value: number | undefined
+  /** Värdet är en nedre gräns (känt för bara en del av maten). */
+  atLeast: boolean
   reference?: NutrientReference
   showStatus: boolean
 }) {
@@ -273,23 +316,34 @@ function NutrientRow({
   const statusMeta = STATUS_LABELS[status]
   const basis = reference?.ri !== undefined && reference.ri > 0 ? 'av RI' : 'av max'
   const barColor = showStatus ? TONE_VAR[statusMeta.tone] : 'var(--lg-gran)'
+  const lowerBound = knownValue && atLeast
+  // En grupp i listan: <div><dt/><dd/><dd/></div> (dt och dd måste vara direkta barn).
   return (
-    <div className={`py-1.5 ${sub ? 'pl-3' : ''}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <dt className="min-w-0 text-sm text-ink-2" title={meta.info}>
-          {sub && <span className="text-ink-3">{sub} </span>}
-          {sub ? meta.name.charAt(0).toLowerCase() + meta.name.slice(1) : meta.name}
-        </dt>
-        <dd className={`shrink-0 text-sm tabular-nums ${knownValue ? 'font-semibold text-ink' : 'text-ink-3'}`}>
-          {knownValue ? formatNutrient(nutrientKey, value) : <span aria-label="okänt">–</span>}
-        </dd>
-      </div>
+    <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 py-1.5 ${sub ? 'pl-3' : ''}`}>
+      <dt className="min-w-0 text-sm text-ink-2" title={meta.info}>
+        {sub && <span className="text-ink-3">{sub} </span>}
+        {sub ? meta.name.charAt(0).toLowerCase() + meta.name.slice(1) : meta.name}
+      </dt>
+      <dd
+        className={`text-right text-sm tabular-nums ${knownValue ? 'font-semibold text-ink' : 'text-ink-3'}`}
+        title={lowerBound ? 'Värdet saknas för en del av maten – det verkliga värdet är troligen högre.' : undefined}
+      >
+        {knownValue ? (
+          <>
+            {lowerBound && <span className="font-normal text-ink-3">minst </span>}
+            {formatNutrient(nutrientKey, value)}
+          </>
+        ) : (
+          <span aria-label="okänt">–</span>
+        )}
+      </dd>
       {reference && knownValue && pct !== undefined && (
-        <dd className="mt-1 flex items-center gap-2">
+        <dd className="col-span-2 mt-1 flex items-center gap-2">
           <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
             <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
           </span>
           <span className="w-[4.75rem] shrink-0 text-right text-[11px] text-ink-3 tabular-nums">
+            {lowerBound ? '≥ ' : ''}
             {formatNumber(pct)} % {basis}
           </span>
           {showStatus && (

@@ -42,7 +42,7 @@ export const SUPPORT_RESOURCES: readonly SupportResource[] = [
     description: 'Anonymt och kostnadsfritt stöd via telefon och nätet för dig över 18 år som vill förändra dina alkoholvanor – och för anhöriga.',
     href: 'https://alkoholhjalpen.se',
     linkLabel: 'alkoholhjalpen.se',
-    phone: { label: 'Ring 020-84 44 48', tel: '020844448' },
+    phone: { label: 'Ring 020-84\u00a044\u00a048', tel: '020844448' },
     emoji: '🫶',
     tone: 'vinbar',
   },

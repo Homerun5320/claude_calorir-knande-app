@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react'
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { cx } from './Button'
-import { toneColor, type Tone } from './Badge'
+import { toneTextColor, type Tone } from './Badge'
 
 export interface StatTrend {
   direction: 'up' | 'down' | 'flat'
@@ -58,7 +58,7 @@ export function Stat({ label, value, unit, sublabel, trend, size = 'md', align =
       <div className={cx('mt-1 flex items-baseline gap-1', align === 'center' && 'justify-center')}>
         <span
           className={cx('display-num font-medium leading-none', VALUE_SIZES[size], !tone && 'text-ink')}
-          style={tone ? { color: toneColor(tone) } : undefined}
+          style={tone ? { color: toneTextColor(tone) } : undefined}
         >
           {value}
         </span>

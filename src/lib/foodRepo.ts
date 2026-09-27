@@ -3,9 +3,11 @@
  *
  * Källor (i prioritetsordning vid uppslag på id):
  *  1. Användarens egna livsmedel, recept och sparade onlineprodukter (`useFoodStore`).
- *  2. Den inbyggda databasen: Lagoms kurerade livsmedel (lazy chunk `data/foods`) och
+ *  2. Den inbyggda databasen: Lagoms kurerade livsmedel (lazy chunk `data/foods`),
  *     Livsmedelsverkets import (`public/data/livsmedelsverket.json`, skapas av
- *     `npm run data:lmv`). Filen är valfri – saknas den eller är enheten offline ignoreras den.
+ *     `npm run data:lmv`; filen är valfri – saknas den eller är enheten offline ignoreras den)
+ *     och de svenska klassikerna (`data/recipes`) som livsmedel 'recipe:klassiker-*', så att en
+ *     loggad klassiker hittas igen i Senaste, favoriter, sökningen och på detaljsidan.
  *  3. Ett tillfälligt minne för produkter som hämtats från Open Food Facts under sessionen
  *     (så att en sökträff kan öppnas på detaljsidan utan att sparas permanent).
  *
@@ -150,8 +152,15 @@ export interface LmvDatasetMeta {
 export interface BuiltinCatalog {
   /** Livsmedel för sökning och bläddring (Livsmedelsverkets dubbletter av kurerade Lagom-livsmedel är dolda). */
   foods: Food[]
-  /** Alla inbyggda livsmedel per id, även dolda dubbletter. */
+  /**
+   * Alla inbyggda livsmedel per id, även dolda dubbletter – och de inbyggda recepten som
+   * livsmedel ('recipe:klassiker-*').
+   */
   byId: ReadonlyMap<string, Food>
+  /** De svenska klassikerna (inbyggda recept), lösta mot Lagoms livsmedel. Samma lista i båda stegen. */
+  recipes: Recipe[]
+  /** Klassikerna som livsmedel (`recipeFood`) – för sökning. Ingår inte i `foods`. */
+  recipeFoods: Food[]
   /** true när Livsmedelsverkets data har lästs in (eller visat sig saknas). */
   complete: boolean
   lmv: LmvDatasetMeta | null
@@ -268,10 +277,20 @@ async function fetchLmvDataset(): Promise<{ foods: Food[]; meta: LmvDatasetMeta 
   }
 }
 
-function buildCatalog(builtin: Food[], lmvFoods: Food[], lmv: LmvDatasetMeta | null, complete: boolean): BuiltinCatalog {
+function buildCatalog(
+  builtin: Food[],
+  lmvFoods: Food[],
+  lmv: LmvDatasetMeta | null,
+  complete: boolean,
+  recipes: Recipe[] = [],
+  // Klassikerna som livsmedel: samma objekt som `recipeFood(recipe)` ger, så att en loggad
+  // klassiker, sökträffen och detaljsidan pekar på samma livsmedel.
+  recipeFoods: Food[] = recipes.map(recipeFood),
+): BuiltinCatalog {
   const byId = new Map<string, Food>()
   for (const f of builtin) if (!byId.has(f.id)) byId.set(f.id, f)
-  if (lmvFoods.length === 0) return { foods: builtin, byId, complete, lmv }
+  for (const f of recipeFoods) if (!byId.has(f.id)) byId.set(f.id, f)
+  if (lmvFoods.length === 0) return { foods: builtin, byId, recipes, recipeFoods, complete, lmv }
   // Kurerade Lagom-livsmedel med känt livsmedelsnummer ersätter Livsmedelsverkets post i sökningen.
   const curated = new Set<number>()
   for (const f of builtin) if (f.lmvNumber !== undefined) curated.add(f.lmvNumber)
@@ -282,19 +301,30 @@ function buildCatalog(builtin: Food[], lmvFoods: Food[], lmv: LmvDatasetMeta | n
     if (f.lmvNumber !== undefined && curated.has(f.lmvNumber)) continue
     foods.push(f)
   }
-  return { foods, byId, complete, lmv }
+  return { foods, byId, recipes, recipeFoods, complete, lmv }
+}
+
+type RecipesModule = typeof import('../data/recipes')
+
+/** Hämta receptmodulen. Går den inte att läsa in fungerar livsmedlen ändå (utan klassiker). */
+function importRecipes(): Promise<RecipesModule | null> {
+  return import('../data/recipes').catch((err: unknown) => {
+    console.error('Kunde inte läsa in de inbyggda recepten', err)
+    return null
+  })
 }
 
 /**
- * Läs in den inbyggda katalogen (memoiserat). Lagoms databas laddas som en separat chunk och
- * publiceras direkt; Livsmedelsverkets fil hämtas parallellt och slås ihop när den är klar.
- * Vid fel publiceras en tom katalog med `error` och nästa anrop försöker igen.
+ * Läs in den inbyggda katalogen (memoiserat). Lagoms databas och klassikerna laddas som separata
+ * chunkar och publiceras direkt; Livsmedelsverkets fil hämtas parallellt och slås ihop när den är
+ * klar. Vid fel publiceras en tom katalog med `error` och nästa anrop försöker igen.
  */
 export function loadBuiltinCatalog(): Promise<BuiltinCatalog> {
   if (catalog?.complete && !catalog.error) return Promise.resolve(catalog)
   if (loading) return loading
   const promise = (async (): Promise<BuiltinCatalog> => {
     const lmvPromise = fetchLmvDataset()
+    const recipesPromise = importRecipes()
     let builtin: Food[]
     try {
       builtin = (await import('../data/foods/index')).BUILTIN_FOODS
@@ -303,6 +333,8 @@ export function loadBuiltinCatalog(): Promise<BuiltinCatalog> {
       const failed: BuiltinCatalog = {
         foods: [],
         byId: new Map(),
+        recipes: [],
+        recipeFoods: [],
         complete: true,
         lmv: null,
         error: 'Livsmedelsdatabasen kunde inte läsas in. Kontrollera uppkopplingen och ladda om sidan.',
@@ -311,9 +343,11 @@ export function loadBuiltinCatalog(): Promise<BuiltinCatalog> {
       publish(failed)
       return failed
     }
-    publish(buildCatalog(builtin, [], null, false))
+    const recipes = (await recipesPromise)?.loadBuiltinRecipes(builtin) ?? []
+    const recipeFoods = recipes.map(recipeFood)
+    publish(buildCatalog(builtin, [], null, false, recipes, recipeFoods))
     const lmv = await lmvPromise
-    const full = buildCatalog(builtin, lmv.foods, lmv.meta, true)
+    const full = buildCatalog(builtin, lmv.foods, lmv.meta, true, recipes, recipeFoods)
     publish(full)
     return full
   })()

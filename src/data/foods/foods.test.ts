@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { BUILTIN_FOOD_FILES, BUILTIN_FOODS } from './index'
 import { kcalFromMacros } from '../../lib/nutrients'
+import { foodKostrad } from '../../lib/kostrad'
 import { FOOD_CATEGORIES, type Food } from '../../types'
 
 const problems = (food: Food): string[] => {
@@ -77,4 +78,32 @@ describe('inbyggd livsmedelsdatabas', () => {
       expect(bad).toEqual([])
     })
   }
+
+  /**
+   * Kostråden 2025: baljväxter är ett eget råd och ingår inte i frukt och grönt. Sammansatta rätter
+   * med bönor, linser, gula ärtor, kikärtor, falafel, hummus eller soja anger därför sin andel
+   * baljväxter i `kostrad` – frukt och grönt är bara grönsaksdelen.
+   */
+  it('har baljväxtandelen i kostrådsdatan för rätter med baljväxter', () => {
+    const LEGUMES = /ärtsoppa|lins|bön|kikärt|falafel|hummus|tofu|edamame|soja-|sojabön|sojaprotein|ärtprotein/
+    const NOT_LEGUME = /gröna bönor|haricots|brytbön|sockerärt|gröna ärtor|böngrodd|sojasås/
+    const dishes = BUILTIN_FOODS.filter((f) => f.kostrad && (f.category === 'fardigratt' || f.category === 'snabbmat'))
+    const legumeDishes = dishes.filter((f) => {
+      const text = `${f.name} ${f.note ?? ''}`.toLowerCase().replace(NOT_LEGUME, '')
+      return LEGUMES.test(text)
+    })
+    expect(legumeDishes.map((f) => f.id)).toEqual(
+      expect.arrayContaining(['lagom:artsoppa-med-flask', 'lagom:chili-con-carne', 'lagom:dal-linsgryta', 'lagom:falafeltallrik', 'lagom:bonchili']),
+    )
+    const missing = legumeDishes.filter((f) => !(f.kostrad?.baljvaxter && f.kostrad.baljvaxter > 0)).map((f) => f.id)
+    expect(missing).toEqual([])
+    for (const f of legumeDishes) {
+      // Grönsaksdelen i kostråden och på tallriken ska hänga ihop (±5 g per 100 g).
+      if (f.plate && f.kostrad?.fruktGront !== undefined) expect(Math.abs(f.kostrad.fruktGront - f.plate.veg * 100)).toBeLessThanOrEqual(5)
+      expect(foodKostrad(f)).toEqual(f.kostrad)
+    }
+    // Rätter med gröna ärtor räknar dem som grönsaker.
+    const wallenbergare = BUILTIN_FOODS.find((f) => f.id === 'lagom:wallenbergare-potatismos-arter')
+    expect(wallenbergare?.kostrad?.baljvaxter).toBeUndefined()
+  })
 })

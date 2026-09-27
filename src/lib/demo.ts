@@ -3,8 +3,8 @@
  * fredagstacos, fika …) så att man kan utforska Lagom utan att först mata in egna uppgifter.
  * Tydligt markerad som exempel och kan rensas i Inställningar.
  */
-import type { DiaryEntry, Food, ISODate, MealId, Profile, UnitKey } from '../types'
-import { addDays, todayISO, weekdayIndex } from './dates'
+import type { DiaryEntry, ExerciseEntry, Food, ISODate, MealId, Profile, UnitKey, WeightEntry } from '../types'
+import { addDays, fromISODate, todayISO, weekdayIndex } from './dates'
 import { makeFoodEntry } from './diary'
 import { uid } from './id'
 import { useBodyStore } from '../stores/bodyStore'
@@ -31,6 +31,15 @@ export const DEMO_PROFILE: Omit<Profile, 'createdAt'> = {
 
 /** [livsmedels-id (utan 'lagom:'), antal portioner (första portionen) eller gram med suffix 'g', måltid, tid] */
 type Item = [string, number | `${number}g`, MealId, string]
+
+/** Favoriter i exemplet – livsmedel och en svensk klassiker (inbyggt recept). */
+export const DEMO_FAVORITES: readonly string[] = [
+  'lagom:havregrynsgrot-mellanmjolk',
+  'lagom:knackebrod-wasa-husman',
+  'lagom:kanelbulle-bageri',
+  'lagom:kaffe-bryggt',
+  'recipe:klassiker-kottbullar',
+]
 
 const FRUKOST_A: Item[] = [
   ['havregrynsgrot-mellanmjolk', 1, 'frukost', '07:10'],
@@ -90,6 +99,20 @@ const DAYS: Array<{ lunch: Item[]; middag: Item[]; extra?: Item[] }> = [
   },
 ]
 
+/** Alla livsmedel som exemplet använder (för kontroll i tester). */
+export function demoFoodIds(): string[] {
+  const items = [...FRUKOST_A, ...FRUKOST_B, ...FIKA, ...FIKA_LATT, ...DAYS.flatMap((d) => [...d.lunch, ...d.middag, ...(d.extra ?? [])])]
+  return [...new Set(items.map(([slug]) => `lagom:${slug}`))]
+}
+
+/** Tidsstämpel för ett klockslag ('HH:mm') en viss dag, i lokal tid. */
+function at(date: ISODate, time: string): number {
+  const d = fromISODate(date)
+  const [hh, mm] = time.split(':').map(Number)
+  d.setHours(hh, mm, 0, 0)
+  return d.getTime()
+}
+
 /** Enkel deterministisk "slump" så att exemplet ser likadant ut varje gång. */
 function noise(i: number): number {
   const x = Math.sin(i * 12.9898) * 43758.5453
@@ -135,7 +158,7 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   // Dagbok
   const entries: Record<ISODate, DiaryEntry[]> = {}
   const water: Record<ISODate, number> = {}
-  const exercise: ReturnType<typeof useDiaryStore.getState>['exercise'] = {}
+  const exercise: Record<ISODate, ExerciseEntry[]> = {}
   // Visa alltid minst frukost och lunch för idag, även tidigt på dagen (det är exempeldata).
   const hour = Math.max(12.5, now.getHours() + now.getMinutes() / 60)
   for (let i = days - 1; i >= 0; i--) {
@@ -158,14 +181,23 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
         if (hh + mm / 60 > hour) continue
       }
       const e = resolveItem(foods, item, date)
-      if (e) list.push({ ...e, id: uid('e_'), createdAt: now.getTime() - i * 86_400_000 + k++ } as DiaryEntry)
+      // Posten skapades när måltiden åts (aldrig i framtiden) – då blir "Senaste" och förslagen
+      // per måltid desamma som om man loggat själv.
+      if (e) list.push({ ...e, id: uid('e_'), createdAt: Math.min(at(date, item[3]), now.getTime()) + k++ } as DiaryEntry)
     }
     if (list.length) entries[date] = list
     water[date] = isToday ? Math.min(1500, Math.max(250, Math.round(hour - 6) * 125)) : 1250 + Math.round(noise(i) * 4) * 250
-    if (wd === 1 || wd === 3) {
-      exercise[date] = [{ id: uid('x_'), date, activityId: 'promenad-rask', name: 'Promenad, rask', minutes: 40, kcal: 180, met: 4.8, createdAt: now.getTime() }]
-    } else if (wd === 5) {
-      exercise[date] = [{ id: uid('x_'), date, activityId: 'lopning-10', name: 'Löpning 10 km/h (6:00 min/km)', minutes: 35, kcal: 340, met: 9.3, distanceKm: 5.8, createdAt: now.getTime() }]
+    // Träning: rask promenad tisdag och torsdag efter jobbet, löprunda lördag förmiddag.
+    // Idag visas passet bara om klockan har hunnit dit.
+    const session =
+      wd === 1 || wd === 3
+        ? { time: '17:30', activityId: 'promenad-rask', name: 'Promenad, rask', minutes: 40, kcal: 180, met: 4.8 }
+        : wd === 5
+          ? { time: '10:00', activityId: 'lopning-10', name: 'Löpning 10 km/h (6:00 min/km)', minutes: 35, kcal: 340, met: 9.3, distanceKm: 5.8 }
+          : null
+    if (session && (!isToday || at(date, session.time) <= now.getTime())) {
+      const { time, ...rest } = session
+      exercise[date] = [{ id: uid('x_'), date, ...rest, createdAt: at(date, time) }]
     }
   }
   const daysMeta = Object.fromEntries(
@@ -176,18 +208,23 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   useDiaryStore.setState({ entries, water, exercise, days: daysMeta })
 
   // Vikt: långsam nedgång med vardagligt brus, vägning de flesta morgnar
-  const weights = []
+  const weights: WeightEntry[] = []
   for (let i = 45; i >= 0; i--) {
     if (i % 3 === 1 && i > 3) continue
     const date = addDays(today, -i)
     const kg = Math.round((DEMO_PROFILE.startWeightKg - (45 - i) * 0.035 + noise(i + 3) * 0.9) * 10) / 10
-    weights.push({ id: uid('w_'), date, kg, createdAt: now.getTime() })
+    weights.push({ id: uid('w_'), date, kg, createdAt: Math.min(at(date, '07:00'), now.getTime()) })
   }
-  useBodyStore.setState({ weights, measurements: [{ id: uid('m_'), date: addDays(today, -30), waistCm: 82, hipCm: 101, createdAt: now.getTime() }, { id: uid('m_'), date: addDays(today, -2), waistCm: 80, hipCm: 100, createdAt: now.getTime() }] })
+  const measured = (daysAgo: number, waistCm: number, hipCm: number) => {
+    const date = addDays(today, -daysAgo)
+    return { id: uid('m_'), date, waistCm, hipCm, createdAt: at(date, '07:05') }
+  }
+  useBodyStore.setState({ weights, measurements: [measured(30, 82, 101), measured(2, 80, 100)] })
 
-  // Favoriter och "Senaste" (samma statistik som när man loggar själv)
+  // Favoriter och "Senaste" (samma statistik som `recordUsage` ger när man loggar själv: antal,
+  // senast använd, senaste mängd och enhet samt måltider – det styr förslagen per måltid).
   useFoodStore.setState({
-    favorites: ['lagom:havregrynsgrot-mellanmjolk', 'lagom:knackebrod-wasa-husman', 'lagom:kanelbulle-bageri', 'lagom:kaffe-bryggt'],
+    favorites: [...DEMO_FAVORITES],
     usage: usageFromEntries(entries),
   })
 

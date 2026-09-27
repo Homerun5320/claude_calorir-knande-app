@@ -9,7 +9,8 @@ import { BarChart, DonutChart, LineChart, Sparkline, type BarDatum, type BarStac
 import { EnergyValue } from '../../components/domain'
 import { Badge, Button, Card, Chip, ProgressRing, Stat, type StatTrend } from '../../components/ui'
 import { addDays, formatDayLong, lastNDays, WEEKDAYS_SHORT, weekdayIndex } from '../../lib/dates'
-import { formatEnergy, formatKg, formatNumber, formatNutrient } from '../../lib/format'
+import { youngestAge } from '../../lib/energy'
+import { formatEnergy, formatKg, formatNumber, formatNutrient, plural } from '../../lib/format'
 import { percentText } from './fmt'
 import { energyDistribution, KJ_PER_KCAL, NUTRIENTS } from '../../lib/nutrients'
 import { useBodyStore } from '../../stores/bodyStore'
@@ -31,6 +32,8 @@ import {
   type MacroRangeKey,
   type RankedNutrient,
 } from './aggregate'
+import { goodDirection } from '../body/bodyLogic'
+import { CareNote } from '../today/CareNote'
 import type { InsightsTab } from './nav'
 import { weekdayInsight, weekdayPattern, MIN_PATTERN_DAYS } from './patterns'
 import { previousPeriod } from './period'
@@ -93,7 +96,7 @@ function ConsistencyCard({ data }: { data: InsightsData }) {
           thickness={8}
           tone="gran"
           aria-label="Loggade dagar"
-          valueText={`${c.logged} av ${c.elapsed} dagar`}
+          valueText={`${c.logged} av ${plural(c.elapsed, 'dag', 'dagar')}`}
         >
           <span className="display-num text-xl leading-none text-ink">
             {c.logged}
@@ -107,8 +110,11 @@ function ConsistencyCard({ data }: { data: InsightsData }) {
             <p className="mt-1.5 text-xs text-ink-3">
               {near === 0
                 ? 'Snitten bygger bara på loggade dagar.'
-                : `${near} ${near === 1 ? 'lagom-dag' : 'lagom-dagar'} – inom ±10 % av dagens mål.`}
+                : `${near} ${near === 1 ? 'lagom-dag' : 'lagom-dagar'} – inom ±10\u00a0% av dagens mål.`}
             </p>
+          )}
+          {data.period.todayExcluded && (
+            <p className="mt-1.5 text-xs text-ink-3">Idag räknas med i snitten när du markerar dagen som klar i dagboken.</p>
           )}
         </div>
       </div>
@@ -230,7 +236,7 @@ function EnergyCard({ data }: { data: InsightsData }) {
           tone="protein"
           value={formatNutrient('protein', avg.averages.protein, false)}
           unit={avg.averages.protein !== undefined ? 'g' : undefined}
-          sublabel={`mål ${formatNumber(targets.proteinG)} g`}
+          sublabel={`mål ${formatNumber(targets.proteinG)}\u00a0g`}
         />
         <Stat
           size="sm"
@@ -238,11 +244,27 @@ function EnergyCard({ data }: { data: InsightsData }) {
           tone="fiber"
           value={formatNutrient('fiber', avg.averages.fiber, false)}
           unit={avg.averages.fiber !== undefined ? 'g' : undefined}
-          sublabel={`mål ${formatNumber(targets.fiberG)} g`}
+          sublabel={`mål ${formatNumber(targets.fiberG)}\u00a0g`}
         />
       </div>
       {trend && <p className="mt-3 text-xs text-ink-3">{trend}</p>}
+      <LowIntakeNote data={data} />
     </Card>
+  )
+}
+
+/**
+ * Varsam notis när de dagar som är markerade som klara i snitt ligger under energigolvet – aldrig
+ * beröm för att äta lite. Samma regel och ton som veckokortet på Idag.
+ */
+function LowIntakeNote({ data }: { data: InsightsData }) {
+  if (data.lowIntakeKcal === undefined) return null
+  return (
+    <CareNote className="mt-4">
+      {data.mindful
+        ? 'De dagar du markerat som klara har du ätit mindre än kroppen behöver för att orka. Ät gärna lite mer – regelbundna måltider ger energi.'
+        : `De dagar du markerat som klara har du i snitt ätit mindre än ${formatEnergy(data.floorKcal, data.unit)} per dag – mindre än kroppen behöver för att orka. Ät gärna lite mer – regelbundna måltider ger energi.`}
+    </CareNote>
   )
 }
 
@@ -260,6 +282,7 @@ function MindfulEnergyCard({ data }: { data: InsightsData }) {
           <p>{label.hint}</p>
         </Callout>
       )}
+      <LowIntakeNote data={data} />
     </Card>
   )
 }
@@ -334,7 +357,7 @@ function DistributionCard({ data }: { data: InsightsData }) {
             legend="none"
             title="Energifördelning"
             summary={`Energifördelning: ${segments.map((s) => `${s.label.toLowerCase()} ${formatNumber(s.value)} procent`).join(', ')}.`}
-            formatValue={(v) => `${formatNumber(v)} E %`}
+            formatValue={(v) => `${formatNumber(v)}\u00a0E%`}
           >
             {mindful ? (
               <span className="text-3xl" aria-hidden="true">
@@ -360,7 +383,7 @@ function DistributionCard({ data }: { data: InsightsData }) {
                   </Badge>
                 </div>
                 <p className="mt-1 pl-[1.125rem] text-xs leading-relaxed text-ink-3">
-                  {!mindful && <span className="text-ink-2">NNR {v.min}–{v.max} E %. </span>}
+                  {!mindful && <span className="text-ink-2">NNR {v.min}–{v.max}{'\u00a0'}E%. </span>}
                   {v.text}
                 </p>
               </li>
@@ -390,7 +413,7 @@ function NutrientList({ items, tone, mindful }: { items: readonly RankedNutrient
         <li key={n.key}>
           <div className="flex items-baseline justify-between gap-2 text-sm">
             <span className="truncate font-medium text-ink">{NUTRIENTS[n.key].name}</span>
-            {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(n.percent)} %</span>}
+            {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(n.percent)}{'\u00a0'}%</span>}
           </div>
           <ShareBar value={n.percent / 100} color={color} className="mt-1" />
         </li>
@@ -448,13 +471,13 @@ function NutrientHighlightsCard({ data, onTab }: { data: InsightsData; onTab: (t
 // ---------------------------------------------------------------------------
 
 function WeekdayCard({ data }: { data: InsightsData }) {
-  const { period, today, entriesByDate, exerciseByDate, targets, addBackPct, days, unit } = data
+  const { period, countedEnd, entriesByDate, exerciseByDate, targets, addBackPct, days, unit } = data
   const weekly = period.kind === 'vecka'
+  // Veckovyn tittar på de senaste åtta veckorna fram till sista dagen som räknas (idag först när den är klar).
   const sourceDays = useMemo(() => {
     if (!weekly) return days
-    const end = period.end < today ? period.end : today
-    return buildDayStats(lastNDays(56, end), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
-  }, [weekly, days, period.end, today, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
+    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
+  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
   const pattern = useMemo(() => weekdayPattern(sourceDays), [sourceDays])
   const insight = useMemo(() => weekdayInsight(pattern), [pattern])
   const samples = pattern.reduce((s, p) => s + p.count, 0)
@@ -491,6 +514,8 @@ function WeekdayCard({ data }: { data: InsightsData }) {
 function WeightTrendCard({ data }: { data: InsightsData }) {
   const weights = useBodyStore((s) => s.weights)
   const goal = useProfileStore((s) => s.profile?.goal)
+  const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
+  const birthYear = useProfileStore((s) => s.profile?.birthYear)
   const { period, today } = data
   const end = period.end < today ? period.end : today
   const start = period.kind === 'vecka' ? addDays(end, -29) : period.start
@@ -509,7 +534,8 @@ function WeightTrendCard({ data }: { data: InsightsData }) {
 
   const change = w.change ?? 0
   const direction: StatTrend['direction'] = Math.abs(change) < 0.05 ? 'flat' : change > 0 ? 'up' : 'down'
-  const good = goal === 'ga_ner' ? 'down' : goal === 'ga_upp' ? 'up' : undefined
+  // Samma ton som under Vikt: viktnedgång tonas aldrig grönt.
+  const good = goodDirection(goal, lifeStage, birthYear !== undefined ? youngestAge(birthYear, today) : undefined)
   const sign = change > 0 ? '+' : change < 0 ? '−' : ''
   return (
     <Card title="Vikttrend" eyebrow={period.kind === 'vecka' ? 'Senaste 30 dagarna' : period.label} action={<CardLink to="/vikt">Vikt</CardLink>}>

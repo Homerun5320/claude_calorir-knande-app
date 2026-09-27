@@ -155,6 +155,26 @@ export function rollingAverage(days: readonly DayStat[], window = 7, minDays = 2
   return out
 }
 
+/** Minsta antal klara dagar innan Insikter säger något om ett lågt intag (samma som Idag). */
+export const LOW_INTAKE_MIN_DAYS = 3
+
+/**
+ * Snittintaget för de dagar i perioden som är markerade som klara (och har poster), om det ligger
+ * under `floorKcal` och bygger på minst tre dagar – annars undefined. Ofullständigt loggade dagar
+ * räknas aldrig, så glömda måltider ger ingen notis. Används för en varsam notis – aldrig beröm.
+ */
+export function lowIntakeAverage(
+  days: readonly DayStat[],
+  isComplete: (date: ISODate) => boolean,
+  floorKcal: number,
+  minDays = LOW_INTAKE_MIN_DAYS,
+): number | undefined {
+  const values = days.filter((d) => d.logged && d.kcal !== undefined && Number.isFinite(d.kcal) && isComplete(d.date)).map((d) => d.kcal as number)
+  if (values.length < minDays) return undefined
+  const avg = values.reduce((s, v) => s + v, 0) / values.length
+  return avg < floorKcal ? avg : undefined
+}
+
 /** Kvalitativ etikett för snittintag mot budget (medvetet läge och delad rapport). */
 export function mindfulAverageLabel(ratio: number | undefined): { title: string; hint: string } {
   if (ratio === undefined || !Number.isFinite(ratio) || ratio <= 0) return { title: 'Inget att visa än', hint: 'Logga några dagar så ser du hur det går.' }
@@ -256,7 +276,7 @@ export function consistency(logged: number, elapsed: number): Consistency {
   else if (ratio >= 1) text = 'Varje dag i perioden är med – imponerande! 🌟'
   else if (ratio >= 0.7) text = 'Fint! Ju fler dagar, desto säkrare blir insikterna.'
   else if (ratio >= 0.4) text = 'Bra jobbat – varje loggad dag ger en ny pusselbit.'
-  else text = 'Varje loggad dag räknas. Dagar utan registrering räknas inte in i snitten, så de drar inte ned något.'
+  else text = 'Varje loggad dag räknas. Dagar som inte är loggade räknas inte in i snitten, så de drar inte ned något.'
   return { logged, elapsed, ratio, title, text }
 }
 

@@ -35,7 +35,7 @@ export function AppearanceSection() {
             { value: 'morkt', label: 'Mörkt', icon: Moon },
           ]}
         />
-        <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">Midsommar på dagen, midvinter på kvällen. System följer telefonens inställning.</p>
+        <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">Midsommar på dagen, midvinter på kvällen. System följer enhetens inställning.</p>
         <div className="mt-4">
           <Switch
             label="Säsongstema"
@@ -61,7 +61,7 @@ export function AppearanceSection() {
           ]}
         />
         <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">
-          1 kcal = {formatNumber(KJ_PER_KCAL, 3)} kJ. Förpackningar visar ofta båda – kcal är vanligast i Sverige.
+          1{'\u00a0'}kcal = {formatNumber(KJ_PER_KCAL, 3)}{'\u00a0'}kJ. Förpackningar visar ofta båda – kcal är vanligast i Sverige.
         </p>
       </Card>
 

@@ -3,6 +3,7 @@
  *
  * Semantik som en radiogrupp: piltangenter flyttar och väljer, Home/End går till ändarna,
  * endast det valda alternativet ligger i tabbordningen (roving tabindex).
+ * Varje alternativ har minst 44 px tryckyta (även `size="sm"`).
  */
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -24,6 +25,13 @@ export interface SegmentedControlProps<T extends string | number> {
   /** Tillgänglig etikett för gruppen (krävs om ingen synlig rubrik finns). */
   'aria-label'?: string
   'aria-labelledby'?: string
+  /** Koppla hjälp- eller feltext till gruppen. */
+  'aria-describedby'?: string
+  /** Markera gruppen som ogiltig (t.ex. obligatoriskt val som saknas). */
+  'aria-invalid'?: boolean | 'true' | 'false'
+  'aria-required'?: boolean
+  /** Id på gruppen, t.ex. för att flytta fokus dit vid fel. */
+  id?: string
   size?: 'sm' | 'md'
   /** neutral = vit markering på tonad yta, gran = grön markering. */
   tone?: 'neutral' | 'gran'
@@ -114,10 +122,12 @@ export function SegmentedControl<T extends string | number>({
             className={cx(
               'relative inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors duration-200',
               'focus-visible:outline-offset-0 disabled:opacity-40',
-              size === 'sm' ? 'h-8 text-[0.8125rem]' : 'h-10 text-sm',
+              // Tryckytan når ut i gruppens kant (p-1): 36 + 8 = 44 px (sm) och 40 + 8 = 48 px (md).
+              "after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']",
+              size === 'sm' ? 'h-9 text-[0.8125rem]' : 'h-10 text-sm',
               // Full bredd: lika breda segment som får krympa – mindre sidmarginal så att fem val
               // ryms i 320 px utan att sidan skrollar i sidled.
-              fullWidth ? cx('min-w-0 flex-1', size === 'sm' ? 'px-1.5' : 'px-2') : size === 'sm' ? 'px-3' : 'px-4',
+              fullWidth ? cx('min-w-0 flex-1', size === 'sm' ? 'px-1.5' : 'px-2') : cx('min-w-11', size === 'sm' ? 'px-3' : 'px-4'),
               selected ? (tone === 'gran' ? 'text-on-gran' : 'text-ink') : 'text-ink-3 hover:text-ink-2',
             )}
           >

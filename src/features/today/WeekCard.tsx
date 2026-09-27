@@ -33,7 +33,7 @@ function MindfulWeek({ series, today }: { series: readonly WeekDay[]; today: ISO
   const logged = series.filter((d) => d.kcal !== undefined).length
   return (
     <>
-      <ul className="grid grid-cols-7 gap-1" aria-label="Dagar med registrering den senaste veckan">
+      <ul className="grid grid-cols-7 gap-1" aria-label="Loggade dagar den senaste veckan">
         {series.map((d) => {
           const has = d.kcal !== undefined
           const isToday = d.date === today
@@ -43,7 +43,7 @@ function MindfulWeek({ series, today }: { series: readonly WeekDay[]; today: ISO
                 className={`grid size-9 place-items-center rounded-full ${has ? 'bg-gran-soft text-gran' : 'bg-surface-2 text-ink-3'} ${
                   isToday ? 'ring-2 ring-gran/50 ring-offset-2 ring-offset-surface' : ''
                 }`}
-                aria-label={`${formatDayLong(d.date, today)}: ${has ? 'registrerad' : 'inget registrerat'}`}
+                aria-label={`${formatDayLong(d.date, today)}: ${has ? 'loggad' : 'inget loggat'}`}
                 role="img"
               >
                 {has && <Check className="size-4" strokeWidth={2.6} aria-hidden="true" />}
@@ -110,7 +110,7 @@ export const WeekCard = memo(function WeekCard({ today, targetKcal, addBackPct, 
             formatValue={formatValue}
             title="Energi per dag de senaste sju dagarna"
             summary={summary}
-            emptyText="Inget registrerat den här veckan ännu"
+            emptyText="Inget loggat den här veckan ännu"
             legend={false}
           />
           <Link

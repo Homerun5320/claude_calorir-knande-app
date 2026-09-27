@@ -129,24 +129,8 @@ export function dayBalance(eatenKcal: number | undefined, budgetKcal: number, un
   return { eaten: s.eaten, budget: s.total, remaining: s.remaining, over: s.over, ratio: s.ratio, status: s.status }
 }
 
-export interface ExerciseAddBack {
-  /** Andel (0–100) av träningens energi som läggs till dagens budget. */
-  pct: number
-  /** true när träningen redan ingår i dagsmålet (adaptiv förbrukning) och därför inte läggs till. */
-  includedInTarget: boolean
-}
-
-/**
- * Hur mycket av träningen som läggs till budgeten. Med adaptiv förbrukning bygger dagsmålet på
- * uppmätt intag och vikttrend – där ingår den vanliga träningen redan, så att lägga till den igen
- * skulle räkna den två gånger. Ett eget energimål går före den adaptiva beräkningen och följer
- * då inställningen som vanligt.
- */
-export function exerciseAddBack(settingPct: number, tdeeSource: 'formel' | 'adaptiv' | undefined, kcalOverridden: boolean): ExerciseAddBack {
-  if (tdeeSource === 'adaptiv' && !kcalOverridden) return { pct: 0, includedInTarget: true }
-  const pct = Number.isFinite(settingPct) ? Math.max(0, Math.min(100, settingPct)) : 0
-  return { pct, includedInTarget: false }
-}
+/** Hur mycket av träningen som läggs till budgeten – regeln finns i lib/diary (används överallt). */
+export { exerciseAddBack, type ExerciseAddBack } from '../../lib/diary'
 
 /** Vänlig mening under dagens siffror – aldrig dömande. */
 export function balanceNote(status: RingStatus, kind: DayKind): string {
@@ -157,7 +141,7 @@ export function balanceNote(status: RingStatus, kind: DayKind): string {
   }
   switch (status) {
     case 'tom':
-      return kind === 'today' ? 'Dagen har precis börjat.' : 'Inget registrerat den här dagen.'
+      return kind === 'today' ? 'Dagen har precis börjat.' : 'Inget loggat den här dagen.'
     case 'lagom':
       return 'Precis lagom – snyggt!'
     case 'over':
@@ -236,6 +220,15 @@ export function shortFoodName(name: string): string {
 /** Läsbar mängd: "2 dl (76 g)", "1 st (medel) (60 g)" eller "Snabbregistrering". */
 export function entryAmountText(entry: DiaryEntry): string {
   return entry.kind === 'food' ? describeAmount(entry.food, entry.amount, entry.unit) : 'Snabbregistrering'
+}
+
+/**
+ * Undertext för en post i dagboken: klockslaget först, sedan mängden och ev. anteckning –
+ * "07:45 · 2 dl (76 g) · anteckning". Klipps raden av på en smal skärm är det mängdens slut
+ * som försvinner, aldrig tiden.
+ */
+export function entrySubtitle(entry: Pick<DiaryEntry, 'time' | 'note'>, amount: string | undefined): string {
+  return [entry.time, amount, entry.note ? 'anteckning' : undefined].filter(Boolean).join(' · ')
 }
 
 /** Energi för en post, `undefined` om okänd. */
@@ -330,7 +323,7 @@ export function mealMacroDots(n: Nutrients): MealMacroDot[] {
 
 /** Uppläst sammanfattning av en måltid, t.ex. "Frukost: 420 kcal, 3 poster". */
 export function mealAriaSummary(name: string, entries: readonly DiaryEntry[], unit: 'kcal' | 'kJ', mindful: boolean): string {
-  if (entries.length === 0) return `${name}: inget registrerat`
+  if (entries.length === 0) return `${name}: inget loggat`
   const count = `${formatNumber(entries.length)} ${entries.length === 1 ? 'post' : 'poster'}`
   if (mindful) return `${name}: ${count}`
   return `${name}: ${formatEnergy(totals(entries).kcal, unit)}, ${count}`
@@ -384,7 +377,7 @@ export function daySummaryText(input: DaySummaryInput): string {
 
   const sum = totals(entries)
   if (entries.length === 0) {
-    lines.push(kind === 'future' ? 'Inget planerat ännu.' : 'Inget registrerat.')
+    lines.push(kind === 'future' ? 'Inget planerat ännu.' : 'Inget loggat.')
   } else if (!mindful) {
     const verb = kind === 'future' ? 'Planerat' : 'Ätit'
     if (budgetKcal !== undefined && budgetKcal > 0) {

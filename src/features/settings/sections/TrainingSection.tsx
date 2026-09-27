@@ -18,7 +18,7 @@ export function TrainingSection() {
   const pct = useProfileStore((s) => s.settings.exerciseAddBackPct)
   const glass = useProfileStore((s) => s.settings.waterGlassMl)
   const updateSettings = useProfileStore((s) => s.updateSettings)
-  const { targets } = useTargets()
+  const { targets, exerciseAddBack } = useTargets()
   const fmt = useEnergyFormatter()
   const glassId = useId()
   const extra = Math.round((EXAMPLE_KCAL * pct) / 100)
@@ -39,7 +39,7 @@ export function TrainingSection() {
           step={5}
           showValue
           tone="lingon"
-          formatValue={(v) => `${formatNumber(v)} %`}
+          formatValue={(v) => `${formatNumber(v)}\u00a0%`}
           marks={[
             { value: 0, label: 'Inget' },
             { value: 50, label: 'Lagom' },
@@ -49,9 +49,11 @@ export function TrainingSection() {
         <div className="mt-4 flex items-start gap-3 rounded-2xl bg-lingon-soft p-3.5">
           <Dumbbell aria-hidden className="mt-0.5 size-5 shrink-0 text-lingon" />
           <p className="text-[0.875rem] leading-relaxed text-ink">
-            {pct === 0
-              ? 'Träningen påverkar inte dagens budget – bra om du vill att maten ska vara densamma varje dag.'
-              : `Loggar du ett pass på ${fmt(EXAMPLE_KCAL)} får du ${fmt(extra)} extra att äta den dagen.`}
+            {exerciseAddBack.includedInTarget
+              ? 'Just nu följer dagsmålet din uppmätta (adaptiva) förbrukning, där din vanliga träning redan ingår – därför läggs inget till budgeten. Andelen gäller när målet räknas från formeln eller när du har ett eget energimål.'
+              : pct === 0
+                ? 'Träningen påverkar inte dagens budget – bra om du vill att maten ska vara densamma varje dag.'
+                : `Loggar du ett pass på ${fmt(EXAMPLE_KCAL)} får du ${fmt(extra)} extra att äta den dagen.`}
           </p>
         </div>
       </Card>

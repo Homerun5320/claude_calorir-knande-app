@@ -114,7 +114,7 @@ function WatchCard({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-ink">{NUTRIENTS[w.key].name}</span>
                   {!mindful && w.percent !== undefined && w.status !== 'okant' && (
-                    <span className="text-xs text-ink-3 tabular-nums">{formatNumber(w.percent)} % av RI</span>
+                    <span className="text-xs text-ink-3 tabular-nums">{formatNumber(w.percent)}{'\u00a0'}% av RI</span>
                   )}
                   <Badge className="ml-auto" tone={STATUS_TONE[w.status]} dot>
                     {status.short === '–' ? 'Okänt' : status.short}
@@ -161,7 +161,7 @@ function SourcesCard({ entries, initial, mindful }: { entries: InsightsData['ent
                     <span className="sr-only">{i + 1}. </span>
                     {s.name}
                   </span>
-                  {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(s.share * 100)} %</span>}
+                  {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(s.share * 100)}{'\u00a0'}%</span>}
                 </div>
                 <ShareBar value={s.share} color="var(--lg-gran)" className="mt-1" />
                 {!mindful && (

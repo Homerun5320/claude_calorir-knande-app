@@ -6,7 +6,7 @@
  */
 import type { DiaryEntry, GoalType, ISODate, LifeStage, MeasurementEntry, Profile, WeightEntry } from '../../types'
 import { addDays, ageFromBirthYear, capitalize, diffDays, fromISODate, MONTHS, toISODate } from '../../lib/dates'
-import { bmi, bmiCategory, projectGoalDate, slopePerDay, weightTrend, type TrendPoint } from '../../lib/energy'
+import { bmi, bmiCategory, goalPause, OLDER_ADULT_AGE, projectGoalDate, slopePerDay, weightTrend, youngestAge, type TrendPoint } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 import { totals } from '../../lib/diary'
 import { niceTicks } from '../../components/charts/chartUtils'
@@ -49,17 +49,19 @@ export function formatSigned(value: number, decimals = 1): string {
 }
 
 /**
- * Vilken riktning som är "önskad" för användaren – används bara för att tona förändringar mjukt
- * gröna. Vid graviditet, amning och under 18 år finns ingen önskad riktning (ingen viktnedgång).
+ * Vilken riktning som tonas mjukt grön. Viktnedgång tonas aldrig grön – Lagom berömmer inte att
+ * gå ner i vikt (och aldrig att gå ner fort); den visas neutralt. En uppgång mot ett mål om att gå
+ * upp i vikt får en mild grön ton. Vid graviditet, amning och under 18 år finns ingen önskad
+ * riktning. `age` ska vara den yngsta möjliga åldern (`youngestAge`).
  */
 export function goodDirection(
   goal: GoalType | undefined,
   lifeStage: LifeStage | undefined,
   age: number | undefined,
-): 'up' | 'down' | undefined {
-  if (!goal || goal === 'behalla') return undefined
+): 'up' | undefined {
+  if (goal !== 'ga_upp') return undefined
   if ((lifeStage && lifeStage !== 'ingen') || (age !== undefined && age < 18)) return undefined
-  return goal === 'ga_ner' ? 'down' : 'up'
+  return 'up'
 }
 
 // ---------------------------------------------------------------------------
@@ -147,16 +149,13 @@ export function trendWord(kgPerWeek: number | undefined): string {
 // BMI
 // ---------------------------------------------------------------------------
 
-/** Från den här åldern gäller en högre nedre BMI-gräns (Socialstyrelsen, 1177). */
-export const OLDER_ADULT_AGE = 70
-
 /**
- * Lägsta BMI som räknas som hälsosamt: 18,5 för vuxna och 22 från 70 år – hos äldre är
- * BMI under 22 ett tecken på risk för undernäring.
+ * Från 70 år gäller en högre nedre BMI-gräns (22 i stället för 18,5) – hos äldre är BMI under 22
+ * ett tecken på risk för undernäring. Reglerna finns i lib/energy så att Idag, Vikt och målen
+ * räknar likadant.
  */
-export function minHealthyBmi(age: number | undefined): number {
-  return age !== undefined && age >= OLDER_ADULT_AGE ? 22 : 18.5
-}
+export { OLDER_ADULT_AGE }
+export { minHealthyBmi } from '../../lib/energy'
 
 export interface BmiDisplay {
   /** Värdet avrundat till en decimal – samma tal som visas och klassas. */
@@ -214,7 +213,10 @@ export interface GoalStatusInput {
   trendKg: number
   rate: WeeklyRate | null
   lifeStage: LifeStage | undefined
+  /** Ålder enligt födelseåret (70-årsgränsen för BMI). */
   age: number | undefined
+  /** Yngsta möjliga ålder (18-årsgränsen). Saknas den används `age`. */
+  youngestAge?: number
   /** Längd för BMI-kontrollen (utan längd görs ingen kontroll). */
   heightCm?: number
   today: ISODate
@@ -223,18 +225,15 @@ export interface GoalStatusInput {
 /**
  * Status för målvikten: nådd, prognos, stabil eller pausad.
  *
- * Viktnedgång pausas vid graviditet, amning, under 18 år och när trendvikten ligger under
- * `minHealthyBmi` – även utan satt målvikt, eftersom underskottet annars fortsätter.
+ * Samma regler som dagsmålet (`goalPause` i lib/energy): viktnedgång pausas vid graviditet,
+ * amning, under 18 år och när trendvikten ligger under `minHealthyBmi` – även utan satt målvikt,
+ * eftersom underskottet annars fortsätter. Nådd målvikt räknas som "behålla" i dagsmålet.
  */
-export function goalStatus({ goal, targetKg, trendKg, rate, lifeStage, age, heightCm, today }: GoalStatusInput): GoalStatus {
-  if (goal === 'ga_ner') {
-    if (lifeStage === 'gravid' || lifeStage === 'ammar') return { kind: 'paused', reason: lifeStage }
-    if (age !== undefined && age < 18) return { kind: 'paused', reason: 'under18' }
-    if (heightCm !== undefined && heightCm > 0 && bmi(trendKg, heightCm) < minHealthyBmi(age)) return { kind: 'paused', reason: 'lowBmi' }
-  }
+export function goalStatus({ goal, targetKg, trendKg, rate, lifeStage, age, youngestAge: young, heightCm, today }: GoalStatusInput): GoalStatus {
+  const pause = goalPause({ goal, lifeStage, youngestAge: young ?? age, age, heightCm, weightKg: trendKg, targetWeightKg: targetKg })
+  if (pause === 'reached') return { kind: 'reached' }
+  if (pause) return { kind: 'paused', reason: pause }
   if (goal === undefined || goal === 'behalla' || targetKg === undefined || !Number.isFinite(targetKg)) return { kind: 'none' }
-  const reached = goal === 'ga_ner' ? trendKg <= targetKg + 0.1 : trendKg >= targetKg - 0.1
-  if (reached) return { kind: 'reached' }
   if (!rate) return { kind: 'early' }
   if (Math.abs(rate.kgPerWeek) < 0.05) return { kind: 'steady' }
   const date = projectGoalDate(trendKg, rate.kgPerWeek, targetKg, today)
@@ -291,13 +290,14 @@ export function bodyOverview(weights: readonly WeightEntry[], profile: OverviewP
   const points = trendSeries(sorted, today)
   const trendKg = points.length ? points[points.length - 1].trend : undefined
   const age = profile ? ageFromBirthYear(profile.birthYear, today) : undefined
+  const young = profile ? youngestAge(profile.birthYear, today) : undefined
   const rate = weeklyRate(sorted, today)
   const startKg = profile?.startWeightKg ?? sorted[0]?.kg
   const target = profile?.targetWeightKg
   const status =
     trendKg === undefined
       ? ({ kind: 'none' } as const)
-      : goalStatus({ goal: profile?.goal, targetKg: target, trendKg, rate, lifeStage: profile?.lifeStage, age, heightCm: profile?.heightCm, today })
+      : goalStatus({ goal: profile?.goal, targetKg: target, trendKg, rate, lifeStage: profile?.lifeStage, age, youngestAge: young, heightCm: profile?.heightCm, today })
   return {
     sorted,
     latest,
@@ -307,8 +307,8 @@ export function bodyOverview(weights: readonly WeightEntry[], profile: OverviewP
     change30: trendChange(points, 30),
     rate,
     age,
-    // Pausad viktnedgång har ingen "önskad" riktning – nedåt ska inte tonas grönt.
-    good: status.kind === 'paused' ? undefined : goodDirection(profile?.goal, profile?.lifeStage, age),
+    // Pausat eller nått mål har ingen "önskad" riktning, och viktnedgång tonas aldrig grönt.
+    good: status.kind === 'paused' || status.kind === 'reached' ? undefined : goodDirection(profile?.goal, profile?.lifeStage, young),
     status,
     startKg,
     startDate: profileStartDate(profile?.createdAt) ?? sorted[0]?.date,
@@ -569,16 +569,10 @@ export function intakeByDay(entries: Readonly<Record<ISODate, readonly DiaryEntr
 }
 
 /**
- * Varför adaptiv förbrukning inte används, eller null om den får användas. Under graviditet,
- * amning och uppväxt ändras vikten av naturliga skäl – en viktökning skulle läsas som ett
- * överskott och sänka målet. Då används formeln (med livsstadietillägg) i stället.
+ * Varför adaptiv förbrukning inte används (graviditet, amning, under 18 år). Regeln finns i
+ * lib/energy och används av både dagsmålen (`computeEnergy`/`useTargets`) och korten.
  */
-export function adaptiveBlockReason(lifeStage: LifeStage | undefined, age: number | undefined): string | null {
-  if (lifeStage === 'gravid') return 'Under graviditeten ändras vikten av naturliga skäl – därför används formeln i stället för den uppmätta förbrukningen.'
-  if (lifeStage === 'ammar') return 'Under amningen förändras kroppen av naturliga skäl – därför används formeln (med tillägg för amning) i stället för den uppmätta förbrukningen.'
-  if (age !== undefined && age < 18) return 'Under uppväxten ändras vikten av naturliga skäl – därför används formeln i stället för den uppmätta förbrukningen.'
-  return null
-}
+export { adaptiveBlockReason, adaptiveBlockReasonFor } from '../../lib/energy'
 
 /** Samma krav som `estimateAdaptiveTdee` i lib/energy. */
 export const ADAPTIVE_REQUIREMENTS = {

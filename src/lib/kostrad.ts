@@ -62,36 +62,6 @@ const RAW_WORDS = /(^|[\s,(])(rå|råa|rått|okokt|otillagad)([\s,)]|$)/
 const SOY_WORDS = /tofu|soja|tempeh|edamame/
 
 /**
- * Rätter där baljväxterna är huvudingrediensen bland "grönsakerna" (ärtsoppa, dal, linsgryta …).
- * Gröna ärtor, sockerärtor och haricots verts räknas som grönsaker och matchas inte.
- */
-const LEGUME_MAIN = /ärtsoppa|linssoppa|bönsoppa|linsgryta|kikärtsgryta|bönsallad|(^|[\s(])dal([\s,)]|$)|bruna bönor|falafel|hummus|bönbiff|linsbiff/
-/** Rätter med baljväxter blandade med andra grönsaker (chili, burrito …) – ungefär hälften räknas. */
-const LEGUME_MIXED = /chili con carne|chili sin carne|bönchili|bönor|linser|kikärt/
-/** Tallrikar med sallad eller grönsaker vid sidan av – även där räknas bara ungefär hälften. */
-const WITH_VEGETABLES = /sallad|grönsak/
-const NOT_LEGUME = /gröna bönor|haricots|brytbön|sockerärt|gröna ärtor|böngrodd/
-
-/**
- * Livsmedel med egna kostrådsvärden från före 2025 har baljväxterna inräknade i frukt och grönt.
- * Flytta den andelen till baljväxter när namnet tydligt visar en baljväxträtt, så att t.ex.
- * ärtsoppa räknas mot baljväxtrådet i stället för mot 500 g frukt och grönt.
- */
-function legumeShareFromName(name: string, contrib: KostradContribFull): KostradContribFull {
-  const fg = contrib.fruktGront
-  if (fg === undefined || fg <= 0 || NOT_LEGUME.test(name)) return contrib
-  const main = LEGUME_MAIN.test(name)
-  const share = main && !WITH_VEGETABLES.test(name) ? 1 : main || LEGUME_MIXED.test(name) ? 0.5 : 0
-  if (share === 0) return contrib
-  const moved = Math.round(fg * share)
-  const rest = fg - moved
-  const result: KostradContribFull = { ...contrib, baljvaxter: moved }
-  if (rest > 0) result.fruktGront = rest
-  else delete result.fruktGront
-  return result
-}
-
-/**
  * Råvikt → tillagad vikt för kött. Rådet gäller tillagad vikt: 350 g tillagat motsvarar ca
  * 400–500 g rått (Livsmedelsverket), dvs. en faktor på ungefär 0,75.
  */
@@ -99,15 +69,13 @@ export const RAW_TO_COOKED_MEAT = 0.75
 
 /**
  * Hur många gram per 100 g av livsmedlet som räknas mot respektive kostråd.
- * `food.kostrad` används om det finns (ersätter schablonen helt), annars kategorins schablon
- * justerad med några nyckelord i namnet (rått kött, sojaprodukter, hummus, feta mejeriprodukter).
+ * `food.kostrad` används om det finns (ersätter schablonen helt – sammansatta rätter anger själva
+ * sin andel baljväxter, se `data/foods`), annars kategorins schablon justerad med några nyckelord
+ * i namnet (rått kött, sojaprodukter, hummus, falafel, feta mejeriprodukter).
  */
 export function foodKostrad(food: Food): KostradContribFull {
-  const name = norm(food.name)
-  if (food.kostrad) {
-    const override: KostradContribFull = { ...food.kostrad }
-    return override.baljvaxter === undefined ? legumeShareFromName(name, override) : override
-  }
+  if (food.kostrad) return { ...food.kostrad }
+  const name = norm(typeof food.name === 'string' ? food.name : '')
   const base: KostradContribFull = { ...(CATEGORY_KOSTRAD[food.category] ?? {}) }
 
   if ((food.category === 'rott_kott' || food.category === 'chark') && RAW_WORDS.test(name)) {

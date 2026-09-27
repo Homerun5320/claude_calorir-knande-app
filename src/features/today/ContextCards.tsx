@@ -142,7 +142,7 @@ function CaffeineTile({ mg, maxMg, mindful }: { mg: number; maxMg: number; mindf
       {!mindful && (
         <span className="mt-0.5 block font-display text-lg leading-tight font-semibold text-ink tabular-nums">
           {formatNutrient('caffeine', mg)}
-          <span className="font-sans text-sm font-normal text-ink-3"> av {formatNumber(maxMg)} mg</span>
+          <span className="font-sans text-sm font-normal text-ink-3"> av {formatNumber(maxMg)}{'\u00a0'}mg</span>
         </span>
       )}
       <ProgressBar value={mg} max={maxMg} tone="hjortron" size="xs" aria-label="Koffein mot dagens riktmärke" className="my-1.5" />
@@ -155,7 +155,7 @@ function AlcoholTile({ drinks, mindful }: { drinks: number; mindful: boolean }) 
   return (
     <Tile to="/dryck" tone="vinbar" icon={Wine} eyebrow="Alkohol i veckan">
       <span className="mt-0.5 block font-display text-lg leading-tight font-semibold text-ink tabular-nums">
-        {mindful ? 'Registrerat i veckan' : `${formatNumber(drinks, 1)} standardglas`}
+        {mindful ? 'Loggat i veckan' : `${formatNumber(drinks, 1)} standardglas`}
       </span>
       <span className="mt-0.5 block text-[0.8125rem] leading-snug text-ink-2">
         Ju mindre alkohol, desto bättre för sömn och återhämtning.

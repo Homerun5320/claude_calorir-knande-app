@@ -3,14 +3,15 @@
  * Delas av välkomstflödet (/valkommen) och Inställningar → Profil så att reglerna är desamma.
  *
  * Säkerhet (se även lib/energy):
- * - Ingen viktnedgång vid graviditet, amning, under 18 år eller när BMI redan är under 18,5.
+ * - Ingen viktnedgång vid graviditet, amning, under 18 år eller när BMI redan är under 18,5
+ *   (22 från 70 år).
  * - Takten begränsas till högst 1 % av kroppsvikten per vecka (viktuppgång högst 0,5 kg/vecka).
- * - Målvikten får inte motsvara ett BMI under 18,5.
+ * - Målvikten får inte motsvara ett BMI under 18,5 (22 från 70 år).
  */
 import type { ActivityLevel, DietType, GoalType, ISODate, LifeStage, MacroPreset, Profile, Sex } from '../../types'
 import { ACTIVITY_LEVELS } from '../../types'
 import { MONTHS, ageFromBirthYear, diffDays, fromISODate, todayISO } from '../../lib/dates'
-import { KCAL_PER_KG, computeEnergy, projectGoalDate } from '../../lib/energy'
+import { HEALTHY_BMI_MIN, KCAL_PER_KG, OLDER_ADULT_AGE, computeEnergy, minHealthyBmi, projectGoalDate, youngestAge } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 
 // ---------------------------------------------------------------------------
@@ -21,8 +22,8 @@ export const MIN_AGE = 13
 export const MAX_AGE = 110
 export const HEIGHT_RANGE = { min: 120, max: 230 } as const
 export const WEIGHT_RANGE = { min: 30, max: 300 } as const
-/** Lägsta BMI som räknas som hälsosamt (WHO). */
-export const HEALTHY_BMI_MIN = 18.5
+/** Lägsta BMI som räknas som hälsosamt för vuxna (WHO) – 22 från 70 år, se `minHealthyBmi`. */
+export { HEALTHY_BMI_MIN }
 /** Valbara takter i kg per vecka. */
 export const RATE_OPTIONS = [0.25, 0.5, 0.75] as const
 /** Högsta takt vid viktuppgång (samma som lib/energy). */
@@ -168,9 +169,8 @@ function currentYear(today: ISODate): number {
  * som är födda det året hunnit fylla år.
  */
 export function minimumAge(birthYear: number, today: ISODate = todayISO()): number {
-  const d = fromISODate(today)
-  const yearDiff = ageFromBirthYear(birthYear, today)
-  return d.getMonth() === 11 && d.getDate() === 31 ? yearDiff : yearDiff - 1
+  // Samma regel som dagsmålen i lib/energy.
+  return youngestAge(birthYear, today)
 }
 
 export function validateBirthYear(birthYear: number | undefined, today: ISODate = todayISO()): string | undefined {
@@ -187,13 +187,13 @@ export function validateBirthYear(birthYear: number | undefined, today: ISODate 
 
 export function validateHeight(heightCm: number | undefined): string | undefined {
   if (heightCm === undefined) return 'Fyll i din längd.'
-  if (heightCm < HEIGHT_RANGE.min || heightCm > HEIGHT_RANGE.max) return `Ange en längd mellan ${HEIGHT_RANGE.min} och ${HEIGHT_RANGE.max} cm.`
+  if (heightCm < HEIGHT_RANGE.min || heightCm > HEIGHT_RANGE.max) return `Ange en längd mellan ${HEIGHT_RANGE.min} och ${HEIGHT_RANGE.max}\u00a0cm.`
   return undefined
 }
 
 export function validateWeight(weightKg: number | undefined): string | undefined {
   if (weightKg === undefined) return 'Fyll i din vikt.'
-  if (weightKg < WEIGHT_RANGE.min || weightKg > WEIGHT_RANGE.max) return `Ange en vikt mellan ${WEIGHT_RANGE.min} och ${WEIGHT_RANGE.max} kg.`
+  if (weightKg < WEIGHT_RANGE.min || weightKg > WEIGHT_RANGE.max) return `Ange en vikt mellan ${WEIGHT_RANGE.min} och ${WEIGHT_RANGE.max}\u00a0kg.`
   return undefined
 }
 
@@ -233,10 +233,21 @@ export function bmiOf(weightKg: number, heightCm: number): number {
   return weightKg / (m * m)
 }
 
-/** Lägsta hälsosamma vikt (BMI 18,5) för en längd, avrundad uppåt till en decimal. */
-export function minHealthyWeight(heightCm: number): number {
+/**
+ * Ålder enligt födelseåret för 70-årsgränsen (högre lägsta BMI). Här räknas den äldsta möjliga
+ * åldern – det är den försiktiga riktningen för BMI-gränsen.
+ */
+function bmiAge(draft: Pick<ProfileDraft, 'birthYear'>, today: ISODate): number | undefined {
+  return draft.birthYear === undefined ? undefined : ageFromBirthYear(draft.birthYear, today)
+}
+
+/**
+ * Lägsta hälsosamma vikt för en längd, avrundad uppåt till en decimal: BMI 18,5 – eller 22 från
+ * 70 år (`age` enligt födelseåret).
+ */
+export function minHealthyWeight(heightCm: number, age?: number): number {
   const m = heightCm / 100
-  return Math.ceil(HEALTHY_BMI_MIN * m * m * 10) / 10
+  return Math.ceil(minHealthyBmi(age) * m * m * 10) / 10
 }
 
 /**
@@ -253,8 +264,11 @@ export function lossBlockReason(draft: ProfileDraft, today: ISODate = todayISO()
   if (age !== undefined && age < 18) {
     return 'Du som är under 18 år växer fortfarande, och då rekommenderas inte kaloriunderskott. Lagom hjälper dig att äta varierat och lagom i stället.'
   }
-  if (draft.weightKg !== undefined && draft.heightCm !== undefined && bmiOf(draft.weightKg, draft.heightCm) < HEALTHY_BMI_MIN) {
-    return 'Din vikt ligger redan i den lägre delen av vad som räknas som hälsosamt, så Lagom sätter inget mål om viktnedgång.'
+  const older = bmiAge(draft, today)
+  if (draft.weightKg !== undefined && draft.heightCm !== undefined && bmiOf(draft.weightKg, draft.heightCm) < minHealthyBmi(older)) {
+    return older !== undefined && older >= OLDER_ADULT_AGE
+      ? 'Din vikt ligger redan i den lägre delen av vad som räknas som hälsosamt för din ålder – från 70 år skyddar lite marginal mot undernäring. Därför sätter Lagom inget mål om viktnedgång.'
+      : 'Din vikt ligger redan i den lägre delen av vad som räknas som hälsosamt, så Lagom sätter inget mål om viktnedgång.'
   }
   return null
 }
@@ -320,12 +334,14 @@ export function validateTarget(draft: ProfileDraft, today: ISODate = todayISO())
   const t = draft.targetWeightKg
   if (t === undefined) return undefined
   const goal = effectiveGoal(draft, today)
-  if (t < WEIGHT_RANGE.min || t > WEIGHT_RANGE.max) return `Ange en vikt mellan ${WEIGHT_RANGE.min} och ${WEIGHT_RANGE.max} kg.`
+  if (t < WEIGHT_RANGE.min || t > WEIGHT_RANGE.max) return `Ange en vikt mellan ${WEIGHT_RANGE.min} och ${WEIGHT_RANGE.max}\u00a0kg.`
   if (draft.weightKg === undefined) return undefined
   if (goal === 'ga_ner') {
     if (t >= draft.weightKg) return 'Målvikten behöver vara lägre än din vikt idag.'
-    if (draft.heightCm !== undefined && t < minHealthyWeight(draft.heightCm)) {
-      return `Den vikten motsvarar ett BMI under ${formatNumber(HEALTHY_BMI_MIN, 1)}. Välj gärna minst ${formatNumber(minHealthyWeight(draft.heightCm), 1)} kg – lägre räknas inte som hälsosamt för din längd.`
+    const age = bmiAge(draft, today)
+    if (draft.heightCm !== undefined && t < minHealthyWeight(draft.heightCm, age)) {
+      const older = age !== undefined && age >= OLDER_ADULT_AGE
+      return `Den vikten motsvarar ett BMI under ${formatNumber(minHealthyBmi(age), 1)}. Välj gärna minst ${formatNumber(minHealthyWeight(draft.heightCm, age), 1)}\u00a0kg – lägre räknas inte som hälsosamt för din längd${older ? ' och ålder' : ''}.`
     }
   }
   if (goal === 'ga_upp' && t <= draft.weightKg) return 'Målvikten behöver vara högre än din vikt idag.'

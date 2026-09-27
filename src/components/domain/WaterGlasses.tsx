@@ -3,7 +3,10 @@
  *
  * - Tryck på ett tomt glas fyller upp till och med det glaset.
  * - Tryck på det sista fyllda glaset tömmer det.
- * - Knapparna − och + ändrar ett glas i taget. Sammanfattningen visar t.ex. "1,25 l av 2 l".
+ * - Knapparna − och + ändrar ett glas i taget. Sammanfattningen visar t.ex. "1,25 liter av 2 liter"
+ *   (siffran i Fraunces, enheten utskriven för sig – "0,88 l" i Fraunces såg ut som "0,881").
+ * - Glasen breddas upp till 44 px när det finns plats. På smala skärmar är de smalare (minst
+ *   36 px); knapparna − och + (44 × 44 px) gör samma sak.
  */
 import { useId } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -29,6 +32,11 @@ export interface WaterGlassesProps {
 /** 1250 → "1,25 l", 2000 → "2 l", 330 → "0,33 l". */
 export function formatLiters(ml: number): string {
   return `${formatNumber(Math.max(0, ml) / 1000, 2)}\u00a0l`
+}
+
+/** 1250 → "1,25 liter" – enheten utskriven (för skärmläsare och där "l" kan misstas för en etta). */
+export function formatLitersLong(ml: number): string {
+  return `${formatNumber(Math.max(0, ml) / 1000, 2)}\u00a0liter`
 }
 
 export function WaterGlasses({
@@ -77,9 +85,9 @@ export function WaterGlasses({
   return (
     <div className={className}>
       <div
-        className="flex flex-wrap items-end gap-1"
+        className="flex flex-wrap items-end"
         role={interactive ? 'group' : 'img'}
-        aria-label={`Vatten: ${formatLiters(drunk)} av ${formatLiters(targetMl)}`}
+        aria-label={`Vatten: ${formatLitersLong(drunk)} av ${formatLitersLong(targetMl)}`}
       >
         {Array.from({ length: count }, (_, i) =>
           interactive ? (
@@ -88,12 +96,12 @@ export function WaterGlasses({
               type="button"
               onClick={() => tap(i)}
               aria-label={glassLabel(i)}
-              className="grid h-12 w-8 place-items-center rounded-xl transition-transform hover:-translate-y-0.5 active:scale-90"
+              className={GLASS_BOX}
             >
               <Glass level={levelOf(i)} />
             </button>
           ) : (
-            <span key={i} className="grid h-12 w-8 place-items-center" aria-hidden="true">
+            <span key={i} className="grid h-12 w-9 place-items-center" aria-hidden="true">
               <Glass level={levelOf(i)} />
             </span>
           ),
@@ -103,7 +111,7 @@ export function WaterGlasses({
             type="button"
             onClick={() => onAdd(size)}
             aria-label={`Lägg till ett glas (${formatNumber(size)} ml)`}
-            className="grid h-12 w-8 place-items-center rounded-xl text-fjall transition-transform hover:-translate-y-0.5 active:scale-90"
+            className={`${GLASS_BOX} text-fjall`}
           >
             <GhostGlass />
           </button>
@@ -113,8 +121,10 @@ export function WaterGlasses({
       {showSummary && (
         <div className="mt-3 flex items-center gap-3">
           <p className="min-w-0 flex-1" aria-live="polite">
-            <span className="font-display text-xl font-semibold text-ink tabular-nums">{formatLiters(drunk)}</span>
-            <span className="text-sm text-ink-3"> av {formatLiters(targetMl)}</span>
+            <span className="font-display text-xl font-semibold text-ink tabular-nums">{formatNumber(drunk / 1000, 2)}</span>
+            <span className="text-sm text-ink-3">
+              {'\u00a0'}liter av {formatLitersLong(targetMl)}
+            </span>
             {reached && <span className="ml-2 text-xs font-semibold text-gran">Dagsmålet nått</span>}
           </p>
           {onRemove && (
@@ -143,6 +153,10 @@ export function WaterGlasses({
     </div>
   )
 }
+
+/** Ett glas: 48 px högt, 36–44 px brett (växer med tillgänglig bredd). */
+const GLASS_BOX =
+  'grid h-12 min-w-9 max-w-11 flex-1 basis-9 place-items-center rounded-xl transition-transform hover:-translate-y-0.5 active:scale-90'
 
 const GLASS_PATH = 'M5 4H27L24.6 35.2A3 3 0 0 1 21.6 38H10.4A3 3 0 0 1 7.4 35.2Z'
 const INNER_TOP = 4

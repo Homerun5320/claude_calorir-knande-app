@@ -39,7 +39,6 @@ import {
   daySummaryText,
   defaultMealForDay,
   diaryPath,
-  exerciseAddBack,
   isValidISODate,
   MAX_FUTURE_DAYS,
   mealLabel,
@@ -121,16 +120,13 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
   const meals = useProfileStore((s) => s.settings.meals)
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const energyUnit = useProfileStore((s) => s.settings.energyUnit)
-  const addBackSetting = useProfileStore((s) => s.settings.exerciseAddBackPct)
-  const kcalOverridden = useProfileStore((s) => s.settings.targetOverrides.kcal !== undefined)
   const glassMl = useProfileStore((s) => s.settings.waterGlassMl)
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
-  const { targets, energy } = useTargets(today)
+  // Samma regel för träningen som Idag, Träning och Inställningar (`useTargets().exerciseAddBack`).
+  const { targets, exerciseAddBack: addBack } = useTargets(today)
   const day = useDay(date)
 
   const kind = dayKind(date, today)
-  // Med adaptiv förbrukning ingår träningen redan i dagsmålet – då läggs den inte till igen.
-  const addBack = exerciseAddBack(addBackSetting, energy?.tdeeSource, kcalOverridden)
   const budget = dailyBudget(targets.kcal, day.exercise, addBack.pct)
   const enabledMeals = useMemo(() => meals.filter((m) => m.enabled), [meals])
   const shownMeals = useMemo(() => visibleMeals(meals, day.byMeal), [meals, day.byMeal])

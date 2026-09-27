@@ -52,8 +52,8 @@ interface OnlineState {
 }
 
 /**
- * Ett livsmedel på id: användarens egna, recept, sparade, inbyggda eller – för `off:`-id:n som
- * inte finns lokalt – hämtat från Open Food Facts.
+ * Ett livsmedel på id: användarens egna, recept, sparade, inbyggda (även de svenska klassikerna,
+ * 'recipe:klassiker-*') eller – för `off:`-id:n som inte finns lokalt – hämtat från Open Food Facts.
  */
 export function useFood(id: string | null | undefined): UseFoodResult {
   const key = id ?? ''
@@ -90,8 +90,8 @@ export function useFood(id: string | null | undefined): UseFoodResult {
 }
 
 /**
- * En funktion som slår upp livsmedel på id bland användarens och de inbyggda livsmedlen.
- * Byts ut när butiken eller katalogen ändras (lämplig som beroende i useMemo).
+ * En funktion som slår upp livsmedel på id bland användarens och de inbyggda livsmedlen
+ * (inklusive klassikerna). Byts ut när butiken eller katalogen ändras (lämplig som beroende i useMemo).
  */
 export function useFoodResolver(): (id: string) => Food | undefined {
   const customFoods = useFoodStore((s) => s.customFoods)

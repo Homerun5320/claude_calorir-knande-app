@@ -1,7 +1,9 @@
 /**
  * Dialog – centrerad modal, samt bekräftelsedialoger.
  *
- * - `<Dialog>`: generell modal (samma tillgänglighet som Sheet: fokusfälla, Escape, aria-modal).
+ * - `<Dialog>`: generell modal (samma tillgänglighet som Sheet: fokusfälla, Escape, aria-modal,
+ *   bakåtknappen stänger). Bekräftelser (alertdialog) får en historikpost bara när de ligger ovanpå
+ *   ett ark – annars kan de störa routerns egen hantering av "Lämna utan att spara?".
  * - `<ConfirmDialog>`: kontrollerad ja/nej-dialog.
  * - `confirmDialog({...})`: imperativ variant som returnerar ett löfte:
  *
@@ -19,7 +21,7 @@ import { create } from 'zustand'
 import { Button, cx, renderIcon, type IconLike } from './Button'
 import { toneVars, type Tone } from './Badge'
 import { IconButton } from './IconButton'
-import { ModalBackdrop, useModal } from './Sheet'
+import { ModalBackdrop, useModal, type ReturnFocus } from './Sheet'
 
 // ---------------------------------------------------------------------------
 // Dialog
@@ -49,6 +51,13 @@ export interface DialogProps {
   /** alertdialog för bekräftelser som kräver svar. */
   role?: 'dialog' | 'alertdialog'
   initialFocusRef?: RefObject<HTMLElement | null>
+  /** Fokus vid stängning: öppnaren (standard), `false` eller ett eget element (ref/funktion). */
+  returnFocus?: ReturnFocus
+  /**
+   * Bakåtknappen stänger dialogen. Standard: ja för `dialog`; för `alertdialog` bara när den ligger
+   * ovanpå ett ark eller en annan dialog med historikpost.
+   */
+  closeOnBack?: boolean
   onExitComplete?: () => void
   className?: string
 }
@@ -81,6 +90,8 @@ function DialogPanel({
   size = 'sm',
   role = 'dialog',
   initialFocusRef,
+  returnFocus,
+  closeOnBack,
   className,
 }: DialogProps) {
   const isPresent = useIsPresent()
@@ -88,7 +99,13 @@ function DialogPanel({
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const descId = useId()
-  useModal(panelRef, { active: isPresent, onDismiss: dismissible ? onClose : undefined, initialFocusRef })
+  useModal(panelRef, {
+    active: isPresent,
+    onDismiss: dismissible ? onClose : undefined,
+    initialFocusRef,
+    returnFocus,
+    closeOnBack: closeOnBack ?? (dismissible ? (role === 'alertdialog' ? 'nested' : true) : false),
+  })
 
   const centered = (align ?? (icon !== undefined ? 'center' : 'start')) === 'center'
   const motionProps = reduce

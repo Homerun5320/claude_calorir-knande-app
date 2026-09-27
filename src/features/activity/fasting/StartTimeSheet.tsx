@@ -90,7 +90,7 @@ export function StartTimeSheet({ open, onClose, mode, initialStart, targetHours,
               Du har fastat <strong className="font-semibold">{formatFastDuration(now - startMs)}</strong> sedan {dayAndTime(startMs, today)}.
             </p>
             <p className="mt-0.5 text-ink-2">
-              Målet på {targetHours} h nås {dayAndTime(startMs + targetHours * 3_600_000, today)}.
+              Målet på {targetHours}{'\u00a0'}h nås {dayAndTime(startMs + targetHours * 3_600_000, today)}.
             </p>
           </div>
         )}

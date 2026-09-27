@@ -3,7 +3,8 @@
  *
  * Perioden har alltid alla sina datum (`dates`, t.ex. måndag–söndag), men bara dagar till och med
  * idag räknas som förflutna (`elapsed`). Oregistrerade dagar räknas aldrig in i snitt – det är
- * anroparens ansvar att filtrera på loggade dagar.
+ * anroparens ansvar att filtrera på loggade dagar. Dagens (ofta ofullständiga) registrering räknas
+ * bara med när dagen är klar, se `withCountedDays`.
  */
 import type { ISODate } from '../../types'
 import { addDays, dateRange, fromISODate, isoWeek, MONTHS_SHORT, startOfWeek } from '../../lib/dates'
@@ -41,6 +42,11 @@ export interface Period {
   phrase: string
   /** Innevarande period (innehåller idag). */
   isCurrent: boolean
+  /**
+   * true när idag är borttagen ur `elapsed` för att dagen inte är markerad som klar än
+   * (se `withCountedDays`).
+   */
+  todayExcluded?: boolean
 }
 
 export function parsePeriodKind(value: string | null | undefined): PeriodKind {
@@ -107,6 +113,19 @@ function build(kind: PeriodKind, offset: number, start: ISODate, end: ISODate, t
     phrase: `de senaste ${n} dagarna`,
     isCurrent,
   }
+}
+
+/**
+ * Perioden med de dagar som räknas i snitt och summeringar. Dagens (ofta ofullständiga)
+ * registrering räknas bara med när dagen är markerad som klar – eller när ingen annan förfluten
+ * dag i perioden har registreringar. Samma regel som veckosnittet och kostråden på Idag, så att en
+ * halv dag inte drar ned snitten. Samma objekt returneras när inget behöver ändras.
+ */
+export function withCountedDays(p: Period, today: ISODate, todayComplete: boolean, hasEntries: (date: ISODate) => boolean): Period {
+  if (todayComplete || !p.elapsed.includes(today)) return p
+  const earlier = p.elapsed.filter((d) => d !== today)
+  if (!earlier.some(hasEntries)) return p
+  return { ...p, elapsed: earlier, todayExcluded: true }
 }
 
 /** Perioden för en typ och (för veckor) en förskjutning bakåt. */

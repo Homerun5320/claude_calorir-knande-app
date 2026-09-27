@@ -41,13 +41,13 @@ export function daylightSpan(t: SunTimes, timeZone: string = STOCKHOLM_TZ): { st
   return { start: clockMinutes(t.sunrise, timeZone) / 1440, end: clockMinutes(t.sunset, timeZone) / 1440 }
 }
 
-/** Timmar → "11 h 42 min". */
+/** Timmar → "11 h 42 min" (hårt mellanslag mellan tal och enhet, så att de aldrig hamnar på olika rader). */
 export function formatDaylight(hours: number): string {
   const total = Math.round(Math.max(0, hours) * 60)
   const h = Math.floor(total / 60)
   const m = total % 60
-  if (h === 0) return `${m} min`
-  return m === 0 ? `${h} h` : `${h} h ${m} min`
+  if (h === 0) return `${m}\u00a0min`
+  return m === 0 ? `${h}\u00a0h` : `${h}\u00a0h ${m}\u00a0min`
 }
 
 /** Hur många minuter dagsljuset ändrats sedan igår (positivt = ljusare). */
@@ -61,7 +61,7 @@ export function daylightDeltaMinutes(today: ISODate, lat: number = DEFAULT_LAT, 
 export function describeDaylightDelta(minutes: number): string {
   if (minutes === 0) return 'Ungefär lika lång som igår'
   const n = Math.abs(minutes)
-  return `${formatNumber(n)} ${n === 1 ? 'minut' : 'minuter'} ${minutes > 0 ? 'längre' : 'kortare'} än igår`
+  return `${formatNumber(n)}\u00a0${n === 1 ? 'minut' : 'minuter'} ${minutes > 0 ? 'längre' : 'kortare'} än igår`
 }
 
 /**
@@ -117,8 +117,8 @@ export function formatElapsed(ms: number): string {
   const min = Math.max(0, Math.floor(ms / 60_000))
   const h = Math.floor(min / 60)
   const m = min % 60
-  if (h === 0) return `${m} min`
-  return `${h} h ${m} min`
+  if (h === 0) return `${m}\u00a0min`
+  return `${h}\u00a0h ${m}\u00a0min`
 }
 
 /** Antal dagar med minst en post de senaste `n` dagarna (till och med idag). */

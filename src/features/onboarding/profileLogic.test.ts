@@ -104,6 +104,16 @@ describe('säkerhetsregler för viktnedgång', () => {
     expect(effectiveGoal(d, TODAY)).toBe('behalla')
   })
 
+  it('från 70 år gäller BMI 22 som nedre gräns för viktnedgång', () => {
+    // 170 cm och 62 kg ≈ BMI 21,5: helt okej vid 45 år, men lägre än rekommenderat från 70.
+    const d = draft({ heightCm: 170, weightKg: 62 })
+    expect(lossBlockReason(d, TODAY)).toBeNull()
+    expect(lossBlockReason({ ...d, birthYear: 1956 }, TODAY)).toMatch(/för din ålder/)
+    expect(effectiveGoal({ ...d, birthYear: 1956 }, TODAY)).toBe('behalla')
+    // 69 år enligt årtalet: 18,5 gäller fortfarande.
+    expect(lossBlockReason({ ...d, birthYear: 1957 }, TODAY)).toBeNull()
+  })
+
   it('livsstadium ignoreras för män', () => {
     expect(lossBlockReason(draft({ sex: 'man', lifeStage: 'gravid' }), TODAY)).toBeNull()
   })
@@ -151,6 +161,16 @@ describe('målvikt och prognos', () => {
 
   it('lägsta hälsosamma vikt räknas från längden', () => {
     expect(minHealthyWeight(170)).toBe(53.5)
+    // BMI 22 från 70 år.
+    expect(minHealthyWeight(170, 70)).toBe(63.6)
+    expect(minHealthyWeight(170, 69)).toBe(53.5)
+  })
+
+  it('målvikten får inte ligga under BMI 22 från 70 år', () => {
+    const older = draft({ birthYear: 1954, heightCm: 170, weightKg: 80 })
+    expect(validateTarget({ ...older, targetWeightKg: 60 }, TODAY)).toMatch(/BMI under 22\. Välj gärna minst 63,6\skg – lägre räknas inte som hälsosamt för din längd och ålder/)
+    expect(validateTarget({ ...older, targetWeightKg: 65 }, TODAY)).toBeUndefined()
+    expect(validateTarget(draft({ heightCm: 170, weightKg: 80, targetWeightKg: 60 }), TODAY)).toBeUndefined()
   })
 
   it('räknar fram ett ungefärligt datum', () => {

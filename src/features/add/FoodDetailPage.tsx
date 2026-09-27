@@ -161,11 +161,11 @@ function FoodDetail({ food }: { food: Food }) {
   const captionNode: ReactNode =
     useBasis === 'portion' ? (
       <>
-        Per portion <span className="normal-case">({formatGrams(grams)})</span>
+        Per portion <span className="whitespace-nowrap normal-case">({formatGrams(grams)})</span>
       </>
     ) : (
       <>
-        Per <span className="normal-case">{per}</span>
+        Per <span className="whitespace-nowrap normal-case">{per}</span>
       </>
     )
   const complete = completeness(food.nutrients)
@@ -254,7 +254,7 @@ function FoodDetail({ food }: { food: Food }) {
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs text-ink-2">
               <span>Näringsdata</span>
-              <span className="tabular-nums">{formatNumber(complete * 100)} % kända värden</span>
+              <span className="tabular-nums">{formatNumber(complete * 100)}{'\u00a0'}% kända värden</span>
             </div>
             <ProgressBar value={complete * 100} max={100} size="xs" tone={complete >= 0.6 ? 'mossa' : complete >= 0.3 ? 'sol' : 'hjortron'} aria-label="Andel kända näringsvärden" />
             {complete < 0.3 && <p className="mt-1.5 text-xs text-ink-3">Bara grundvärdena är kända. Okända ämnen visas som ”–”, aldrig som noll.</p>}
@@ -354,7 +354,7 @@ function FoodDetail({ food }: { food: Food }) {
               })}
             </ul>
             {food.density !== undefined && (
-              <p className="mt-2 text-xs text-ink-3">1 dl väger ca {formatGrams(food.density * 100)} – därför går det att ange mängden i dl, msk och tsk.</p>
+              <p className="mt-2 text-xs text-ink-3">1{'\u00a0'}dl väger ca <span className="whitespace-nowrap">{formatGrams(food.density * 100)}</span> – därför går det att ange mängden i dl, msk och tsk.</p>
             )}
           </Card>
         )}
@@ -499,8 +499,8 @@ function MacroSummary({ nutrients, mindful, caption }: { nutrients: Nutrients; m
                     )
                   ) : (
                     <>
-                      <span className="font-semibold">{g !== undefined ? `${formatNumber(g, g < 10 ? 1 : 0)} g` : '–'}</span>
-                      {pct !== undefined && g !== undefined && <span className="ml-2 text-ink-3">{formatNumber(pct)} E%</span>}
+                      <span className="font-semibold">{g !== undefined ? `${formatNumber(g, g < 10 ? 1 : 0)}\u00a0g` : '–'}</span>
+                      {pct !== undefined && g !== undefined && <span className="ml-2 whitespace-nowrap text-ink-3">{formatNumber(pct)}{'\u00a0'}E%</span>}
                     </>
                   )}
                 </dd>
@@ -536,7 +536,7 @@ function PlateCard({ food }: { food: Food }) {
                 {parts.map((p) => (
                   <li key={p} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-3.5 py-2.5">
                     <span className="text-ink">{PLATE_PART_LABELS[p].label}</span>
-                    {parts.length > 1 && <span className="tabular-nums text-ink-3">{formatNumber(split[p] * 100)} %</span>}
+                    {parts.length > 1 && <span className="tabular-nums text-ink-3">{formatNumber(split[p] * 100)}{'\u00a0'}%</span>}
                   </li>
                 ))}
               </ul>
@@ -574,7 +574,7 @@ function ClimateCard({ food, grams, caption }: { food: Food; grams: number; capt
   const kg = (factor.kgPerKg * grams) / 1000
   const eq = co2eEquivalents(kg)
   const level = foodClimateLevel(factor.kgPerKg)
-  const car = eq.carKm < 1 ? `${formatNumber(Math.max(10, Math.round((eq.carKm * 1000) / 10) * 10))} meter` : `${formatNumber(eq.carKm, 1)} km`
+  const car = eq.carKm < 1 ? `${formatNumber(Math.max(10, Math.round((eq.carKm * 1000) / 10) * 10))}\u00a0meter` : `${formatNumber(eq.carKm, 1)}\u00a0km`
   return (
     <Card title="Klimatavtryck" eyebrow={caption}>
       <div className="flex items-end justify-between gap-4">
@@ -591,7 +591,7 @@ function ClimateCard({ food, grams, caption }: { food: Food; grams: number; capt
         <span>Ungefär som att köra {car} med en genomsnittlig svensk personbil.</span>
       </div>
       <p className="mt-3 text-xs text-ink-3">
-        {formatNumber(factor.kgPerKg, 1)} kg CO₂e per kg · Källa: {factor.source}
+        {formatNumber(factor.kgPerKg, 1)}{'\u00a0'}kg{'\u00a0'}CO₂e per kg · Källa: {factor.source}
       </p>
     </Card>
   )
@@ -626,7 +626,7 @@ function ProductCard({ food }: { food: Food }) {
                 </span>
                 <span className="min-w-0">
                   <span className="block font-semibold text-ink">Nutri-Score {nutri.grade}</span>
-                  <span className="block text-xs text-ink-3">Jämför produkter inom samma kategori, från A till E.</span>
+                  <span className="block text-xs text-ink-3">Jämför produkter inom samma kategori, från A till{'\u00a0'}E.</span>
                 </span>
               </div>
             )}

@@ -111,6 +111,25 @@ describe('InsightsPage', () => {
     expect(screen.getByRole('heading', { name: 'När du äter' })).toBeInTheDocument()
   })
 
+  it('räknar inte med dagens ofullständiga dag i snitten – förrän dagen är klar', async () => {
+    seed(3)
+    renderPage('/insikter?period=30')
+    expect(await screen.findByText('Du har loggat 2 av 29 dagar')).toBeInTheDocument()
+    expect(screen.getByText(/Idag räknas med i snitten när du markerar dagen som klar/)).toBeInTheDocument()
+    await act(async () => useDiaryStore.getState().setDayMeta(todayISO(), { complete: true }))
+    expect(await screen.findByText('Du har loggat 3 av 30 dagar')).toBeInTheDocument()
+    expect(screen.queryByText(/Idag räknas med i snitten/)).not.toBeInTheDocument()
+  })
+
+  it('säger något varsamt när klara dagar i snitt ligger under energigolvet – aldrig beröm', async () => {
+    // Exempeldagarna är ca 1 100 kcal – under 1 200 kcal.
+    seed(4)
+    for (let i = 1; i <= 3; i++) useDiaryStore.getState().setDayMeta(addDays(todayISO(), -i), { complete: true })
+    renderPage('/insikter?period=30')
+    expect(await screen.findByText(/har du i snitt ätit mindre än 1\s200 kcal per dag/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: '1177' }).length).toBeGreaterThan(0)
+  })
+
   it('visar 90 dagar med linjediagram', async () => {
     seed(20)
     renderPage('/insikter?period=90')

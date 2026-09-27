@@ -77,7 +77,7 @@ export const ExerciseSection = memo(function ExerciseSection({
         <ul className="-mx-3 flex flex-col">
           {exercise.map((x) => {
             const emoji = getActivity(x.activityId)?.emoji ?? '🏃'
-            const details = [formatDuration(x.minutes), x.distanceKm ? `${formatNumber(x.distanceKm, 1)} km` : undefined]
+            const details = [formatDuration(x.minutes), x.distanceKm ? `${formatNumber(x.distanceKm, 1)}\u00a0km` : undefined]
               .filter(Boolean)
               .join(' · ')
             return (
@@ -103,7 +103,7 @@ export const ExerciseSection = memo(function ExerciseSection({
             {exerciseInTarget
               ? 'Med adaptiv förbrukning ingår din vanliga träning redan i dagsmålet, så den läggs inte till budgeten en gång till.'
               : addBackPct > 0
-                ? `${formatNumber(addBackPct)} % av träningen (${formatEnergy(added, energyUnit)}) räknas in i dagens budget. Träningskalorier överskattas ofta, därför räknas bara en del.`
+                ? `${formatNumber(addBackPct)}\u00a0% av träningen (${formatEnergy(added, energyUnit)}) räknas in i dagens budget. Träningskalorier överskattas ofta, därför räknas bara en del.`
                 : 'Träningen räknas inte in i budgeten enligt dina inställningar.'}
           </span>
         </p>

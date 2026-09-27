@@ -116,7 +116,7 @@ describe('validering', () => {
   })
 
   it('stoppar orimlig energi per 100 g', () => {
-    expect(validateDraft(draft({ energy: 1500 })).energy).toMatch(/900 kcal/)
+    expect(validateDraft(draft({ energy: 1500 })).energy).toMatch(/900\u00a0kcal per 100\u00a0g/)
     expect(validateDraft(draft({ energy: 1500, energyUnit: 'kJ' })).energy).toBeUndefined()
   })
 

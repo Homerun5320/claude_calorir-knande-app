@@ -61,21 +61,23 @@ describe('Håll koll på under vinterhalvåret', () => {
 
 describe('kostrådstexter', () => {
   it('beskriver framsteg per dag, per vecka och i dagar', () => {
-    expect(kostradProgressText(result({}))).toBe('320 g/dag – mål 500 g/dag')
+    expect(kostradProgressText(result({}))).toBe('320\u00a0g/dag – mål 500\u00a0g/dag')
     expect(kostradProgressText(result({ id: 'salt', unit: 'g/dag', direction: 'hogst', target: 6, actual: 7.24 }))).toBe(
-      '7,2 g/dag – högst 6 g/dag',
+      '7,2\u00a0g/dag – högst 6\u00a0g/dag',
     )
     // 28 dagar, 600 g fisk → 150 g per vecka
     expect(kostradProgressText(result({ id: 'fisk', unit: 'g', perDay: false, target: 1200, actual: 600, weeklyTarget: 300, periodDays: 28 }))).toBe(
-      '150 g per vecka – mål 300 g',
+      '150\u00a0g per vecka – mål 300\u00a0g',
     )
     expect(kostradProgressText(result({ id: 'baljvaxter', unit: 'dagar', perDay: false, target: 5, actual: 2 }))).toBe('2 av 5 dagar')
+    // Singular när målet är en dag.
+    expect(kostradProgressText(result({ id: 'baljvaxter', unit: 'dagar', perDay: false, target: 1, actual: 0 }))).toBe('0 av 1 dag')
     expect(kostradProgressText(result({ id: 'alkohol', unit: 'standardglas', target: 0, actual: 0 }))).toBe('Inga standardglas')
     expect(kostradProgressText(result({ id: 'alkohol', unit: 'standardglas', target: 0, actual: 3, periodDays: 14 }))).toBe(
       '1,5 standardglas per vecka',
     )
     expect(kostradProgressText(result({ id: 'mattat_fett', unit: 'E%', direction: 'hogst', target: 10, actual: 13.4 }))).toBe(
-      '13 E\u00a0% – högst 10 E\u00a0%',
+      '13\u00a0E% – högst 10\u00a0E%',
     )
   })
 

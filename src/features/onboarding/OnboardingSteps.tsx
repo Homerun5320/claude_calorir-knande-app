@@ -97,7 +97,7 @@ export function StepHeading({
 const PROMISES: ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
   { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
   { icon: Gift, tone: 'lingon', title: 'Gratis, utan reklam', text: 'Inga konton, inga prenumerationer och ingen betalvägg.' },
-  { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar i din telefon', text: 'Ingen server. Exportera eller radera allt när du vill.' },
+  { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Ingen server. Exportera eller radera allt när du vill.' },
 ]
 
 export function WelcomeStep({ today }: { today: ISODate }) {
@@ -216,7 +216,7 @@ export function AboutStep({
         eyebrow={eyebrow}
         focusOnMount={focusOnMount}
         title="Lite om dig"
-        subtitle="Det behövs för att räkna ut hur mycket energi din kropp gör av med. Uppgifterna stannar i din telefon."
+        subtitle="Det behövs för att räkna ut hur mycket energi din kropp gör av med. Uppgifterna stannar på din enhet."
       />
       <AboutFields draft={draft} onChange={onChange} errors={errors} visibleErrors={visibleErrors} onBlurField={onBlurField} today={today} />
     </>
@@ -282,7 +282,7 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
   // Säkerhetsgolvet (1 200/1 500 kcal) kan göra att den valda takten inte går att nå.
   const floorNote =
     losing && eff?.limitedByFloor && eff.kcal !== undefined
-      ? `Lagom sätter aldrig dagsmålet under ${fmtEnergy(eff.kcal)}, så att du får i dig tillräckligt med näring. För dig blir takten därför ungefär ${formatNumber(eff.rate, 2)} kg i veckan – och det är helt okej.`
+      ? `Lagom sätter aldrig dagsmålet under ${fmtEnergy(eff.kcal)}, så att du får i dig tillräckligt med näring. För dig blir takten därför ungefär ${formatNumber(eff.rate, 2)}\u00a0kg i veckan – och det är helt okej.`
       : null
 
   return (
@@ -309,10 +309,10 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
             onSelect={() => onChange({ weeklyRateKg: o.value })}
             title={
               <>
-                {formatNumber(o.value, 2)} kg per vecka <span className="font-normal text-ink-3">· {o.label}</span>
+                {formatNumber(o.value, 2)}{'\u00a0'}kg per vecka <span className="font-normal text-ink-3">· {o.label}</span>
               </>
             }
-            description={o.disabled ? 'Mer än 1 % av din vikt per vecka – det rekommenderas inte.' : o.description}
+            description={o.disabled ? 'Mer än 1\u00a0% av din vikt per vecka – det rekommenderas inte.' : o.description}
             tone={losing ? 'fjall' : 'hjortron'}
             compact
             aside={
@@ -326,7 +326,7 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
         ))}
       </ChoiceGroup>
       {anyDisabled && losing && (
-        <p className="mt-2 px-1 text-[0.8125rem] leading-snug text-ink-3">Lagom begränsar takten till högst 1 % av kroppsvikten per vecka.</p>
+        <p className="mt-2 px-1 text-[0.8125rem] leading-snug text-ink-3">Lagom begränsar takten till högst 1{'\u00a0'}% av kroppsvikten per vecka.</p>
       )}
       {floorNote && (
         <div className="mt-3">
@@ -353,7 +353,7 @@ export function RateStep({ draft, onChange, today, focusOnMount, eyebrow, showEr
               <CalendarHeart aria-hidden className="mt-0.5 size-5 shrink-0 text-(--tone-ink)" />
               <p className="text-[0.9375rem] leading-relaxed text-ink">
                 Med {eff?.limitedByFloor ? 'ungefär ' : ''}
-                {formatNumber(eff?.rate ?? rate, 2)} kg i veckan når du {formatNumber(draft.targetWeightKg, 1)} kg{' '}
+                {formatNumber(eff?.rate ?? rate, 2)}{'\u00a0'}kg i veckan når du {formatNumber(draft.targetWeightKg, 1)}{'\u00a0'}kg{' '}
                 <strong className="font-semibold">{describeProjection(projection, today)}</strong>. Vikten går sällan spikrakt – Lagom följer din
                 trend, inte enskilda vägningar.
               </p>
@@ -527,7 +527,7 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
               <div className="flex items-start gap-3 px-1 py-0.5">
                 <CalendarHeart aria-hidden className="mt-0.5 size-5 shrink-0 text-(--tone-ink)" />
                 <p className="text-[0.9375rem] leading-relaxed text-ink">
-                  Målvikten {formatNumber(draft.targetWeightKg, 1)} kg nås {describeProjection(projection, today)}, om allt går enligt plan.
+                  Målvikten {formatNumber(draft.targetWeightKg, 1)}{'\u00a0'}kg nås {describeProjection(projection, today)}, om allt går enligt plan.
                 </p>
               </div>
             </Card>
@@ -537,7 +537,7 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
 
       <div className="mt-4 flex flex-col gap-2.5">
         <Note tone="mossa" icon={ShieldCheck}>
-          Allt du fyllt i sparas bara i den här telefonen. Inget konto, ingen server och ingen reklam.
+          Allt du fyllt i sparas bara i den här webbläsaren. Inget konto, ingen server och ingen reklam.
         </Note>
         <p className="flex items-center gap-2 px-1 text-[0.875rem] text-ink-3">
           <Sparkles aria-hidden className="size-4 shrink-0" />

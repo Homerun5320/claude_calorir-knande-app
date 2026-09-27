@@ -4,12 +4,16 @@
  * - `inputMode="decimal"` ger siffertangentbord med decimalkomma på mobil.
  * - Den råa texten behålls medan man skriver (inget omformaterande mitt i), värdet tolkas med
  *   `parseSwedishNumber` och skickas som `number | undefined` (tomt fält = undefined).
- * - min/max tillämpas på det utskickade värdet; texten snyggas till när fältet lämnas.
+ * - min/max kläms INTE medan man skriver – då gick "7,24" inte att skriva i ett fält med min 20
+ *   (första siffran blev 20). Ett tal utanför gränserna ger i stället ett meddelande vid fältet
+ *   ("Ange ett värde mellan 20 och 400 kg.") och skickas som `undefined`, så att föräldern aldrig
+ *   får ett ogiltigt värde. Enter skickar inte formuläret då. Värdet kläms först när fältet
+ *   lämnas eller när man stegar (knappar/piltangenter), och texten snyggas till.
  * - Piltangenter upp/ned stegar (Shift = ×10). Valfria −/+-knappar med håll-för-att-upprepa.
  * - `size="lg"` är den stora portionsväljaren med siffror i Fraunces.
  */
 import { useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { parseSwedishNumber } from '../../lib/format'
+import { formatNumber, parseSwedishNumber } from '../../lib/format'
 import { cx, renderIcon, type IconLike } from './Button'
 import { FIELD_INPUT, FIELD_SHELL, Field, fieldDescribedBy, mergeRefs } from './TextField'
 import { StepButton, clampNumber, stepDecimals, stepNumber } from './Stepper'
@@ -43,6 +47,8 @@ export interface NumberFieldProps {
   readOnly?: boolean
   required?: boolean
   autoFocus?: boolean
+  /** Webbläsarens autofyll, t.ex. "bday-year" för födelseår. Standard "off". */
+  autoComplete?: string
   id?: string
   name?: string
   'aria-label'?: string
@@ -67,6 +73,20 @@ const LARGE_TEXT = 'display-num text-[3.5rem] font-medium leading-none'
 
 function sameNumber(a: number | undefined, b: number | undefined): boolean {
   return a === b || (a !== undefined && b !== undefined && Math.abs(a - b) < 1e-9)
+}
+
+function parseInput(raw: string): number {
+  return parseSwedishNumber(raw.trim().replace('−', '-'))
+}
+
+/** "Ange ett värde mellan 10 och 3 000 ml." – eller bara min/max om den andra gränsen saknas. */
+export function rangeMessage(min: number | undefined, max: number | undefined, unit?: string, decimals = 2): string {
+  const u = unit ? `\u00a0${unit}` : ''
+  const f = (n: number) => formatNumber(n, decimals)
+  if (min !== undefined && max !== undefined) return `Ange ett värde mellan ${f(min)} och ${f(max)}${u}.`
+  if (min !== undefined) return `Ange minst ${f(min)}${u}.`
+  if (max !== undefined) return `Ange högst ${f(max)}${u}.`
+  return ''
 }
 
 /**
@@ -97,6 +117,7 @@ export function NumberField({
   readOnly,
   required,
   autoFocus,
+  autoComplete = 'off',
   id: idProp,
   name,
   'aria-label': ariaLabel,
@@ -130,25 +151,36 @@ export function NumberField({
     if (!sameNumber(next, value)) onChange(next)
   }
 
-  const allowed = allowNegative ? /^[-−]?[\d\s  .,½¼¾⅓⅔/]*$/ : /^[\d\s  .,½¼¾⅓⅔/]*$/
+  const allowed = allowNegative ? /^[-−]?[\d\s  .,½¼¾⅓⅔/]*$/ : /^[\d\s  .,½¼¾⅓⅔/]*$/
+  const inRange = (n: number) => (min === undefined || n >= min) && (max === undefined || n <= max)
+
+  // Tal utanför gränserna medan man skriver: meddelande i stället för att klämma.
+  const typed = text.trim() === '' ? Number.NaN : parseInput(text)
+  const outOfRange = !Number.isNaN(typed) && !inRange(typed)
+  const unitText = typeof suffix === 'string' ? suffix : undefined
+  const rangeError = outOfRange ? rangeMessage(min, max, unitText, dec) : undefined
+  // Uppläses när Enter stoppas av ett värde utanför gränserna.
+  const [announcement, setAnnouncement] = useState('')
 
   const handleInput = (raw: string) => {
     if (!allowed.test(raw)) return
     setText(raw)
+    setAnnouncement('')
     if (raw.trim() === '') {
       emit(undefined)
       return
     }
-    const parsed = parseSwedishNumber(raw.replace('−', '-'))
+    const parsed = parseInput(raw)
     // Ofullständig inmatning ("-", "1/", "1 1") – vänta tills den blir ett tal.
     if (Number.isNaN(parsed)) return
-    emit(clampNumber(parsed, min, max))
+    // Utanför gränserna: föräldern får inget ogiltigt värde (undefined = inget giltigt tal än).
+    emit(inRange(parsed) ? parsed : undefined)
   }
 
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     const trimmed = text.trim()
     if (trimmed !== '') {
-      const parsed = parseSwedishNumber(trimmed.replace('−', '-'))
+      const parsed = parseInput(trimmed)
       if (Number.isNaN(parsed)) {
         // Ogiltigt – återgå till senaste giltiga värde.
         setText(toEditText(value, dec))
@@ -160,14 +192,18 @@ export function NumberField({
     } else if (text !== '') {
       setText('')
     }
+    setAnnouncement('')
     onBlur?.(e)
   }
 
   const stepBy = (dir: 1 | -1, multiplier = 1) => {
     if (disabled || readOnly) return
-    const next = stepNumber(value, dir, step, min, max, multiplier)
+    // Stega från det som står i fältet (även ett tal utanför gränserna – det kläms då).
+    const from = !Number.isNaN(typed) ? typed : value
+    const next = stepNumber(from, dir, step, min, max, multiplier)
     emit(next)
     setText(toEditText(next, dec))
+    setAnnouncement('')
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -177,15 +213,27 @@ export function NumberField({
     } else if (e.key === 'PageUp' || e.key === 'PageDown') {
       e.preventDefault()
       stepBy(e.key === 'PageUp' ? 1 : -1, 10)
+    } else if (e.key === 'Enter' && rangeError) {
+      // Skicka inte formuläret med ett värde utanför gränserna – säg varför i stället.
+      e.preventDefault()
+      setAnnouncement(rangeError)
     }
   }
 
-  const invalid = Boolean(error)
-  const describedBy = fieldDescribedBy(id, hint, error)
-  const unitText = typeof suffix === 'string' ? ` ${suffix}` : ''
+  // Gränsmeddelandet går före förälderns fel (som ofta bara säger att värdet saknas).
+  const shownError = rangeError ?? error
+  const invalid = Boolean(shownError)
+  const describedBy = fieldDescribedBy(id, hint, shownError)
+  const unitSuffix = unitText ? ` ${unitText}` : ''
   const atMin = min !== undefined && value !== undefined && value <= min
   const atMax = max !== undefined && value !== undefined && value >= max
   const labelText = typeof label === 'string' ? label.toLocaleLowerCase('sv-SE') : (ariaLabel?.toLocaleLowerCase('sv-SE') ?? 'värdet')
+
+  const live = (
+    <span className="sr-only" aria-live="assertive">
+      {announcement}
+    </span>
+  )
 
   const input = (
     <input
@@ -195,14 +243,14 @@ export function NumberField({
       type="text"
       inputMode="decimal"
       enterKeyHint="done"
-      autoComplete="off"
+      autoComplete={autoComplete}
       autoCorrect="off"
       spellCheck={false}
       role="spinbutton"
       aria-valuenow={value}
       aria-valuemin={min}
       aria-valuemax={max}
-      aria-valuetext={value !== undefined ? `${text || toEditText(value, dec)}${unitText}` : undefined}
+      aria-valuetext={value !== undefined ? `${text || toEditText(value, dec)}${unitSuffix}` : undefined}
       aria-label={ariaLabel}
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
@@ -241,7 +289,8 @@ export function NumberField({
 
   if (large) {
     return (
-      <Field id={id} label={label} hint={hint} error={error} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+      <Field id={id} label={label} hint={hint} error={shownError} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+        {live}
         <div
           data-invalid={invalid}
           className={cx('flex items-center justify-between gap-3', disabled && 'pointer-events-none opacity-50', fieldClassName)}
@@ -281,7 +330,8 @@ export function NumberField({
   }
 
   return (
-    <Field id={id} label={label} hint={hint} error={error} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+    <Field id={id} label={label} hint={hint} error={shownError} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+      {live}
       <div data-invalid={invalid} data-disabled={Boolean(disabled)} className={cx(FIELD_SHELL, 'h-12', showStepper && 'pr-1.5', fieldClassName)}>
         {prefix !== undefined && <span className="flex shrink-0 items-center text-ink-3">{renderIcon(prefix, 'size-5')}</span>}
         {input}

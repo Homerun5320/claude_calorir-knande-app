@@ -14,6 +14,7 @@ import { useCallback, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui'
 import { DateNavigator } from '../../components/domain'
+import { useTargets } from '../../hooks/useTargets'
 import { useToday } from '../../hooks/useToday'
 import { relativeDayLabel } from '../../lib/dates'
 import { useDiaryStore } from '../../stores/diaryStore'
@@ -59,7 +60,8 @@ export default function ExercisePage() {
   const exercise = useDiaryStore((s) => s.exercise[date] ?? EMPTY_EXERCISE)
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const energyUnit = useProfileStore((s) => s.settings.energyUnit)
-  const addBackPct = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  // Samma regel som Idag och Dagbok: med adaptiv förbrukning ingår träningen redan i dagsmålet.
+  const { exerciseAddBack } = useTargets(today)
   const basics = useBodyBasics()
   const dayKcal = exercise.reduce((s, x) => s + (x.kcal || 0), 0)
 
@@ -72,7 +74,7 @@ export default function ExercisePage() {
 
   return (
     <div className="px-4 pb-8">
-      <PageHeader title="Träning" compactTitle={`Träning · ${relativeDayLabel(date, today)}`} subtitle="Rörelse i alla former räknas – räknat ärligt, netto utöver vila.">
+      <PageHeader title="Träning" compactTitle={`Träning · ${relativeDayLabel(date, today)}`} subtitle="All rörelse räknas – ärligt räknat, utöver vila.">
         <div className="card rounded-[1.75rem] px-1 py-1.5">
           <DateNavigator date={date} onChange={goTo} today={today} maxFutureDays={0} />
         </div>
@@ -84,13 +86,14 @@ export default function ExercisePage() {
           isToday={isToday}
           list={exercise}
           mindful={mindful}
-          addBackPct={addBackPct}
+          addBackPct={exerciseAddBack.pct}
+          inTarget={exerciseAddBack.includedInTarget}
           onAdd={openAdd}
           onEdit={openEdit}
         />
         <StepsCard date={date} isToday={isToday} exercise={exercise} basics={basics} mindful={mindful} />
         <WeeklyMovementCard date={date} today={today} />
-        <ExerciseInfoCard dayKcal={dayKcal} mindful={mindful} />
+        <ExerciseInfoCard dayKcal={dayKcal} mindful={mindful} inTarget={exerciseAddBack.includedInTarget} />
       </div>
 
       <ActivitySheet

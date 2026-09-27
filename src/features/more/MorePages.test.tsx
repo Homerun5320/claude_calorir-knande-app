@@ -93,6 +93,24 @@ describe('MorePage', () => {
     expect(screen.queryByText(/säkerhetskopia/)).not.toBeInTheDocument()
   })
 
+  it('går jämnt ut i tre kolumner: Stöd & hjälp blir en egen, bred rad', () => {
+    inRouter(<MorePage />)
+    const nav = screen.getByRole('navigation', { name: 'Mer i Lagom' })
+    const cards = within(nav).getAllByRole('listitem')
+    expect(cards).toHaveLength(10)
+    // 9 kort fyller tre rader à tre; det tionde spänner över hela raden i stället för att stå ensamt.
+    expect(cards.at(-1)).toHaveTextContent('Stöd & hjälp')
+    expect(cards.at(-1)).toHaveClass('sm:col-span-full')
+    expect(cards.filter((li) => li.className.includes('col-span'))).toHaveLength(1)
+  })
+
+  it('talar om enhet och webbläsare – inte telefon', () => {
+    const { container } = inRouter(<MorePage />)
+    expect(container).not.toHaveTextContent(/telefon/i)
+    expect(screen.getByText(/din data stannar på din enhet/)).toBeInTheDocument()
+    expect(screen.getByText(/Din data finns bara i den här webbläsaren/)).toBeInTheDocument()
+  })
+
   it('öppnar Stöd & hjälp', async () => {
     inRouter(<MorePage />)
     fireEvent.click(screen.getByRole('button', { name: /Stöd & hjälp/ }))
@@ -112,6 +130,13 @@ describe('AboutPage', () => {
     expect(screen.getByRole('link', { name: /2024 Adult Compendium/ })).toBeInTheDocument()
     expect(screen.getByText('Inte en medicinteknisk produkt')).toBeInTheDocument()
     expect(screen.getByText(/Version \d+\.\d+\.\d+/)).toBeInTheDocument()
+  })
+
+  it('använder svenska ord och säger enhet i stället för telefon', () => {
+    const { container } = inRouter(<AboutPage />)
+    expect(screen.getByText('Användarinmatade databaser med dubbletter och fel')).toBeInTheDocument()
+    expect(screen.getByText(/^Granskade svenska livsmedel/)).toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/crowdsourc|kurerad|telefon/i)
   })
 
   it('erbjuder att komma igång före välkomstflödet', () => {

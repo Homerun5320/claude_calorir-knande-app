@@ -120,9 +120,29 @@ describe('BodyPage', () => {
     const today = todayISO()
     useBodyStore.setState({ weights: [{ id: 'w1', date: today, kg: 67.5, createdAt: 0 }], measurements: [] })
     renderPage()
-    expect(await screen.findByText(/Du har nått din målvikt 68 kg/)).toBeInTheDocument()
+    const text = await screen.findByText(/Du har nått din målvikt 68 kg/)
+    // Varmt men neutralt – inget beröm för att ha gått ner i vikt.
+    expect(text).not.toHaveTextContent(/jobbat/)
+    expect(text).toHaveTextContent(/Dagsmålet räknas nu för att behålla vikten/)
     fireEvent.click(screen.getByRole('button', { name: 'Byt till att behålla vikten' }))
     expect(useProfileStore.getState().profile?.goal).toBe('behalla')
+  })
+
+  it('tonar aldrig viktnedgång grönt', async () => {
+    const today = todayISO()
+    const weights = Array.from({ length: 22 }, (_, k) => ({ id: `w${k}`, date: addDays(today, k - 21), kg: 80 - k * 0.1, createdAt: 0 }))
+    useBodyStore.setState({ weights, measurements: [] })
+    useProfileStore.setState({ profile: { ...PROFILE, targetWeightKg: 70 } })
+    const { container } = renderPage()
+    expect(await screen.findByText('senaste veckan')).toBeInTheDocument()
+    expect(container.querySelector('.text-good')).toBeNull()
+  })
+
+  it('använder inte adaptiv förbrukning under graviditet – inte ens om den redan var påslagen', async () => {
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla', lifeStage: 'gravid' }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true, adaptiveTargets: true } })
+    renderPage()
+    expect(await screen.findByText(/Under graviditeten ändras vikten av naturliga skäl/)).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: /Låt målen följa min verkliga förbrukning/ })).toBeDisabled()
   })
 
   it('använder inte adaptiv förbrukning under graviditet', async () => {

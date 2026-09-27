@@ -66,7 +66,7 @@ function ResultRow({ food, onPick, excluded }: { food: Food; onPick: (food: Food
   const amount = defaultAmount(unit)
   const g = gramsFor(food, amount, unit)
   const kcal = Number.isFinite(g) ? nutrientsForGrams(food.nutrients, g).kcal : undefined
-  const line = Number.isFinite(g) ? amountLine(food, amount, unit) : '100 g'
+  const line = Number.isFinite(g) ? amountLine(food, amount, unit) : '100\u00a0g'
   return (
     <li>
       <button
@@ -170,7 +170,7 @@ export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSea
         ) : results.length === 0 ? (
           !pending && (
             <p className="mt-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
-              Inga träffar på "{trimmed}". Prova ett kortare ord eller en synonym – t.ex. "grädde" i stället för "vispgrädde 40 %".
+              Inga träffar på ”{trimmed}”. Prova ett kortare ord eller en synonym – t.ex. ”grädde” i stället för ”vispgrädde 40{'\u00a0'}%”.
             </p>
           )
         ) : (

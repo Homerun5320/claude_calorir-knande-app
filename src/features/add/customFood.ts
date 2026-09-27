@@ -229,8 +229,8 @@ export function validateDraft(draft: CustomFoodDraft): DraftErrors {
     if (kcal100 !== undefined && kcal100 > 950) {
       errors.energy =
         draft.basis === 'portion'
-          ? 'Det blir mer än 900 kcal per 100 g – kontrollera portionsvikten.'
-          : 'Mer än 900 kcal per 100 g går inte (rent fett ger 900). Har du skrivit kJ som kcal?'
+          ? 'Det blir mer än 900\u00a0kcal per 100\u00a0g – kontrollera portionsvikten.'
+          : 'Mer än 900\u00a0kcal per 100\u00a0g går inte (rent fett ger 900). Har du skrivit kJ som kcal?'
     }
   }
 
@@ -238,7 +238,7 @@ export function validateDraft(draft: CustomFoodDraft): DraftErrors {
   if (code && !isValidEan(code)) errors.barcode = 'Streckkoden ser inte ut att stämma – kontrollera siffrorna.'
 
   if (draft.gramsPerDl !== undefined && !(draft.gramsPerDl > 0 && draft.gramsPerDl <= 300)) {
-    errors.gramsPerDl = 'Ange en vikt mellan 1 och 300 g per dl.'
+    errors.gramsPerDl = 'Ange en vikt mellan 1 och 300\u00a0g per dl.'
   }
 
   const halfFilled = draft.portions.some((p) => {
@@ -257,14 +257,14 @@ export function draftWarnings(draft: CustomFoodDraft): string[] {
   const at = atwaterCheck(n)
   if (at?.mismatch) {
     out.push(
-      `Energin stämmer inte med makronäringsämnena – kontrollera värdena. Utifrån protein, kolhydrater och fett blir det ungefär ${formatNumber(at.expected)} kcal per 100 g.`,
+      `Energin stämmer inte med makronäringsämnena – kontrollera värdena. Utifrån protein, kolhydrater och fett blir det ungefär ${formatNumber(at.expected)}\u00a0kcal per 100\u00a0g.`,
     )
   }
   if (n.sugars !== undefined && n.carbs !== undefined && n.sugars > n.carbs + 0.05) out.push('Sockerarterna är fler än kolhydraterna – de ingår i kolhydraterna.')
   if (n.addedSugar !== undefined && n.sugars !== undefined && n.addedSugar > n.sugars + 0.05) out.push('Tillsatt socker är mer än sockerarterna totalt.')
   if (n.satFat !== undefined && n.fat !== undefined && n.satFat > n.fat + 0.05) out.push('Mättat fett är mer än fettet totalt.')
   const mass = (n.protein ?? 0) + (n.carbs ?? 0) + (n.fat ?? 0) + (n.fiber ?? 0) + (n.salt ?? 0) + (n.alcohol ?? 0)
-  if (mass > 101) out.push(`Näringsämnena blir tillsammans ${formatNumber(mass)} g per 100 g – mer än hela vikten.`)
+  if (mass > 101) out.push(`Näringsämnena blir tillsammans ${formatNumber(mass)}\u00a0g per 100\u00a0g – mer än hela vikten.`)
   return out
 }
 

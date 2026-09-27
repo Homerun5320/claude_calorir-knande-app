@@ -154,7 +154,9 @@ describe('Dryck', () => {
   it('lägger till vatten med Ångra', () => {
     renderAt('/dryck')
     expect(screen.getByRole('heading', { level: 1, name: 'Dryck' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '1 flaska (50 cl)' }))
+    // Samma enhet för glas och flaska (ml) – inte "250 ml" bredvid "50 cl".
+    expect(screen.getByRole('button', { name: /^1 glas \(250\sml\)$/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^1 flaska \(500\sml\)$/ }))
     expect(useDiaryStore.getState().water[todayISO()]).toBe(500)
     act(() => lastToast()?.action?.onClick())
     expect(useDiaryStore.getState().water[todayISO()]).toBe(0)

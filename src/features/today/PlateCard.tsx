@@ -22,7 +22,7 @@ export const PlateCard = memo(function PlateCard({ today, variant }: PlateCardPr
   const main = useMemo(() => mainMealEntries(entries), [entries])
   const plate = useMemo(() => mealPlate(main, variant), [main, variant])
   const good = plate.hasPlate && plate.score >= PLATE_GOOD_SCORE
-  const emptyHint = main.length === 0 ? 'Tallriken fylls när du registrerar lunch eller middag.' : plate.advice
+  const emptyHint = main.length === 0 ? 'Tallriken fylls när du loggar lunch eller middag.' : plate.advice
 
   return (
     <Card

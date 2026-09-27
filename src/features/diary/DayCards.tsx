@@ -16,7 +16,7 @@ import { firstAddFoodLink, firstEntryButton, focusAfterRender } from './focus'
 // ---------------------------------------------------------------------------
 
 const EMPTY_TEXT: Record<DayKind, { title: string; text: string }> = {
-  today: { title: 'Inget registrerat ännu', text: 'Börja med det du ätit senast – det behöver inte vara perfekt, ungefär räcker gott.' },
+  today: { title: 'Inget loggat ännu', text: 'Börja med det du ätit senast – det behöver inte vara perfekt, ungefär räcker gott.' },
   past: { title: 'Den här dagen är tom', text: 'Vill du fylla i i efterhand? Ungefärliga mängder räcker fint.' },
   future: { title: 'Planera dagen', text: 'Lägg in måltider i förväg – då är det lätt att se hur dagen blir.' },
 }

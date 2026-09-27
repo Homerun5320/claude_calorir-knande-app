@@ -4,7 +4,7 @@
  */
 import type { ISODate, NutrientKey, Nutrients } from '../../types'
 import { fromISODate } from '../../lib/dates'
-import { formatNumber } from '../../lib/format'
+import { formatNumber, plural } from '../../lib/format'
 import { nutrientStatus, percentOfReference, type ReferenceMap, type WatchItem } from '../../lib/nnr'
 import type { KostradResult, KostradStatus } from '../../lib/kostrad'
 
@@ -103,14 +103,14 @@ export function kostradProgressText(r: KostradResult): string {
     const perWeek = r.periodDays > 0 ? (r.actual * 7) / r.periodDays : r.actual
     return `${n(perWeek, 1)} standardglas per vecka`
   }
-  if (r.unit === 'dagar') return `${n(r.actual)} av ${n(r.target)} dagar`
+  if (r.unit === 'dagar') return `${n(r.actual)} av ${plural(r.target, 'dag', 'dagar')}`
   if (r.weeklyTarget !== undefined && r.periodDays > 0) {
     const perWeek = (r.actual * 7) / r.periodDays
     const unit = r.unit === 'min' ? 'min' : 'g'
-    return `${n(perWeek)} ${unit} per vecka – ${limit} ${n(r.weeklyTarget)} ${unit}`
+    return `${n(perWeek)}\u00a0${unit} per vecka – ${limit} ${n(r.weeklyTarget)}\u00a0${unit}`
   }
-  const unit = r.unit === 'E%' ? 'E\u00a0%' : r.unit
-  return `${n(r.actual)} ${unit} – ${limit} ${n(r.target)} ${unit}`
+  const unit = r.unit
+  return `${n(r.actual)}\u00a0${unit} – ${limit} ${n(r.target)}\u00a0${unit}`
 }
 
 /** Vänlig etikett för kostrådspoängen. */

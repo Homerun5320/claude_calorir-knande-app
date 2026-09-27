@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 import { createHashRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
+import { MotionConfig } from 'motion/react'
 import { AppShell, PageFallback } from './components/layout/AppShell'
 import { RouteError } from './components/layout/RouteError'
 import { useHydrated } from './stores/hydration'
@@ -84,5 +85,11 @@ const router = createHashRouter([
 ])
 
 export default function App() {
-  return <RouterProvider router={router} />
+  // reducedMotion="user": alla motion-animationer (toast, flikpiller, +-knappen …) följer
+  // systemets "Minska rörelse" – transformationer stängs av, opacitet och färg finns kvar.
+  return (
+    <MotionConfig reducedMotion="user">
+      <RouterProvider router={router} />
+    </MotionConfig>
+  )
 }

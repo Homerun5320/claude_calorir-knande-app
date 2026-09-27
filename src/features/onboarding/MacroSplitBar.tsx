@@ -9,7 +9,7 @@ export interface MacroSplit {
 }
 
 export function macroSplitText(p: MacroSplit): string {
-  return `Protein ${formatNumber(p.protein)} %, kolhydrater ${formatNumber(p.carbs)} %, fett ${formatNumber(p.fat)} % av energin`
+  return `Protein ${formatNumber(p.protein)}\u00a0%, kolhydrater ${formatNumber(p.carbs)}\u00a0%, fett ${formatNumber(p.fat)}\u00a0% av energin`
 }
 
 export function MacroSplitBar({ split, className, showLegend }: { split: MacroSplit; className?: string; showLegend?: boolean }) {
@@ -26,15 +26,15 @@ export function MacroSplitBar({ split, className, showLegend }: { split: MacroSp
         <div aria-hidden className={cx('mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.75rem] tabular-nums text-ink-3')}>
           <span>
             <span className="mr-1 inline-block size-2 rounded-full bg-protein" />
-            Protein {formatNumber(split.protein)} %
+            Protein {formatNumber(split.protein)}{'\u00a0'}%
           </span>
           <span>
             <span className="mr-1 inline-block size-2 rounded-full bg-carbs" />
-            Kolhydrater {formatNumber(split.carbs)} %
+            Kolhydrater {formatNumber(split.carbs)}{'\u00a0'}%
           </span>
           <span>
             <span className="mr-1 inline-block size-2 rounded-full bg-fat" />
-            Fett {formatNumber(split.fat)} %
+            Fett {formatNumber(split.fat)}{'\u00a0'}%
           </span>
         </div>
       )}

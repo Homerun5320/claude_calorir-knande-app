@@ -11,6 +11,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - type `Tone`
 - `toneColor(tone: Tone): string`
 - `toneSoftColor(tone: Tone): string`
+- `toneTextColor(tone: Tone): string` – tonen som textfärg (`--lg-*-text`, minst 4,5:1 mot alla ytor och -soft i båda temana)
 - `toneInkColor(tone: Tone): string`
 - `toneVars(tone: Tone, style?: CSSProperties): CSSProperties`
 - type `BadgeVariant`
@@ -42,7 +43,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `Chip({ selected, icon, count, tone = 'gran', size = 'md', className, children, type = 'button', style, ...rest }: ChipProps)`
 
 ### `src/components/ui/Dialog.tsx`
-- interface `DialogProps`
+- interface `DialogProps` – `returnFocus`, `closeOnBack` (standard: ja för `dialog`; `alertdialog` bara ovanpå ett ark)
 - `Dialog(props: DialogProps)`
 - interface `ConfirmOptions`
 - interface `ConfirmDialogProps`
@@ -54,7 +55,10 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/components/ui/EmptyState.tsx`
 - type `EmptyIllustration`
 - interface `EmptyStateProps`
-- `EmptyState({ title, text, action, illustration = 'plate', compact, titleAs: TitleTag = 'h3', className }: EmptyStateProps)`
+- `EmptyState({ title, text, action, illustration = 'plate', compact, titleAs, className }: EmptyStateProps)` – rubriknivån väljs automatiskt efter föregående rubrik (h2 under sidans h1, h3 i kort/ark) om `titleAs` saknas
+
+### `src/components/ui/headingLevel.ts`
+- `levelAfterPrecedingHeading(el)`, `useHeadingLevel(ref, explicit?, fallback = 3)`, `headingTag(level)`
 
 ### `src/components/ui/IconButton.tsx`
 - type `IconButtonSize`
@@ -68,8 +72,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `ListGroup({ title, footer, children, plain, className }: ListGroupProps)`
 
 ### `src/components/ui/NumberField.tsx`
-- interface `NumberFieldProps`
-- `NumberField(`
+- interface `NumberFieldProps` – `autoComplete` (standard "off")
+- `NumberField(` – min/max kläms inte medan man skriver: värden utanför ger ett meddelande ("Ange ett värde mellan 20 och 400 kg.") och skickas som `undefined`, Enter skickar inte formuläret; värdet kläms när fältet lämnas och vid stegning
+- `rangeMessage(min, max, unit?, decimals?)`
 
 ### `src/components/ui/PageHeader.tsx`
 - interface `PageHeaderProps`
@@ -89,7 +94,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 
 ### `src/components/ui/SegmentedControl.tsx`
 - interface `SegmentOption`
-- interface `SegmentedControlProps`
+- interface `SegmentedControlProps` – tar `aria-describedby`, `aria-invalid`, `aria-required`, `id`; minst 44 px tryckyta
 - `SegmentedControl<T extends string | number>(`
 
 ### `src/components/ui/Select.tsx`
@@ -101,7 +106,13 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 ### `src/components/ui/Sheet.tsx`
 - `getFocusable(root: HTMLElement): HTMLElement[]`
 - interface `UseModalOptions`
-- `useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss, initialFocusRef }: UseModalOptions)`
+- type `ReturnFocus`
+- `useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss, initialFocusRef, closeOnBack = false, returnFocus = true }: UseModalOptions)`
+- `Sheet` tar `returnFocus` (öppnaren som standard, `false` eller ett eget element) och `closeOnBack` (standard = `dismissible`): bakåtknappen stänger arket
+
+### `src/components/ui/modalHistory.ts`
+- `registerModalEntry(onBack): () => void` – egen historikpost per öppen modal (samma URL och router-state + markören `__lagomModal`). Bakåt stänger modalen utan att routern ser något; stängning i gränssnittet tar bort posten om den fortfarande är aktuell; push/replace/`navigate(-1)` inifrån en modal fungerar som vanligt
+- `hasModalEntries(): boolean`
 - `useMediaQuery(query: string): boolean`
 - `ModalBackdrop({ onClick }: { onClick?: () => void })`
 - interface `SheetProps`
@@ -143,7 +154,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `tabId(base: string, value: string): string`
 - `tabPanelId(base: string, value: string): string`
 - `tabPanelProps(base: string, value: string)`
-- `Tabs<T extends string>({ value, onChange, tabs, id, variant = 'underline', className, ...aria }: TabsProps<T>)`
+- `Tabs<T extends string>({ value, onChange, tabs, id, variant = 'underline', controls = 'auto', className, ...aria }: TabsProps<T>)` – `controls`: `'auto'` (aria-controls bara mot paneler som finns), `'none'` eller en funktion; fokusramen ritas innanför fliken
 
 ### `src/components/ui/TextField.tsx`
 - `mergeRefs<T>(...refs: Array<Ref<T> | undefined>): RefCallback<T>`
@@ -162,6 +173,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - const `useToastStore`
 - `toast(message: string, opts: Omit<ToastItem, 'id' | 'message'> = {}): string` – med `action` visas notisen 8 s och pausas vid hovring/fokus
 - `toastDuration(t): number`, `pauseToast(id)`, `resumeToast(id)`
+- Varje notis har en stängknapp ("Stäng notisen"); Escape stänger den. Stängs en notis med fokus (Ångra, ✕) går fokus tillbaka dit det var innan – annars till öppet ark eller sidans h1
 - `ToastViewport()` – portal till `<body>`; fel läses upp med `role="alert"`, övrigt artigt
 
 
@@ -173,6 +185,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - type `BarLabelMode`
 - interface `BarChartProps`
 - `BarChart(`
+- `targetLabelFor(value, ticks): string` – mållinjens etikett med egen precision (1,6 blir "1,6", inte "2")
 
 ### `src/components/charts/CalendarHeatmap.tsx`
 - interface `CalendarHeatmapProps`
@@ -244,7 +257,9 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - type `IconSize`
 - const `ICON_SIZE_CLASSES : Record<IconSize, string>`
 - interface `CategoryIconProps`
-- `CategoryIcon({ category, size = 'md', emoji, labelled = false, className = '' }: CategoryIconProps)`
+- `foodEmoji(name, category): string` – emoji efter namnets huvudord ("Smörgås, …" → 🥪), annars kategorins
+- const `EMOJI_CLASS`
+- `CategoryIcon({ category, size = 'md', emoji, name, labelled = false, className = '' }: CategoryIconProps)` – skicka gärna `name`
 
 ### `src/components/domain/DateNavigator.tsx`
 - interface `SwipeOptions`
@@ -267,7 +282,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - `describeAmount(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): string`
 - `entryToRow(entry: DiaryEntry): FoodRowData`
 - `foodToRow(food: Food, opts: { amount?: number; unit?: UnitKey; emoji?: string } = {}): FoodRowData`
-- `FoodRow(`
+- `FoodRow(` – `nameLines` (2 eller 3); makron visas som P/K/F + tal (färgen är extra stöd)
 
 ### `src/components/domain/MacroBars.tsx`
 - type `MacroKey`
@@ -290,7 +305,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 - const `NUTRIENT_GROUP_LABELS : Record<NutrientTableGroupId, string>`
 - `referenceStatus(value: number | undefined, ref: NutrientReference | undefined): NutrientStatus`
 - `referencePercent(value: number | undefined, ref: NutrientReference | undefined): number | undefined`
-- interface `NutrientTableProps`
+- interface `NutrientTableProps` – `caption: ReactNode` (visas utan versaler), `coverage` (andel känd per ämne → "minst 48,7 g"), `headingLevel` (standard: efter föregående rubrik)
 - `NutrientTable(`
 
 ### `src/components/domain/PortionPicker.tsx` (importera direkt, inte via `domain/index`)
@@ -300,6 +315,7 @@ Genererad översikt över exporterade namn. Läs källfilen för detaljer (JSDoc
 
 ### `src/components/domain/WaterGlasses.tsx`
 - interface `WaterGlassesProps`
+- `formatLiters(ml)` ("1,25 l"), `formatLitersLong(ml)` ("1,25 liter") – sammanfattningen visar siffran och "liter" var för sig
 - `formatLiters(ml: number): string`
 - `WaterGlasses(`
 

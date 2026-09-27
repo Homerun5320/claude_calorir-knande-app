@@ -12,7 +12,7 @@ import { useCallback, useState } from 'react'
 import { PageHeader, toast } from '../../components/ui'
 import { Confetti } from '../../components/signature'
 import { useToday } from '../../hooks/useToday'
-import { ageFromBirthYear } from '../../lib/dates'
+import { youngestAge } from '../../lib/energy'
 import { useFastingStore, type FastRecord } from '../../stores/fastingStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { DEFAULT_PROTOCOL_ID, fastSucceeded, lastProtocolId, protocolById } from './fastingLogic'
@@ -51,7 +51,7 @@ export default function FastingPage() {
   }, [])
 
   const caution: 'graviditet' | 'ung' | null =
-    lifeStage === 'gravid' || lifeStage === 'ammar' ? 'graviditet' : birthYear !== undefined && ageFromBirthYear(birthYear, today) < 18 ? 'ung' : null
+    lifeStage === 'gravid' || lifeStage === 'ammar' ? 'graviditet' : birthYear !== undefined && youngestAge(birthYear, today) < 18 ? 'ung' : null
 
   const protocol = protocolById(protocolId) ?? protocolById(DEFAULT_PROTOCOL_ID)
   const sheetTarget = sheet.mode === 'edit' && active ? active.targetHours : (protocol?.fastHours ?? 16)

@@ -42,7 +42,7 @@ export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantO
     <Card tone="vinbar" eyebrow="Alkohol" title="Standardglas">
       {mindful ? (
         <p className="text-[0.9375rem] leading-relaxed text-ink">
-          {summary.daysWithAlcohol === 0 ? 'Ingen alkohol registrerad i veckan.' : `Registrerat ${plural(summary.daysWithAlcohol, 'dag', 'dagar')} i veckan.`}
+          {summary.daysWithAlcohol === 0 ? 'Ingen alkohol loggad i veckan.' : `Alkohol loggad ${plural(summary.daysWithAlcohol, 'dag', 'dagar')} i veckan.`}
         </p>
       ) : (
         <>
@@ -106,13 +106,13 @@ function AdultAlcoholInfo({ today, mindful }: { today: ISODate; mindful: boolean
           </span>
         </summary>
         <ul className="flex list-disc flex-col gap-2 pb-3 pl-5 pt-1 text-[0.8125rem] leading-relaxed text-ink-2 marker:text-ink-3">
-          <li>Ett standardglas innehåller 12 gram alkohol – ungefär 33 cl starköl, 50 cl folköl, 12–15 cl vin eller 4 cl sprit.</li>
+          <li>Ett standardglas innehåller 12{'\u00a0'}gram alkohol – ungefär 33{'\u00a0'}cl starköl, 50{'\u00a0'}cl folköl, 12–15{'\u00a0'}cl vin eller 4{'\u00a0'}cl sprit.</li>
           <li>Det finns ingen helt riskfri nivå. Ju mindre alkohol, desto lägre risk för skador och sjukdomar på sikt.</li>
           <li>
             Enligt Socialstyrelsen erbjuder vården stöd från {RISK_DRINKS_PER_WEEK} standardglas i veckan, eller {RISK_DRINKS_PER_OCCASION}{' '}
             standardglas vid ett och samma tillfälle en gång i månaden eller oftare.
           </li>
-          <li>Alkohol påverkar sömnen och återhämtningen, och ger 7 kcal per gram.</li>
+          <li>Alkohol påverkar sömnen och återhämtningen, och ger 7{'\u00a0'}kcal per gram.</li>
         </ul>
       </details>
 

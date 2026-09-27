@@ -2,16 +2,19 @@
  * Vikt i korthet – senaste vägningen, trendriktning senaste veckan och en snabb "Väg dig".
  *
  * Trenden (exponentiellt glidande medelvärde) visas i stället för dag-till-dag-svängningar,
- * och tonen är neutral: bara en förändring i linje med användarens mål tonas mjukt grönt.
+ * och tonen är neutral: viktnedgång tonas aldrig grönt. Är viktmålet pausat (låg vikt) eller
+ * målvikten nådd visas samma besked som under Vikt och i målen.
  */
 import { memo, useMemo, useRef, useState } from 'react'
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Scale } from 'lucide-react'
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Scale, Sprout } from 'lucide-react'
 import { Button, Card, NumberField, Sheet, toast } from '../../components/ui'
 import { ageFromBirthYear, relativeDayLabel } from '../../lib/dates'
+import { goalPauseNote, OLDER_ADULT_AGE, youngestAge, type GoalPause } from '../../lib/energy'
 import { formatKg, formatNumber } from '../../lib/format'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
+import { SwitchToMaintainButton } from '../body/parts'
 import { CareNote } from './CareNote'
 import { SectionLink } from './SectionLink'
 import { weightCaution, weightGoodDirection, weightSnapshot, type WeightCaution } from './todayLogic'
@@ -21,12 +24,36 @@ const MAX_KG = 400
 const TREND_ICON = { up: ArrowUpRight, down: ArrowDownRight, flat: ArrowRight } as const
 const TREND_WORD = { up: 'uppåt', down: 'nedåt', flat: 'oförändrad' } as const
 
-const CAUTION_TEXT: Record<WeightCaution, string> = {
-  snabb: 'Vikten går ner snabbare än vi rekommenderar – högst ungefär 1 % av kroppsvikten i veckan. Ät gärna lite mer; kroppen mår bäst av en lugn takt.',
-  lag: 'Din trendvikt ligger under det som räknas som hälsosamt för din längd. Ät gärna lite mer, och prata med vården om du är osäker.',
+function cautionText(caution: WeightCaution, age: number | undefined): string {
+  if (caution === 'snabb') {
+    return 'Vikten går ner snabbare än vi rekommenderar – högst ungefär 1\u00a0% av kroppsvikten i veckan. Ät gärna lite mer; kroppen mår bäst av en lugn takt.'
+  }
+  const forWhom = age !== undefined && age >= OLDER_ADULT_AGE ? 'för din längd och ålder' : 'för din längd'
+  return `Din trendvikt ligger under det som räknas som hälsosamt ${forWhom}. Ät gärna lite mer, och prata med vården om du är osäker.`
 }
 
-export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }) {
+/**
+ * Medvetet läge: Vikt-kortet vilar, men är viktmålet pausat för att vikten redan är låg visas
+ * samma varsamma besked som under Vikt – utan siffror.
+ */
+export const GoalCareCard = memo(function GoalCareCard({ today }: { today: ISODate }) {
+  const birthYear = useProfileStore((s) => s.profile?.birthYear)
+  const age = birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined
+  return (
+    <Card title="Ditt mål">
+      <CareNote>{goalPauseNote('lowBmi', age)}</CareNote>
+      <SwitchToMaintainButton />
+    </Card>
+  )
+})
+
+export interface WeightCardProps {
+  today: ISODate
+  /** Varför viktmålet är pausat (från `useTargets().energy.goalPause`), eller null. */
+  goalPause?: GoalPause | null
+}
+
+export const WeightCard = memo(function WeightCard({ today, goalPause = null }: WeightCardProps) {
   const weights = useBodyStore((s) => s.weights)
   const goal = useProfileStore((s) => s.profile?.goal)
   const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
@@ -35,10 +62,14 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
   const heightCm = useProfileStore((s) => s.profile?.heightCm)
 
   const snap = useMemo(() => weightSnapshot(weights, today), [weights, today])
+  // 70-årsgränsen räknas på åldern enligt födelseåret, 18-årsgränsen försiktigt (yngsta möjliga).
   const age = birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined
-  const good = weightGoodDirection(goal, lifeStage, age)
+  const young = birthYear !== undefined ? youngestAge(birthYear, today) : undefined
+  const good = goalPause ? undefined : weightGoodDirection(goal, lifeStage, young)
   // För snabb nedgång eller låg vikt tonas aldrig grönt – då visas en varsam notis i stället.
-  const caution = snap ? weightCaution(snap, { heightCm, age, lifeStage }) : null
+  const caution = snap ? weightCaution(snap, { heightCm, age, youngestAge: young, lifeStage }) : null
+  // Pausat mål för att vikten redan är låg säger samma sak som "lag" – visa bara pausbeskedet.
+  const shownCaution = goalPause === 'lowBmi' && caution === 'lag' ? null : caution
 
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState<number | undefined>(undefined)
@@ -92,7 +123,7 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
                   <span className="sr-only">Trenden går {TREND_WORD[snap.direction]}:</span>
                   {snap.direction === 'flat'
                     ? 'Stabil'
-                    : `${snap.weekChangeKg > 0 ? '+' : '−'}${formatNumber(Math.abs(snap.weekChangeKg), 1)} kg/vecka`}
+                    : `${snap.weekChangeKg > 0 ? '+' : '−'}${formatNumber(Math.abs(snap.weekChangeKg), 1)}\u00a0kg/vecka`}
                 </span>
               )}
               <span>Vägd {relativeDayLabel(snap.latest.date, today).toLowerCase()}</span>
@@ -117,7 +148,23 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
           Trendvikt {formatKg(snap.trendKg)}. Vikten svänger naturligt från dag till dag – det är riktningen över tid som räknas.
         </p>
       )}
-      {caution && <CareNote className="mt-3">{CAUTION_TEXT[caution]}</CareNote>}
+      {goalPause === 'lowBmi' && (
+        <>
+          <CareNote className="mt-3">{goalPauseNote('lowBmi', age)}</CareNote>
+          <SwitchToMaintainButton />
+        </>
+      )}
+      {goalPause !== null && goalPause !== 'lowBmi' && (
+        // Nådd målvikt, graviditet, amning eller under 18 år: ett lugnt besked, samma som i målen.
+        <div className="mt-3 rounded-2xl bg-surface-2 p-3.5">
+          <p className="flex items-start gap-2 text-[0.8125rem] leading-relaxed text-ink-2">
+            <Sprout aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-mossa" strokeWidth={2.2} />
+            <span>{goalPauseNote(goalPause, age)}</span>
+          </p>
+          <SwitchToMaintainButton className="mt-2" />
+        </div>
+      )}
+      {shownCaution && <CareNote className="mt-3">{cautionText(shownCaution, age)}</CareNote>}
 
       <Sheet
         open={open}
@@ -151,7 +198,7 @@ export const WeightCard = memo(function WeightCard({ today }: { today: ISODate }
             // Bara min 0: fältet ska inte tyst skriva om en felskriven vikt ("7,24" → 20 kg).
             // Intervallet kontrolleras här och visas som fel.
             min={0}
-            error={value !== undefined && !valid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG} kg` : undefined}
+            error={value !== undefined && !valid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG}\u00a0kg` : undefined}
           />
         </form>
       </Sheet>

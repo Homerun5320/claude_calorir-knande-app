@@ -12,6 +12,7 @@ import { entryNutrients } from './diary'
 import { NUTRIENTS, type NutrientKey } from './nutrients'
 import { todayISO } from './dates'
 import { mealName } from './meals'
+import { describeRepairs, sanitizeBackupData, skippedCount, type BackupRepairs } from './backupValidation'
 
 export const BACKUP_FORMAT = 'lagom-backup'
 export const BACKUP_VERSION = 1
@@ -28,6 +29,11 @@ export interface BackupFile {
     body: Pick<ReturnType<typeof useBodyStore.getState>, 'weights' | 'measurements'>
     fasting: Pick<ReturnType<typeof useFastingStore.getState>, 'active' | 'history'>
   }
+  /**
+   * Vad som rättades eller hoppades över när filen lästes in (sätts av `parseBackup`, sparas
+   * inte i filen).
+   */
+  repairs?: BackupRepairs
 }
 
 export function createBackup(): BackupFile {
@@ -62,8 +68,15 @@ export class BackupError extends Error {}
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-/** Validera och tolka en säkerhetskopia. Kastar BackupError med svensk text vid fel. */
-export function parseBackup(text: string): BackupFile {
+/**
+ * Validera och tolka en säkerhetskopia. Kastar BackupError med svensk text om filen inte går att
+ * använda alls (inte JSON, inte från Lagom, från en nyare version eller utan sina avsnitt).
+ *
+ * Innehållet kontrolleras post för post (`sanitizeBackupData`): skadade poster hoppas över och
+ * småfel rättas, så att en återställning – även "Ersätt allt" – aldrig kan få appen att krascha.
+ * Vad som hoppades över står i `repairs` och i `summarizeBackup`.
+ */
+export function parseBackup(text: string, now: number = Date.now()): BackupFile {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -71,14 +84,22 @@ export function parseBackup(text: string): BackupFile {
     throw new BackupError('Filen är inte en giltig JSON-fil.')
   }
   if (!isObj(raw) || raw.format !== BACKUP_FORMAT) throw new BackupError('Filen är ingen säkerhetskopia från Lagom.')
-  if (typeof raw.version !== 'number' || raw.version > BACKUP_VERSION) {
+  if (typeof raw.version !== 'number' || !Number.isFinite(raw.version) || raw.version > BACKUP_VERSION) {
     throw new BackupError('Säkerhetskopian är från en nyare version av Lagom. Uppdatera appen och försök igen.')
   }
   const data = raw.data
   if (!isObj(data) || !isObj(data.diary) || !isObj(data.profile) || !isObj(data.food) || !isObj(data.body)) {
     throw new BackupError('Säkerhetskopian är ofullständig eller skadad.')
   }
-  return raw as unknown as BackupFile
+  const { data: clean, repairs } = sanitizeBackupData(data, now)
+  return {
+    format: BACKUP_FORMAT,
+    version: raw.version,
+    exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : '',
+    app: typeof raw.app === 'string' ? raw.app : 'Lagom',
+    data: clean,
+    repairs,
+  }
 }
 
 export interface ImportSummary {
@@ -87,16 +108,25 @@ export interface ImportSummary {
   weights: number
   customFoods: number
   recipes: number
+  /** Antal skadade poster som hoppas över vid importen (0 för en hel säkerhetskopia). */
+  skipped: number
+  /** Antal poster med småfel som rättades, t.ex. ett saknat id eller en okänd måltid. */
+  repaired: number
+  /** Vad som hoppas över, t.ex. ["2 dagboksposter", "1 vägning"]. Tom för en hel säkerhetskopia. */
+  skippedDetails: string[]
 }
 
 export function summarizeBackup(b: BackupFile): ImportSummary {
-  const entries = Object.values(b.data.diary.entries ?? {}).reduce((s, l) => s + (l?.length ?? 0), 0)
+  const entries = Object.values(b.data.diary.entries ?? {}).reduce((s, l) => s + (Array.isArray(l) ? l.length : 0), 0)
   return {
     days: Object.keys(b.data.diary.entries ?? {}).length,
     entries,
-    weights: b.data.body.weights?.length ?? 0,
+    weights: Array.isArray(b.data.body.weights) ? b.data.body.weights.length : 0,
     customFoods: Object.keys(b.data.food.customFoods ?? {}).length,
     recipes: Object.keys(b.data.food.recipes ?? {}).length,
+    skipped: b.repairs ? skippedCount(b.repairs) : 0,
+    repaired: b.repairs?.repaired ?? 0,
+    skippedDetails: b.repairs ? describeRepairs(b.repairs) : [],
   }
 }
 

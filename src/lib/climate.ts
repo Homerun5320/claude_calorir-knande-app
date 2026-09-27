@@ -109,13 +109,14 @@ export const NAME_CO2E_RULES: ReadonlyArray<{ pattern: RegExp; categories?: read
 const COOKED = /\bkokt|\btillagad|\bkonserverad|\bi burk/
 const COOKED_FACTOR = 0.4
 
-/** Klimatfaktor med källa för ett livsmedel. */
+/** Klimatfaktor med källa för ett livsmedel. Okänd kategori ger schablonen för "Övrigt". */
 export function foodClimateFactor(food: Food): ClimateFactor {
   if (food.co2e !== undefined && Number.isFinite(food.co2e) && food.co2e >= 0) {
     return { kgPerKg: food.co2e, source: food.source === 'openfoodfacts' ? 'Open Food Facts' : 'Livsmedlets eget värde' }
   }
-  const name = food.name.toLowerCase()
-  let factor: ClimateFactor = CATEGORY_CO2E[food.category]
+  const name = typeof food.name === 'string' ? food.name.toLowerCase() : ''
+  // En sparad ögonblicksbild kan ha en kategori som inte längre finns – använd då "Övrigt".
+  let factor: ClimateFactor = Object.hasOwn(CATEGORY_CO2E, food.category) ? CATEGORY_CO2E[food.category] : CATEGORY_CO2E.ovrigt
   for (const rule of NAME_CO2E_RULES) {
     if (rule.categories && !rule.categories.includes(food.category)) continue
     if (rule.pattern.test(name)) {

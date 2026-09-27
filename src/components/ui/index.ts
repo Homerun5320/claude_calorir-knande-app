@@ -11,6 +11,7 @@ export {
   toneColor,
   toneSoftColor,
   toneInkColor,
+  toneTextColor,
   toneVars,
   type Tone,
   type AccentTone,
@@ -32,7 +33,7 @@ export { EmptyState, type EmptyStateProps, type EmptyIllustration } from './Empt
 export { Skeleton, SkeletonText, SkeletonRow, type SkeletonProps } from './Skeleton'
 
 // Modaler och notiser
-export { Sheet, useModal, useMediaQuery, ModalBackdrop, type SheetProps, type UseModalOptions } from './Sheet'
+export { Sheet, useModal, useMediaQuery, ModalBackdrop, type SheetProps, type UseModalOptions, type ReturnFocus } from './Sheet'
 export {
   Dialog,
   ConfirmDialog,

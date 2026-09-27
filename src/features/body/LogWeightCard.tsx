@@ -82,7 +82,7 @@ export function LogWeightCard({ today, first, hideNumbers = false }: LogWeightCa
           min={0}
           // Medvetet läge: ingen exempelvikt i fältet – bara ett neutralt streck.
           placeholder={hideNumbers ? '–' : '72,4'}
-          error={kg !== undefined && !kgValid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG} kg` : undefined}
+          error={kg !== undefined && !kgValid ? `Ange en vikt mellan ${MIN_KG} och ${MAX_KG}\u00a0kg` : undefined}
         />
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">

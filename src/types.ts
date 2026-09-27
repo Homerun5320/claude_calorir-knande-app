@@ -318,12 +318,15 @@ export interface MeasurementEntry {
 
 export type Sex = 'kvinna' | 'man'
 
-/** PAL-nivå för vardagen (exklusive planerad träning som loggas separat). */
+/**
+ * PAL-nivå för vardagen – jobb, hem och resor (exklusive planerad träning som loggas separat).
+ * Beskrivningarna följer samma mönster: hur vardagen ser ut, med ett par exempel.
+ */
 export const ACTIVITY_LEVELS = {
-  stillasittande: { pal: 1.4, label: 'Stillasittande', description: 'Kontorsjobb, lite rörelse på fritiden' },
-  latt: { pal: 1.55, label: 'Lätt aktiv', description: 'Promenerar dagligen, cyklar till jobbet' },
-  aktiv: { pal: 1.7, label: 'Aktiv', description: 'Står och går mycket i jobbet (t.ex. vård, handel)' },
-  mycket_aktiv: { pal: 1.9, label: 'Mycket aktiv', description: 'Tungt fysiskt arbete (t.ex. bygg, skog, lantbruk)' },
+  stillasittande: { pal: 1.4, label: 'Stillasittande', description: 'Sitter större delen av dagen, t.ex. kontorsjobb och bil eller buss till jobbet' },
+  latt: { pal: 1.55, label: 'Lätt aktiv', description: 'Sitter en del men rör dig lite varje dag, t.ex. korta promenader och ärenden till fots' },
+  aktiv: { pal: 1.7, label: 'Aktiv', description: 'Står och går mycket, t.ex. i vård och handel, eller går och cyklar längre sträckor varje dag' },
+  mycket_aktiv: { pal: 1.9, label: 'Mycket aktiv', description: 'Tungt fysiskt arbete större delen av dagen, t.ex. bygg, skog och lantbruk' },
 } as const
 export type ActivityLevel = keyof typeof ACTIVITY_LEVELS
 

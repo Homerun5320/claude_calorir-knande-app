@@ -9,6 +9,7 @@ import {
   Button,
   ConfirmDialog,
   DialogHost,
+  EmptyState,
   NumberField,
   ProgressBar,
   SegmentedControl,
@@ -17,17 +18,37 @@ import {
   Switch,
   Tabs,
   TextField,
+  ToastViewport,
   confirmDialog,
   stepNumber,
+  tabPanelProps,
+  toast,
   useDialogStore,
+  useToastStore,
 } from './index'
+import { pauseToast, resumeToast, toastDuration } from './toast'
+import { rangeMessage } from './NumberField'
 
-function ControlledNumber({ onValue, initial, ...rest }: { onValue?: (v: number | undefined) => void; initial?: number; min?: number; max?: number; step?: number }) {
+function ControlledNumber({
+  onValue,
+  initial,
+  suffix = 'dl',
+  ...rest
+}: {
+  onValue?: (v: number | undefined) => void
+  initial?: number
+  min?: number
+  max?: number
+  step?: number
+  suffix?: string
+  autoComplete?: string
+  error?: string
+}) {
   const [value, setValue] = useState<number | undefined>(initial)
   return (
     <NumberField
       label="Mängd"
-      suffix="dl"
+      suffix={suffix}
       value={value}
       onChange={(v) => {
         setValue(v)
@@ -88,18 +109,78 @@ describe('NumberField', () => {
     expect(input).toHaveValue('')
   })
 
-  it('begränsar till max och snyggar till texten när fältet lämnas', async () => {
+  it('klämmer inte medan man skriver – visar ett meddelande och klämmer först när fältet lämnas', async () => {
     const user = userEvent.setup()
     const onValue = vi.fn()
     render(<ControlledNumber onValue={onValue} max={10} />)
     const input = screen.getByRole('spinbutton', { name: 'Mängd' })
 
     await user.type(input, '25')
-    expect(onValue).toHaveBeenLastCalledWith(10)
+    // Föräldern får inget ogiltigt värde – och inte heller ett tyst ändrat (10).
+    expect(onValue).toHaveBeenLastCalledWith(undefined)
+    expect(onValue).not.toHaveBeenCalledWith(10)
     expect(input).toHaveValue('25') // inte omskrivet mitt i
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAccessibleDescription('Ange högst 10\u00a0dl.')
 
     await user.tab()
     expect(input).toHaveValue('10')
+    expect(onValue).toHaveBeenLastCalledWith(10)
+    expect(input).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('går att skriva "7,24" och "72,4" i ett fält med min 20 (vikt)', async () => {
+    const user = userEvent.setup()
+    const onValue = vi.fn()
+    const onSubmit = vi.fn((e: { preventDefault: () => void }) => e.preventDefault())
+    render(
+      <form onSubmit={onSubmit}>
+        <ControlledNumber onValue={onValue} min={20} max={400} suffix="kg" step={0.1} />
+      </form>,
+    )
+    const input = screen.getByRole('spinbutton', { name: 'Mängd' })
+
+    await user.type(input, '7,24')
+    expect(input).toHaveValue('7,24')
+    expect(onValue).not.toHaveBeenCalledWith(20)
+    expect(screen.getByText('Ange ett värde mellan 20 och 400 kg.')).toBeInTheDocument()
+    // Enter skickar inte formuläret med ett värde utanför gränserna.
+    await user.keyboard('{Enter}')
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.clear(input)
+    await user.type(input, '72,4')
+    expect(onValue).toHaveBeenLastCalledWith(72.4)
+    expect(input).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByText(/Ange ett värde mellan/)).not.toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('gränsmeddelandet går före förälderns fel och stegning klämmer', async () => {
+    const user = userEvent.setup()
+    const onValue = vi.fn()
+    render(<ControlledNumber onValue={onValue} min={10} max={3000} step={50} suffix="ml" error="Ange en mängd." />)
+    const input = screen.getByRole('spinbutton', { name: 'Mängd' })
+    await user.type(input, '5000')
+    expect(input).toHaveAccessibleDescription('Ange ett värde mellan 10 och 3\u00a0000\u00a0ml.')
+    await user.keyboard('{ArrowUp}')
+    expect(onValue).toHaveBeenLastCalledWith(3000)
+    expect(input).toHaveValue('3000')
+  })
+
+  it('autoComplete är "off" som standard och kan sättas', () => {
+    const { unmount } = render(<ControlledNumber />)
+    expect(screen.getByRole('spinbutton', { name: 'Mängd' })).toHaveAttribute('autocomplete', 'off')
+    unmount()
+    render(<ControlledNumber autoComplete="bday-year" />)
+    expect(screen.getByRole('spinbutton', { name: 'Mängd' })).toHaveAttribute('autocomplete', 'bday-year')
+  })
+
+  it('rangeMessage formulerar gränserna på svenska', () => {
+    expect(rangeMessage(20, 400, 'kg')).toBe('Ange ett värde mellan 20 och 400 kg.')
+    expect(rangeMessage(0.5, undefined)).toBe('Ange minst 0,5.')
+    expect(rangeMessage(undefined, 10000, 'g')).toBe('Ange högst 10 000 g.')
   })
 
   it('stegar med piltangenter (Shift = ×10) och snäpper till steget', async () => {
@@ -232,23 +313,168 @@ describe('Tabs', () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(
-      <Tabs
-        id="insikter"
-        aria-label="Insikter"
-        value="energi"
-        onChange={onChange}
-        tabs={[
-          { value: 'energi', label: 'Energi' },
-          { value: 'makro', label: 'Makro', count: 3 },
-        ]}
-      />,
+      <>
+        <Tabs
+          id="insikter"
+          aria-label="Insikter"
+          value="energi"
+          onChange={onChange}
+          tabs={[
+            { value: 'energi', label: 'Energi' },
+            { value: 'makro', label: 'Makro', count: 3 },
+          ]}
+        />
+        <div {...tabPanelProps('insikter', 'energi')}>Energi-innehåll</div>
+      </>,
     )
     const energi = screen.getByRole('tab', { name: 'Energi' })
     expect(energi).toHaveAttribute('aria-selected', 'true')
     expect(energi).toHaveAttribute('aria-controls', 'insikter-panel-energi')
+    expect(screen.getByRole('tabpanel', { name: 'Energi' })).toBeInTheDocument()
+    // Makro-panelen finns inte i dokumentet – då pekar aria-controls inte dit.
+    expect(screen.getByRole('tab', { name: /Makro/ })).not.toHaveAttribute('aria-controls')
     energi.focus()
     await user.keyboard('{ArrowRight}')
     expect(onChange).toHaveBeenLastCalledWith('makro')
+  })
+
+  it('tar emot egna panel-id:n och kan stänga av aria-controls', () => {
+    const tabs = [
+      { value: 'a', label: 'A' },
+      { value: 'b', label: 'B' },
+    ]
+    const { unmount } = render(<Tabs aria-label="Val" value="a" onChange={() => {}} tabs={tabs} controls={(v) => `egen-${v}`} />)
+    expect(screen.getByRole('tab', { name: 'B' })).toHaveAttribute('aria-controls', 'egen-b')
+    unmount()
+    render(<Tabs aria-label="Val" value="a" onChange={() => {}} tabs={tabs} controls="none" />)
+    expect(screen.getByRole('tab', { name: 'A' })).not.toHaveAttribute('aria-controls')
+  })
+})
+
+describe('SegmentedControl – aria', () => {
+  it('skickar vidare aria-describedby och aria-invalid till radiogruppen', () => {
+    render(
+      <>
+        <SegmentedControl
+          aria-label="Kön"
+          aria-describedby="kon-fel"
+          aria-invalid
+          id="kon"
+          value=""
+          onChange={() => {}}
+          options={[
+            { value: 'kvinna', label: 'Kvinna' },
+            { value: 'man', label: 'Man' },
+          ]}
+        />
+        <p id="kon-fel">Välj ett alternativ.</p>
+      </>,
+    )
+    const group = screen.getByRole('radiogroup', { name: 'Kön' })
+    expect(group).toHaveAttribute('aria-invalid', 'true')
+    expect(group).toHaveAccessibleDescription('Välj ett alternativ.')
+    expect(group).toHaveAttribute('id', 'kon')
+  })
+})
+
+describe('toast', () => {
+  beforeEach(() => {
+    act(() => {
+      for (const t of useToastStore.getState().toasts) useToastStore.getState().dismiss(t.id)
+    })
+  })
+
+  it('visar ångra-notiser minst 8 s och pausar medan man är i dem', () => {
+    vi.useFakeTimers()
+    try {
+      expect(toastDuration({ action: { label: 'Ångra', onClick: () => {} } })).toBeGreaterThanOrEqual(8000)
+      let id = ''
+      act(() => {
+        id = toast('Borttaget', { action: { label: 'Ångra', onClick: () => {} } })
+      })
+      act(() => vi.advanceTimersByTime(7000))
+      expect(useToastStore.getState().toasts.map((t) => t.id)).toContain(id)
+      pauseToast(id)
+      act(() => vi.advanceTimersByTime(60_000))
+      expect(useToastStore.getState().toasts.map((t) => t.id)).toContain(id)
+      resumeToast(id)
+      act(() => vi.advanceTimersByTime(2000))
+      expect(useToastStore.getState().toasts.map((t) => t.id)).not.toContain(id)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('har en stängknapp och lämnar tillbaka fokus när Ångra trycks', async () => {
+    const user = userEvent.setup()
+    const undo = vi.fn()
+    render(
+      <>
+        <button type="button">Sök</button>
+        <ToastViewport />
+      </>,
+    )
+    const origin = screen.getByRole('button', { name: 'Sök' })
+    origin.focus()
+    act(() => {
+      toast('Tillagt i lunch', { action: { label: 'Ångra', onClick: undo } })
+    })
+    // Tangentbordsanvändaren går in i notisen och trycker Ångra.
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Ångra' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Stäng notisen' })).toBeInTheDocument()
+    await user.keyboard('{Enter}')
+    expect(undo).toHaveBeenCalledTimes(1)
+    expect(origin).toHaveFocus() // inte <body>
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+
+    act(() => {
+      toast('Sparat')
+    })
+    await user.click(await screen.findByRole('button', { name: 'Stäng notisen' }))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('Escape stänger notisen men inte arket bakom', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <>
+        <Sheet open onClose={onClose} title="Portion">
+          <button type="button">Lägg till</button>
+        </Sheet>
+        <ToastViewport />
+      </>,
+    )
+    screen.getByRole('button', { name: 'Lägg till' }).focus()
+    act(() => {
+      toast('Tillagt', { action: { label: 'Ångra', onClick: () => {} } })
+    })
+    act(() => screen.getByRole('button', { name: 'Ångra' }).focus())
+    await user.keyboard('{Escape}')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(onClose).not.toHaveBeenCalled()
+    // Fokus tillbaka in i arket.
+    expect(screen.getByRole('dialog', { name: 'Portion' }).contains(document.activeElement)).toBe(true)
+  })
+})
+
+describe('EmptyState – rubriknivå', () => {
+  it('blir h2 direkt under sidans h1 och h3 under ett korts h2', () => {
+    render(
+      <>
+        <h1>Recept</h1>
+        <EmptyState title="Inga recept ännu" />
+        <section>
+          <h2>Mina recept</h2>
+          <EmptyState title="Inget sparat" compact />
+        </section>
+        <EmptyState title="Egen nivå" titleAs="h4" />
+      </>,
+    )
+    expect(screen.getByRole('heading', { name: 'Inga recept ännu' })).toHaveProperty('tagName', 'H2')
+    expect(screen.getByRole('heading', { name: 'Inget sparat' })).toHaveProperty('tagName', 'H3')
+    expect(screen.getByRole('heading', { name: 'Egen nivå' })).toHaveProperty('tagName', 'H4')
   })
 })
 

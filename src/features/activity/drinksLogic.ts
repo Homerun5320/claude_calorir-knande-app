@@ -13,23 +13,23 @@
 import type { DiaryEntry, ISODate } from '../../types'
 import { entryNutrients, totals } from '../../lib/diary'
 import { standardDrinks } from '../../lib/nutrients'
+import { CAFFEINE_ADULT_MAX_MG, YOUTH_CAFFEINE_MG_PER_KG, YOUTH_FALLBACK_WEIGHT_KG } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
 
 /** Genomsnittlig halveringstid för koffein i timmar. */
 export const CAFFEINE_HALF_LIFE_H = 5
 
 /** Riktmärke när målet saknas: 400 mg per dag för friska vuxna (EFSA). */
-export const DEFAULT_CAFFEINE_MAX_MG = 400
+export const DEFAULT_CAFFEINE_MAX_MG = CAFFEINE_ADULT_MAX_MG
 
 /** EFSA (2015): för barn och ungdomar under 18 år högst ca 3 mg koffein per kg kroppsvikt och dag. */
-export const YOUTH_CAFFEINE_MG_PER_KG = 3
-
-/** Vikt som används för ungdomars koffeingräns om vikten är okänd (kg). */
-const YOUTH_FALLBACK_WEIGHT_KG = 50
+export { YOUTH_CAFFEINE_MG_PER_KG }
 
 /**
- * Dagens koffeinriktmärke. Vuxna: målet (400 mg, 200 mg vid graviditet och amning). Under 18 år:
- * högst 3 mg per kg kroppsvikt – aldrig mer än vuxenmålet.
+ * Dagens koffeinriktmärke utifrån ett mål. Dagsmålen (`computeTargets`) räknar redan in
+ * ungdomsgränsen (3 mg/kg) och graviditet/amning (200 mg), så Idag och Dryck visar samma tal –
+ * den här funktionen används bara när det egna målet och åldern ska vägas ihop, t.ex. utan profil.
+ * Vuxna: målet. Under 18 år: högst 3 mg per kg kroppsvikt – aldrig mer än målet.
  */
 export function caffeineLimitMg(targetMaxMg: number, age: number | undefined, weightKg: number | undefined): number {
   const adult = targetMaxMg > 0 ? targetMaxMg : DEFAULT_CAFFEINE_MAX_MG
@@ -141,7 +141,7 @@ export function caffeineLevel(mg: number, maxMg: number): CaffeineLevel {
 }
 
 export const CAFFEINE_LEVEL_TEXT: Record<CaffeineLevel, { label: string; text: string }> = {
-  inget: { label: 'Inget än', text: 'Inget koffein registrerat idag.' },
+  inget: { label: 'Inget än', text: 'Inget koffein loggat idag.' },
   lagom: { label: 'Lagom', text: 'Gott om marginal till dagens riktmärke.' },
   nara: { label: 'Nära riktmärket', text: 'Nära dagens riktmärke – kanske något koffeinfritt till nästa fika?' },
   over: { label: 'Över riktmärket', text: 'Över riktmärket idag. Vatten eller koffeinfritt kan vara skönt resten av dagen.' },
@@ -150,12 +150,12 @@ export const CAFFEINE_LEVEL_TEXT: Record<CaffeineLevel, { label: string; text: s
 /** Sömntips utifrån dagens sista koffeinintag och uppskattad mängd vid läggdags. */
 export function sleepTip(intakes: readonly CaffeineIntake[], bedtimeMinute = BEDTIME_MINUTE): string {
   const last = intakes[intakes.length - 1]
-  if (!last) return 'Koffein har en halveringstid på ungefär 5 timmar – en eftermiddagskaffe kan påverka sömnen.'
+  if (!last) return 'Koffein har en halveringstid på ungefär 5\u00a0timmar – en eftermiddagskaffe kan påverka sömnen.'
   const hoursBefore = (bedtimeMinute - last.minute) / 60
   if (hoursBefore < 6) {
-    return 'Koffein har en halveringstid på ungefär 5 timmar – en del av dagens sista kopp finns kvar vid läggdags och kan göra sömnen lättare. Koffeinfritt är ett gott alternativ på kvällen.'
+    return 'Koffein har en halveringstid på ungefär 5\u00a0timmar – en del av dagens sista kopp finns kvar vid läggdags och kan göra sömnen lättare. Koffeinfritt är ett gott alternativ på kvällen.'
   }
-  return 'Koffein har en halveringstid på ungefär 5 timmar. Dagens sista kopp var i god tid före kvällen – skönt för sömnen.'
+  return 'Koffein har en halveringstid på ungefär 5\u00a0timmar. Dagens sista kopp var i god tid före kvällen – skönt för sömnen.'
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ export function alcoholStatus(summary: Pick<AlcoholSummary, 'total' | 'maxDay'>)
 }
 
 export const ALCOHOL_STATUS_TEXT: Record<AlcoholStatus, string> = {
-  inget: 'Ingen alkohol registrerad i veckan.',
+  inget: 'Ingen alkohol loggad i veckan.',
   under: 'Ju mindre alkohol, desto bättre för sömn, återhämtning och hälsa på sikt.',
   over: 'Veckan når nivån där vården brukar erbjuda stöd. Vill du fundera på dina vanor finns anonymt stöd hos Alkoholhjälpen.',
 }
@@ -219,7 +219,7 @@ export const ALCOHOL_STATUS_TEXT: Record<AlcoholStatus, string> = {
 export function waterPresets(glassMl: number): Array<{ id: string; label: string; ml: number }> {
   const glass = glassMl > 0 ? Math.round(glassMl) : 250
   return [
-    { id: 'glas', label: `1 glas (${formatNumber(glass)} ml)`, ml: glass },
-    { id: 'flaska', label: '1 flaska (50 cl)', ml: 500 },
+    { id: 'glas', label: `1 glas (${formatNumber(glass)}\u00a0ml)`, ml: glass },
+    { id: 'flaska', label: '1 flaska (500\u00a0ml)', ml: 500 },
   ]
 }

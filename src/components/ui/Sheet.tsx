@@ -3,7 +3,9 @@
  *
  * - Portal till document.body, bakgrund med oskärpa.
  * - Dra ned i handtaget/huvudet för att stänga (mobil), Escape stänger.
- * - Fokusfälla, fokus återställs vid stängning, aria-modal + aria-labelledby.
+ * - Bakåtknappen (webbläsare/Android) stänger arket i stället för att lämna sidan – se
+ *   `modalHistory.ts`. Navigering inifrån arket fungerar som vanligt.
+ * - Fokusfälla, fokus återställs vid stängning (`returnFocus`), aria-modal + aria-labelledby.
  * - Sidans scroll låses. Höjden följer innehållet (max 92dvh) med fast sidfot.
  *
  * Filen exporterar även modal-grunderna (`useModal`, `ModalBackdrop`, `useMediaQuery`)
@@ -15,6 +17,7 @@ import { AnimatePresence, motion, useDragControls, useIsPresent, useReducedMotio
 import { X } from 'lucide-react'
 import { cx } from './Button'
 import { IconButton } from './IconButton'
+import { hasModalEntries, registerModalEntry } from './modalHistory'
 
 // ---------------------------------------------------------------------------
 // Modal-grunder
@@ -85,23 +88,48 @@ export function getFocusable(root: HTMLElement): HTMLElement[] {
   )
 }
 
+/** Vart fokus ska när modalen stängs. */
+export type ReturnFocus = boolean | RefObject<HTMLElement | null> | (() => HTMLElement | null | undefined)
+
 export interface UseModalOptions {
   /** Aktiv medan modalen är öppen (sätt false under utgångsanimationen). */
   active: boolean
-  /** Anropas vid Escape. Utelämna för att inte kunna stänga med Escape. */
+  /** Anropas vid Escape och bakåtknappen. Utelämna för att inte kunna stänga med Escape. */
   onDismiss?: () => void
   /** Element som ska få fokus när modalen öppnas. Standard: själva panelen. */
   initialFocusRef?: RefObject<HTMLElement | null>
+  /**
+   * Bakåtknappen stänger modalen (egen historikpost, se `modalHistory.ts`). `'nested'` = bara om
+   * en annan modal redan har en post (t.ex. en bekräftelse ovanpå ett ark). Standard false.
+   */
+  closeOnBack?: boolean | 'nested'
+  /**
+   * Fokus vid stängning: `true` (standard) = elementet som öppnade modalen, `false` = rör inte
+   * fokus, eller ett eget element (ref eller funktion). Finns elementet inte längre används
+   * öppnaren i stället.
+   */
+  returnFocus?: ReturnFocus
+}
+
+function resolveReturnFocus(option: ReturnFocus | undefined): HTMLElement | null | undefined {
+  if (option === undefined || option === true || option === false) return undefined
+  return typeof option === 'function' ? option() : option.current
+}
+
+function focusable(el: HTMLElement | null | undefined): el is HTMLElement {
+  return !!el && el.isConnected && el !== document.body && !el.closest('[inert]') && !(el as HTMLButtonElement).disabled
 }
 
 /**
  * Tillgänglighetsbeteende för modaler: Escape, fokusfälla, fokusåterställning och scroll-lås.
  * `ref` ska peka på panelen (med tabIndex={-1}).
  */
-export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss, initialFocusRef }: UseModalOptions) {
+export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss, initialFocusRef, closeOnBack = false, returnFocus = true }: UseModalOptions) {
   const dismissRef = useRef(onDismiss)
+  const optionsRef = useRef({ closeOnBack, returnFocus })
   useEffect(() => {
     dismissRef.current = onDismiss
+    optionsRef.current = { closeOnBack, returnFocus }
   })
 
   useEffect(() => {
@@ -115,6 +143,10 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
     lockBackground()
     const target = initialFocusRef?.current ?? ref.current
     target?.focus({ preventScroll: true })
+
+    // Bakåtknappen stänger modalen.
+    const back = optionsRef.current.closeOnBack
+    const releaseHistory = back === true || (back === 'nested' && hasModalEntries()) ? registerModalEntry(() => dismissRef.current?.()) : undefined
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isTop() || e.defaultPrevented) return
@@ -161,9 +193,14 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
       document.removeEventListener('focusin', onFocusIn)
       const i = modalStack.indexOf(token)
       if (i >= 0) modalStack.splice(i, 1)
+      releaseHistory?.()
       unlockScroll()
       unlockBackground()
-      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true })
+      const option = optionsRef.current.returnFocus
+      if (option === false) return
+      const custom = resolveReturnFocus(option)
+      const next = focusable(custom) ? custom : previouslyFocused
+      if (focusable(next)) next.focus({ preventScroll: true })
     }
     // ref och initialFocusRef är stabila objekt – effekten styrs enbart av `active`.
   }, [active])
@@ -226,6 +263,10 @@ export interface SheetProps {
   width?: 'sm' | 'md' | 'lg'
   /** Element som får fokus vid öppning. Standard: panelen (så att tangentbordet inte fälls upp). */
   initialFocusRef?: RefObject<HTMLElement | null>
+  /** Fokus vid stängning: öppnaren (standard), `false` eller ett eget element (ref/funktion). */
+  returnFocus?: ReturnFocus
+  /** Bakåtknappen stänger arket (standard: samma som `dismissible`). */
+  closeOnBack?: boolean
   /** Anropas när stängningsanimationen är klar. */
   onExitComplete?: () => void
   className?: string
@@ -262,6 +303,8 @@ function SheetPanel({
   size = 'auto',
   width = 'md',
   initialFocusRef,
+  returnFocus,
+  closeOnBack = dismissible,
   className,
   bodyClassName,
 }: SheetProps) {
@@ -273,7 +316,13 @@ function SheetPanel({
   const descId = useId()
   const dragControls = useDragControls()
 
-  useModal(panelRef, { active: isPresent, onDismiss: dismissible ? onClose : undefined, initialFocusRef })
+  useModal(panelRef, {
+    active: isPresent,
+    onDismiss: dismissible ? onClose : undefined,
+    initialFocusRef,
+    closeOnBack,
+    returnFocus,
+  })
 
   const canDrag = dismissible && !wide && !reduce
   const motionProps = reduce

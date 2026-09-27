@@ -163,14 +163,14 @@ function TimingCard({ data }: { data: InsightsData }) {
 // ---------------------------------------------------------------------------
 
 function MoodCard({ data }: { data: InsightsData }) {
-  const { days, metaByDate, period, today, entriesByDate, exerciseByDate, targets, addBackPct } = data
-  // En enskild vecka räcker sällan för samband – då tittar vi på de senaste åtta veckorna.
+  const { days, metaByDate, period, countedEnd, entriesByDate, exerciseByDate, targets, addBackPct } = data
+  // En enskild vecka räcker sällan för samband – då tittar vi på de senaste åtta veckorna
+  // (fram till sista dagen som räknas: idag räknas först när dagen är klar).
   const weekly = period.kind === 'vecka'
   const sourceDays = useMemo(() => {
     if (!weekly) return days
-    const end = period.end < today ? period.end : today
-    return buildDayStats(lastNDays(56, end), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
-  }, [weekly, days, period.end, today, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
+    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
+  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
   const a = useMemo(() => moodInsights(sourceDays, metaByDate), [sourceDays, metaByDate])
   const span = weekly ? 'de senaste 8 veckorna' : 'perioden'
   return (
@@ -214,12 +214,12 @@ function AlcoholCard({ data }: { data: InsightsData }) {
   return (
     <Card title="Alkohol" eyebrow="Standardglas per vecka">
       {total < 0.05 ? (
-        <Callout emoji="🌿">Ingen alkohol registrerad under perioden – bra för både sömn och återhämtning.</Callout>
+        <Callout emoji="🌿">Ingen alkohol loggad under perioden – bra för både sömn och återhämtning.</Callout>
       ) : (
         <>
           <p className="text-sm text-ink-2">
             I snitt <strong className="font-semibold text-ink">{formatNumber(perWeek, 1)} standardglas</strong> per vecka (ett
-            standardglas = {STANDARD_DRINK_G} g alkohol).
+            standardglas = {STANDARD_DRINK_G}{'\u00a0'}g alkohol).
           </p>
           <ul className="mt-3 space-y-2" aria-label="Standardglas per vecka">
             {weeks.map((w) => (
@@ -239,7 +239,7 @@ function AlcoholCard({ data }: { data: InsightsData }) {
             ))}
           </ul>
           <InfoNote className="mt-3">
-            Ju mindre alkohol, desto bättre för hälsan. Stapeln fylls vid {ALCOHOL_RISK_PER_WEEK} glas – Socialstyrelsens gräns för
+            Ju mindre alkohol, desto bättre för hälsan. Stapeln fylls vid {ALCOHOL_RISK_PER_WEEK}{'\u00a0'}glas – Socialstyrelsens gräns för
             riskbruk. Vill du prata med någon finns Alkoholhjälpen på 020-84 44 48.
           </InfoNote>
         </>
@@ -256,7 +256,7 @@ function CaffeineCard({ data }: { data: InsightsData }) {
     <Card title="Koffein" eyebrow="Snitt per loggad dag">
       {mg === undefined || mg < 1 ? (
         <p className="text-sm leading-relaxed text-ink-2">
-          Inget koffein registrerat under perioden. Kaffe, te, energidryck och cola räknas när de loggas.
+          Inget koffein loggat under perioden. Kaffe, te, energidryck och cola räknas när de loggas.
         </p>
       ) : (
         <>
@@ -274,12 +274,12 @@ function CaffeineCard({ data }: { data: InsightsData }) {
             color="var(--lg-hjortron)"
             label={mindful ? (mg <= max ? 'Inom en säker nivå' : 'Över den rekommenderade nivån') : undefined}
             aria-label="Koffein per dag"
-            valueText={`${formatNumber(mg)} av högst ${formatNumber(max)} mg`}
+            valueText={`${formatNumber(mg)} av högst ${formatNumber(max)}\u00a0mg`}
           />
           <p className="mt-2 text-xs leading-relaxed text-ink-3">
             {mg <= max
-              ? `Under ${formatNumber(max)} mg per dag, som EFSA bedömer som säkert för friska vuxna.`
-              : `Över ${formatNumber(max)} mg per dag. Kanske värt att prova te eller koffeinfritt ibland, särskilt på eftermiddagen.`}
+              ? `Under ${formatNumber(max)}\u00a0mg per dag, som EFSA bedömer som säkert för friska vuxna.`
+              : `Över ${formatNumber(max)}\u00a0mg per dag. Kanske värt att prova te eller koffeinfritt ibland, särskilt på eftermiddagen.`}
           </p>
         </>
       )}

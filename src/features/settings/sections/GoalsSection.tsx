@@ -10,7 +10,7 @@ import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
 import { addDays } from '../../../lib/dates'
 import { totals } from '../../../lib/diary'
-import { MACRO_PRESETS, computeTargets, macroPercents, type EnergyBreakdown } from '../../../lib/energy'
+import { MACRO_PRESETS, macroPercents, type EnergyBreakdown } from '../../../lib/energy'
 import { formatEnergy, formatNumber, parseSwedishNumber } from '../../../lib/format'
 import { KJ_PER_KCAL } from '../../../lib/nutrients'
 import { useBodyStore } from '../../../stores/bodyStore'
@@ -27,6 +27,7 @@ import {
   MACRO_LABELS,
   OVERRIDE_FIELDS,
   clampKcalOverride,
+  computedDefaults,
   kcalFloorText,
   kcalOverrideFloor,
   macroEnergyMismatch,
@@ -89,7 +90,7 @@ function AdaptiveCard() {
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const entries = useDiaryStore((s) => s.entries)
   const weights = useBodyStore((s) => s.weights)
-  const { adaptive, energy } = useTargets(today)
+  const { adaptive, energy, adaptiveBlocked } = useTargets(today)
   const fmt = useEnergyUnit()
 
   // Underlag de senaste 28 dagarna (samma regler som lib/energy).
@@ -103,6 +104,21 @@ function AdaptiveCard() {
     const weighIns = weights.filter((w) => w.date >= start && w.date <= today).length
     return { logged, weighIns }
   }, [entries, weights, today])
+
+  // Graviditet, amning och under 18 år: vikten ändras av naturliga skäl – formeln gäller.
+  if (adaptiveBlocked) {
+    return (
+      <Card eyebrow="Smartare mål" title="Adaptiv energiförbrukning">
+        <Switch
+          label="Räkna förbrukningen ur min vikttrend"
+          description="Inte tillgängligt just nu – dagsmålet räknas från formeln utifrån din profil."
+          checked={false}
+          disabled
+        />
+        <p className="mt-3 rounded-2xl bg-surface-2 p-3.5 text-[0.875rem] leading-relaxed text-ink-2">{adaptiveBlocked}</p>
+      </Card>
+    )
+  }
 
   return (
     <Card eyebrow="Smartare mål" title="Adaptiv energiförbrukning">
@@ -189,7 +205,7 @@ function MacroCard({ profile, kcal }: { profile: Profile; kcal: number }) {
           checked={custom}
           onSelect={() => choose('anpassad')}
           title="Egen fördelning"
-          description="Ställ in procenten själv – summan blir alltid 100 %."
+          description="Ställ in procenten själv – summan blir alltid 100 %."
           icon={SlidersHorizontal}
           compact
         />
@@ -208,8 +224,8 @@ function MacroCard({ profile, kcal }: { profile: Profile; kcal: number }) {
               step={1}
               tone={MACRO_TONE[k]}
               showValue
-              formatValue={(v) => `${formatNumber(v)} %`}
-              hint={`≈ ${formatNumber(grams[k])} g per dag`}
+              formatValue={(v) => `${formatNumber(v)}\u00a0%`}
+              hint={`≈ ${formatNumber(grams[k])}\u00a0g per dag`}
             />
           ))}
           <MacroSplitBar split={pct} showLegend />
@@ -231,19 +247,22 @@ function OverridesCard({ profile, weightKg, energy, targets }: { profile: Profil
   const overrides = useProfileStore((s) => s.settings.targetOverrides)
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const today = useToday()
-  const { adaptive } = useTargets(today)
+  const { adaptive, trendKg } = useTargets(today)
   const unit = useEnergyUnit()
-  const computedKcal = energy.kcal
   const floor = kcalOverrideFloor(profile, energy, today)
   // Ett eget energimål från förr (t.ex. innan graviditet eller byte av kön) kan ligga under golvet.
+  // Dagsmålen använder då golvet i stället (computeTargets), och här föreslås att höja det sparade värdet.
   const tooLow = overrides.kcal !== undefined && overrides.kcal < floor.kcal
+  // Med egna makron tar kolhydraterna resten av energin; det kan bara slå fel när kolhydraterna
+  // själva är egna eller när protein och fett tillsammans redan överstiger dagsmålet.
   const mismatch = macroEnergyMismatch(targets)
 
-  // Beräknade standardvärden: egna kcal påverkar makrona, men egna makron räknas inte in.
-  const defaults = useMemo<Targets>(() => {
-    const base = computeTargets(profile, weightKg, overrides.kcal !== undefined ? { kcal: overrides.kcal } : {}, { adaptiveTdee: adaptive?.tdee })
-    return { ...base, kcal: computedKcal }
-  }, [profile, weightKg, overrides.kcal, adaptive, computedKcal])
+  // Platshållare: värdet varje fält skulle få om det lämnades tomt – med alla andra egna mål
+  // inräknade (samma regler som dagsmålen).
+  const defaults = useMemo<Targets>(
+    () => computedDefaults(profile, weightKg, overrides, { today, adaptiveTdee: adaptive?.tdee, trendKg: trendKg ?? undefined }),
+    [profile, weightKg, overrides, today, adaptive, trendKg],
+  )
 
   const set = (key: keyof Targets, value: number | undefined) => updateSettings({ targetOverrides: withOverride(overrides, key, value) })
   const count = overrideCount(overrides)
@@ -275,7 +294,8 @@ function OverridesCard({ profile, weightKg, energy, targets }: { profile: Profil
       {tooLow && (
         <div className="mb-4">
           <Note>
-            Ditt eget energimål ({formatEnergy(overrides.kcal, unit)}) är lägre än vad Lagom rekommenderar för dig nu. {kcalFloorText(floor, unit)}
+            Ditt eget energimål ({formatEnergy(overrides.kcal, unit)}) är lägre än vad Lagom rekommenderar för dig nu, så dagsmålet är{' '}
+            {formatEnergy(floor.kcal, unit)} tills vidare. {kcalFloorText(floor, unit)}
             <div className="mt-2">
               <Button size="sm" variant="soft" onClick={() => updateSettings({ targetOverrides: clampKcalOverride(overrides, floor.kcal) })}>
                 Höj till {formatEnergy(floor.kcal, unit)}
@@ -294,8 +314,10 @@ function OverridesCard({ profile, weightKg, energy, targets }: { profile: Profil
       {mismatch && (
         <p className="mt-4 rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2" role="note">
           Makromålen motsvarar tillsammans {formatEnergy(mismatch.macroKcal, unit)} – {formatEnergy(Math.abs(mismatch.diff), unit)}{' '}
-          {mismatch.diff > 0 ? 'mer' : 'mindre'} än dagsmålet på {formatEnergy(targets.kcal, unit)}. Justera gärna kolhydraterna eller fettet så att det
-          går jämnt upp.
+          {mismatch.diff > 0 ? 'mer' : 'mindre'} än dagsmålet på {formatEnergy(targets.kcal, unit)}.{' '}
+          {overrides.carbsG !== undefined
+            ? 'Lämna gärna kolhydraterna tomma, så får de det som blir kvar av energin.'
+            : 'Protein och fett tar redan hela dagsmålet – sänk gärna något av dem.'}
         </p>
       )}
     </Card>
@@ -336,10 +358,13 @@ function OverrideRow({
       return
     }
     let v = parsed / factor
+    // Ett för lågt energimål höjs till golvet – och det sägs tydligt, inte bara i tysthet.
+    const raised = energy && v < min
     v = Math.min(field.max, Math.max(min, v))
     v = energy ? Math.round(v / 10) * 10 : Number(v.toFixed(field.decimals))
     onCommit(v)
     setLocal(toShown(v))
+    if (raised) toast(`Energimålet är höjt till ${formatEnergy(v, unit)} – det lägsta Lagom rekommenderar för dig just nu.`)
   }
 
   const shownUnit = energy ? unit : field.unit

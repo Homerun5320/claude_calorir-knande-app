@@ -90,7 +90,7 @@ describe('DiaryPage', () => {
     useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: yesterday, meal: 'middag' })
     renderAt('/dagbok')
 
-    expect(await screen.findByRole('heading', { name: 'Inget registrerat ännu' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inget loggat ännu' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Lägg till mat' }).getAttribute('href')).toMatch(new RegExp(`/lagg-till\\?maltid=\\w+&datum=${today}`))
     // Varje aktiverad måltid har en "+" till rätt dag.
     expect(screen.getByRole('link', { name: 'Lägg till i frukost' })).toHaveAttribute('href', `/lagg-till?maltid=frukost&datum=${today}`)
@@ -105,6 +105,16 @@ describe('DiaryPage', () => {
     act(() => lastToast()?.action?.onClick())
     expect(useDiaryStore.getState().entries[today]).toBeUndefined()
     expect(useDiaryStore.getState().entries[yesterday]?.length).toBe(1)
+  })
+
+  it('visar klockslaget först i postens undertext', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 1, unit: 'portion:portion', grams: 300, date: today, meal: 'frukost', time: '07:10' })
+    renderAt('/dagbok')
+
+    const row = await screen.findByRole('button', { name: /Ändra Havregrynsgröt/ })
+    expect(row).toHaveAccessibleName(/^Ändra Havregrynsgröt, 07:10 · 1 portion/)
+    expect(within(row).getByText(/^07:10 · 1 portion/)).toBeInTheDocument()
   })
 
   it('visar måltider med energi och låter en post ändras och tas bort med ångra', async () => {
@@ -296,6 +306,25 @@ describe('DiaryPage', () => {
       expect(useDiaryStore.getState().days[today]?.mood).toBe(4)
     } finally {
       vi.useRealTimers()
+    }
+  })
+  it('träningen följer samma regel som Idag: ett eget mål som höjts till golvet räknar inte träningen två gånger', async () => {
+    const today = todayISO()
+    // Fyra veckor med 2 000 kcal per dag och stabil vikt ⇒ adaptiv förbrukning ≈ 2 000 kcal.
+    for (let i = 1; i <= 27; i++) {
+      const date = addDays(today, -i)
+      useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Dag', nutrients: { kcal: 2000 }, date, meal: 'middag' })
+      if (i % 3 === 0) useBodyStore.getState().logWeight(date, 70)
+    }
+    useDiaryStore.getState().addExercise({ date: today, activityId: 'custom', name: 'Promenad', minutes: 60, kcal: 300 })
+    // Ett för lågt eget mål (t.ex. från en säkerhetskopia) höjs till golvet, som bygger på den adaptiva förbrukningen.
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, adaptiveTargets: true, targetOverrides: { kcal: 1000 } } })
+    try {
+      renderAt('/dagbok')
+      expect(await screen.findByText(/ingår din vanliga träning redan i dagsmålet/)).toBeInTheDocument()
+      expect(screen.queryByText(/av träningen .* räknas in i dagens budget/)).not.toBeInTheDocument()
+    } finally {
+      useBodyStore.getState().clearBody()
     }
   })
 })

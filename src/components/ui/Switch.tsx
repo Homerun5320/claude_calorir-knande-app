@@ -23,8 +23,9 @@ export interface SwitchProps {
 }
 
 const SIZES = {
-  sm: { track: 'h-6 w-10', knob: 'size-5', travel: 16 },
-  md: { track: 'h-[1.875rem] w-[3.25rem]', knob: 'size-[1.625rem]', travel: 22 },
+  // `hit` förstorar tryckytan till minst 44 × 44 px utan att ändra reglagets storlek.
+  sm: { track: 'h-6 w-10', knob: 'size-5', travel: 16, hit: 'after:-inset-x-1 after:-inset-y-2.5' },
+  md: { track: 'h-[1.875rem] w-[3.25rem]', knob: 'size-[1.625rem]', travel: 22, hit: 'after:-inset-x-1 after:-inset-y-[7px]' },
 } as const
 
 /**
@@ -77,7 +78,9 @@ export function Switch({
       className={cx(
         'relative inline-flex shrink-0 items-center rounded-full p-0.5 transition-colors duration-200',
         'disabled:cursor-not-allowed disabled:opacity-45',
+        "after:absolute after:content-['']",
         s.track,
+        s.hit,
         // Av: tydlig kant och mörk knopp – minst 3:1 mot kortet och mellan knopp och spår (WCAG 1.4.11).
         checked ? 'bg-gran' : 'bg-surface-3 ring-2 ring-inset ring-ink-3 hover:bg-[color-mix(in_oklab,var(--lg-surface-3)_85%,var(--lg-ink-3))]',
       )}

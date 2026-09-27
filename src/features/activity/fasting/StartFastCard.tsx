@@ -65,14 +65,14 @@ export const StartFastCard = memo(function StartFastCard({ protocolId, onProtoco
 function DayBar({ protocol }: { protocol: FastingProtocol }) {
   const fastPct = (protocol.fastHours / 24) * 100
   return (
-    <div className="mt-4" role="img" aria-label={`Dygnet: ${protocol.fastHours} timmar fasta och ${protocol.eatHours} timmar ätfönster`}>
+    <div className="mt-4" role="img" aria-label={`Dygnet: ${protocol.fastHours}\u00a0timmar fasta och ${protocol.eatHours}\u00a0timmar ätfönster`}>
       <div className="flex h-3 overflow-hidden rounded-full bg-surface-2">
         <div className="h-full rounded-l-full bg-blabar transition-[width] duration-500 ease-spring" style={{ width: `${fastPct}%` }} />
         <div className="h-full flex-1 rounded-r-full bg-hjortron-soft ring-1 ring-inset ring-hjortron/30" />
       </div>
       <div className="mt-1.5 flex justify-between text-xs font-medium">
-        <span className="text-blabar">Fasta {protocol.fastHours} h</span>
-        <span className="text-ink-2">Ätfönster {protocol.eatHours} h</span>
+        <span className="text-blabar">Fasta {protocol.fastHours}{'\u00a0'}h</span>
+        <span className="text-ink-2">Ätfönster {protocol.eatHours}{'\u00a0'}h</span>
       </div>
     </div>
   )

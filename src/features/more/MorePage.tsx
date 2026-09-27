@@ -18,7 +18,7 @@ import {
   Timer,
   type LucideIcon,
 } from 'lucide-react'
-import { Card, PageHeader, toneVars, type Tone } from '../../components/ui'
+import { Card, PageHeader, cx, toneVars, type Tone } from '../../components/ui'
 import { formatLiters } from '../../components/domain/WaterGlasses'
 import { LogoMark } from '../../components/layout/Logo'
 import { useToday } from '../../hooks/useToday'
@@ -42,6 +42,11 @@ interface HubItem {
   tone: Tone
   to?: string
   onClick?: () => void
+  /**
+   * Brett kort från `sm` och uppåt: spänner över hela raden (ikonen till vänster). Används för
+   * sista kortet så att rutnätet (3 kolumner) går jämnt ut i stället för att lämna det ensamt.
+   */
+  wide?: boolean
 }
 
 /** Nu, uppdaterat varje minut (för pågående fasta). */
@@ -62,14 +67,21 @@ function HubCard({ item, index }: { item: HubItem; index: number }) {
       initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: reduce ? 0 : Math.min(index, 10) * 0.035, type: 'spring', stiffness: 320, damping: 32 }}
-      className="flex"
+      className={cx('flex', item.wide && 'sm:col-span-full')}
     >
-      <Card to={item.to} onClick={item.onClick} padding="none" className="flex min-h-[8.75rem] flex-col p-4">
-        <span style={toneVars(item.tone)} aria-hidden className="grid size-11 place-items-center rounded-2xl bg-(--tone-soft) text-(--tone)">
+      <Card
+        to={item.to}
+        onClick={item.onClick}
+        padding="none"
+        className={cx('flex min-h-[8.75rem] flex-col p-4', item.wide && 'sm:min-h-0 sm:flex-row sm:items-center sm:gap-4')}
+      >
+        <span style={toneVars(item.tone)} aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-(--tone-soft) text-(--tone)">
           <item.icon className="size-[1.3rem]" strokeWidth={2.1} />
         </span>
-        <span className="mt-auto block pt-3 font-display text-[1.0625rem] font-semibold leading-snug tracking-tight text-ink">{item.title}</span>
-        <span className="mt-0.5 line-clamp-2 text-[0.8125rem] leading-snug text-ink-3">{item.stat}</span>
+        <span className={cx('mt-auto block min-w-0 pt-3', item.wide && 'sm:mt-0 sm:pt-0')}>
+          <span className="block font-display text-[1.0625rem] font-semibold leading-snug tracking-tight text-ink">{item.title}</span>
+          <span className="mt-0.5 line-clamp-2 block text-[0.8125rem] leading-snug text-ink-3">{item.stat}</span>
+        </span>
       </Card>
     </motion.li>
   )
@@ -129,14 +141,23 @@ export default function MorePage() {
       to: '/traning',
       icon: Dumbbell,
       tone: 'lingon',
-      stat: exerciseMin > 0 ? `${formatDuration(exerciseMin)} rörelse idag` : 'Promenad, skidor, padel …',
+      stat: exerciseMin > 0 ? `${formatDuration(exerciseMin)} rörelse idag` : 'Promenad, skidor, padel\u00a0…',
     },
     { id: 'dryck', title: 'Dryck', to: '/dryck', icon: GlassWater, tone: 'fjall', stat: waterMl > 0 ? `${formatLiters(waterMl)} vatten idag` : 'Vatten, kaffe och alkohol' },
     { id: 'fasta', title: 'Fasta', to: '/fasta', icon: Timer, tone: 'vinbar', stat: fast ? `Pågår · ${formatElapsed(now - fast.start)}` : 'Ingen fasta pågår' },
     { id: 'matkalender', title: 'Matkalender', to: '/matkalender', icon: CalendarHeart, tone: 'sol', stat: foodDay },
     { id: 'installningar', title: 'Inställningar', to: '/installningar', icon: Settings, tone: 'gran', stat: 'Mål, tema och data' },
     { id: 'om', title: 'Om Lagom', to: '/om', icon: Info, tone: 'neutral', stat: 'Källor och integritet' },
-    { id: 'stod', title: 'Stöd & hjälp', onClick: () => setSupport(true), icon: HeartHandshake, tone: 'vinbar', stat: '1177, Frisk & Fri och Alkoholhjälpen' },
+    {
+      id: 'stod',
+      title: 'Stöd & hjälp',
+      onClick: () => setSupport(true),
+      icon: HeartHandshake,
+      tone: 'vinbar',
+      stat: '1177, Frisk & Fri och Alkoholhjälpen',
+      // 10 kort: två kolumner går jämnt ut på mobil; i tre kolumner blir stödkortet en egen, bred rad.
+      wide: true,
+    },
   ]
 
   const showBackup = backupDue(lastBackup, Date.now(), hasData)
@@ -168,7 +189,7 @@ export default function MorePage() {
               <CloudUpload aria-hidden className="size-5 shrink-0 text-(--tone-ink)" />
               <span className="min-w-0 flex-1">
                 <span className="block text-[0.9375rem] font-semibold text-ink">{lastBackup === null ? 'Gör din första säkerhetskopia' : 'Dags för en ny säkerhetskopia?'}</span>
-                <span className="block text-[0.8125rem] leading-snug text-ink-2">Din data finns bara i telefonen – en fil tar tio sekunder.</span>
+                <span className="block text-[0.8125rem] leading-snug text-ink-2">Din data finns bara i den här webbläsaren – en fil tar tio sekunder.</span>
               </span>
             </div>
           </Card>
@@ -183,7 +204,7 @@ export default function MorePage() {
         </nav>
 
         <p className="px-2 pt-2 text-center text-[0.8125rem] leading-relaxed text-ink-3">
-          Lagom är gratis, utan reklam och din data stannar i din telefon.
+          Lagom är gratis, utan reklam och din data stannar på din enhet.
         </p>
       </div>
 

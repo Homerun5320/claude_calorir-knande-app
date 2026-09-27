@@ -22,7 +22,11 @@ const kg = (v: number | undefined, d = 1) => (v === undefined ? '–' : `${forma
 export function usePeriodClimate(data: InsightsData) {
   const { period, entriesByDate } = data
   const chartDays = useMemo(() => climateDays(period.dates, entriesByDate), [period.dates, entriesByDate])
-  const summary = useMemo(() => summarizeClimate(chartDays.filter((d) => d.date <= data.today)), [chartDays, data.today])
+  // Samma dagar som övriga snitt: förflutna dagar, idag först när dagen är klar.
+  const summary = useMemo(() => {
+    const counted = new Set(period.elapsed)
+    return summarizeClimate(chartDays.filter((d) => counted.has(d.date)))
+  }, [chartDays, period.elapsed])
   return { chartDays, summary }
 }
 
@@ -123,7 +127,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
                 <Car className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
                 <span>
                   Hela perioden: {kg(summary.totalKg)} CO₂e – ungefär som att köra{' '}
-                  <strong className="font-semibold text-ink">{formatNumber(eq.carKm)} km</strong> med en genomsnittlig bil.
+                  <strong className="font-semibold text-ink">{formatNumber(eq.carKm)}{'\u00a0'}km</strong> med en genomsnittlig bil.
                 </span>
               </p>
             </Callout>
@@ -187,7 +191,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
           Så räknar vi: varje livsmedel får ett ungefärligt värde i kg CO₂e per kg, från RISE Klimatdatabas för livsmedel (2022)
           eller en schablon för kategorin. Värdena gäller från jord till industrins grind och kan skilja sig mycket mellan
           producenter – se dem som en fingervisning. Klimatsmart nivå: WWF One Planet Plate. Genomsnittlig svensk:
-          Naturvårdsverket. Bil: {formatNumber(CAR_KG_CO2E_PER_KM * 1000)} g CO₂ per km (Trafikverket).
+          Naturvårdsverket. Bil: {formatNumber(CAR_KG_CO2E_PER_KM * 1000)}{'\u00a0'}g CO₂ per km (Trafikverket).
           {summary.unknownEntries > 0 &&
             ` ${summary.unknownEntries} ${summary.unknownEntries === 1 ? 'snabbpost' : 'snabbposter'} utan vikt kunde inte räknas med.`}
         </InfoNote>

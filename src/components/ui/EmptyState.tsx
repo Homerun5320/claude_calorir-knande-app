@@ -7,9 +7,10 @@
  *   search – förstoringsglas med lingon (inga sökträffar)
  *   chart  – staplar under en uppgående sol (för lite data för insikter)
  */
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { cx } from './Button'
+import { headingTag, useHeadingLevel } from './headingLevel'
 
 export type EmptyIllustration = 'plate' | 'forest' | 'search' | 'chart'
 
@@ -23,7 +24,10 @@ export interface EmptyStateProps {
   illustration?: EmptyIllustration | ReactNode
   /** Mindre variant för kort och listor. */
   compact?: boolean
-  /** Rubriknivå (standard h3). */
+  /**
+   * Rubriknivå. Standard: automatiskt efter föregående rubrik – h2 direkt under sidans h1,
+   * h3 i ett kort eller ark med h2-rubrik.
+   */
   titleAs?: 'h2' | 'h3' | 'h4'
   className?: string
 }
@@ -172,11 +176,14 @@ function isBuiltIn(x: unknown): x is EmptyIllustration {
  *   action={<Button iconLeft={Plus} to="/lagg-till">Lägg till</Button>} />
  * ```
  */
-export function EmptyState({ title, text, action, illustration = 'plate', compact, titleAs: TitleTag = 'h3', className }: EmptyStateProps) {
+export function EmptyState({ title, text, action, illustration = 'plate', compact, titleAs, className }: EmptyStateProps) {
   const reduce = useReducedMotion()
   const Art = isBuiltIn(illustration) ? ART[illustration] : null
+  const rootRef = useRef<HTMLDivElement>(null)
+  const TitleTag = headingTag(useHeadingLevel(rootRef, titleAs ? (Number(titleAs.slice(1)) as 2 | 3 | 4) : undefined))
   return (
     <motion.div
+      ref={rootRef}
       initial={reduce ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}

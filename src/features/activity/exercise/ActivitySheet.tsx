@@ -251,10 +251,10 @@ export function ActivitySheet({ open, onClose, date, editing, weightKg, weightKn
 function speedHint(eff: ReturnType<typeof effectiveMet>, activityId: string | undefined, distance: number | undefined, minutes: number | undefined): string | undefined {
   if (!eff.speed || !distance || !minutes) return undefined
   const kind = speedKindFor(activityId)
-  const parts = [`Fart ${formatNumber(eff.speed, 1)} km/h`]
+  const parts = [`Fart ${formatNumber(eff.speed, 1)}\u00a0km/h`]
   if (kind !== 'cykling') {
     const pace = paceMinPerKm(distance, minutes)
-    if (pace) parts.push(`${pace} min/km`)
+    if (pace) parts.push(`${pace}\u00a0min/km`)
   }
   if (eff.fromSpeed) parts.push('energin räknas på din fart')
   return parts.join(' · ')
@@ -290,7 +290,7 @@ function PickStep({ query, onQuery, group, onGroup, onPick, onCustom, weightKg, 
         title={a.name}
         subtitle={`${intensityLabel(metIntensity(a.met))} · ${formatNumber(a.met, 1)} MET`}
         value={mindful ? undefined : <EnergyValue kcal={netKcal(a.met, weightKg, 30)} />}
-        valueSub={mindful ? undefined : 'per 30 min'}
+        valueSub={mindful ? undefined : 'per 30\u00a0min'}
         onClick={() => onPick(a)}
         chevron
       />
@@ -445,9 +445,9 @@ function EnergyBlock({
       </p>
       <p className="mt-1.5 text-[0.8125rem] leading-snug text-ink-2">
         {computedFrom
-          ? `Beräknat på ${formatNumber(computedFrom.weightKg, 1)} kg och ${formatNumber(computedFrom.met, 1)} MET, minus vilan.`
+          ? `Beräknat på ${formatNumber(computedFrom.weightKg, 1)}\u00a0kg och ${formatNumber(computedFrom.met, 1)} MET, minus vilan.`
           : 'Ditt eget värde används.'}
-        {!weightKnown && computedFrom && ' Vi räknar med 70 kg tills du loggar din vikt.'}
+        {!weightKnown && computedFrom && ' Vi räknar med 70\u00a0kg tills du loggar din vikt.'}
       </p>
 
       <Switch

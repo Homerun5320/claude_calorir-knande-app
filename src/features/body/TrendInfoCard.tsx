@@ -44,7 +44,7 @@ export function TrendInfoCard() {
     <Card tone="blabar" eyebrow="Bra att veta" title="Varför trendvikt?">
       <TrendArt />
       <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink">
-        Vikten kan svänga 1–2 kg från en dag till nästa – av vätska, salt, kolhydrater, mat i magen, träning och hormoner. Det
+        Vikten kan svänga 1–2{'\u00a0'}kg från en dag till nästa – av vätska, salt, kolhydrater, mat i magen, träning och hormoner. Det
         är inte fett som kommer och går.
       </p>
       <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">

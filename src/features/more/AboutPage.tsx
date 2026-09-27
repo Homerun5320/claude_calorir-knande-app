@@ -19,7 +19,7 @@ import {
   WifiOff,
   type LucideIcon,
 } from 'lucide-react'
-import { Badge, Button, Card, ListGroup, PageHeader, toneVars, type Tone } from '../../components/ui'
+import { Badge, Button, Card, ListGroup, PageHeader, cx, toneVars, type Tone } from '../../components/ui'
 import { LogoMark, Wordmark } from '../../components/layout/Logo'
 import { useProfileStore } from '../../stores/profileStore'
 import { SupportSheet } from './SupportSheet'
@@ -38,8 +38,8 @@ export const SOLUTIONS: readonly Solution[] = [
   {
     icon: BadgeCheck,
     tone: 'mossa',
-    problem: 'Crowdsourcade databaser med dubbletter och fel',
-    solution: 'Kurerade svenska livsmedel med värden från Livsmedelsverket. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt.',
+    problem: 'Användarinmatade databaser med dubbletter och fel',
+    solution: 'Granskade svenska livsmedel med värden från Livsmedelsverket. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt.',
   },
   {
     icon: CircleSlash,
@@ -57,7 +57,7 @@ export const SOLUTIONS: readonly Solution[] = [
     icon: Ruler,
     tone: 'hjortron',
     problem: 'Utländska mått och livsmedel',
-    solution: 'Knäckebröd, falukorv och ärtsoppa – i dl, msk, tsk och krm. ”2 dl havregryn” räknas om till rätt vikt med livsmedlets densitet.',
+    solution: 'Knäckebröd, falukorv och ärtsoppa – i dl, msk, tsk och krm. ”2\u00a0dl havregryn” räknas om till rätt vikt med livsmedlets densitet.',
   },
   {
     icon: TrendingUp,
@@ -93,7 +93,7 @@ export const SOLUTIONS: readonly Solution[] = [
     icon: ShieldCheck,
     tone: 'gran',
     problem: 'Integritet och spårning',
-    solution: 'Ingen server och inget konto. Din data stannar i telefonen (GDPR) och du kan exportera eller radera allt när som helst.',
+    solution: 'Ingen server och inget konto. Din data stannar på din enhet (GDPR) och du kan exportera eller radera allt när som helst.',
   },
   {
     icon: Leaf,
@@ -111,12 +111,12 @@ interface Source {
 }
 
 export const SOURCES: readonly Source[] = [
-  { name: 'Livsmedelsverkets livsmedelsdatabas', use: 'Namn och näringsvärden per 100 g', license: 'Öppna data', href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
+  { name: 'Livsmedelsverkets livsmedelsdatabas', use: 'Namn och näringsvärden per 100\u00a0g', license: 'Öppna data', href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
   { name: 'Nordiska näringsrekommendationer 2023 (NNR 2023)', use: 'Referensvärden för energi, makron, vitaminer och mineraler', href: 'https://www.norden.org/en/publication/nordic-nutrition-recommendations-2023' },
   { name: 'Livsmedelsverkets kostråd', use: 'Råd om frukt, grönt, fisk, kött, fullkorn och rörelse', href: 'https://www.livsmedelsverket.se/matvanor-halsa--miljo/kostrad/' },
   { name: 'Tallriksmodellen', use: 'Hur en balanserad måltid kan fördelas', href: 'https://www.livsmedelsverket.se/matvanor-halsa--miljo/kostrad/tallriksmodellen/' },
   { name: 'Open Food Facts', use: 'Streckkoder och förpackade produkter', license: 'ODbL', href: 'https://se.openfoodfacts.org/' },
-  { name: 'RISE Klimatdatabas för livsmedel', use: 'Ungefärliga klimatschabloner (kg CO₂e per kg)', href: 'https://www.ri.se/sv' },
+  { name: 'RISE Klimatdatabas för livsmedel', use: 'Ungefärliga klimatschabloner (kg\u00a0CO₂e per kg)', href: 'https://www.ri.se/sv' },
   { name: '2024 Adult Compendium of Physical Activities', use: 'MET-värden för träning och aktiviteter', href: 'https://pacompendium.com/adult-compendium/' },
 ]
 
@@ -161,7 +161,7 @@ export default function AboutPage() {
           </p>
           <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2">
             Lagom är en svensk kalori- och näringsdagbok byggd på svenska livsmedel, svenska mått och de nordiska näringsrekommendationerna. Den är gratis,
-            fungerar utan uppkoppling och all data stannar i din telefon.
+            fungerar utan uppkoppling och all data stannar på din enhet.
           </p>
           {!onboarded && (
             <Button to="/valkommen" className="mt-5">
@@ -181,7 +181,8 @@ export default function AboutPage() {
                 initial={reduce ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: reduce ? 0 : 0.05 + Math.min(i, 8) * 0.04, type: 'spring', stiffness: 300, damping: 32 }}
-                className="card flex gap-3.5 p-4"
+                // Udda antal kort: det sista spänner över båda kolumnerna i stället för att stå ensamt.
+                className={cx('card flex gap-3.5 p-4', i === SOLUTIONS.length - 1 && SOLUTIONS.length % 2 === 1 && 'sm:col-span-2')}
               >
                 <span style={toneVars(s.tone)} aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-(--tone-soft) text-(--tone)">
                   <s.icon className="size-5" strokeWidth={2.1} />
@@ -207,7 +208,7 @@ export default function AboutPage() {
         <Card eyebrow="Integritet" title="Din data är din">
           <p className="text-[0.9375rem] leading-relaxed text-ink-2">
             Lagom har ingen server, inga konton, ingen reklam och ingen spårning. Allt du loggar sparas lokalt i den här webbläsaren. Det enda som lämnar
-            telefonen är det du själv söker eller skannar hos Open Food Facts (sökordet eller streckkoden), och om du väljer att hämta Livsmedelsverkets
+            enheten är det du själv söker eller skannar hos Open Food Facts (sökordet eller streckkoden), och om du väljer att hämta Livsmedelsverkets
             databas. Du kan exportera eller radera allt under Inställningar → Data.
           </p>
           {onboarded && (

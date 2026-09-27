@@ -39,7 +39,7 @@ const TONE_BASE: Record<Exclude<Tone, 'neutral'>, AccentTone> = {
   bad: 'lingon',
 }
 
-/** Tonens huvudfärg som CSS-värde, t.ex. `var(--lg-lingon)`. */
+/** Tonens huvudfärg som CSS-värde, t.ex. `var(--lg-lingon)`. För ytor, staplar och ikoner. */
 export function toneColor(tone: Tone): string {
   return tone === 'neutral' ? 'var(--lg-ink-3)' : `var(--lg-${TONE_BASE[tone]})`
 }
@@ -50,18 +50,27 @@ export function toneSoftColor(tone: Tone): string {
 }
 
 /**
- * Textfärg med god kontrast mot tonens mjuka bakgrund: tonen blandad med bläck.
- * I ljust läge blir den mörkare, i mörkt läge ljusare – kontrasten ökar i båda.
+ * Tonen som textfärg: minst 4,5:1 mot alla ytor och tonens -soft i båda temana
+ * (`--lg-*-text` i index.css). Använd för tal och ord i tonfärg, t.ex. i `Stat`.
  */
-export function toneInkColor(tone: Tone): string {
-  return tone === 'neutral' ? 'var(--lg-ink-2)' : `color-mix(in oklab, ${toneColor(tone)} 72%, var(--lg-ink))`
+export function toneTextColor(tone: Tone): string {
+  return tone === 'neutral' ? 'var(--lg-ink-3)' : `var(--lg-${TONE_BASE[tone]}-text)`
 }
 
-/** CSS-variabler för en ton: `--tone`, `--tone-soft`, `--tone-ink`. Sprid in i `style`. */
+/**
+ * Textfärg med god kontrast mot tonens mjuka bakgrund: textvarianten blandad med bläck.
+ * I ljust läge blir den mörkare, i mörkt läge ljusare. Minst 6:1 mot -soft och alla ytor.
+ */
+export function toneInkColor(tone: Tone): string {
+  return tone === 'neutral' ? 'var(--lg-ink-2)' : `color-mix(in oklab, ${toneTextColor(tone)} 72%, var(--lg-ink))`
+}
+
+/** CSS-variabler för en ton: `--tone`, `--tone-soft`, `--tone-text`, `--tone-ink`. Sprid in i `style`. */
 export function toneVars(tone: Tone, style?: CSSProperties): CSSProperties {
   return {
     '--tone': toneColor(tone),
     '--tone-soft': toneSoftColor(tone),
+    '--tone-text': toneTextColor(tone),
     '--tone-ink': toneInkColor(tone),
     ...style,
   } as CSSProperties
@@ -88,7 +97,8 @@ export interface BadgeProps {
 
 const VARIANTS: Record<BadgeVariant, string> = {
   soft: 'bg-(--tone-soft) text-(--tone-ink)',
-  solid: 'bg-(--tone) text-bg',
+  // Textvarianten som bakgrund: ljus text klarar 4,5:1 även för hjortron och sol i ljust läge.
+  solid: 'bg-(--tone-text) text-bg',
   outline: 'bg-transparent text-(--tone-ink) ring-1 ring-inset ring-(--tone)/35',
 }
 

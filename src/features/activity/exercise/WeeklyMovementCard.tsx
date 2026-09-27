@@ -36,7 +36,7 @@ export const WeeklyMovementCard = memo(function WeeklyMovementCard({ date, today
           valueText={`${formatNumber(active)} av ${goal} minuter`}
         >
           <span className="display-num text-[2rem] font-semibold leading-none text-ink">{formatNumber(active)}</span>
-          <span className="mt-1 text-xs text-ink-3">av {goal} min</span>
+          <span className="mt-1 text-xs text-ink-3">av {goal}{'\u00a0'}min</span>
         </ProgressRing>
         <div className="min-w-0 flex-1">
           <p className="text-[0.9375rem] leading-snug text-ink">{movementMessage(active, m.totalMinutes)}</p>

@@ -42,6 +42,11 @@ export interface FoodDay {
   /** Sista dagen för perioder som varar flera dagar (t.ex. Prinsesstårtans vecka). */
   endDate?: ISODate
   name: string
+  /**
+   * Emoji som visar dagens mat eller tradition (🍰 för prinsesstårta, 🎿 för Vasaloppet). Finns
+   * ingen egen emoji väljs något som hör till dagen (🌲 för lingonen i barrskogen) – aldrig en
+   * symbol som kan läsas som en statusmarkering eller varning, som 🔴.
+   */
   emoji: string
   kind: FoodDayKind
   /** 2–3 varma meningar med en rolig fakta. */
@@ -239,7 +244,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
   {
     key: 'knackebrodets-dag',
     name: 'Knäckebrödets dag',
-    emoji: '🍞',
+    emoji: '🫓',
     kind: 'matdag',
     date: fixed(2, 19),
     description:
@@ -262,7 +267,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
   {
     key: 'vasaloppet',
     name: 'Vasaloppet',
-    emoji: '⛷️',
+    emoji: '🎿',
     kind: 'tradition',
     region: 'Dalarna',
     date: vasaloppet,
@@ -344,7 +349,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
   {
     key: 'chokladbollens-dag',
     name: 'Chokladbollens dag',
-    emoji: '🍫',
+    emoji: '🥥',
     kind: 'matdag',
     date: fixed(5, 11),
     description:
@@ -462,7 +467,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
   {
     key: 'lingonsasong',
     name: 'Lingonsäsong',
-    emoji: '🔴',
+    emoji: '🌲',
     kind: 'sasong',
     approximate: true,
     date: fixed(8, 25),
@@ -498,7 +503,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
   {
     key: 'prinsesstartans-vecka',
     name: 'Prinsesstårtans vecka',
-    emoji: '🎂',
+    emoji: '🍰',
     kind: 'matdag',
     date: (y) => princessCakeWeek(y).start,
     endDate: (y) => princessCakeWeek(y).end,

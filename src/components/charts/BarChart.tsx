@@ -18,6 +18,7 @@ import { formatNumber } from '../../lib/format'
 import {
   approxTextWidth,
   bandLayout,
+  decimalsForStep,
   formatTicks,
   linearScale,
   niceTicks,
@@ -143,7 +144,9 @@ export function BarChart({
 
   // --- Layout --------------------------------------------------------------
   const tickLabels = formatTicks(ticks)
-  const gutter = Math.max(30, Math.max(...tickLabels.map((l) => approxTextWidth(l))) + 14)
+  const targetText = target !== undefined && Number.isFinite(target) ? targetLabelFor(target, ticks) : undefined
+  // Axeletiketterna och mållinjens etikett ligger i högermarginalen – den får plats med båda.
+  const gutter = Math.max(30, Math.max(...[...tickLabels, targetText ?? ''].map((l) => approxTextWidth(l))) + 14)
   const left = MARGIN.left
   const right = Math.max(left + 40, width - gutter)
   const top = MARGIN.top
@@ -388,7 +391,7 @@ export function BarChart({
                 strokeLinecap="round"
               />
               <text x={right + 8} y={targetY} dy="0.32em" className="fill-ink-2 text-[11px] font-semibold tabular-nums">
-                {tickLabelFor(target!, ticks)}
+                {targetText}
               </text>
             </g>
           )}
@@ -570,7 +573,13 @@ function fmtMaybe(v: number | undefined, fmt: (v: number) => string): string {
   return v === undefined || !Number.isFinite(v) ? '–' : fmt(v)
 }
 
-/** Målvärdet formaterat med samma decimaler som axeln. */
-function tickLabelFor(value: number, ticks: readonly number[]): string {
-  return formatTicks([...ticks.slice(0, 2), value])[2] ?? formatNumber(value)
+/**
+ * Etikett för mållinjen: minst axelns decimaler, men med målets egen precision – en linje på
+ * 1,6 med heltalsaxel ska heta "1,6", inte "2". Stora tal avrundas som vanligt (2 000).
+ */
+export function targetLabelFor(value: number, ticks: readonly number[]): string {
+  const step = ticks.length > 1 ? Math.abs(ticks[1] - ticks[0]) : 1
+  const axis = decimalsForStep(step)
+  const own = Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2
+  return formatNumber(value, Math.max(axis, own))
 }

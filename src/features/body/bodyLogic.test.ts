@@ -73,12 +73,12 @@ describe('directionOf och trendWord', () => {
 })
 
 describe('goodDirection', () => {
-  it('följer målet men saknar önskad riktning vid graviditet och under 18', () => {
-    expect(goodDirection('ga_ner', 'ingen', 30)).toBe('down')
+  it('tonar aldrig viktnedgång grönt – bara en uppgång mot ett mål om att gå upp', () => {
+    expect(goodDirection('ga_ner', 'ingen', 30)).toBeUndefined()
     expect(goodDirection('ga_upp', 'ingen', 30)).toBe('up')
     expect(goodDirection('behalla', 'ingen', 30)).toBeUndefined()
-    expect(goodDirection('ga_ner', 'gravid', 30)).toBeUndefined()
-    expect(goodDirection('ga_ner', 'ingen', 16)).toBeUndefined()
+    expect(goodDirection('ga_upp', 'gravid', 30)).toBeUndefined()
+    expect(goodDirection('ga_upp', 'ingen', 16)).toBeUndefined()
   })
 })
 
@@ -443,7 +443,17 @@ describe('bodyOverview', () => {
     expect(o.progress).toBeLessThan(1)
     expect(o.startDate).toBe('2026-06-01')
     expect(o.daysSinceLast).toBe(2)
-    expect(o.good).toBe('down')
+    // Viktnedgång tonas aldrig grönt.
+    expect(o.good).toBeUndefined()
+  })
+
+  it('räknar 18-årsgränsen försiktigt och ger ingen önskad riktning när målet är nått', () => {
+    // Född 2008: 18 år enligt årtalet den 26 september 2026, men kan fortfarande vara 17.
+    const young = bodyOverview(linearWeights('2026-06-01', 100, 86, -0.05, 2), { ...profile, birthYear: 2008 }, '2026-09-09')
+    expect(young.status).toEqual({ kind: 'paused', reason: 'under18' })
+    const reached = bodyOverview(linearWeights('2026-06-01', 100, 86, -0.05, 2), { ...profile, goal: 'ga_upp', targetWeightKg: 70 }, '2026-09-09')
+    expect(reached.status.kind).toBe('reached')
+    expect(reached.good).toBeUndefined()
   })
 
   it('klarar sig utan vägningar och utan profil', () => {

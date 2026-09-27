@@ -3,8 +3,9 @@
  */
 import type { ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from 'lucide-react'
-import { cx } from '../../components/ui'
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Scale } from 'lucide-react'
+import { Button, cx, toast } from '../../components/ui'
+import { useProfileStore } from '../../stores/profileStore'
 import { directionOf, formatSignedKg } from './bodyLogic'
 
 /** Mjuk, återhållsam intoning av en sektion när sidan öppnas. */
@@ -60,5 +61,42 @@ export function ChangePill({
       {formatSignedKg(change, decimals, unit)}
       {suffix !== undefined && <span className="font-medium text-ink-3">{suffix}</span>}
     </span>
+  )
+}
+
+/**
+ * Byt målet till "behålla vikten" med ett tryck (med Ångra). Används när viktmålet är pausat
+ * (låg vikt) eller målvikten är nådd – under Vikt och på Idag.
+ */
+export function SwitchToMaintainButton({ className = 'mt-3' }: { className?: string }) {
+  const onClick = () => {
+    const { profile, updateProfile } = useProfileStore.getState()
+    if (!profile || profile.goal === 'behalla') return
+    const previous = profile.goal
+    updateProfile({ goal: 'behalla' })
+    toast('Målet är nu att behålla vikten', {
+      tone: 'success',
+      action: { label: 'Ångra', onClick: () => useProfileStore.getState().updateProfile({ goal: previous }) },
+    })
+  }
+  return (
+    <Button variant="soft" size="sm" iconLeft={Scale} onClick={onClick} className={className}>
+      Byt till att behålla vikten
+    </Button>
+  )
+}
+
+/** Länkar till stöd vid oro kring mat, vikt och kropp. */
+export function SupportLinks() {
+  return (
+    <>
+      <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+        1177
+      </a>{' '}
+      och{' '}
+      <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+        Frisk &amp; Fri
+      </a>
+    </>
   )
 }

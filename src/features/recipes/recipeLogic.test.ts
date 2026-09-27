@@ -126,6 +126,10 @@ describe('mängder i text', () => {
     expect(portionAmountText('1 hel gurka', 0.5)).toBe('½ hel gurka')
     expect(portionAmountText('1 hel gurka', 2)).toBe('2 × hel gurka')
     expect(portionAmountText('1 burgare', 2)).toBe('2 × burgare')
+    // Samma pluralformer som dagboken (PORTION_PLURALS i lib/units).
+    expect(portionAmountText('1 smörgås (ca 62 g)', 2)).toBe('2 smörgåsar')
+    expect(portionAmountText('1 bulle', 3)).toBe('3 bullar')
+    expect(portionAmountText('1 skål (ca 30 g)', 2)).toBe('2 skålar')
     expect(portionAmountText('på en toast (15 g)', 2)).toBe('2 × på en toast (15 g)')
   })
 
@@ -256,7 +260,7 @@ describe('tillagad vikt, klimat och tallrik', () => {
     expect(info.final).toBe(240)
     expect(info.perServing).toBe(60)
     expect(info.changePct).toBeCloseTo(-20)
-    expect(cookedWeightText(info)).toContain('20 %')
+    expect(cookedWeightText(info)).toContain('20\u00a0%')
     expect(cookedWeightText(weightInfo(recipe()))).toContain('råvikten')
   })
 
@@ -264,13 +268,13 @@ describe('tillagad vikt, klimat och tallrik', () => {
     // Mjöl (spannmål) kan suga upp vätska.
     const withFlour = weightInfo(recipe({ cookedWeightG: 450 }))
     expect(withFlour.absorbs).toBe(true)
-    expect(cookedWeightText(withFlour)).toContain('50 %')
+    expect(cookedWeightText(withFlour)).toContain('50\u00a0%')
     expect(cookedWeightText(withFlour)).toMatch(/suger upp vatten/)
     // Grönsakssoppa utan torra råvaror: vätskan står troligen inte bland ingredienserna.
     const soup = weightInfo(recipe({ cookedWeightG: 300, ingredients: [{ id: 'l', food: lok, amount: 2, unit: 'portion:st', grams: 200 }] }))
     expect(soup.absorbs).toBeUndefined()
     const text = cookedWeightText(soup)
-    expect(text).toContain('50 %')
+    expect(text).toContain('50\u00a0%')
     expect(text).not.toMatch(/ris|pasta|gryn/)
     expect(text).toMatch(/vatten eller buljong/)
   })

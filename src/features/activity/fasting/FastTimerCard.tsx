@@ -59,7 +59,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
     if (!current.done) {
       const ok = await confirmDialog({
         title: 'Avsluta fastan nu?',
-        message: `Du har fastat ${formatFastDuration(current.elapsedMs)} av ${active.targetHours} timmar. Det är helt okej att avsluta tidigare – lyssna på kroppen.`,
+        message: `Du har fastat ${formatFastDuration(current.elapsedMs)} av ${active.targetHours}\u00a0timmar. Det är helt okej att avsluta tidigare – lyssna på kroppen.`,
         confirmLabel: 'Avsluta och spara',
         cancelLabel: 'Fortsätt fasta',
         icon: Hourglass,
@@ -113,7 +113,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
           thickness={16}
           tone={p.done ? 'mossa' : 'blabar'}
           aria-label="Fastans förlopp"
-          valueText={`${formatFastDuration(p.elapsedMs)} av ${active.targetHours} timmar`}
+          valueText={`${formatFastDuration(p.elapsedMs)} av ${active.targetHours}\u00a0timmar`}
         >
           <span className="eyebrow">{p.done ? 'Fastat' : 'Har fastat'}</span>
           <span className="display-num mt-1.5 text-[2.75rem] font-semibold leading-none text-ink">{formatHms(p.elapsedMs)}</span>
@@ -128,7 +128,10 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
             <dd className="mt-0.5 text-[0.9375rem] font-semibold text-ink first-letter:uppercase">{dayAndTime(active.start, today)}</dd>
           </div>
           <div className="rounded-2xl bg-surface-2 px-3.5 py-2.5">
-            <dt className="eyebrow">Mål ({active.targetHours} h)</dt>
+            <dt className="eyebrow">
+              {/* Rubriken skrivs med versaler – enheten ska ändå stå som "h", inte "H". */}
+              Mål <span className="normal-case">({active.targetHours}{'\u00a0'}h)</span>
+            </dt>
             <dd className="mt-0.5 text-[0.9375rem] font-semibold text-ink first-letter:uppercase">{dayAndTime(p.goalAt, today)}</dd>
           </div>
         </dl>

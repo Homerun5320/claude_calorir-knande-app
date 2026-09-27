@@ -27,7 +27,6 @@ import type { PlateVariant } from '../../lib/plate'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
-import { exerciseAddBack } from '../diary/diaryLogic'
 import { ContextCards } from './ContextCards'
 import { DayRingCard } from './DayRingCard'
 import { EveningCheckIn } from './EveningCheckIn'
@@ -39,7 +38,7 @@ import { TipCard } from './TipCard'
 import { TodayHeader } from './TodayHeader'
 import { WaterCard } from './WaterCard'
 import { WeekCard } from './WeekCard'
-import { WeightCard } from './WeightCard'
+import { GoalCareCard, WeightCard } from './WeightCard'
 import { WelcomeCard } from './WelcomeCard'
 import { isDiaryEmpty } from './todayLogic'
 
@@ -77,13 +76,12 @@ export default function TodayPage() {
   const hydrated = useHydrated()
   const today = useToday()
   const wide = useMediaQuery('(min-width: 768px)')
-  const { targets, energy } = useTargets(today)
+  const { targets, energy, exerciseAddBack } = useTargets(today)
+  const goalPause = energy?.goalPause ?? null
 
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const unit = useProfileStore((s) => s.settings.energyUnit)
   const meals = useProfileStore((s) => s.settings.meals)
-  const addBackSetting = useProfileStore((s) => s.settings.exerciseAddBackPct)
-  const kcalOverridden = useProfileStore((s) => s.settings.targetOverrides.kcal !== undefined)
   const glassMl = useProfileStore((s) => s.settings.waterGlassMl)
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
   const activityLevel = useProfileStore((s) => s.profile?.activityLevel)
@@ -92,7 +90,7 @@ export default function TodayPage() {
   if (!hydrated) return <TodaySkeleton />
 
   // Med adaptiv förbrukning ingår träningen redan i dagsmålet – då läggs den inte till igen.
-  const { pct: addBackPct, includedInTarget: exerciseInTarget } = exerciseAddBack(addBackSetting, energy?.tdeeSource, kcalOverridden)
+  const { pct: addBackPct, includedInTarget: exerciseInTarget } = exerciseAddBack
 
   const plateVariant: PlateVariant = activityLevel === 'aktiv' || activityLevel === 'mycket_aktiv' ? 'aktiv' : 'vanlig'
 
@@ -113,8 +111,9 @@ export default function TodayPage() {
     water: <WaterCard today={today} targetMl={targets.waterMl} glassMl={glassMl} />,
     plate: <PlateCard today={today} variant={plateVariant} />,
     week: firstDay ? null : <WeekCard today={today} targetKcal={targets.kcal} addBackPct={addBackPct} mindful={mindful} unit={unit} />,
-    // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt).
-    weight: mindful ? null : <WeightCard today={today} />,
+    // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt). Är viktmålet
+    // pausat för att vikten redan är låg visas ändå en varsam notis, utan siffror.
+    weight: mindful ? goalPause === 'lowBmi' ? <GoalCareCard today={today} /> : null : <WeightCard today={today} goalPause={goalPause} />,
     kostrad: firstDay ? null : <KostradCard today={today} mindful={mindful} />,
     tip: <TipCard today={today} />,
     context: (

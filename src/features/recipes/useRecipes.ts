@@ -1,28 +1,23 @@
 /**
  * Hookar för receptsidorna: egna recept ur butiken och de inbyggda svenska klassikerna, som
- * löses upp mot den inbyggda livsmedelsdatabasen när den har lästs in.
+ * löses upp mot den inbyggda livsmedelsdatabasen när den har lästs in (`BuiltinCatalog.recipes`,
+ * samma recept som registret använder för 'recipe:klassiker-*').
  */
 import { useMemo } from 'react'
 import type { Recipe } from '../../types'
 import { useFoodStore } from '../../stores/foodStore'
 import { useBuiltinCatalog } from '../../hooks/useFood'
 import { findRecipe, type BuiltinCatalog } from '../../lib/foodRepo'
-import { builtinRecipeInfo, isBuiltinRecipeId, loadBuiltinRecipes } from '../../data/recipes'
+import { builtinRecipeInfo, isBuiltinRecipeId } from '../../data/recipes'
 import { DEFAULT_SERVING_NOUN, recipeFavoriteId, type ServingNoun } from './recipeLogic'
 
 const EMPTY: Recipe[] = []
 
-/**
- * Klassikerna löses upp en gång: Lagoms livsmedel är samma objekt i båda versionerna av katalogen
- * (före och efter att Livsmedelsverkets data slagits ihop), så resultatet kan återanvändas.
- */
-let resolved: Recipe[] | null = null
-
+/** Klassikerna ur katalogen – samma lista i båda stegen av inläsningen (stabil referens). */
 function builtinFrom(catalog: BuiltinCatalog | null): Recipe[] | null {
   if (!catalog) return null
-  if (catalog.error || catalog.foods.length === 0) return EMPTY
-  if (!resolved) resolved = loadBuiltinRecipes(catalog.foods)
-  return resolved
+  if (catalog.error || catalog.recipes.length === 0) return EMPTY
+  return catalog.recipes
 }
 
 export interface BuiltinRecipesResult {

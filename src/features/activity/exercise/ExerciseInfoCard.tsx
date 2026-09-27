@@ -1,6 +1,8 @@
 /**
  * "Så räknar Lagom träning" – förklarar nettoprincipen och varför bara en del av träningen
  * läggs till budgeten. Andelen går att ändra direkt här (inställningen `exerciseAddBackPct`).
+ * Med adaptiv förbrukning ingår träningen redan i dagsmålet (`exerciseAddBack` i lib/diary) –
+ * då läggs inget till, och kortet säger det.
  */
 import { memo } from 'react'
 import { BookOpen, Gauge, Scale } from 'lucide-react'
@@ -11,21 +13,30 @@ import { useProfileStore } from '../../../stores/profileStore'
 import { addBackKcal } from '../activityLogic'
 
 const MARKS = [
-  { value: 0, label: '0 %' },
+  { value: 0, label: '0\u00a0%' },
   { value: 50, label: 'Lagom' },
-  { value: 100, label: '100 %' },
+  { value: 100, label: '100\u00a0%' },
 ]
 
-export const ExerciseInfoCard = memo(function ExerciseInfoCard({ dayKcal, mindful }: { dayKcal: number; mindful: boolean }) {
+export interface ExerciseInfoCardProps {
+  dayKcal: number
+  mindful: boolean
+  /** Adaptiv förbrukning: den vanliga träningen ingår redan i dagsmålet och läggs inte till. */
+  inTarget?: boolean
+}
+
+export const ExerciseInfoCard = memo(function ExerciseInfoCard({ dayKcal, mindful, inTarget = false }: ExerciseInfoCardProps) {
   const pct = useProfileStore((s) => s.settings.exerciseAddBackPct)
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const unit = useEnergyUnit()
 
-  const example = mindful
-    ? 'Lägre andel ger en försiktigare budget. 50 % är ett bra förval för de flesta.'
-    : dayKcal > 0
-      ? `Idag: ${formatEnergy(dayKcal, unit)} träning ger ${formatEnergy(addBackKcal(dayKcal, pct), unit)} extra i dagens budget.`
-      : `Exempel: ett pass på ${formatEnergy(300, unit)} ger ${formatEnergy(addBackKcal(300, pct), unit)} extra i dagens budget.`
+  const example = inTarget
+    ? 'Just nu följer dagsmålet din uppmätta förbrukning, där din vanliga träning redan ingår – därför läggs inget till budgeten. Andelen här gäller när målet räknas från formeln.'
+    : mindful
+      ? 'Lägre andel ger en försiktigare budget. 50\u00a0% är ett bra förval för de flesta.'
+      : dayKcal > 0
+        ? `Idag: ${formatEnergy(dayKcal, unit)} träning ger ${formatEnergy(addBackKcal(dayKcal, pct), unit)} extra i dagens budget.`
+        : `Exempel: ett pass på ${formatEnergy(300, unit)} ger ${formatEnergy(addBackKcal(300, pct), unit)} extra i dagens budget.`
 
   const points = [
     {

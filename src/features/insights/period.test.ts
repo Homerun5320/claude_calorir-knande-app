@@ -1,4 +1,4 @@
-import { formatDateRange, makePeriod, parsePeriodKind, parseWeekOffset, previousPeriod } from './period'
+import { formatDateRange, makePeriod, parsePeriodKind, parseWeekOffset, previousPeriod, withCountedDays } from './period'
 
 const TODAY = '2026-09-26' // lördag, vecka 39
 
@@ -75,5 +75,41 @@ describe('adressparametrar', () => {
     const w = writeParams(new URLSearchParams('flik=naring&vecka=-2'), { kind: '90' })
     expect(w.toString()).toBe('flik=naring&period=90')
     expect(writeParams(w, { tab: 'oversikt', kind: 'vecka', offset: -1 }).toString()).toBe('vecka=-1')
+  })
+})
+
+describe('withCountedDays – idag räknas först när dagen är klar', () => {
+  const week = makePeriod('vecka', 0, TODAY) // måndag 21 – lördag 26 september
+  const logged = new Set(['2026-09-22', '2026-09-26'])
+  const has = (d: string) => logged.has(d)
+
+  it('tar bort dagens ofullständiga dag när andra dagar har registreringar', () => {
+    const p = withCountedDays(week, TODAY, false, has)
+    expect(p.elapsed).not.toContain(TODAY)
+    expect(p.elapsed).toHaveLength(5)
+    expect(p.todayExcluded).toBe(true)
+    // Datumen för diagrammet är orörda.
+    expect(p.dates).toEqual(week.dates)
+    // Jämförelsen med förra veckan gäller lika många dagar.
+    expect(previousPeriod(p, TODAY).elapsed).toHaveLength(5)
+  })
+
+  it('räknar med idag när dagen är markerad som klar', () => {
+    expect(withCountedDays(week, TODAY, true, has)).toBe(week)
+  })
+
+  it('räknar med idag när den är den enda dagen med registreringar', () => {
+    expect(withCountedDays(week, TODAY, false, (d) => d === TODAY)).toBe(week)
+  })
+
+  it('rör inte perioder som inte innehåller idag', () => {
+    const last = makePeriod('vecka', -1, TODAY)
+    expect(withCountedDays(last, TODAY, false, () => true)).toBe(last)
+  })
+
+  it('gäller även 30 dagar', () => {
+    const p = withCountedDays(makePeriod('30', 0, TODAY), TODAY, false, has)
+    expect(p.elapsed).toHaveLength(29)
+    expect(p.elapsed.at(-1)).toBe('2026-09-25')
   })
 })

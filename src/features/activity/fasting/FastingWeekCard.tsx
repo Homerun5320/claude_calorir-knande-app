@@ -59,7 +59,7 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
       </ol>
       {w.count > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-ink-3">
-          Längsta fastan i veckan: {formatNumber(w.longestMs / HOUR_MS, 1)} h. Fastor räknas till dagen de avslutades.
+          Längsta fastan i veckan: {formatNumber(w.longestMs / HOUR_MS, 1)}{'\u00a0'}h. Fastor räknas till dagen de avslutades.
         </p>
       )}
     </Card>

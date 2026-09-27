@@ -5,15 +5,15 @@
  * I medvetet läge visas bara riktningen i ord – siffrorna kan visas på begäran.
  */
 import { useMemo } from 'react'
-import { Eye, Flag, PencilLine, Scale, Sprout } from 'lucide-react'
-import { Button, Card, ProgressBar, toast } from '../../components/ui'
+import { Eye, Flag, PencilLine, Sprout } from 'lucide-react'
+import { Button, Card, ProgressBar } from '../../components/ui'
 import { Sparkline } from '../../components/charts'
 import { relativeDayLabel } from '../../lib/dates'
+import { goalPauseNote } from '../../lib/energy'
 import { formatKg, formatNumber } from '../../lib/format'
-import { useProfileStore } from '../../stores/profileStore'
 import type { GoalType } from '../../types'
-import { formatSignedKg, goalDateLabel, OLDER_ADULT_AGE, trendWord, type BodyOverview } from './bodyLogic'
-import { ChangePill } from './parts'
+import { formatSignedKg, goalDateLabel, trendWord, type BodyOverview } from './bodyLogic'
+import { ChangePill, SupportLinks, SwitchToMaintainButton } from './parts'
 
 const PROFILE_LINK = '/installningar/profil'
 
@@ -159,7 +159,7 @@ function GoalSection({ overview, goal, targetKg, today }: WeightHeroProps) {
           />
           <div className="mt-1.5 flex justify-between text-xs tabular-nums text-ink-3">
             <span>Start {formatKg(startKg)}</span>
-            <span className="font-semibold text-ink-2">{pct} %</span>
+            <span className="font-semibold text-ink-2">{pct}{'\u00a0'}%</span>
             <span>Mål {formatKg(targetKg)}</span>
           </div>
         </div>
@@ -168,55 +168,27 @@ function GoalSection({ overview, goal, targetKg, today }: WeightHeroProps) {
         <Sprout aria-hidden className="mt-0.5 size-4 shrink-0 text-mossa" strokeWidth={2.2} />
         <span>{goalSentence(overview, targetKg, today)}</span>
       </p>
-      {status.kind === 'reached' && <SwitchToMaintain />}
+      {status.kind === 'reached' && <SwitchToMaintainButton />}
     </div>
   )
 }
 
 /**
- * Trendvikten ligger under hälsosamt BMI medan målet är att gå ner: ingen mer viktnedgång,
- * ett tryck för att byta mål och en väg till stöd. Inga siffror – visas även i medvetet läge.
+ * Trendvikten ligger under hälsosamt BMI medan målet är att gå ner: dagsmålet räknas redan för
+ * att behålla vikten (samma text som i målen och på Idag), ett tryck för att byta mål och en väg
+ * till stöd. Inga siffror – visas även i medvetet läge.
  */
 function LowWeightNote({ age }: { age: number | undefined }) {
-  const forWhom = age !== undefined && age >= OLDER_ADULT_AGE ? 'för din längd och ålder' : 'för din längd'
   return (
     <>
       <p className="mt-1 text-sm leading-relaxed text-ink-2">
-        Din vikt ligger nu under det som räknas som hälsosamt {forWhom}, så Lagom rekommenderar inte att gå ner mer. Byt gärna
-        mål till att behålla vikten – då räknas dagsmålet utan underskott.
+        {goalPauseNote('lowBmi', age)} Byt gärna mål till att behålla vikten, så blir det tydligt även i din profil.
       </p>
-      <SwitchToMaintain />
+      <SwitchToMaintainButton />
       <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">
-        Känns tankar kring mat, vikt eller kropp tunga? Du är inte ensam – stöd finns hos{' '}
-        <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
-          1177
-        </a>{' '}
-        och{' '}
-        <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
-          Frisk &amp; Fri
-        </a>
-        .
+        Känns tankar kring mat, vikt eller kropp tunga? Du är inte ensam – stöd finns hos <SupportLinks />.
       </p>
     </>
-  )
-}
-
-/** Byt målet till "behålla vikten" med ett tryck (med Ångra). Dagsmålet räknas då utan under-/överskott. */
-function SwitchToMaintain() {
-  const onClick = () => {
-    const { profile, updateProfile } = useProfileStore.getState()
-    if (!profile || profile.goal === 'behalla') return
-    const previous = profile.goal
-    updateProfile({ goal: 'behalla' })
-    toast('Målet är nu att behålla vikten', {
-      tone: 'success',
-      action: { label: 'Ångra', onClick: () => useProfileStore.getState().updateProfile({ goal: previous }) },
-    })
-  }
-  return (
-    <Button variant="soft" size="sm" iconLeft={Scale} onClick={onClick} className="mt-3">
-      Byt till att behålla vikten
-    </Button>
   )
 }
 
@@ -229,7 +201,7 @@ function goalSentence(overview: BodyOverview, targetKg: number, today: string): 
         ? `Du är nästan framme – med nuvarande takt når du ${target} inom en vecka.`
         : `Med nuvarande takt når du ${target} omkring ${goalDateLabel(status.date, today)}.`
     case 'reached':
-      return `Du har nått din målvikt ${target} – starkt jobbat! Byt gärna mål till att behålla vikten, så räknas dagsmålet utan underskott eller överskott.`
+      return `Du har nått din målvikt ${target}. Dagsmålet räknas nu för att behålla vikten – byt gärna mål här, så blir det tydligt även i din profil.`
     case 'early':
       return 'Väg dig några gånger till under ett par veckor, så kan Lagom uppskatta när du når målet.'
     case 'steady':

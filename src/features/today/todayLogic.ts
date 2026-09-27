@@ -8,7 +8,8 @@
 import type { DayMeta, DiaryEntry, ExerciseEntry, GoalType, ISODate, LifeStage, MealId, WeightEntry } from '../../types'
 import { addDays, capitalize, dateRange, diffDays, formatDayLong, formatDayShort, greeting, isoWeek, startOfWeek } from '../../lib/dates'
 import { dailyBudget, entryKcal, totals } from '../../lib/diary'
-import { bmi, weightTrend } from '../../lib/energy'
+import { bmi, minHealthyBmi, weightTrend } from '../../lib/energy'
+import { goodDirection } from '../body/bodyLogic'
 import { formatEnergy, formatNumber, plural } from '../../lib/format'
 import type { KostradId, KostradResult, KostradStatus } from '../../lib/kostrad'
 import { standardDrinks } from '../../lib/nutrients'
@@ -185,9 +186,9 @@ export function weekChartSummary(
 ): string {
   const title = 'Energi per dag de senaste sju dagarna'
   const logged = series.filter((d): d is WeekDay & { kcal: number } => d.kcal !== undefined)
-  if (logged.length === 0) return `${title}: inget registrerat den här veckan ännu.`
+  if (logged.length === 0) return `${title}: inget loggat den här veckan ännu.`
   const e = (kcal: number) => formatEnergy(kcal, unit)
-  const parts = [`${title}. ${formatNumber(logged.length)} av ${plural(series.length, 'dag', 'dagar')} har registreringar.`]
+  const parts = [`${title}. Loggat ${formatNumber(logged.length)} av ${plural(series.length, 'dag', 'dagar')}.`]
   const average = weekAverage(series, today, todayComplete)
   if (average !== undefined) {
     // Samma regel som weekAverage: idag räknas inte förrän dagen är klar (om det finns andra dagar).
@@ -281,15 +282,18 @@ export function pickKostradHighlights(results: readonly KostradResult[], count =
   return picked.sort((a, b) => rank(a) - rank(b))
 }
 
-/** "320 av 500 g/dag", "150 av 300 g i veckan", "2 av 4 dagar", "0 av 1 dag", "45 av 150 min i veckan". */
+/**
+ * "320 av 500 g/dag", "150 av 300 g/vecka", "2 av 4 dagar", "0 av 1 dag", "45 av 150 min/vecka" – samma
+ * form för dags- och veckoråd, och hårt mellanslag mellan tal och enhet.
+ */
 export function kostradProgressText(r: KostradResult): string {
   const n = (v: number) => formatNumber(v)
   if (r.unit === 'dagar') return `${n(r.actual)} av ${plural(r.target, 'dag', 'dagar')}`
   if (r.weeklyTarget !== undefined) {
     const unit = r.unit === 'min' ? 'min' : 'g'
-    return `${n(r.actual)} av ${n(r.weeklyTarget)} ${unit} i veckan`
+    return `${n(r.actual)} av ${n(r.weeklyTarget)}\u00a0${unit}/vecka`
   }
-  return `${n(r.actual)} av ${n(r.target)} ${r.unit}`
+  return `${n(r.actual)} av ${n(r.target)}\u00a0${r.unit}`
 }
 
 // ---------------------------------------------------------------------------
@@ -404,20 +408,23 @@ export type WeightCaution = 'snabb' | 'lag'
  * Ska Idag säga något varsamt om vikten i stället för att tona nedgången grönt?
  * - 'snabb': trenden går ned mer än 1 % av kroppsvikten per vecka.
  * - 'lag': BMI under 18,5 (under 22 från 70 år) för vuxna – inte under graviditet eller amning.
+ *
+ * `age` är åldern enligt födelseåret (70-årsgränsen), `youngestAge` den yngsta möjliga
+ * (18-årsgränsen, se lib/energy). Saknas `youngestAge` används `age`.
  */
 export function weightCaution(
   snap: Pick<WeightSnapshot, 'trendKg' | 'weekChangeKg' | 'direction'>,
-  profile: { heightCm?: number; age?: number; lifeStage?: LifeStage },
+  profile: { heightCm?: number; age?: number; youngestAge?: number; lifeStage?: LifeStage },
 ): WeightCaution | null {
   const { heightCm, age, lifeStage } = profile
+  const young = profile.youngestAge ?? age
   if (snap.direction === 'down' && snap.weekChangeKg !== undefined && -snap.weekChangeKg > snap.trendKg * MAX_WEEKLY_LOSS_SHARE) {
     return 'snabb'
   }
-  const adult = age === undefined || age >= 18
+  const adult = young === undefined || young >= 18
   const pregnantOrNursing = lifeStage !== undefined && lifeStage !== 'ingen'
   if (heightCm && heightCm > 0 && adult && !pregnantOrNursing) {
-    const floor = age !== undefined && age >= 70 ? 22 : 18.5
-    if (bmi(snap.trendKg, heightCm) < floor) return 'lag'
+    if (bmi(snap.trendKg, heightCm) < minHealthyBmi(age)) return 'lag'
   }
   return null
 }
@@ -489,16 +496,15 @@ export function mainMealEntries(entries: readonly DiaryEntry[]): DiaryEntry[] {
 }
 
 /**
- * Åt vilket håll en viktförändring räknas som "i linje med målet" (visas mjukt grönt).
- * Ingen riktning alls vid graviditet, amning eller under 18 år – där ska viktnedgång aldrig
- * uppmuntras – och inte heller när målet är att behålla vikten.
+ * Åt vilket håll en viktförändring tonas mjukt grön – samma regel som under Vikt
+ * (`goodDirection`). Viktnedgång tonas aldrig grönt: Lagom berömmer inte att gå ner i vikt.
+ * En uppgång mot ett mål om att gå upp får en mild grön ton, utom vid graviditet, amning och
+ * under 18 år (`age` = yngsta möjliga ålder).
  */
 export function weightGoodDirection(
   goal: GoalType | undefined,
   lifeStage: LifeStage | undefined,
   age: number | undefined,
-): 'up' | 'down' | undefined {
-  if (!goal || goal === 'behalla') return undefined
-  if ((lifeStage && lifeStage !== 'ingen') || (age !== undefined && age < 18)) return undefined
-  return goal === 'ga_ner' ? 'down' : 'up'
+): 'up' | undefined {
+  return goodDirection(goal, lifeStage, age)
 }

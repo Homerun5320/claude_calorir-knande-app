@@ -3,8 +3,11 @@
  *
  * - Pilar för föregående/nästa dag, veckonummer ("v. 39") och relativa namn (Idag, Igår, Imorgon).
  * - Svep åt vänster/höger (pekarhändelser) byter dag. `useSwipe` kan även användas på hela sidan.
- * - Tryck på datumet öppnar systemets datumväljare för att hoppa direkt.
+ * - Tryck på datumet öppnar systemets datumväljare för att hoppa direkt. Hela mittfältet är
+ *   tryckyta (minst 44 px hög); "Till idag" har en egen yta på 44 px höjd.
  * - Framtida dagar tillåts för planering, som standard upp till 7 dagar fram.
+ * - Veckodagen skrivs med stor bokstav först i en rad och med liten mitt i en mening
+ *   ("Föregående dag, tisdag 23 september").
  */
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
@@ -12,6 +15,7 @@ import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import type { ISODate } from '../../types'
 import {
   addDays,
+  capitalize,
   diffDays,
   formatDayLong,
   formatDayShort,
@@ -21,6 +25,11 @@ import {
   WEEKDAYS,
   weekdayIndex,
 } from '../../lib/dates'
+
+/** Mitt i en mening: "Tisdag 23 september" → "tisdag 23 september". */
+function midSentence(s: string): string {
+  return s.charAt(0).toLocaleLowerCase('sv-SE') + s.slice(1)
+}
 
 // ---------------------------------------------------------------------------
 // Svep
@@ -151,12 +160,15 @@ export function DateNavigator({
   const label = relativeDayLabel(date, today)
   const relative = Math.abs(diff) <= 1
   const week = `v. ${isoWeek(date)}`
+  // Raden under rubriken börjar med veckodagen – då med stor bokstav. Igår/imorgon visas utan
+  // veckonummer (det står i knappens etikett) så att "Till idag" får plats även i 320 px.
   const subtitle = relative
-    ? `${WEEKDAYS[weekdayIndex(date)]} ${formatDayShort(date)}${showWeek ? ` · ${week}` : ''}`
+    ? `${capitalize(WEEKDAYS[weekdayIndex(date)])} ${formatDayShort(date)}${showWeek && diff === 0 ? ` · ${week}` : ''}`
     : showWeek
       ? week
       : ''
   const fullLabel = formatDayLong(date, today)
+  const dateLabel = `${label === fullLabel ? fullLabel : `${label}, ${midSentence(fullLabel)}`}${showWeek ? `, vecka ${isoWeek(date)}` : ''}. Välj datum`
   const offset = reduced ? 0 : 28
 
   return (
@@ -170,13 +182,14 @@ export function DateNavigator({
         type="button"
         onClick={() => go(-1)}
         disabled={!canPrev}
-        aria-label={`Föregående dag, ${formatDayLong(addDays(date, -1), today)}`}
+        aria-label={`Föregående dag, ${midSentence(formatDayLong(addDays(date, -1), today))}`}
         className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 active:scale-95 disabled:opacity-30"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
 
-      <div className="relative min-w-0 flex-1 overflow-hidden text-center">
+      {/* overflow-x-clip: sidledes klipps animationen, men tryckytorna får sticka ut på höjden. */}
+      <div className="relative min-w-0 flex-1 overflow-x-clip text-center">
         <AnimatePresence mode="popLayout" initial={false} custom={direction}>
           <motion.div
             key={date}
@@ -187,11 +200,12 @@ export function DateNavigator({
             transition={{ type: 'spring', stiffness: 420, damping: 34 }}
             className="flex flex-col items-center"
           >
+            {/* Knappens ::after täcker hela mittfältet (rubrik + raden under), minst 44 px högt. */}
             <button
               type="button"
               onClick={openPicker}
-              aria-label={`${label === fullLabel ? fullLabel : `${label}, ${fullLabel}`}, ${week}. Välj datum`}
-              className="group flex max-w-full items-center gap-1.5 rounded-xl px-2 font-display text-xl font-semibold leading-tight text-ink transition-colors hover:bg-surface-2"
+              aria-label={dateLabel}
+              className="group flex max-w-full items-center gap-1.5 rounded-xl px-2 font-display text-xl font-semibold leading-tight text-ink transition-colors after:absolute after:inset-x-0 after:-inset-y-1 after:rounded-2xl after:content-[''] hover:bg-surface-2"
             >
               <span className="truncate">{label}</span>
               <CalendarDays
@@ -199,14 +213,19 @@ export function DateNavigator({
                 aria-hidden="true"
               />
             </button>
-            <div className="mt-0.5 flex h-5 items-center justify-center gap-2 text-xs text-ink-3 tabular-nums">
-              {subtitle && <span aria-hidden="true">{subtitle}</span>}
+            <div className="mt-0.5 flex h-5 min-w-0 max-w-full items-center justify-center gap-2 text-xs text-ink-3 tabular-nums">
+              {subtitle && (
+                <span aria-hidden="true" className="truncate">
+                  {subtitle}
+                </span>
+              )}
               {diff !== 0 && (
+                // Egen tryckyta på 44 px höjd, mest nedåt – så att den inte täcker rubriken ovanför.
                 <button
                   type="button"
                   onClick={() => onChange(today)}
                   aria-label="Gå till idag"
-                  className="relative rounded-full bg-gran-soft px-2 py-0.5 text-[11px] font-semibold text-gran transition-transform after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] active:scale-95"
+                  className="relative z-10 shrink-0 rounded-full bg-gran-soft px-2 py-0.5 text-[11px] font-semibold text-gran transition-transform after:absolute after:-inset-x-2 after:-top-1 after:-bottom-5 after:content-[''] active:scale-95"
                 >
                   Till idag
                 </button>
@@ -236,7 +255,7 @@ export function DateNavigator({
         type="button"
         onClick={() => go(1)}
         disabled={!canNext}
-        aria-label={`Nästa dag, ${formatDayLong(addDays(date, 1), today)}`}
+        aria-label={`Nästa dag, ${midSentence(formatDayLong(addDays(date, 1), today))}`}
         className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 active:scale-95 disabled:opacity-30"
       >
         <ChevronRight className="h-5 w-5" />

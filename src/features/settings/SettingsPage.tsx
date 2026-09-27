@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Card, ListGroup, ListRow, PageHeader, type Tone } from '../../components/ui'
+import { useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
 import { useTargets } from '../../hooks/useTargets'
 import { ageFromBirthYear, relativeDayLabel, toISODate } from '../../lib/dates'
 import { MACRO_PRESETS } from '../../lib/energy'
@@ -54,7 +55,7 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   maltider: { title: 'Måltider', description: 'Namn och vilka måltider som visas.', icon: UtensilsCrossed, tone: 'hjortron', component: MealsSection },
   utseende: { title: 'Utseende och visning', description: 'Tema, energienhet och medvetet läge.', icon: Palette, tone: 'vinbar', component: AppearanceSection },
   traning: { title: 'Träning och vatten', description: 'Träningskalorier och glasstorlek.', icon: Dumbbell, tone: 'fjall', component: TrainingSection },
-  data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger i din telefon.', icon: HardDrive, tone: 'gran', component: DataSection },
+  data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger på din enhet.', icon: HardDrive, tone: 'gran', component: DataSection },
   databas: { title: 'Livsmedelsdatabas', description: 'Vad som finns inbyggt, källor och import.', icon: Database, tone: 'mossa', component: DatabaseSection },
 }
 
@@ -88,7 +89,7 @@ export function profileSummary(profile: Profile | null, today: string): string {
   const parts = [
     profile.sex === 'kvinna' ? 'Kvinna' : 'Man',
     `${ageFromBirthYear(profile.birthYear, today)} år`,
-    `${formatNumber(profile.heightCm)} cm`,
+    `${formatNumber(profile.heightCm)}\u00a0cm`,
     ACTIVITY_LEVELS[profile.activityLevel].label.toLocaleLowerCase('sv-SE'),
   ]
   return parts.join(' · ')
@@ -102,8 +103,9 @@ export function appearanceSummary(s: Pick<Settings, 'theme' | 'energyUnit' | 'mi
 function SettingsIndex() {
   const profile = useProfileStore((s) => s.profile)
   const settings = useProfileStore((s) => s.settings)
-  const { targets } = useTargets()
+  const { targets, exerciseAddBack } = useTargets()
   const lastBackup = useLastBackup()
+  const memoryOnly = useMemoryOnlyStorage()
   const [support, setSupport] = useState(false)
   const today = toISODate(new Date())
 
@@ -114,7 +116,12 @@ function SettingsIndex() {
     ? `Mål i bakgrunden · ${preset}`
     : `${formatEnergy(targets.kcal, settings.energyUnit)} per dag · ${preset}${custom > 0 ? ` · ${custom} egna` : ''}`
   const enabledMeals = settings.meals.filter((m) => m.enabled).length
-  const backupSub = lastBackup === null ? 'Ingen säkerhetskopia ännu' : `Säkerhetskopierad ${relativeDayLabel(toISODate(new Date(lastBackup)), today).toLocaleLowerCase('sv-SE')}`
+  const backupSub = memoryOnly
+    ? 'Sparas inte på enheten just nu – spara en säkerhetskopia'
+    : lastBackup === null
+      ? 'Ingen säkerhetskopia ännu'
+      : `Säkerhetskopierad ${relativeDayLabel(toISODate(new Date(lastBackup)), today).toLocaleLowerCase('sv-SE')}`
+  const trainingSub = exerciseAddBack.includedInTarget ? 'Träningen ingår i det adaptiva målet' : `${formatNumber(settings.exerciseAddBackPct)}\u00a0% av träningen räknas`
 
   const row = (id: SectionId, subtitle: string) => (
     <ListRow key={id} to={`/installningar/${id}`} leading={SECTIONS[id].icon} leadingTone={SECTIONS[id].tone} title={SECTIONS[id].title} subtitle={subtitle} />
@@ -124,7 +131,7 @@ function SettingsIndex() {
 
   return (
     <div className="px-4 pb-8">
-      <PageHeader title="Inställningar" subtitle="Gör Lagom till din. Allt sparas bara i din telefon." />
+      <PageHeader title="Inställningar" subtitle="Gör Lagom till din. Allt sparas bara på din enhet." />
 
       <div className="flex flex-col gap-6">
         <Card to="/installningar/profil" padding="md" aria-label="Öppna profilen">
@@ -153,10 +160,10 @@ function SettingsIndex() {
 
         <ListGroup title="Appen">
           {row('utseende', appearanceSummary(settings))}
-          {row('traning', `${formatNumber(settings.exerciseAddBackPct)} % av träningen räknas · glas ${formatNumber(settings.waterGlassMl / 100, 1)} dl`)}
+          {row('traning', `${trainingSub} · glas ${formatNumber(settings.waterGlassMl / 100, 1)}\u00a0dl`)}
         </ListGroup>
 
-        <ListGroup title="Data och integritet" footer="Lagom har ingen server och inga konton. Din data lämnar aldrig telefonen om du inte själv exporterar den.">
+        <ListGroup title="Data och integritet" footer="Lagom har ingen server och inga konton. Din data lämnar aldrig din enhet om du inte själv exporterar den.">
           {row('data', backupSub)}
           {row('databas', 'Källor, import och sparade livsmedel')}
         </ListGroup>

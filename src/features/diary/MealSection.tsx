@@ -12,7 +12,7 @@ import { IconButton, cx } from '../../components/ui'
 import { CategoryIcon, EnergyValue, FoodRow, MealIcon, entryToRow } from '../../components/domain'
 import { formatEnergy, formatNumber } from '../../lib/format'
 import type { DiaryEntry, ISODate, MealConfig, MealId, Nutrients } from '../../types'
-import { addFoodHref, entryAmountText, entryName, mealAriaSummary, mealMacroDots, shortFoodName } from './diaryLogic'
+import { addFoodHref, entryAmountText, entryName, entrySubtitle, mealAriaSummary, mealMacroDots, shortFoodName } from './diaryLogic'
 import { addFoodLinkId } from './focus'
 
 export interface MealSectionProps {
@@ -56,7 +56,7 @@ export const MealSection = memo(function MealSection({
           </h3>
           <p className="sr-only">{mealAriaSummary(meal.name, entries, energyUnit, mindful)}</p>
           {empty ? (
-            <p className="mt-0.5 text-xs text-ink-3">Inget registrerat ännu</p>
+            <p className="mt-0.5 text-xs text-ink-3">Inget loggat ännu</p>
           ) : mindful ? (
             <p className="mt-0.5 truncate text-xs text-ink-3" aria-hidden>
               {names}
@@ -70,7 +70,7 @@ export const MealSection = memo(function MealSection({
                 <span
                   key={d.key}
                   className="inline-flex items-center gap-[2px] whitespace-nowrap text-[11px]"
-                  title={`${d.label} ${formatNumber(d.grams)} g`}
+                  title={`${d.label} ${formatNumber(d.grams)}\u00a0g`}
                 >
                   <span className={cx('size-1.5 rounded-full', DOT_CLASS[d.key])} />
                   <span>
@@ -127,11 +127,6 @@ export const MealSection = memo(function MealSection({
   )
 })
 
-/** Tid och anteckning läggs till efter mängden: "2 dl (76 g) · 07:45". */
-function subtitleFor(entry: DiaryEntry, base: string | undefined): string {
-  return [base, entry.time, entry.note ? 'anteckning' : undefined].filter(Boolean).join(' · ')
-}
-
 const EntryRow = memo(function EntryRow({
   entry,
   onOpen,
@@ -142,7 +137,7 @@ const EntryRow = memo(function EntryRow({
   energyUnit: 'kcal' | 'kJ'
 }) {
   const row = entryToRow(entry)
-  const amountText = subtitleFor(entry, row.amountText)
+  const amountText = entrySubtitle(entry, row.amountText)
   const energy = row.kcal !== undefined ? formatEnergy(row.kcal, energyUnit) : 'energi okänd'
   return (
     <FoodRow {...row} amountText={amountText} onClick={() => onOpen(entry)} actionLabel={`Ändra ${row.name}, ${amountText}, ${energy}`} />
@@ -152,7 +147,7 @@ const EntryRow = memo(function EntryRow({
 /** Rad utan energisiffror för medvetet läge: vad och hur mycket. */
 const MindfulEntryRow = memo(function MindfulEntryRow({ entry, onOpen }: { entry: DiaryEntry; onOpen: (e: DiaryEntry) => void }) {
   const name = entryName(entry)
-  const amount = subtitleFor(entry, entry.kind === 'food' ? entryAmountText(entry) : undefined)
+  const amount = entrySubtitle(entry, entry.kind === 'food' ? entryAmountText(entry) : undefined)
   const category = entry.kind === 'food' ? entry.food.category : (entry.category ?? 'ovrigt')
   return (
     <button

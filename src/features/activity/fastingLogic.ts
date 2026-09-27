@@ -162,7 +162,7 @@ export function startParts(startMs: number, now: Date = new Date()): { day: Star
 export function validateStart(startMs: number | null, nowMs: number): string | null {
   if (startMs === null || !Number.isFinite(startMs)) return 'Ange ett klockslag, t.ex. 20:00.'
   if (startMs > nowMs + MINUTE_MS) return 'Starttiden kan inte ligga i framtiden.'
-  if (nowMs - startMs > MAX_FAST_HOURS * HOUR_MS) return `Starttiden kan ligga högst ${MAX_FAST_HOURS} timmar bakåt.`
+  if (nowMs - startMs > MAX_FAST_HOURS * HOUR_MS) return `Starttiden kan ligga högst ${MAX_FAST_HOURS}\u00a0timmar bakåt.`
   return null
 }
 

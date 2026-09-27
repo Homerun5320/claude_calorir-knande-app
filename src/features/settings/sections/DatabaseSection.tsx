@@ -56,8 +56,8 @@ function BuiltinCard() {
             <li className="flex gap-3">
               <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-mossa" />
               <span>
-                <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} kurerade svenska livsmedel</strong> – namn och näringsvärden per
-                100 g från Livsmedelsverket, kvalitetskontrollerade och med svenska portioner och mått.
+                <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} granskade svenska livsmedel</strong> – namn och näringsvärden per
+                100{'\u00a0'}g från Livsmedelsverket, kvalitetskontrollerade och med svenska portioner och mått.
               </span>
             </li>
             {counts.lmv > 0 && (
@@ -137,7 +137,7 @@ function LmvImportCard() {
   return (
     <Card eyebrow="Livsmedelsverket" title="Hämta hela databasen">
       <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        Livsmedelsverkets öppna databas har cirka 2 600 livsmedel med ett 50-tal näringsämnen. Importen tar några minuter och sparas i telefonen, så att
+        Livsmedelsverkets öppna databas har cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen. Importen tar några minuter och sparas på din enhet, så att
         allt går att söka även offline.
       </p>
 
@@ -147,7 +147,7 @@ function LmvImportCard() {
             value={p.phase === 'lista' ? 0 : p.done + p.failed}
             max={Math.max(1, p.total)}
             label={phaseText}
-            valueLabel={p.phase === 'naringsvarden' && p.total > 0 ? `${formatNumber(((p.done + p.failed) / p.total) * 100)} %` : undefined}
+            valueLabel={p.phase === 'naringsvarden' && p.total > 0 ? `${formatNumber(((p.done + p.failed) / p.total) * 100)}\u00a0%` : undefined}
             size="sm"
             animate={false}
           />
@@ -195,14 +195,14 @@ function LmvImportCard() {
         )}
       </div>
       <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">
-        Stanna på sidan medan importen pågår. Anropen görs direkt från din telefon till Livsmedelsverket – inget passerar någon annan server.
+        Stanna på sidan medan importen pågår. Anropen görs direkt från din enhet till Livsmedelsverket – inget passerar någon annan server.
       </p>
     </Card>
   )
 }
 
 const SOURCES: ReadonlyArray<{ title: string; text: string; href: string; badge?: string }> = [
-  { title: 'Livsmedelsverkets livsmedelsdatabas', text: LMV_ATTRIBUTION.replace('Källa: ', 'Namn och näringsvärden per 100 g – '), href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
+  { title: 'Livsmedelsverkets livsmedelsdatabas', text: LMV_ATTRIBUTION.replace('Källa: ', 'Namn och näringsvärden per 100\u00a0g – '), href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
   { title: 'Open Food Facts', text: 'Streckkoder och produkter, öppna data under ODbL. Användarbidrag – jämför gärna med förpackningen.', href: 'https://se.openfoodfacts.org/', badge: 'ODbL' },
   { title: 'Nordiska näringsrekommendationer 2023', text: 'Referensvärden för vitaminer, mineraler och makron.', href: 'https://www.norden.org/en/publication/nordic-nutrition-recommendations-2023' },
 ]

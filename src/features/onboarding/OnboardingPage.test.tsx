@@ -71,7 +71,7 @@ describe('OnboardingPage', () => {
     expect(screen.getByRole('heading', { name: /kaloriräknaren som gör det lätt att äta lagom/ })).toBeInTheDocument()
     expect(screen.getByText('Svenska livsmedel och mått')).toBeInTheDocument()
     expect(screen.getByText('Gratis, utan reklam')).toBeInTheDocument()
-    expect(screen.getByText('Din data stannar i din telefon')).toBeInTheDocument()
+    expect(screen.getByText('Din data stannar på din enhet')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
     await screen.findByRole('heading', { name: 'Vad vill du med Lagom?' })
@@ -92,7 +92,7 @@ describe('OnboardingPage', () => {
 
     await screen.findByRole('heading', { name: 'I vilken takt?' })
     // 72,5 kg → 0,75 kg/vecka är mer än 1 % och går inte att välja
-    expect(screen.getByRole('radio', { name: /0,75 kg per vecka/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /0,75\skg per vecka/ })).toBeDisabled()
     fireEvent.change(screen.getByRole('spinbutton', { name: /Målvikt/ }), { target: { value: '68' } })
     expect(await screen.findByText(/om ca/)).toBeInTheDocument()
     next()

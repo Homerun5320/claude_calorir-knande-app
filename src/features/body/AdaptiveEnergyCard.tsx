@@ -11,14 +11,12 @@ import { EnergyValue, useEnergyFormatter } from '../../components/domain'
 import { adaptiveIntake, computeEnergy, estimateAdaptiveTdee, KCAL_PER_KG } from '../../lib/energy'
 import { plural } from '../../lib/format'
 import { useTargets } from '../../hooks/useTargets'
-import { ageFromBirthYear } from '../../lib/dates'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import {
   ADAPTIVE_REQUIREMENTS as REQ,
-  adaptiveBlockReason,
   adaptiveNeeds,
   adaptiveProgress,
   compareTdeeText,
@@ -38,7 +36,8 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
   const entries = useDiaryStore((s) => s.entries)
   const days = useDiaryStore((s) => s.days)
   const weights = useBodyStore((s) => s.weights)
-  const { targets } = useTargets(today)
+  // `adaptiveBlocked`: graviditet, amning eller under 18 år – samma regel som dagsmålen.
+  const { targets, adaptiveBlocked: blocked, exerciseAddBack } = useTargets(today)
   const fmtEnergy = useEnergyFormatter()
 
   // Samma urval som useTargets: räcker de klarmarkerade dagarna används bara de.
@@ -56,8 +55,8 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
     toast(on ? 'Dina mål följer nu din verkliga förbrukning' : 'Målen räknas från formeln igen', { tone: 'success' })
   }
 
-  // Graviditet, amning och uppväxt: viktförändringen är naturlig och får inte styra målet.
-  const blocked = profile ? adaptiveBlockReason(profile.lifeStage, ageFromBirthYear(profile.birthYear, today)) : null
+  // Graviditet, amning och uppväxt: viktförändringen är naturlig och får inte styra målet –
+  // dagsmålen (useTargets) räknas då från formeln även om inställningen är på.
   if (blocked) {
     return (
       <Card eyebrow="Adaptiv energi" title="Din verkliga förbrukning" action={<Activity aria-hidden className="size-5 text-gran" strokeWidth={2.2} />}>
@@ -105,12 +104,13 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
       </>
     )
   } else if (hideNumbers) {
-    status = 'På: dina dagsmål följer nu din verkliga förbrukning.'
+    status = 'På: dina dagsmål följer nu din verkliga förbrukning. Din vanliga träning ingår då redan i målet och läggs inte till en gång till.'
   } else {
     status = (
       <>
         På: ditt dagsmål är nu <EnergyValue kcal={targets.kcal} unitClassName="" className="font-semibold text-ink-2" /> och följer
         din verkliga förbrukning. Dagar under {minDay} räknas inte med.
+        {exerciseAddBack.includedInTarget && ' Din vanliga träning ingår då redan i målet, så den läggs inte till budgeten en gång till.'}
       </>
     )
   }
@@ -169,7 +169,7 @@ export function AdaptiveEnergyCard({ today, hideNumbers }: { today: ISODate; hid
             <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">
               Uträknat från ditt snittintag (<EnergyValue kcal={estimate.avgIntake} unitClassName="" />
               /dag) och trendviktens förändring ({formatSignedKg(estimate.weeklyChangeKg, 2)}/vecka) de senaste fyra
-              veckorna. 1 kg kroppsvikt motsvarar ungefär <EnergyValue kcal={KCAL_PER_KG} unitClassName="" />.
+              veckorna. 1{'\u00a0'}kg kroppsvikt motsvarar ungefär <EnergyValue kcal={KCAL_PER_KG} unitClassName="" />.
             </p>
           )}
         </div>

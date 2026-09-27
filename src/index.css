@@ -72,6 +72,24 @@
   --color-warn: var(--lg-hjortron);
   --color-bad: var(--lg-lingon);
 
+  /*
+   * Text i tonfärg (text-lingon, text-carbs …) använder tonens textvariant, som har minst 4,5:1
+   * mot bg, surface, surface-2, surface-3 och tonens -soft i båda temana (WCAG 1.4.3).
+   * Ytor, staplar och prickar (bg-, fill-, stroke-) behåller grundtonen.
+   * text-sol lämnas orörd: den används bara för logotypens punkt och dekorativa ikoner.
+   */
+  --text-color-lingon: var(--lg-lingon-text);
+  --text-color-hjortron: var(--lg-hjortron-text);
+  --text-color-mossa: var(--lg-mossa-text);
+  --text-color-fjall: var(--lg-fjall-text);
+  --text-color-protein: var(--lg-lingon-text);
+  --text-color-carbs: var(--lg-hjortron-text);
+  --text-color-fiber: var(--lg-mossa-text);
+  --text-color-water: var(--lg-fjall-text);
+  --text-color-good: var(--lg-mossa-text);
+  --text-color-warn: var(--lg-hjortron-text);
+  --text-color-bad: var(--lg-lingon-text);
+
   --radius-card: 1.5rem;
   --radius-pill: 999px;
 
@@ -113,6 +131,16 @@
   --lg-sol: #e6a91a;
   --lg-sol-soft: #fcf0cc;
 
+  /* Textvarianter (se --text-color-* ovan): minst 4,6:1 mot alla ytor och tonens -soft. */
+  --lg-gran-text: var(--lg-gran);
+  --lg-lingon-text: #b52c34;
+  --lg-hjortron-text: #954e00;
+  --lg-blabar-text: var(--lg-blabar);
+  --lg-mossa-text: #3f6c2b;
+  --lg-vinbar-text: var(--lg-vinbar);
+  --lg-fjall-text: #1d678c;
+  --lg-sol-text: #885600;
+
   --lg-inverse: #16201c;
   --lg-on-inverse: #f6f3ec;
   --lg-inverse-accent: #e6a91a; /* 8,0:1 mot inverse */
@@ -152,6 +180,16 @@
   --lg-fjall-soft: #132d3a;
   --lg-sol: #f5cf6b;
   --lg-sol-soft: #3a3116;
+
+  /* I mörkt läge klarar grundtonerna redan minst 4,9:1 som text. */
+  --lg-gran-text: var(--lg-gran);
+  --lg-lingon-text: var(--lg-lingon);
+  --lg-hjortron-text: var(--lg-hjortron);
+  --lg-blabar-text: var(--lg-blabar);
+  --lg-mossa-text: var(--lg-mossa);
+  --lg-vinbar-text: var(--lg-vinbar);
+  --lg-fjall-text: var(--lg-fjall);
+  --lg-sol-text: var(--lg-sol);
 
   --lg-inverse: #eeebe3;
   --lg-on-inverse: #0b1210;

@@ -123,21 +123,14 @@ describe('foodKostrad', () => {
     expect(foodKostrad(override)).toEqual({ fruktGront: 50 })
   })
 
-  it('flyttar baljväxtandelen i äldre kostrådsdata från frukt och grönt till baljväxter', () => {
-    const pea = food('Ärtsoppa med fläsk', 'fardigratt', { kcal: 90 }, { kostrad: { fruktGront: 48, rottKott: 10 } })
-    expect(foodKostrad(pea)).toEqual({ baljvaxter: 48, rottKott: 10 })
-    const dal = food('Dal (indisk linsgryta)', 'fardigratt', { kcal: 120 }, { kostrad: { fruktGront: 69 } })
-    expect(foodKostrad(dal)).toEqual({ baljvaxter: 69 })
-    // Blandade rätter: ungefär hälften är baljväxter, resten grönsaker.
-    const chili = food('Bönchili (vegetarisk chili)', 'fardigratt', { kcal: 100 }, { kostrad: { fruktGront: 94 } })
-    expect(foodKostrad(chili)).toEqual({ baljvaxter: 47, fruktGront: 47 })
-    const plate = food('Falafeltallrik med bulgur, hummus och sallad', 'fardigratt', { kcal: 150 }, { kostrad: { fruktGront: 45 } })
-    expect(foodKostrad(plate)).toEqual({ baljvaxter: 23, fruktGront: 22 })
-    // Gröna ärtor och egna baljväxtvärden lämnas orörda.
+  it('använder kostrådsdatan som den är – baljväxtandelen står i datan', () => {
+    const pea = food('Ärtsoppa med fläsk', 'fardigratt', { kcal: 90 }, { kostrad: { fruktGront: 4, baljvaxter: 44, rottKott: 10 } })
+    expect(foodKostrad(pea)).toEqual({ fruktGront: 4, baljvaxter: 44, rottKott: 10 })
+    // Ett eget recept med namnet "Linssoppa" men utan baljväxter bland ingredienserna gissas inte om.
+    const soup = food('Linssoppa', 'fardigratt', { kcal: 60 }, { kostrad: { fruktGront: 40 } })
+    expect(foodKostrad(soup)).toEqual({ fruktGront: 40 })
     const wallenbergare = food('Wallenbergare med potatismos, gröna ärtor och lingon', 'fardigratt', { kcal: 150 }, { kostrad: { fruktGront: 13 } })
     expect(foodKostrad(wallenbergare)).toEqual({ fruktGront: 13 })
-    const explicit = food('Ärtsoppa, vegetarisk', 'fardigratt', { kcal: 80 }, { kostrad: { fruktGront: 10, baljvaxter: 40 } })
-    expect(foodKostrad(explicit)).toEqual({ fruktGront: 10, baljvaxter: 40 })
   })
 
   it('returnerar en kopia som inte påverkar schablonen', () => {

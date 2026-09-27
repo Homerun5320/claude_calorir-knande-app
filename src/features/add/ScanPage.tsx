@@ -316,7 +316,7 @@ export default function ScanPage() {
           <CameraFallback reason={cam.reason} onRetry={() => setAttempt((a) => a + 1)} onSubmit={submitManual} inputRef={manualInput} busy={busy} />
         ) : (
           <p className="mt-[calc(min(80vw,24rem)/1.55_+_3rem)] rounded-full bg-surface/60 px-4 py-2 text-sm text-ink backdrop-blur-md" aria-live="polite">
-            {busy ? 'Streckkod hittad – letar efter produkten …' : cam.kind === 'scanning' ? 'Håll streckkoden inom ramen' : 'Startar kameran …'}
+            {busy ? 'Streckkod hittad – letar efter produkten\u00a0…' : cam.kind === 'scanning' ? 'Håll streckkoden inom ramen' : 'Startar kameran …'}
           </p>
         )}
       </div>

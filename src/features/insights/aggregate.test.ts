@@ -4,6 +4,7 @@ import {
   climateDays,
   consistency,
   countLoggedDays,
+  lowIntakeAverage,
   coverageSummary,
   coverageText,
   macroKcal,
@@ -244,5 +245,24 @@ describe('vikt', () => {
     expect(w.change).toBeLessThan(0)
     expect(weightWindow([], '2026-09-01', '2026-09-26').points).toEqual([])
     expect(weightWindow(weights, '2026-09-19', '2026-09-26').change).toBeUndefined()
+  })
+})
+
+describe('lowIntakeAverage', () => {
+  const day = (date: string, kcal: number | undefined) => ({ date, logged: kcal !== undefined, entryCount: kcal === undefined ? 0 : 1, totals: {}, kcal, budget: 2000, exerciseKcal: 0 })
+  const days = [day('2026-09-21', 900), day('2026-09-22', 1000), day('2026-09-23', 1100), day('2026-09-24', 600), day('2026-09-25', undefined)]
+  const complete = new Set(['2026-09-21', '2026-09-22', '2026-09-23'])
+
+  it('ger snittet när minst tre klara dagar ligger under golvet', () => {
+    expect(lowIntakeAverage(days, (d) => complete.has(d), 1200)).toBe(1000)
+  })
+
+  it('räknar bara klara dagar – ofullständigt loggade dagar ger ingen notis', () => {
+    expect(lowIntakeAverage(days, () => false, 1200)).toBeUndefined()
+    expect(lowIntakeAverage(days, (d) => d === '2026-09-24' || d === '2026-09-21', 1200)).toBeUndefined()
+  })
+
+  it('säger inget när snittet ligger över golvet', () => {
+    expect(lowIntakeAverage(days, (d) => complete.has(d), 900)).toBeUndefined()
   })
 })

@@ -216,14 +216,14 @@ describe('veckan', () => {
   it('läser upp samma snitt som visas under diagrammet', () => {
     const s = weekSeries(dates, entries, ex, 2000, 50)
     const text = weekChartSummary(s, '2026-09-26', false, 2000).replace(/\u00a0/g, ' ')
-    expect(text).toContain('2 av 3 dagar har registreringar')
+    expect(text).toContain('Loggat 2 av 3 dagar.')
     // Idag (400 kcal, inte klar) räknas inte – samma snitt som weekAverage.
     expect(text).toContain('Snitt 1 800 kcal per dag, utom idag som inte är klar än.')
     expect(text).toContain('Högst 1 800 kcal (24 sep)')
     expect(text).toContain('Mål 2 000 kcal.')
     const complete = weekChartSummary(s, '2026-09-26', true, 2000).replace(/\u00a0/g, ' ')
     expect(complete).toContain('Snitt 1 100 kcal per dag.')
-    expect(weekChartSummary(weekSeries(dates, {}, {}, 2000, 0), '2026-09-26', false, 2000)).toMatch(/inget registrerat/)
+    expect(weekChartSummary(weekSeries(dates, {}, {}, 2000, 0), '2026-09-26', false, 2000)).toMatch(/inget loggat/)
     expect(weekChartSummary(s, '2026-09-26', false, 2000, 'kJ')).toContain('kJ')
   })
 })
@@ -260,15 +260,15 @@ describe('kostråd i veckan', () => {
   })
 
   it('beskriver framsteg i läsbar form', () => {
-    expect(kostradProgressText(kostrad('frukt_gront', 'nastan', { actual: 320.4, target: 500 }))).toBe('320 av 500 g/dag')
+    expect(kostradProgressText(kostrad('frukt_gront', 'nastan', { actual: 320.4, target: 500 }))).toBe('320 av 500\u00a0g/dag')
     expect(kostradProgressText(kostrad('fisk', 'nastan', { unit: 'g', actual: 150, target: 128.6, weeklyTarget: 300 }))).toBe(
-      '150 av 300 g i veckan',
+      '150 av 300\u00a0g/vecka',
     )
     expect(kostradProgressText(kostrad('baljvaxter', 'nastan', { unit: 'dagar', actual: 2, target: 4 }))).toBe('2 av 4 dagar')
     expect(kostradProgressText(kostrad('baljvaxter', 'langt_kvar', { unit: 'dagar', actual: 0, target: 1 }))).toBe('0 av 1 dag')
     expect(kostradProgressText(kostrad('baljvaxter', 'bra', { unit: 'dagar', actual: 1, target: 1 }))).toBe('1 av 1 dag')
     expect(kostradProgressText(kostrad('rorelse', 'nastan', { unit: 'min', actual: 45, target: 64, weeklyTarget: 150 }))).toBe(
-      '45 av 150 min i veckan',
+      '45 av 150\u00a0min/vecka',
     )
   })
 
@@ -378,9 +378,11 @@ describe('vikt', () => {
     expect(stable?.direction).toBe('flat')
   })
 
-  it('uppmuntrar aldrig viktnedgång vid graviditet, amning eller under 18 år', () => {
-    expect(weightGoodDirection('ga_ner', 'ingen', 35)).toBe('down')
+  it('tonar aldrig viktnedgång grönt – och ingen riktning alls vid graviditet, amning eller under 18 år', () => {
+    expect(weightGoodDirection('ga_ner', 'ingen', 35)).toBeUndefined()
     expect(weightGoodDirection('ga_upp', 'ingen', 35)).toBe('up')
+    expect(weightGoodDirection('ga_upp', 'gravid', 30)).toBeUndefined()
+    expect(weightGoodDirection('ga_upp', 'ingen', 17)).toBeUndefined()
     expect(weightGoodDirection('behalla', 'ingen', 35)).toBeUndefined()
     expect(weightGoodDirection('ga_ner', 'gravid', 30)).toBeUndefined()
     expect(weightGoodDirection('ga_ner', 'ammar', 30)).toBeUndefined()
@@ -403,6 +405,9 @@ describe('vikt', () => {
     expect(weightCaution({ trendKg: 60, direction: 'flat' }, adult)).toBeNull()
     // BMI-gränsen gäller inte under 18 år eller vid graviditet – men för snabb nedgång gör det.
     expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, age: 16 })).toBeNull()
+    // 18 enligt årtalet men kanske 17 (yngsta möjliga ålder) räknas försiktigt som under 18.
+    expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, age: 18, youngestAge: 17 })).toBeNull()
+    expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, age: 19, youngestAge: 18 })).toBe('lag')
     expect(weightCaution({ trendKg: 50, direction: 'flat' }, { ...adult, lifeStage: 'gravid' })).toBeNull()
     expect(weightCaution({ trendKg: 70, weekChangeKg: -1, direction: 'down' }, { ...adult, lifeStage: 'ammar' })).toBe('snabb')
     // Utan längd: bara takten bedöms.

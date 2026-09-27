@@ -74,6 +74,15 @@ describe('foodCo2e', () => {
     expect(foodCo2e(food('Okänd rätt', 'fardigratt'))).toBe(2.5)
   })
 
+  it('faller tillbaka på "Övrigt" för en okänd kategori', () => {
+    const old = food('Gammal produkt', 'finns-inte-langre' as unknown as FoodCategory)
+    expect(foodClimateFactor(old)).toEqual(CATEGORY_CO2E.ovrigt)
+    expect(foodCo2e({ ...old, category: 'constructor' as unknown as FoodCategory })).toBe(CATEGORY_CO2E.ovrigt.kgPerKg)
+    expect(entryCo2e({ id: 'e1', kind: 'food', food: old, amount: 100, unit: 'g', grams: 1000, date: '2026-09-20', meal: 'lunch', createdAt: 0 })).toBe(
+      CATEGORY_CO2E.ovrigt.kgPerKg,
+    )
+  })
+
   it('förfinar rött kött utifrån namnet', () => {
     expect(foodCo2e(notfars)).toBe(28)
     expect(foodCo2e(food('Entrecôte', 'rott_kott'))).toBe(28)

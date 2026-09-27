@@ -1,17 +1,22 @@
 /**
  * Gemensamt dataunderlag för Insikters flikar. Väljer stabila referenser ur butikerna (aldrig nya
  * objekt i selektorer) och härleder allt med useMemo.
+ *
+ * Snitten räknas bara på förflutna dagar – och dagens (ofta ofullständiga) registrering bara när
+ * dagen är markerad som klar (`withCountedDays`, samma regel som veckokortet på Idag). `period`
+ * i datan är därför perioden med de dagar som räknas.
  */
 import { useMemo } from 'react'
 import type { DayMeta, DiaryEntry, DietType, ExerciseEntry, ISODate, LifeStage, MealConfig, Sex, Targets } from '../../types'
 import { useTargets } from '../../hooks/useTargets'
 import { ageFromBirthYear } from '../../lib/dates'
+import { MIN_KCAL } from '../../lib/energy'
 import { periodAverages, referenceIntakes, type PeriodAverages, type ReferenceMap } from '../../lib/nnr'
 import type { PlateVariant } from '../../lib/plate'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
-import { buildDayStats, periodEntries, summarizeDays, type DayStat, type DaysSummary } from './aggregate'
-import type { Period } from './period'
+import { buildDayStats, lowIntakeAverage, periodEntries, summarizeDays, type DayStat, type DaysSummary } from './aggregate'
+import { withCountedDays, type Period } from './period'
 
 export interface RefProfile {
   sex: Sex
@@ -23,18 +28,24 @@ export interface RefProfile {
 
 export interface InsightsData {
   today: ISODate
+  /**
+   * Perioden med de dagar som räknas: `elapsed` saknar idag tills dagen är markerad som klar
+   * (då är `todayExcluded` true).
+   */
   period: Period
+  /** Sista dagen som räknas i snitten (idag, eller igår när idag inte är klar än). */
+  countedEnd: ISODate
   entriesByDate: Record<ISODate, DiaryEntry[]>
   exerciseByDate: Record<ISODate, ExerciseEntry[]>
   metaByDate: Record<ISODate, DayMeta>
-  /** En post per dag i hela perioden (även framtida dagar i innevarande vecka). */
+  /** En post per dag i hela perioden (även idag och framtida dagar i innevarande vecka). */
   chartDays: DayStat[]
-  /** Förflutna dagar. */
+  /** Dagarna som räknas i snitten (förflutna, idag bara när den är klar). */
   days: DayStat[]
   summary: DaysSummary
   /** Snitt per loggad dag och täckningsgrad. */
   avg: PeriodAverages
-  /** Alla poster i perioden. */
+  /** Alla poster under de dagar som räknas. */
   entries: DiaryEntry[]
   targets: Targets
   refs: ReferenceMap
@@ -43,10 +54,17 @@ export interface InsightsData {
   unit: 'kcal' | 'kJ'
   meals: MealConfig[]
   plateVariant: PlateVariant
+  /** Andel av träningen som läggs till budgeten – 0 när den redan ingår i ett adaptivt dagsmål. */
   addBackPct: number
+  /** Adaptiv förbrukning: träningen ingår redan i dagsmålet. */
+  exerciseInTarget: boolean
+  /** Energigolvet (1 200/1 500 kcal) som notisen om lågt intag jämför med. */
+  floorKcal: number
+  /** Snittintag de klara dagarna när det ligger under golvet (minst tre dagar), annars undefined. */
+  lowIntakeKcal?: number
 }
 
-export function useInsights(period: Period, today: ISODate): InsightsData {
+export function useInsights(basePeriod: Period, today: ISODate): InsightsData {
   const entriesByDate = useDiaryStore((s) => s.entries)
   const exerciseByDate = useDiaryStore((s) => s.exercise)
   const metaByDate = useDiaryStore((s) => s.days)
@@ -54,27 +72,45 @@ export function useInsights(period: Period, today: ISODate): InsightsData {
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const unit = useProfileStore((s) => s.settings.energyUnit)
   const meals = useProfileStore((s) => s.settings.meals)
-  const addBackPct = useProfileStore((s) => s.settings.exerciseAddBackPct)
-  const { targets, weightKg } = useTargets(today)
+  const { targets, weightKg, exerciseAddBack } = useTargets(today)
+  // Samma regel som Idag och Dagbok: med adaptiv förbrukning läggs träningen inte till igen.
+  const addBackPct = exerciseAddBack.pct
+  const todayComplete = metaByDate[today]?.complete === true
+
+  const period = useMemo(
+    () => withCountedDays(basePeriod, today, todayComplete, (d) => (entriesByDate[d]?.length ?? 0) > 0),
+    [basePeriod, today, todayComplete, entriesByDate],
+  )
+  const countedEnd = period.elapsed.length > 0 ? period.elapsed[period.elapsed.length - 1] : period.start
 
   const chartDays = useMemo(
     () => buildDayStats(period.dates, entriesByDate, exerciseByDate, targets.kcal, addBackPct),
     [period.dates, entriesByDate, exerciseByDate, targets.kcal, addBackPct],
   )
-  const days = useMemo(() => chartDays.filter((d) => d.date <= today), [chartDays, today])
+  const days = useMemo(() => {
+    const counted = new Set(period.elapsed)
+    return chartDays.filter((d) => counted.has(d.date))
+  }, [chartDays, period.elapsed])
   const summary = useMemo(() => summarizeDays(days), [days])
   const avg = useMemo(() => periodAverages(entriesByDate, period.elapsed), [entriesByDate, period.elapsed])
   const entries = useMemo(() => periodEntries(entriesByDate, period.elapsed), [entriesByDate, period.elapsed])
 
+  const sex = profile?.sex ?? 'kvinna'
+  const floorKcal = MIN_KCAL[sex]
+  const lowIntakeKcal = useMemo(
+    () => lowIntakeAverage(days, (d) => metaByDate[d]?.complete === true, floorKcal),
+    [days, metaByDate, floorKcal],
+  )
+
   const refProfile = useMemo<RefProfile>(
     () => ({
-      sex: profile?.sex ?? 'kvinna',
+      sex,
       age: profile ? ageFromBirthYear(profile.birthYear, today) : 35,
       lifeStage: profile?.lifeStage ?? 'ingen',
       diet: profile?.diet ?? 'allatare',
       weightKg: weightKg ?? profile?.startWeightKg,
     }),
-    [profile, today, weightKg],
+    [profile, sex, today, weightKg],
   )
 
   // Energiprocent (t.ex. mättat fett < 10 E%) räknas på faktiskt intag när det finns, annars på målet.
@@ -97,6 +133,7 @@ export function useInsights(period: Period, today: ISODate): InsightsData {
   return {
     today,
     period,
+    countedEnd,
     entriesByDate,
     exerciseByDate,
     metaByDate,
@@ -113,5 +150,8 @@ export function useInsights(period: Period, today: ISODate): InsightsData {
     meals,
     plateVariant,
     addBackPct,
+    exerciseInTarget: exerciseAddBack.includedInTarget,
+    floorKcal,
+    lowIntakeKcal,
   }
 }
