@@ -384,6 +384,41 @@ describe('backup', () => {
       expect(backup.repairs?.skipped).toMatchObject({ entries: 1, customFoods: 1, usage: 1 })
     })
 
+    it('behåller receptlänk och veckans fokus men rensar bort ogiltiga värden', () => {
+      const recipe = (id: string, sourceUrl: unknown) => ({ id, name: 'Gröt', servings: 2, ingredients: [], sourceUrl, createdAt: NOW, updatedAt: NOW })
+      const withFocus = (weeklyFocus: unknown) =>
+        parseBackup(file({ ...sections, profile: { profile: null, settings: { weeklyFocus } } }), NOW).data.profile.settings.weeklyFocus
+      const backup = parseBackup(
+        file({
+          ...sections,
+          food: {
+            recipes: {
+              r1: recipe('r1', 'https://example.com/recept/grot?portioner=2'),
+              r2: recipe('r2', 'http://example.com/gammal'),
+              r3: recipe('r3', 'javascript:alert(1)'),
+              r4: recipe('r4', `https://example.com/${'a'.repeat(2000)}`),
+              r5: recipe('r5', 42),
+              r6: recipe('r6', 'example.com/utan-schema'),
+            },
+          },
+        }),
+        NOW,
+      )
+      const recipes = backup.data.food.recipes
+      expect(recipes.r1.sourceUrl).toBe('https://example.com/recept/grot?portioner=2')
+      expect(recipes.r2.sourceUrl).toBe('http://example.com/gammal')
+      for (const id of ['r3', 'r4', 'r5', 'r6']) expect(recipes[id].sourceUrl).toBeUndefined()
+      // Receptet finns kvar – bara länken rensas bort.
+      expect(summarizeBackup(backup)).toMatchObject({ skipped: 0, repaired: 4 })
+
+      expect(withFocus({ id: 'mer-gronsaker', since: '2026-09-21' })).toEqual({ id: 'mer-gronsaker', since: '2026-09-21' })
+      expect(withFocus(undefined)).toBeUndefined()
+      expect(withFocus({ id: '', since: '2026-09-21' })).toBeUndefined()
+      expect(withFocus({ id: 'mer-gronsaker', since: '21 september' })).toBeUndefined()
+      expect(withFocus({ id: 'mer-gronsaker', since: '2026-02-30' })).toBeUndefined()
+      expect(withFocus('mer-gronsaker')).toBeUndefined()
+    })
+
     it('rör inte en hel säkerhetskopia', () => {
       useDiaryStore.getState().addEntry({ kind: 'food', food: mjolk, amount: 1, unit: 'portion:glas', grams: 206, date: '2026-09-20', meal: 'frukost', time: '07:15' })
       useDiaryStore.getState().addExercise({ date: '2026-09-20', activityId: 'promenad', name: 'Promenad', minutes: 30, kcal: 110, met: 3.8 })
@@ -395,6 +430,11 @@ describe('backup', () => {
       useFoodStore.getState().recordUsage(mjolk.id, 1, 'portion:glas', 'frukost')
       useFoodStore.getState().toggleFavorite(mjolk.id)
       useFastingStore.getState().startFast(16, '16:8', Date.now() - 3_600_000)
+      useFoodStore.getState().saveRecipe({
+        id: 'recipe:gröt', name: 'Gröt', servings: 2, sourceUrl: 'https://example.com/recept/grot',
+        ingredients: [{ id: 'i1', food: mjolk, amount: 2, unit: 'dl', grams: 206 }], createdAt: Date.now(), updatedAt: Date.now(),
+      })
+      useProfileStore.getState().updateSettings({ weeklyFocus: { id: 'mer-gronsaker', since: '2026-09-21' } })
       useProfileStore.getState().setProfile({
         sex: 'man', birthYear: 1985, heightCm: 180, startWeightKg: 82, activityLevel: 'latt', goal: 'ga_ner', weeklyRateKg: 0.5,
         targetWeightKg: 78, lifeStage: 'ingen', diet: 'allatare', macroPreset: 'nnr', createdAt: Date.now(),

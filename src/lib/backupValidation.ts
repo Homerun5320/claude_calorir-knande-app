@@ -621,6 +621,13 @@ function sanitizeDayMeta(raw: unknown, r: Rec): DayMeta | null {
 // Recept, sparade måltider och användning
 // ---------------------------------------------------------------------------
 
+/** Längsta tillåtna länk till ett originalrecept (tecken). */
+const MAX_SOURCE_URL_LENGTH = 2000
+
+/** En länk till ett originalrecept: en http(s)-adress på högst 2 000 tecken (aldrig t.ex. javascript:). */
+const isSourceUrl = (v: unknown): v is string =>
+  typeof v === 'string' && v.length <= MAX_SOURCE_URL_LENGTH && /^https?:\/\//i.test(v)
+
 function sanitizeIngredient(raw: unknown, r: Rec, ctx: Ctx): RecipeIngredient | null {
   if (!isObj(raw)) return null
   const food = sanitizeFood(raw.food, r)
@@ -672,6 +679,8 @@ function sanitizeRecipe(raw: unknown, r: Rec, ctx: Ctx): Recipe | null {
     if (valid.length !== tags.length) r.fixed = true
     recipe.tags = [...new Set(valid)]
   }
+  const sourceUrl = optional(raw.sourceUrl, r, isSourceUrl)
+  if (sourceUrl) recipe.sourceUrl = sourceUrl
   // Inbyggda recept sparas aldrig i butiken – en kopia med märkningen skulle bli omöjlig att ändra.
   if (raw.builtin !== undefined) r.fixed = true
   return recipe
@@ -901,6 +910,16 @@ function sanitizeMeals(raw: unknown, r: Rec): MealConfig[] {
   return out
 }
 
+/** Veckans fokus: ett id och ett giltigt datum, annars inget fokus (rättat). */
+function sanitizeWeeklyFocus(raw: unknown, r: Rec): Settings['weeklyFocus'] {
+  if (raw === undefined || raw === null) return undefined
+  if (isObj(raw) && isNonEmptyString(raw.id) && raw.id.length <= 200 && typeof raw.since === 'string' && isValidISODate(raw.since)) {
+    return { id: raw.id, since: raw.since }
+  }
+  r.fixed = true
+  return undefined
+}
+
 function sanitizeSettings(raw: unknown, r: Rec): Settings {
   const s: Obj = isObj(raw) ? raw : {}
   if (raw !== undefined && raw !== null && !isObj(raw)) r.fixed = true
@@ -937,7 +956,7 @@ function sanitizeSettings(raw: unknown, r: Rec): Settings {
   } else if (s.targetOverrides !== undefined) {
     r.fixed = true
   }
-  return {
+  const settings: Settings = {
     theme: s.theme === undefined ? DEFAULT_SETTINGS.theme : choice(s.theme, r, THEMES, DEFAULT_SETTINGS.theme),
     meals: s.meals === undefined ? DEFAULT_MEALS.map((m) => ({ ...m })) : sanitizeMeals(s.meals, r),
     exerciseAddBackPct: clamp('exerciseAddBackPct', 0, 100),
@@ -952,6 +971,9 @@ function sanitizeSettings(raw: unknown, r: Rec): Settings {
     targetOverrides,
     onboardingDone: bool('onboardingDone'),
   }
+  const weeklyFocus = sanitizeWeeklyFocus(s.weeklyFocus, r)
+  if (weeklyFocus) settings.weeklyFocus = weeklyFocus
+  return settings
 }
 
 // ---------------------------------------------------------------------------

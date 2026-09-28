@@ -348,6 +348,11 @@ export interface Recipe {
   tags?: FoodTag[]
   /** Inbyggt klassiskt recept (kan kopieras men inte ändras). */
   builtin?: boolean
+  /**
+   * Länk till originalreceptet, t.ex. när receptet har importerats från en webbsida.
+   * Alltid en http(s)-adress på högst 2 000 tecken (kontrolleras vid återställning av säkerhetskopia).
+   */
+  sourceUrl?: string
   createdAt: number
   updatedAt: number
 }
@@ -460,4 +465,9 @@ export interface Settings {
   /** Egna mål som skriver över beräknade. */
   targetOverrides: Partial<Targets>
   onboardingDone: boolean
+  /**
+   * Veckans fokus som användaren själv har valt (t.ex. "mer grönsaker"): id för fokuset och
+   * dagen det valdes. Saknas när inget fokus är valt.
+   */
+  weeklyFocus?: { id: string; since: ISODate }
 }
