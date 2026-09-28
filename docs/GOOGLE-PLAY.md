@@ -4,6 +4,15 @@ Allt som behövs för att lägga upp Lagom i Google Play: konto, sluten test, bu
 köp i appen, formulärsvar i Play Console, instruktioner till granskarna och själva appen (en
 Trusted Web Activity byggd med Bubblewrap). Skrivet för en ägare utan jurist eller revisor.
 
+> **Ändrat 2026-09-28 – Play-appen blir en inbyggd Capacitor-app, inte en TWA.** Ägaren har
+> beslutat att båda butiksapparna byggs med Capacitor 8. Android-appen är nu projektet `android/`
+> (applicationId `se.lagomappen.lagom`, bygget `npm run build:android` med
+> `VITE_DISTRIBUTION=play`), köpen görs med Google Play Billing via `@capgo/native-purchases`, och
+> appen använder Health Connect. Det som står nedan om TWA, Bubblewrap och Digital Asset Links
+> (avsnitt 10–11, delar av 7) gäller inte längre och skrivs om; kontot, butikstexterna, grafiken,
+> den slutna testen och formulären gäller fortfarande, med tilläggen i [NATIVE.md](NATIVE.md)
+> (behörigheter, Health Connect-deklarationen, Data safety, 16 KB-sidor).
+
 > **Viktigt:** det här är en arbetsbeskrivning, inte juridisk rådgivning. Googles regler och
 > formulär ändras ofta – läs texten i Play Console innan du svarar, och kontrollera skatt och
 > moms med Skatteverket (verksamt.se) om du är osäker.

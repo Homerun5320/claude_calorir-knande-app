@@ -85,22 +85,23 @@ Priserna och kvittot utgår i dag från 25 % moms. **Beslut som saknas:** är de
 
 ## Plattformar och butiker
 
-Samma kod körs på webben, i Google Play-appen och i iPhone-appen. Bygget styrs av `VITE_DISTRIBUTION` (`web`, `appstore` eller `play`) och körmiljön avgörs i `src/config/platform.ts` (`sellsOnWeb`, `isInApp`, `allowsLicenseKeyEntry` …). Play-appen är ett TWA-skal runt webbversionen och använder webbygget; `play` är reserverat för ett eventuellt inbyggt Android-bygge.
+Samma kod körs på webben och i de inbyggda apparna för App Store (bara iPhone) och Google Play. Bygget styrs av `VITE_DISTRIBUTION` (`web`, `appstore` eller `play`) och körmiljön avgörs i `src/config/platform.ts` (`sellsOnWeb`, `isInApp`, `allowsLicenseKeyEntry` …). Båda butiksapparna är [Capacitor 8](https://capacitorjs.com)-appar (projekten `ios/` och `android/`) runt butiksbygget i `dist-native/`; native-koden ligger i `src/native/` och laddas bara i apparna. Allt om apparna: [`docs/NATIVE.md`](docs/NATIVE.md).
 
 | Bygge | Kommando | Hamnar i | Köp |
 | --- | --- | --- | --- |
-| Webben (och Google Play-appen, som är ett TWA-skal runt webben) | `npx vite build` | `dist/` | Stripe på webben; i Play-appen Google Play Billing |
-| iPhone (App Store, Capacitor) | `VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> npx vite build` | `dist-native/` | Bara köp i appen |
+| Webben | `npx vite build` | `dist/` | Stripe |
+| iPhone (App Store) | `VITE_API_BASE=https://<webbplatsen> npm run build:ios` | `dist-native/` → `ios/` | Bara köp i appen (StoreKit 2) |
+| Android (Google Play) | `VITE_API_BASE=https://<webbplatsen> npm run build:android` | `dist-native/` → `android/` | Bara köp i appen (Google Play Billing) |
 
-Butiksbygget kräver dessutom säljarvariablerna ovan, till exempel:
+Butiksbyggena kräver dessutom säljarvariablerna ovan, till exempel:
 
 ```bash
-VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> \
+VITE_API_BASE=https://<webbplatsen> \
 VITE_SELLER_NAME="…" VITE_SELLER_ORGNR="…" VITE_SELLER_ADDRESS="…" VITE_SELLER_PHONE="…" \
-VITE_SUPPORT_EMAIL="…" npx vite build
+VITE_SUPPORT_EMAIL="…" npm run build:ios
 ```
 
-I butiksbygget finns ingen service worker (uppdateringar kommer via butiken), CSP:n läggs som meta-tagg i `index.html` (samma regler som `netlify.toml`, plus `VITE_API_BASE`), och varken Stripe-köp, kronpriser eller licensnyckelaktivering visas. Capacitor och ett IAP-tillägg (t.ex. `@capacitor/core` med `cordova-plugin-purchase` eller `@revenuecat/purchases-capacitor`) är **inte installerade** ännu – `src/lib/storePurchases.ts` är en stubbe tills dess, och Apple godkänner inte appen utan fungerande köp i appen. Play-appen startar `https://<domän>/?plattform=play`, så att Lagom vet att den körs där.
+I butiksbygget finns ingen service worker (uppdateringar kommer via butiken), CSP:n läggs som meta-tagg i `index.html` (samma regler som `netlify.toml`, plus `VITE_API_BASE`), och varken Stripe-köp, kronpriser eller licensnyckelaktivering (App Store) visas. Köpen i appen görs med `@capgo/native-purchases` (StoreKit 2 och Play Billing, utan egen server); tills de är inkopplade (`NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts`) stoppar byggkontrollen butiksbyggen utom testbyggen (`LAGOM_ALLOW_STORE_WITHOUT_IAP=1`). Själva apparna byggs i CI (`.github/workflows/native.yml`) eller i molnet – Android SDK och Xcode behövs inte lokalt.
 
 Steg för steg: [`docs/APP-STORE.md`](docs/APP-STORE.md), [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md) och [`docs/IOS-BYGGE-I-MOLNET.md`](docs/IOS-BYGGE-I-MOLNET.md) (iPhone-bygget i molnet, utan egen Mac).
 
@@ -108,6 +109,7 @@ Steg för steg: [`docs/APP-STORE.md`](docs/APP-STORE.md), [`docs/GOOGLE-PLAY.md`
 
 ```bash
 node scripts/generate-icons.mjs --only=store     # appikonen 1024 × 1024 m.fl. till store-assets/
+npm run native:assets                            # appikoner och startskärmar i ios/ och android/
 node scripts/generate-store-graphics.mjs         # Google Plays funktionsgrafik (1024 × 500)
 node scripts/app-store-screenshots.mjs [--dist=dist-native] [--only=apple|play] [--scheme=ljust|morkt]
 ANDROID_PACKAGE=… ANDROID_SHA256="…,…" node scripts/generate-assetlinks.mjs   # public/.well-known/assetlinks.json

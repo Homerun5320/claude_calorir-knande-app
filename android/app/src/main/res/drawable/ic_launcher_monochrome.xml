@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tonad appikon (Android 13+, "Temaikoner"): samma siluett som notisikonen, inom den adaptiva
+  ikonens säkra zon (66 dp av 108 dp). Systemet färgar den efter bakgrundsbilden.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Märket skalas till 62 % kring ikonens mitt – samma som förgrunden (ADAPTIVE_SCALE i scripts/generate-native-assets.mjs). -->
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M140.1,244 A118,118 0 0,1 371.9,244 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M106,254 H406 A14,14 0 0,1 406,282 H106 A14,14 0 0,1 106,254 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M167,316 H345 A11,11 0 0,1 345,338 H167 A11,11 0 0,1 167,316 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M216,370 H296 A10,10 0 0,1 296,390 H216 A10,10 0 0,1 216,370 Z" />
+    </group>
+</vector>

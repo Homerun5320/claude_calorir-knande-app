@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mörkt läge: lg-gran och lg-bg under .dark i src/index.css. -->
+<resources>
+    <color name="colorPrimary">#6CC49A</color>
+    <color name="colorPrimaryDark">#0B1210</color>
+    <color name="colorAccent">#6CC49A</color>
+    <color name="lagom_background">#0B1210</color>
+</resources>

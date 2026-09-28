@@ -48,3 +48,10 @@ android.keystore
 # precis före inskickningen (de beror på dagens datum och exempeldata). Laddas upp direkt från
 # mappen. Ikonerna och funktionsgrafiken i store-assets/ checkas däremot in.
 store-assets/screenshots/
+
+# De inbyggda apparna (Capacitor): webbdelen kopieras in av `npx cap sync` och ignoreras redan i
+# android/.gitignore och ios/.gitignore. Här: filer som skapas vid bygget och signerade paket.
+android/app/src/main/res/values/lagom_generated.xml
+android/app/release/
+*.ipa
+*.xcarchive

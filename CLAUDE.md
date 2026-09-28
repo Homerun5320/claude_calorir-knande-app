@@ -7,8 +7,8 @@ Lagom är en svensk kalori- och näringsdagbok (PWA): React 19 + TypeScript 6 + 
 - `npx tsc -b` – typkontroll (måste vara felfri)
 - `npx vitest run [sökväg]` – tester (vitest + jsdom + fake-indexeddb, `globals: true`)
 - `npx oxlint src netlify scripts` – lint (samma som CI i `.github/workflows/ci.yml`)
-- `npx vite build` – produktionsbygge (`dist/`). Butiksbygge: se "Plattform och butiker".
-- Ändra inte `package.json` och installera inga paket. Om ett paket verkligen behövs: skriv det i din slutrapport.
+- `npx vite build` – produktionsbygge (`dist/`). Butiksbygge och native-appar: se "Plattform och butiker" och "Native-appar".
+- Ändra inte `package.json` och installera inga paket. Om ett paket verkligen behövs: skriv det i din slutrapport. Undantag: Capacitor 8 och tilläggen under "Native-appar" är godkända av ägaren (exakta versioner i `package.json`); alla andra nya paket kräver fortfarande ägarens godkännande.
 
 ## Kodstil
 
@@ -65,11 +65,26 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 ## Plattform och butiker
 
 - `VITE_DISTRIBUTION` (`web` | `appstore` | `play`, standard `web`) väljer bygge. Körmiljön avgörs i `src/config/platform.ts`: `sellsOnWeb()`, `isInApp()`, `isNativeApp()`, `isTwa()`, `allowsLicenseKeyEntry()`, `offersLicenseRecovery()`, `storagePlace()` ("i den här webbläsaren"/"i appen på den här enheten") och `cameraSettingsHint()`. Skriv aldrig "i den här webbläsaren" direkt – använd `storagePlace()`.
-- Stripe, kronpriser och `priceSummary()` visas bara när `sellsOnWeb()`. Annars används `priceSummaryText()`, och butikspriserna kommer från butiken (`src/lib/storePurchases.ts`, i dag en stubbe tills Capacitor och ett IAP-tillägg installeras – produkt-id `livstid`, `ar` och `prov14`). I App Store-bygget går det inte att klistra in licensnycklar; köp återställs med "Återställ köp".
-- Butiksbygge: `VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> npx vite build` → `dist-native/` (ingen service worker, CSP som meta-tagg från `netlify.toml`). Byggkontrollen `scripts/commerce-guard.ts` stoppar skarpa byggen och butiksbyggen utan `VITE_SELLER_NAME`, `VITE_SELLER_ORGNR`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` och en riktig `VITE_SUPPORT_EMAIL` (`VITE_SELLER_VAT` är frivillig), och ett Netlify-produktionsbygge i testläge utan `LAGOM_ALLOW_TEST_COMMERCE=1`.
+- Stripe, kronpriser och `priceSummary()` visas bara när `sellsOnWeb()`. Annars används `priceSummaryText()`, och butikspriserna kommer från butiken (`src/lib/storePurchases.ts` – i dag en stubbe tills köpen kopplas in med `@capgo/native-purchases` i `src/native/`, produkt-id `livstid`, `ar` och `prov14`; byggkontrollen stoppar butiksbyggen tills `NATIVE_PURCHASES_READY` är true). I App Store-bygget går det inte att klistra in licensnycklar; köp återställs med "Återställ köp".
+- Butiksbygge: `VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> npx vite build` → `dist-native/` (ingen service worker, CSP som meta-tagg från `netlify.toml`) – eller hela vägen in i apparna med `npm run build:ios` / `npm run build:android` (se "Native-appar"). Byggkontrollen `scripts/commerce-guard.ts` stoppar skarpa byggen och butiksbyggen utan `VITE_SELLER_NAME`, `VITE_SELLER_ORGNR`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` och en riktig `VITE_SUPPORT_EMAIL` (`VITE_SELLER_VAT` är frivillig), och ett Netlify-produktionsbygge i testläge utan `LAGOM_ALLOW_TEST_COMMERCE=1`.
 - Övriga variabler: `VITE_WEB_SALES=on|off`, `VITE_APPSTORE_URL`, `VITE_PLAY_URL`, `VITE_LICENSE_PUBLIC_KEYS` (kommaseparerad, den nuvarande nyckeln först). Se `.env.example` och `docs/BETALNING.md`.
 - Exempeldata är skrivskyddad: `useAccess().demo` är true, och `requireAccess(action)` visar exempelarket i stället för att logga. Provperioden startar först när den egna profilen skapas. Anropa `requireAccess('<åtgärd>')` före allt som skapar nytt.
 - Lagom Moln är avstängt tills `VITE_SUPABASE_URL` och `VITE_SUPABASE_PUBLISHABLE_KEY` sätts (`CLOUD_ENABLED` i `src/config/cloud.ts`, se `docs/BACKEND.md`). Koden i `src/lib/cloud` får bara laddas med dynamisk import. Lägg ingen Supabase-adress i CSP:n förrän projektet finns och ägaren har godkänt det.
+
+## Native-appar (Capacitor 8)
+
+- Butiksapparna för App Store (bara iPhone) och Google Play är Capacitor 8-appar runt `dist-native/`. Projekten `ios/` (Swift Package Manager) och `android/` checkas in; `capacitor.config.ts` styr dem. Allt om bygge, behörigheter, integritetsmanifest och butiksformulär: `docs/NATIVE.md`.
+- Godkända paket (ägaren, 2026-09-28): `@capacitor/core`, `@capacitor/cli` (dev), `@capacitor/ios`, `@capacitor/android`, `@capacitor/app`, `@capacitor/filesystem`, `@capacitor/share`, `@capacitor/haptics`, `@capacitor/status-bar`, `@capacitor/keyboard`, `@capacitor/splash-screen`, `@capacitor/local-notifications`, `@capacitor/barcode-scanner` (ML Kit på Android, Apple Vision på iPhone), `@capgo/native-purchases` (köp i appen: StoreKit 2 och Play Billing, utan egen server och utan extra konto) och `@capgo/capacitor-health` (Apple Hälsa och Health Connect). Andra tillägg kräver godkännande.
+- Kodens organisation: **appkoden importerar bara `src/native/index.ts`** (`isNative()`, `nativePlatform()`, `initNative()`, `loadNative('<modul>')`, `NATIVE_BUILD`). Varje funktion ligger i en egen modul i `src/native/` som får importera `@capacitor/*` statiskt, och registreras i `MODULES` i `src/native/index.ts` – alla dynamiska importer av native-moduler står där, annars följer native-koden med i webbygget och service workerns cache. `loadNative()` ger `null` på webben: `const share = await loadNative('share'); if (share) { …; return }` och annars webbens väg som förut. `initNative()` (anropas av AppShell) startar funktionerna via `src/native/init.ts`. Allt är no-op på webben, kastar aldrig (fel → `logError`), och `src/native/native.test.ts` kontrollerar reglerna.
+- Kommandon (butiksbyggena kräver samma variabler som ovan; lokala testbyggen med `LAGOM_ALLOW_STORE_WITHOUT_IAP=1` och testvärden, se `docs/NATIVE.md`):
+  - `npm run build:ios` – `VITE_DISTRIBUTION=appstore vite build && cap sync ios`
+  - `npm run build:android` – `VITE_DISTRIBUTION=play vite build`, `scripts/native-config.mjs` och `cap sync android`
+  - `npm run cap:sync` – kopiera `dist-native/` och tilläggen till båda projekten
+  - `npm run native:assets` – appikoner och startskärmar ur `public/icon.svg` (`scripts/generate-native-assets.mjs`)
+  - Själva apparna byggs i CI (`.github/workflows/native.yml`; Android SDK och Xcode finns inte lokalt). `node scripts/check-android-16kb.mjs <apk|aab>` kontrollerar 16 KB-sidor.
+- Ändra aldrig `appId` (`se.lagomappen.lagom`) efter första uppladdningen, och aldrig `server.hostname`/`iosScheme`/`androidScheme` – dagboken ligger i webbvyns IndexedDB, som hör till ursprunget.
+- Ändra inte genererade filer: `ios/App/CapApp-SPM/Package.swift`, `android/app/capacitor.build.gradle`, `android/capacitor.settings.gradle` och den kopierade webbdelen (`ios/App/App/public`, `android/app/src/main/assets/public`).
+- Behörigheter hålls minimala: tilläggens onödiga Android-behörigheter tas bort med `tools:node="remove"` i `AndroidManifest.xml`, och inga exakta alarm – schemalägg påminnelser med `isExactNotification: false`. Texter i `Info.plist` (kamera, Hälsa) är på svenska. Ny native-funktion som samlar eller skickar data → uppdatera `PrivacyInfo.xcprivacy`, App Privacy/Data safety (`docs/NATIVE.md`) och integritetspolicyn.
 
 ## Juridik och integritet
 

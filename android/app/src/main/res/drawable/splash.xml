@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bakgrunden bakom startskärmen – bara appens bakgrundsfärg (ljus/mörk). Ikonen ritas av
+  startskärmen själv (windowSplashScreenAnimatedIcon i values/styles.xml).
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/lagom_background" />
+</layer-list>

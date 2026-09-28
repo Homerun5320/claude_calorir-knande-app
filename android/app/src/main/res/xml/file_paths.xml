@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mappar som andra appar kan få läsa en enskild fil ur via FileProvider, t.ex. när en export eller
+  säkerhetskopia delas (Capacitor Share). Skriv delade filer till Directory.Cache.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="delning" path="." />
+    <files-path name="filer" path="." />
+</paths>

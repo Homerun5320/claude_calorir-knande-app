@@ -8,10 +8,11 @@ Mac – varje steg säger var i App Store Connect det görs.
 > och avgifter ändras ofta. Läs alltid texten i App Store Connect innan du svarar, och kontrollera
 > skatt och moms med Skatteverket (verksamt.se) om du är osäker.
 
-**Läget just nu (hösten 2026):** iPhone-appen byggs med Capacitor, som ännu inte är installerat.
-Koden är förberedd (`VITE_DISTRIBUTION=appstore`, plattformsflaggor i `src/config/platform.ts`,
-köp i appen i `src/lib/storePurchases.ts`), men själva Xcode-projektet och IAP-tillägget kommer i
-nästa steg. Bygget görs i molnet – se [IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md).
+**Läget just nu (2026-09-28):** iPhone-appen byggs med Capacitor 8. Xcode-projektet (`ios/`,
+bara iPhone, integritetsmanifest, HealthKit) och tilläggen – bland dem `@capgo/native-purchases`
+för köp i appen – är på plats; funktionerna kopplas in i `src/native/` i nästa steg. Allt om
+projektet, paketen och byggena: [NATIVE.md](NATIVE.md). Bygget görs i molnet – se
+[IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md).
 
 ## Innehåll
 
@@ -74,7 +75,7 @@ nästa steg. Bygget görs i molnet – se [IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MO
 | Plattform | iOS |
 | Namn | `Lagom` (reserv: `Lagom – kaloriräknaren` om namnet är upptaget) |
 | Primärt språk | Svenska |
-| Bundle ID | Samma som i Xcode-projektet, t.ex. `se.<dittnamn>.lagom` – **kan inte ändras senare** |
+| Bundle ID | `se.lagomappen.lagom` (samma som i Xcode-projektet och `capacitor.config.ts`) – **kan inte ändras senare**; bekräfta det först ([NATIVE.md §1](NATIVE.md#1-att-bekräfta-innan-första-uppladdningen)) |
 | SKU | `lagom-ios` (syns bara för dig) |
 | Användaråtkomst | Full åtkomst |
 
@@ -342,10 +343,12 @@ inte för spårning.
 
 Det här samlas **inte** in (och ska inte kryssas i):
 
-- Hälsa och träning, kost och vikt – dagboken sparas bara på telefonen och lämnar den aldrig.
-- Köp – köpet hanteras av Apple; appen skickar inga köpuppgifter till någon server. **Gäller bara om
-  köp-i-appen-tillägget talar direkt med StoreKit** (rekommenderat: `cordova-plugin-purchase` med
-  StoreKit 2, utan egen server). Väljs i stället **RevenueCat** får RevenueCat köphistorik och ett
+- Hälsa och träning, kost och vikt – dagboken sparas bara på telefonen och lämnar den aldrig. Det
+  gäller också uppgifter som läses från eller sparas i Apple Hälsa (HealthKit).
+- Köp – köpet hanteras av Apple; appen skickar inga köpuppgifter till någon server. Tillägget
+  `@capgo/native-purchases` talar direkt med StoreKit 2, utan egen server och utan konto hos någon
+  tredje part (se [NATIVE.md §2](NATIVE.md#2-paketen-och-varför)). Skulle det bytas mot
+  **RevenueCat** får RevenueCat köphistorik och ett
   användar-id – då måste *Purchases* och *Identifiers* anges här, RevenueCat läggas till som
   personuppgiftsbiträde i integritetspolicyn och i registerförteckningen, och Data safety i Google
   Play ändras på samma sätt – **före** inskickningen.
@@ -361,9 +364,10 @@ Det här samlas **inte** in (och ska inte kryssas i):
 
 **Spårning (App Tracking Transparency):** Nej. Appen visar ingen spårningsfråga.
 
-**Privacy manifest (`PrivacyInfo.xcprivacy`):** läggs i Xcode-projektet när Capacitor installeras.
-Deklarera samma datatyp (Search History, inte kopplad, ingen spårning) och de "required reason
-APIs" som Capacitor och tilläggen använder (t.ex. UserDefaults – skäl `CA92.1`).
+**Privacy manifest (`PrivacyInfo.xcprivacy`):** finns i Xcode-projektet
+(`ios/App/App/PrivacyInfo.xcprivacy`) med samma datatyp (Search History, inte kopplad, ingen
+spårning) och de "required reason APIs" som tilläggen använder (filtidsstämplar `C617.1`,
+UserDefaults `CA92.1`) – se [NATIVE.md §8](NATIVE.md#8-integritet-app-privacy-och-data-safety).
 
 ## 8. Åldersklassning
 
@@ -396,7 +400,8 @@ gränsen – det är okej, eftersom appen själv släpper in bara vuxna.
 | **Content Rights** – innehåller appen innehåll från tredje part? | **Ja**, och du har rätt att använda det: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0, källan anges i appen), Open Food Facts (data ODbL, bilder CC BY-SA, källan anges), typsnitten Fraunces och Inter (SIL Open Font License), Workbox (MIT). Licenstexterna finns i `public/licenses/` och i Om Lagom. |
 | **Betalningsval i EU** (alternativa villkor, länkar till extern betalning) | **Nej.** Behåll Apples standardvillkor och bara köp i appen. Ansök inte om *StoreKit External Purchase Link Entitlement* eller *Alternative Terms Addendum for Apps in the EU*. |
 | **Sign in with Apple** | Behövs inte – appen har inga konton. |
-| **Kamerabehörighet** (`NSCameraUsageDescription` i `Info.plist`) | `Lagom använder kameran för att läsa streckkoder på förpackningar. Inga bilder sparas eller skickas.` |
+| **Kamerabehörighet** (`NSCameraUsageDescription` i `Info.plist`) | `Lagom använder kameran för att läsa streckkoder på förpackningar. Bilderna sparas inte.` |
+| **Apple Hälsa** (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`, HealthKit-förmågan) | Texterna och förmågan finns i projektet ([NATIVE.md §5](NATIVE.md#5-iphone-projektet-ios)). Slå på **HealthKit** för Bundle ID:t på developer.apple.com. Apple kräver att appen tydligt visar när den använder Hälsa och att hälsodata aldrig används för reklam eller lämnas vidare. |
 | **Digital Services Act – trader** | Ja (du säljer appen). Se [avsnitt 2](#2-konto-och-avtal). |
 
 ## 10. App Review Notes (granskningsanteckningar)
@@ -421,6 +426,12 @@ lägg till den här meningen i stycket om köp i appen:
 'prov14' (14-day Trial, non-consumable, free) is claimed automatically when a profile is created; the trial length, what requires a purchase afterwards and the prices are shown before it starts.
 ```
 
+När kopplingen till Apple Hälsa finns i appen, lägg till:
+
+```
+Apple Health (HealthKit) is optional and off until the user turns it on. It reads weight, steps and active energy and writes weight, dietary energy and water that the user logs. Health data stays on the device and is never used for advertising or shared.
+```
+
 ## 11. Bygge, TestFlight och inskickning
 
 Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och steg finns i
@@ -430,8 +441,7 @@ Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och s
 
    ```sh
    npm ci
-   VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<domän> npx vite build   # → dist-native/
-   npx cap sync ios        # när Capacitor är installerat
+   VITE_API_BASE=https://<domän> npm run build:ios   # vite build → dist-native/ och cap sync ios
    ```
 
    Byggkontrollen (`scripts/commerce-guard.ts`) stoppar butiksbygget om något av det här saknas –

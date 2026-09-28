@@ -5,9 +5,11 @@ på macOS. Du har ingen Mac, så bygget görs på en Mac i molnet. Det här doku
 vanligaste gratisalternativen, **Codemagic** och **GitHub Actions**, och rekommenderar ett
 upplägg.
 
-> **Läget:** Capacitor (som gör iPhone-appen av Lagom) är ännu inte installerat. Själva
-> byggfilerna (`codemagic.yaml` eller `.github/workflows/ios.yml`) skrivs när Capacitor och
-> köp-i-appen-tillägget är på plats. Det här är planen och förberedelserna.
+> **Läget (2026-09-28):** Capacitor 8 är installerat och Xcode-projektet finns i `ios/` (Swift
+> Package Manager, delat schema `App`, se [NATIVE.md](NATIVE.md)). Ett kontrollbygge för
+> simulatorn utan signering finns redan i `.github/workflows/native.yml` (körs på begäran).
+> Byggfilerna för signerade byggen och uppladdning (`codemagic.yaml` eller
+> `.github/workflows/ios.yml`) skrivs när köpen i appen fungerar. Det här är planen.
 >
 > Priser och gratisnivåer ändras ofta – siffrorna nedan gällde hösten 2026. Kontrollera
 > alltid på tjänstens prissida innan du väljer.
@@ -43,8 +45,9 @@ går att byta senare utan att ändra appen.
 
 1. **Apple Developer Program** (individkonto, 99 USD per år) – se [APP-STORE.md](APP-STORE.md#2-konto-och-avtal).
 2. **Ett Bundle ID** (*developer.apple.com → Certificates, Identifiers & Profiles → Identifiers → +*),
-   t.ex. `se.<dittnamn>.lagom`. Kryssa i förmågan **In-App Purchase**. Samma id används i
-   Capacitor (`capacitor.config.ts` → `appId`) och i App Store Connect.
+   `se.lagomappen.lagom` (bekräfta det först, [NATIVE.md §1](NATIVE.md#1-att-bekräfta-innan-första-uppladdningen)).
+   Kryssa i förmågorna **In-App Purchase** och **HealthKit**. Samma id används i Capacitor
+   (`capacitor.config.ts` → `appId`), i Xcode-projektet och i App Store Connect.
 3. **Appen i App Store Connect** (se [APP-STORE.md](APP-STORE.md#3-skapa-appen-i-app-store-connect)) –
    den måste finnas innan det första bygget kan laddas upp.
 4. **En App Store Connect API-nyckel** – molnbygget loggar in med den i stället för ditt
@@ -61,15 +64,13 @@ går att byta senare utan att ändra appen.
 
    ```sh
    npm ci
-   npx vite build        # med VITE_DISTRIBUTION=appstore m.fl., se APP-STORE.md avsnitt 11 → dist-native/
-   npx cap sync ios
+   npm run build:ios     # VITE_DISTRIBUTION=appstore vite build → dist-native/ och cap sync ios
    ```
 
    Miljövariablerna (`VITE_DISTRIBUTION`, `VITE_API_BASE`, `VITE_SELLER_*`,
    `VITE_SUPPORT_EMAIL`, `VITE_LICENSE_PUBLIC_KEY`) läggs in som variabler i molntjänsten – de
    är inte hemliga (de hamnar i appen), men hemliga nycklar hör aldrig hemma i `VITE_`-variabler.
-   Butiksbygget hamnar i `dist-native/` – när Capacitor installeras ska `webDir` i
-   `capacitor.config.ts` därför vara `dist-native`, annars kopieras fel bygge in i appen.
+   Butiksbygget hamnar i `dist-native/`, som är `webDir` i `capacitor.config.ts`.
 
 ## Codemagic – steg för steg
 
@@ -82,11 +83,11 @@ går att byta senare utan att ändra appen.
 4. **Signering:** under *Code signing identities* kan Codemagic skapa ett distributionscertifikat
    åt dig (*Generate certificate*). Ladda ned det och spara det i lösenordshanteraren – det
    behövs om du byter tjänst.
-5. **Byggfilen** `codemagic.yaml` läggs i repots rot när Capacitor är installerat. En skiss av
+5. **Byggfilen** `codemagic.yaml` läggs i repots rot när köpen i appen fungerar. En skiss av
    vad den kommer att innehålla (inte en färdig fil):
 
    ```yaml
-   # SKISS – den riktiga filen skrivs när Capacitor är installerat.
+   # SKISS – den riktiga filen skrivs när köpen i appen fungerar.
    workflows:
      ios-testflight:
        name: iPhone → TestFlight
@@ -97,15 +98,14 @@ går att byta senare utan att ändra appen.
        environment:
          ios_signing:
            distribution_type: app_store
-           bundle_identifier: se.<dittnamn>.lagom
+           bundle_identifier: se.lagomappen.lagom
          node: 22
          vars:
            VITE_DISTRIBUTION: appstore
            # … övriga VITE_-variabler
        scripts:
          - npm ci
-         - npx vite build
-         - npx cap sync ios
+         - npm run build:ios
          - xcode-project use-profiles
          # Byggnumret ökar automatiskt (agvtool måste köras i mappen med Xcode-projektet).
          - cd ios/App && agvtool new-version -all $(($BUILD_NUMBER + 1))
@@ -127,8 +127,8 @@ går att byta senare utan att ändra appen.
 1. **Hemligheter** (*repot → Settings → Secrets and variables → Actions → New repository secret*):
    `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` och
    `APP_STORE_CONNECT_KEY` (innehållet i `.p8`-filen). VITE-variablerna läggs under *Variables*.
-2. **Byggfilen** `.github/workflows/ios.yml` skrivs när Capacitor är installerat. Den kör på
-   `runs-on: macos-15` (eller senare), bygger webbdelen som ovan och sedan:
+2. **Byggfilen** `.github/workflows/ios.yml` skrivs när köpen i appen fungerar. Den kör på
+   `runs-on: macos-15` (eller senare) med Xcode 26, bygger webbdelen som ovan och sedan:
    - `xcodebuild archive … -allowProvisioningUpdates -authenticationKeyPath … -authenticationKeyID … -authenticationKeyIssuerID …`
      – Xcode skapar själv certifikat och profil i Apples moln med API-nyckeln,
    - `xcodebuild -exportArchive` med `method = app-store-connect`,

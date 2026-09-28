@@ -1,0 +1,122 @@
+# De inbyggda apparna (Capacitor): kontrollbygge av Android-appen och, när du ber om det,
+# iPhone-appen. Här signeras och laddas inget upp – det görs i molnbygget för butikerna (se
+# docs/NATIVE.md och docs/IOS-BYGGE-I-MOLNET.md). Android SDK finns på GitHubs Linux-maskiner och
+# Xcode på macOS-maskinerna; lokalt behövs varken eller.
+#
+# Webbdelen byggs som TESTBYGGE (LAGOM_ALLOW_STORE_WITHOUT_IAP=1) – paketen härifrån får aldrig
+# skickas in. Byggkontrollen kräver säljaruppgifter: lägg in dina riktiga som Variables
+# (Settings → Secrets and variables → Actions → Variables); annars används testvärdena nedan.
+#
+# OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
+name: Native-appar
+
+on:
+  workflow_dispatch:
+    inputs:
+      ios:
+        description: Bygg även iPhone-appen (macOS – minuterna räknas tio gånger i privata repon)
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - android/**
+      - ios/**
+      - capacitor.config.ts
+      - package.json
+      - package-lock.json
+      - src/native/**
+      - scripts/native-config.mjs
+      - scripts/check-android-16kb.mjs
+      - .github/workflows/native.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://lagom.invalid' }}
+  VITE_SELLER_NAME: ${{ vars.VITE_SELLER_NAME || 'Testbygge' }}
+  VITE_SELLER_ADDRESS: ${{ vars.VITE_SELLER_ADDRESS || 'Testgatan 1, 123 45 Teststad' }}
+  VITE_SELLER_PHONE: ${{ vars.VITE_SELLER_PHONE || '000-000 00 00' }}
+  VITE_SUPPORT_EMAIL: ${{ vars.VITE_SUPPORT_EMAIL || 'ci@users.noreply.github.com' }}
+  LAGOM_ALLOW_STORE_WITHOUT_IAP: '1'
+
+jobs:
+  android:
+    name: Android (APK för test och AAB) + 16 KB-kontroll
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Java 21 (Capacitor 8)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Webbdelen (VITE_DISTRIBUTION=play) och cap sync
+        run: npm run build:android
+
+      - name: Gradle – debug-APK och release-AAB (osignerad)
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug bundleRelease -PlagomVersionCode=${{ github.run_number }}
+
+      - name: 16 KB-sidor (Google Play, Android 15+)
+        run: |
+          node scripts/check-android-16kb.mjs android/app/build/outputs/apk/debug/app-debug.apk
+          node scripts/check-android-16kb.mjs android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Spara test-APK:n (kan installeras på en Android-telefon för test)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lagom-android-testbygge
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  ios:
+    name: iPhone (simulatorbygge utan signering)
+    if: github.event_name == 'workflow_dispatch' && inputs.ios
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Xcode 26 (App Store kräver iOS 26-SDK:n)
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+          xcodebuild -version
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Webbdelen (VITE_DISTRIBUTION=appstore) och cap sync
+        run: npm run build:ios
+
+      - name: Xcode – bygg för simulatorn
+        run: >-
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build

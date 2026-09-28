@@ -16,6 +16,7 @@ import { markBackupNow } from '../../features/settings/backupStatus'
 import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGate'
 import { requireAccess } from '../../features/premium/requireAccess'
 import { storeName } from '../../features/premium/premiumLogic'
+import { initNative } from '../../native'
 
 interface NavItem {
   to: string
@@ -292,6 +293,11 @@ export function AppShell() {
     } catch {
       /* lagrings-API:t saknas – inget att göra */
     }
+  }, [])
+
+  // De inbyggda apparna (Capacitor): starta native-funktionerna en gång. No-op på webben (src/native).
+  useEffect(() => {
+    void initNative()
   }, [])
 
   // Bottennavigeringen täcker nederkanten – håll fokuserade element ovanför den (se index.css).
