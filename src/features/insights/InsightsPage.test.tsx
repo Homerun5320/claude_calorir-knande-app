@@ -82,7 +82,7 @@ describe('InsightsPage', () => {
     seed(10)
     renderPage()
     expect(await screen.findByRole('heading', { name: 'Energi per dag' })).toBeInTheDocument()
-    expect(screen.getByText(/Du har loggat \d av \d dagar/)).toBeInTheDocument()
+    expect(screen.getByText(/Du har loggat \d+ av \d+ dag(ar)?/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Energifördelning' })).toBeInTheDocument()
     expect(screen.getAllByText(/Baserat på \d+ loggade? dag/).length).toBeGreaterThan(0)
   })

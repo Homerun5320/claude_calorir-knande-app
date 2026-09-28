@@ -44,7 +44,7 @@ export function IngredientRow({
         aria-label={`Ändra mängd: ${food.name}, ${line}`}
         className="-ml-2 flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2"
       >
-        <CategoryIcon category={food.category} size="sm" />
+        <CategoryIcon category={food.category} name={food.name} size="sm" />
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 text-[0.95rem] font-medium leading-snug text-ink">{food.name}</span>
           <span className="mt-0.5 block truncate text-xs text-ink-3 tabular-nums">{line}</span>
@@ -60,9 +60,19 @@ export function IngredientRow({
   )
 }
 
+/**
+ * Enheten som föreslås för en ny ingrediens. Recept anges nästan alltid i rå eller okokt vikt, så
+ * livsmedel som anges tillagade (`rawWeight`: kött, fisk, pasta, ris …) startar i "g rå"/"g okokt" –
+ * annars skulle "500 g" pasta tolkas som kokt pasta.
+ */
+export function recipeStartUnit(food: Pick<Food, 'rawWeight'>): UnitKey | undefined {
+  return food.rawWeight && food.rawWeight.factor > 0 ? 'g-ra' : undefined
+}
+
 function ResultRow({ food, onPick, excluded }: { food: Food; onPick: (food: Food) => void; excluded?: boolean }) {
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
-  const unit = defaultUnit(food)
+  // Samma utgångsläge som i mängdarket: "100 g okokt · 250 g tillagat" för pasta, annars förvald portion.
+  const unit = recipeStartUnit(food) ?? defaultUnit(food)
   const amount = defaultAmount(unit)
   const g = gramsFor(food, amount, unit)
   const kcal = Number.isFinite(g) ? nutrientsForGrams(food.nutrients, g).kcal : undefined
@@ -75,7 +85,7 @@ function ResultRow({ food, onPick, excluded }: { food: Food; onPick: (food: Food
         onClick={() => onPick(food)}
         className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2 disabled:opacity-50"
       >
-        <CategoryIcon category={food.category} size="sm" />
+        <CategoryIcon category={food.category} name={food.name} size="sm" />
         <span className="min-w-0 flex-1">
           <span className="line-clamp-2 text-[0.95rem] font-medium leading-snug text-ink">{food.name}</span>
           <span className="mt-0.5 block truncate text-xs text-ink-3">
@@ -114,7 +124,14 @@ export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSea
 ) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const { results, loading, pending } = useFoodSearch(query, { limit: 8 })
+  const search = useFoodSearch(query, { limit: 8 })
+  const { loading, pending } = search
+  // Livsmedelsverkets övriga poster (ofta råvaror) efter Lagoms egna: fyller upp till åtta träffar,
+  // men visar alltid upp till tre från Livsmedelsverket när de finns.
+  const results = useMemo(
+    () => (search.lmvResults.length === 0 ? search.results : [...search.results, ...search.lmvResults.slice(0, Math.max(3, 8 - search.results.length))]),
+    [search.results, search.lmvResults],
+  )
   const recent = useRecentFoods(6)
   const recentShown = useMemo(() => recent.filter((f) => f.id !== excludeId), [recent, excludeId])
   const trimmed = query.trim()
@@ -218,7 +235,7 @@ export function AmountSheet({
           key={state.mode === 'edit' ? state.ingredient.id : food.id}
           food={food}
           initialAmount={state.mode === 'edit' ? state.ingredient.amount : undefined}
-          initialUnit={state.mode === 'edit' ? state.ingredient.unit : undefined}
+          initialUnit={state.mode === 'edit' ? state.ingredient.unit : recipeStartUnit(food)}
           confirmLabel={state.mode === 'edit' ? 'Spara mängd' : 'Lägg till i receptet'}
           confirmIcon={Check}
           onConfirm={(amount, unit, grams) => onConfirm(food, amount, unit, grams)}

@@ -7,11 +7,11 @@
  */
 import type { Food, FoodTag, Nutrients, PlateSplit, Recipe, RecipeIngredient, UnitKey } from '../../types'
 import { EXTRAS_PREFIX, builtinRecipeInfo } from '../../data/recipes'
-import { PORTION_PLURALS, UNIT_LABELS, gramsFor, isPortionUnit, unitLabel } from '../../lib/units'
+import { PORTION_PLURALS, UNIT_LABELS, gramsFor, isPortionUnit, isRawUnit, unitLabel, type UnitFood } from '../../lib/units'
 import { formatGrams, formatNumber, plural } from '../../lib/format'
 import { foldSv } from '../../lib/search'
 import { uid } from '../../lib/id'
-import { recipeCo2e, recipeFinalWeight, recipeRawWeight, recipeServingWeight, recipeTags } from '../../lib/recipes'
+import { recipeCo2e, recipeFinalWeight, recipeRawWeight, recipeServingWeight, recipeTags, recipeUncookedWeight } from '../../lib/recipes'
 import { CLIMATE_REFERENCE, CAR_KG_CO2E_PER_KM } from '../../lib/climate'
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ export function scaleIngredient<T extends Pick<RecipeIngredient, 'amount' | 'gra
  */
 export function roundAmount(amount: number, unit: UnitKey): number {
   if (!Number.isFinite(amount) || amount <= 0) return 0
-  if (unit === 'g' || unit === 'ml') {
+  if (unit === 'g' || unit === 'g-ra' || unit === 'ml') {
     if (amount >= 100) return Math.round(amount / 5) * 5
     if (amount >= 10) return Math.round(amount)
     return Math.round(amount * 10) / 10
@@ -147,17 +147,23 @@ export function portionAmountText(label: string, amount: number): string {
 export interface AmountDisplay {
   /** Huvudtexten, t.ex. "2½ dl", "3 ägg", "500 g". */
   text: string
-  /** Vikten, t.ex. "150 g" – utelämnas när mängden redan är i gram. */
+  /** Vikten, t.ex. "150 g" eller "113 g tillagat" – utelämnas när mängden redan är i gram. */
   grams?: string
 }
 
 /** Läsbar mängd för en ingrediens (efter avrundning) med vikten som komplement. */
-export function formatIngredientAmount(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): AmountDisplay {
+export function formatIngredientAmount(food: UnitFood, amount: number, unit: UnitKey): AmountDisplay {
   const rounded = roundAmount(amount, unit)
   const g = gramsFor(food, amount, unit)
   const gramsText = Number.isFinite(g) && g > 0 ? formatGrams(roundAmount(g, 'g'), g < 10 ? 1 : 0) : undefined
   if (unit === 'g') return { text: formatGrams(rounded, rounded < 10 ? 1 : 0) }
   if (isPortionUnit(unit)) return { text: portionAmountText(unitLabel(food, unit), rounded), grams: gramsText }
+  if (isRawUnit(unit)) {
+    // "150 g rå" (113 g tillagat), "1½ dl okokt" (345 g tillagat).
+    const [base, kind] = unitLabel(food, unit).split(' ')
+    const qty = unit === 'g-ra' ? formatGrams(rounded, rounded < 10 ? 1 : 0) : `${formatFractionAmount(rounded)} ${base}`
+    return { text: `${qty} ${kind}`, grams: gramsText && `${gramsText} tillagat` }
+  }
   const short = UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
   const qty = unit === 'kg' || unit === 'l' || rounded >= 20 ? formatNumber(rounded, 2) : formatFractionAmount(rounded)
   return { text: `${qty} ${short}`, grams: gramsText }
@@ -379,7 +385,11 @@ export function isVegetarian(recipe: Recipe): boolean {
 // ---------------------------------------------------------------------------
 
 export interface WeightInfo {
+  /** Ingrediensernas vikt före tillagning – rå/okokt vikt för det som angetts i "g rå" eller "dl okokt". */
   raw: number
+  /** Ingrediensernas vikt som den räknas utan tillagad vikt: rå/okokt angivna varor räknas tillagade. */
+  estimated: number
+  /** Färdig vikt: uppmätt tillagad vikt, annars `estimated`. */
   final: number
   perServing: number
   /** Tillagad vikt är angiven. */
@@ -388,24 +398,32 @@ export interface WeightInfo {
   changePct?: number
   /** Receptet innehåller torra råvaror som suger upp vatten vid kokning (ris, pasta, gryn, baljväxter). */
   absorbs?: boolean
+  /** Någon ingrediens är angiven i rå eller okokt vikt och räknas om till tillagad vikt. */
+  rawUnits?: boolean
 }
 
 /** Kategorier med torra råvaror som suger upp vatten när de kokas. */
 const ABSORBING_CATEGORIES: ReadonlySet<string> = new Set(['pasta_ris', 'spannmal', 'baljvaxter'])
 
 export function weightInfo(recipe: Pick<Recipe, 'ingredients' | 'cookedWeightG' | 'servings'>): WeightInfo {
-  const raw = recipeRawWeight(recipe)
+  const raw = recipeUncookedWeight(recipe)
+  const estimated = recipeRawWeight(recipe)
   const final = recipeFinalWeight(recipe)
   const cooked = recipe.cookedWeightG !== undefined && recipe.cookedWeightG > 0
-  const info: WeightInfo = { raw, final, perServing: recipeServingWeight(recipe), cooked }
+  const info: WeightInfo = { raw, estimated, final, perServing: recipeServingWeight(recipe), cooked }
   if (cooked && raw > 0) info.changePct = ((final - raw) / raw) * 100
   if (recipe.ingredients.some((i) => i.grams > 0 && ABSORBING_CATEGORIES.has(i.food.category))) info.absorbs = true
+  if (recipe.ingredients.some((i) => isRawUnit(i.unit) && i.food.rawWeight)) info.rawUnits = true
   return info
 }
 
 /** Vänlig förklaring av skillnaden mellan råvikt och tillagad vikt. */
 export function cookedWeightText(info: WeightInfo): string {
-  if (!info.cooked) return 'Ingen tillagad vikt angiven – näringen per portion räknas på råvikten.'
+  if (!info.cooked) {
+    return info.rawUnits
+      ? 'Ingen tillagad vikt angiven – Lagom räknar med ingrediensernas vikt, med det du angett i rå eller okokt vikt omräknat till tillagat.'
+      : 'Ingen tillagad vikt angiven – näringen per portion räknas på råvikten.'
+  }
   const change = info.changePct ?? 0
   if (Math.abs(change) < 2) return 'Rätten väger ungefär lika mycket färdig som rå.'
   const pct = formatNumber(Math.abs(change))

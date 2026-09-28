@@ -149,7 +149,8 @@ export function draftFromFood(food: Food, energyUnit: EnergyInputUnit = 'kcal'):
     gramsPerDl: food.density !== undefined ? round(food.density * 100, 1) : undefined,
     barcode: food.barcode ?? '',
     tags: food.tags ? [...food.tags] : [],
-    note: food.note ?? '',
+    // Ett samlingsvärdes förklaring ("genomsnitt av vanliga märken") stämmer inte för en egen kopia.
+    note: food.isAverage ? '' : (food.note ?? ''),
   }
 }
 

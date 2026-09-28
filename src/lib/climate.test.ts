@@ -122,6 +122,10 @@ describe('foodCo2e', () => {
     expect(foodClimateFactor(food('Pasta, kokt', 'pasta_ris')).source).toMatch(/kokt vikt/)
     // "okokt" ska inte tolkas som kokt.
     expect(foodCo2e(food('Pasta, okokt', 'pasta_ris'))).toBe(0.8)
+    // Korta namn utan "kokt": livsmedlets omräkning från okokt vikt avgör.
+    expect(foodCo2e(food('Pasta', 'pasta_ris', { rawWeight: { factor: 2.5, kind: 'okokt' } }))).toBeCloseTo(0.32)
+    expect(foodCo2e(food('Ris', 'pasta_ris', { rawWeight: { factor: 3, kind: 'okokt', density: 0.85 } }))).toBeCloseTo(3.1 / 3)
+    expect(foodClimateFactor(food('Ris', 'pasta_ris', { rawWeight: { factor: 3, kind: 'okokt' } })).source).toMatch(/kokt vikt/)
   })
 })
 

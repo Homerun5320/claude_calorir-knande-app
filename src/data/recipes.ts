@@ -14,6 +14,7 @@
  */
 import type { Food, FoodTag, Recipe, RecipeIngredient, UnitKey } from '../types'
 import { gramsFor } from '../lib/units'
+import { aliasAmount, resolveFoodAlias } from './foods/aliases'
 
 /** Prefix för inbyggda recept: 'klassiker-kottbullar'. */
 export const BUILTIN_RECIPE_PREFIX = 'klassiker-'
@@ -75,7 +76,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Mormors köttbullar – saftiga tack vare ströbröd som svällt i mjölk.',
     ingredients: [
-      ['lagom:blandfars-ra', 500, 'g'],
+      ['lagom:blandfars-stekt', 500, 'g-ra'],
       ['lagom:strobrod', 0.75, 'dl'],
       ['lagom:mjolk-standard-3', 1.5, 'dl'],
       ['lagom:agg-ratt', 1, st],
@@ -129,9 +130,9 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Torsdagsklassikern – mättande, billig och full av fibrer från de gula ärtorna.',
     ingredients: [
-      ['lagom:gula-artor-torkade', 5, 'dl'],
+      ['lagom:gula-artor-kokta', 5, 'dl-ra'],
       ['lagom:vatten-kranvatten', 15, 'dl'],
-      ['lagom:sidflask-rimmat-ratt', 300, 'g'],
+      ['lagom:sidflask-rimmat-stekt', 300, 'g-ra'],
       ['lagom:lok-gul', 1, st],
       ['lagom:salt-jodberikat', 1, 'tsk'],
     ],
@@ -184,7 +185,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Långkokt nötgryta med kryddpeppar och lagerblad – husmanskost när den är som bäst.',
     ingredients: [
-      ['lagom:notkott-grytbitar-ra', 1000, 'g'],
+      ['lagom:notkott-grytbitar-kokt', 1000, 'g-ra'],
       ['lagom:vetemjol', 3, 'msk'],
       ['lagom:smor-normalsaltat-82', 3, 'msk'],
       ['lagom:lok-gul', 3, st],
@@ -215,14 +216,14 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Frasiga potatisplättar med stekt fläsk och rårörda lingon.',
     ingredients: [
-      ['lagom:potatis-ra', 800, 'g'],
+      ['lagom:potatis-kokt-skalad', 800, 'g'],
       ['lagom:vetemjol', 2, 'dl'],
       ['lagom:mjolk-standard-3', 4, 'dl'],
       ['lagom:agg-ratt', 2, st],
       ['lagom:salt-jodberikat', 1, 'tsk'],
       ['lagom:smor-normalsaltat-82', 4, 'msk'],
-      ['lagom:sidflask-rimmat-ratt', 300, 'g'],
-      ['lagom:lingon-rarorda', 4, 'portion:portion'],
+      ['lagom:sidflask-rimmat-stekt', 300, 'g-ra'],
+      ['lagom:lingonsylt', 4, 'portion:portion'],
     ],
     cookedWeightG: 1500,
     instructions: [
@@ -245,7 +246,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     intro: 'Kålrullar med sirapsglans – en klassiker med rötter i Karl XII:s tid.',
     ingredients: [
       ['lagom:vitkal', 1000, 'g'],
-      ['lagom:blandfars-ra', 500, 'g'],
+      ['lagom:blandfars-stekt', 500, 'g-ra'],
       ['lagom:ris-grotris-torrt', 1, 'dl'],
       ['lagom:mjolk-standard-3', 1, 'dl'],
       ['lagom:agg-ratt', 1, st],
@@ -274,7 +275,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Krämiga kalvfärsbiffar med grädde och äggulor, serverade med mos och ärtor.',
     ingredients: [
-      ['lagom:kalvfars-ra', 500, 'g'],
+      ['lagom:kalvfars-stekt', 500, 'g-ra'],
       ['lagom:aggula-ra', 4, st],
       ['lagom:vispgradde-40', 2, 'dl'],
       ['lagom:salt-jodberikat', 1, 'tsk'],
@@ -283,7 +284,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:smor-normalsaltat-82', 3, 'msk'],
       ['lagom:potatismos-hemlagat', 600, 'g'],
       ['lagom:arter-grona-frysta', 4, 'dl'],
-      ['lagom:lingon-rarorda', 4, 'portion:portion'],
+      ['lagom:lingonsylt', 4, 'portion:portion'],
     ],
     cookedWeightG: 1680,
     instructions: [
@@ -304,7 +305,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Rosa biffar med rödbetor och kapris – uppkallade efter Henrik Lindström.',
     ingredients: [
-      ['lagom:notfars-12-ra', 500, 'g'],
+      ['lagom:notfars-12-stekt', 500, 'g-ra'],
       ['lagom:rodbetor-inlagda', 100, 'g'],
       ['lagom:kapris', 2, 'msk'],
       ['lagom:lok-gul', 0.5, st],
@@ -338,10 +339,10 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:vetemjol', 3, 'dl'],
       ['lagom:agg-ratt', 1, st],
       ['lagom:salt-jodberikat', 1, 'tsk'],
-      ['lagom:sidflask-rimmat-ratt', 200, 'g'],
+      ['lagom:sidflask-rimmat-stekt', 200, 'g-ra'],
       ['lagom:lok-gul', 1, st],
       ['lagom:smor-normalsaltat-82', 50, 'g'],
-      ['lagom:lingon-rarorda', 4, 'portion:portion'],
+      ['lagom:lingonsylt', 4, 'portion:portion'],
     ],
     extras: ['1 tsk malen kryddpeppar'],
     instructions: [
@@ -362,7 +363,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'husman',
     intro: 'Tjock pannkaka i långpanna med knaprigt bacon och lingonsylt.',
     ingredients: [
-      ['lagom:bacon-ratt', 1, 'portion:forp'],
+      ['lagom:bacon-stekt', 1, 'portion:forp'],
       ['lagom:vetemjol', 2.5, 'dl'],
       ['lagom:salt-jodberikat', 0.5, 'tsk'],
       ['lagom:mjolk-standard-3', 6, 'dl'],
@@ -390,7 +391,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     intro: 'Kålrot, potatis och morot – ett gyllene mos till fläsklägg eller korv.',
     ingredients: [
       ['lagom:kalrot', 600, 'g'],
-      ['lagom:potatis-ra', 400, 'g'],
+      ['lagom:potatis-kokt-skalad', 400, 'g'],
       ['lagom:morot', 2, st],
       ['lagom:smor-normalsaltat-82', 2, 'msk'],
       ['lagom:mjolk-standard-3', 1, 'dl'],
@@ -423,8 +424,8 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:rapsolja', 1, 'msk'],
       ['lagom:tomatpure', 2, 'msk'],
       ['lagom:matlagningsgradde-15', 1, 'portion:forp'],
-      ['lagom:senap-fransk', 1, 'msk'],
-      ['lagom:ris-langkornigt-torrt', 3, 'dl'],
+      ['lagom:senap-dijon', 1, 'msk'],
+      ['lagom:ris-langkornigt-kokt', 3, 'dl-ra'],
     ],
     cookedWeightG: 1600,
     instructions: [
@@ -445,13 +446,13 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'vardag',
     intro: 'Kyckling, banan, bacon och jordnötter i gräddig chilisås – en älskad 70-talsrätt.',
     ingredients: [
-      ['lagom:grillkyckling-utan-skinn', 700, 'g'],
+      ['lagom:grillkyckling-med-skinn', 1, 'portion:hel'],
       ['lagom:vispgradde-40', 3, 'dl'],
       ['lagom:sweet-chilisas', 1, 'dl'],
       ['lagom:banan', 3, st],
-      ['lagom:bacon-ratt', 1, 'portion:forp'],
+      ['lagom:bacon-stekt', 1, 'portion:forp'],
       ['lagom:jordnotter-rostade-saltade', 1, 'dl'],
-      ['lagom:ris-langkornigt-torrt', 4, 'dl'],
+      ['lagom:ris-langkornigt-kokt', 4, 'dl-ra'],
     ],
     cookedWeightG: 2400,
     instructions: [
@@ -472,7 +473,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'vardag',
     intro: 'Veckans trygga middag – gärna med extra morot i såsen.',
     ingredients: [
-      ['lagom:notfars-12-ra', 500, 'g'],
+      ['lagom:notfars-12-stekt', 500, 'g-ra'],
       ['lagom:lok-gul', 1, st],
       ['lagom:morot', 1, st],
       ['lagom:vitlok', 2, 'portion:klyfta'],
@@ -482,7 +483,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:buljongtarning', 1, 'portion:tarning'],
       ['lagom:oregano-torkad', 1, 'tsk'],
       ['lagom:salt-jodberikat', 0.5, 'tsk'],
-      ['lagom:pasta-vete-torr', 350, 'g'],
+      ['lagom:pasta-vete-kokt', 350, 'g-ra'],
     ],
     cookedWeightG: 1850,
     instructions: [
@@ -503,7 +504,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'vardag',
     intro: 'Köttfärssås, krämig vitsås och gratinerad ost i lager på lager.',
     ingredients: [
-      ['lagom:notfars-12-ra', 500, 'g'],
+      ['lagom:notfars-12-stekt', 500, 'g-ra'],
       ['lagom:lok-gul', 1, st],
       ['lagom:vitlok', 2, 'portion:klyfta'],
       ['lagom:rapsolja', 1, 'msk'],
@@ -514,7 +515,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:smor-normalsaltat-82', 3, 'msk'],
       ['lagom:vetemjol', 3, 'msk'],
       ['lagom:mjolk-standard-3', 6, 'dl'],
-      ['lagom:lasagneplattor-torra', 12, st],
+      ['lagom:pasta-vete-kokt', 12, st],
       ['lagom:riven-ost-gratangost', 150, 'g'],
     ],
     cookedWeightG: 2000,
@@ -537,11 +538,11 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'vardag',
     intro: 'Sveriges mest älskade fredagsmys – bygg din egen taco vid bordet.',
     ingredients: [
-      ['lagom:notfars-12-ra', 500, 'g'],
+      ['lagom:notfars-12-stekt', 500, 'g-ra'],
       ['lagom:tacokryddmix', 1, 'portion:pase'],
       ['lagom:vatten-kranvatten', 1, 'dl'],
       ['lagom:tortilla-vete', 8, st],
-      ['lagom:isbergssallad', 150, 'g'],
+      ['lagom:sallad-blandad', 150, 'g'],
       ['lagom:tomat', 2, st],
       ['lagom:gurka', 0.5, 'portion:hel'],
       ['lagom:majs-konserverad', 1, 'portion:burk'],
@@ -593,7 +594,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'hogtid',
     intro: 'Julbordets drottning: potatis, lök och ansjovis i grädde.',
     ingredients: [
-      ['lagom:potatis-ra', 1000, 'g'],
+      ['lagom:potatis-kokt-skalad', 1000, 'g'],
       ['lagom:lok-gul', 2, st],
       ['lagom:ansjovis-skarpsill', 1, 'portion:burk'],
       ['lagom:vispgradde-40', 3, 'dl'],
@@ -620,7 +621,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'fisk',
     intro: 'Potatis, gravad lax och dill under en krämig äggstanning – med skirat smör.',
     ingredients: [
-      ['lagom:potatis-ra', 800, 'g'],
+      ['lagom:potatis-kokt-skalad', 800, 'g'],
       ['lagom:lax-gravad', 250, 'g'],
       ['lagom:lok-gul', 1, st],
       ['lagom:dill-farsk', 1, 'portion:knippe'],
@@ -649,12 +650,12 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'fisk',
     intro: 'Vit fisk och räkor i dillsås under en krispig moskant.',
     ingredients: [
-      ['lagom:torsk-ra', 500, 'g'],
+      ['lagom:torsk-kokt', 500, 'g-ra'],
       ['lagom:rakor-kokta-skalade', 100, 'g'],
       ['lagom:matlagningsgradde-15', 1, 'portion:forp'],
       ['lagom:fond-koncentrerad', 1, 'msk'],
       ['lagom:dill-farsk', 10, 'g'],
-      ['lagom:potatis-ra', 800, 'g'],
+      ['lagom:potatis-kokt-skalad', 800, 'g'],
       ['lagom:mjolk-standard-3', 1.5, 'dl'],
       ['lagom:smor-normalsaltat-82', 2, 'msk'],
       ['lagom:riven-ost-gratangost', 40, 'g'],
@@ -679,13 +680,13 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'fisk',
     intro: 'Strömmingsflundror i rågmjöl – billig, klimatsmart och full av omega-3.',
     ingredients: [
-      ['lagom:stromming-ra', 600, 'g'],
+      ['lagom:stromming', 600, 'g-ra'],
       ['lagom:dill-farsk', 10, 'g'],
       ['lagom:ragmjol-fullkorn', 1, 'dl'],
       ['lagom:salt-jodberikat', 1, 'tsk'],
       ['lagom:smor-normalsaltat-82', 3, 'msk'],
       ['lagom:potatismos-hemlagat', 4, 'portion:portion'],
-      ['lagom:lingon-rarorda', 4, 'portion:portion'],
+      ['lagom:lingonsylt', 4, 'portion:portion'],
     ],
     cookedWeightG: 1500,
     instructions: [
@@ -709,7 +710,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:majonnas-80', 1, 'dl'],
       ['lagom:creme-fraiche-34', 1, 'dl'],
       ['lagom:dill-farsk', 15, 'g'],
-      ['lagom:lok-rod', 0.5, st],
+      ['lagom:lok-gul', 0.5, st],
       ['lagom:citron', 0.5, st],
       ['lagom:formfranska', 4, 'portion:skiva'],
       ['lagom:smor-normalsaltat-82', 2, 'msk'],
@@ -735,7 +736,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     group: 'vego',
     intro: 'Röda linser, tomat och kokos – värmande, proteinrik och klimatsmart.',
     ingredients: [
-      ['lagom:linser-roda-torkade', 2, 'dl'],
+      ['lagom:linser-grona-kokta', 2, 'dl-ra'],
       ['lagom:lok-gul', 1, st],
       ['lagom:vitlok', 2, 'portion:klyfta'],
       ['lagom:morot', 2, st],
@@ -767,7 +768,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     intro: 'Krispiga biffar av kikärtor och vita bönor – gott med tzatziki och sallad.',
     ingredients: [
       ['lagom:kikartor-kokta', 1, 'portion:burk'],
-      ['lagom:vita-bonor-kokta', 1, 'portion:burk'],
+      ['lagom:kidneybonor-kokta', 1, 'portion:burk'],
       ['lagom:lok-gul', 1, st],
       ['lagom:vitlok', 1, 'portion:klyfta'],
       ['lagom:havregryn', 1, 'dl'],
@@ -1043,7 +1044,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
       ['lagom:sill-inlagd', 4, 'portion:portion'],
       ['lagom:graddfil-12', 2, 'dl'],
       ['lagom:graslok', 0.5, 'portion:knippe'],
-      ['lagom:agg-kokt', 2, st],
+      ['lagom:agg-ratt', 2, st],
     ],
     instructions: [
       'Koka färskpotatisen med dillkronor i saltat vatten, ca 15 minuter.',
@@ -1113,7 +1114,26 @@ function instructionsText(seed: BuiltinRecipeSeed): string {
 const cache = new WeakMap<readonly Food[], Recipe[]>()
 
 /**
- * Gör om receptdefinitionerna till `Recipe`-objekt med ögonblicksbilder av livsmedlen.
+ * Livsmedel, mängd och enhet för en ingrediens i en receptdefinition. Finns livsmedlet inte längre
+ * följs dess alias till ersättaren; ersätts en rå rad av den tillagade (`unit: 'g-ra'`) blir
+ * mängden i gram rå vikt ('g' → 'g-ra', 'kg' → 'g-ra' × 1000). undefined om inget hittas.
+ */
+export function resolveSeedIngredient(
+  byId: ReadonlyMap<string, Food>,
+  foodId: string,
+  amount: number,
+  unit: UnitKey,
+): { food: Food; amount: number; unit: UnitKey } | undefined {
+  const direct = byId.get(foodId)
+  if (direct) return { food: direct, amount, unit }
+  const alias = resolveFoodAlias(foodId)
+  const target = alias ? byId.get(alias.to) : undefined
+  return target ? { food: target, ...aliasAmount(alias, amount, unit) } : undefined
+}
+
+/**
+ * Gör om receptdefinitionerna till `Recipe`-objekt med ögonblicksbilder av livsmedlen. Id:n som
+ * slagits ihop följer sitt alias (`resolveSeedIngredient`).
  * Ingredienser vars livsmedel saknas (eller vars mängd inte kan räknas om till gram) hoppas över
  * med en varning i konsolen. Resultatet memoiseras per livsmedelslista.
  */
@@ -1127,12 +1147,13 @@ export function loadBuiltinRecipes(foods: readonly Food[]): Recipe[] {
   for (const seed of BUILTIN_RECIPE_SEEDS) {
     const id = `${BUILTIN_RECIPE_PREFIX}${seed.id}`
     const ingredients: RecipeIngredient[] = []
-    seed.ingredients.forEach(([foodId, amount, unit], index) => {
-      const food = byId.get(foodId)
-      if (!food) {
+    seed.ingredients.forEach(([foodId, seedAmount, seedUnit], index) => {
+      const resolved = resolveSeedIngredient(byId, foodId, seedAmount, seedUnit)
+      if (!resolved) {
         console.warn(`Recept "${seed.name}": livsmedlet ${foodId} saknas och hoppas över.`)
         return
       }
+      const { food, amount, unit } = resolved
       const grams = gramsFor(food, amount, unit)
       if (!Number.isFinite(grams) || grams <= 0) {
         console.warn(`Recept "${seed.name}": ${amount} ${unit} ${food.name} kan inte räknas om till gram.`)

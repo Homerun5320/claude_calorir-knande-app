@@ -264,6 +264,26 @@ describe('tillagad vikt, klimat och tallrik', () => {
     expect(cookedWeightText(weightInfo(recipe()))).toContain('råvikten')
   })
 
+  it('räknar rå och okokt vikt som råvikt – inte som tillagad vikt', () => {
+    const farsFood: Food = { ...lok, id: 'lagom:fars', name: 'Nötfärs', category: 'rott_kott', rawWeight: { factor: 0.8, kind: 'ra' } }
+    const risFood: Food = { ...lok, id: 'lagom:ris', name: 'Ris', category: 'pasta_ris', rawWeight: { factor: 3, kind: 'okokt', density: 0.85 } }
+    const ingredients = [
+      { id: 'f', food: farsFood, amount: 500, unit: 'g-ra' as const, grams: 400 },
+      { id: 'r', food: risFood, amount: 2, unit: 'dl-ra' as const, grams: 510 },
+    ]
+    // 500 g rå färs + 2 dl okokt ris (170 g) = 670 g rå; räknat tillagat 400 g + 510 g = 910 g.
+    const info = weightInfo(recipe({ ingredients, cookedWeightG: 850 }))
+    expect(info.raw).toBe(670)
+    expect(info.estimated).toBe(910)
+    expect(info.rawUnits).toBe(true)
+    expect(info.changePct).toBeCloseTo(((850 - 670) / 670) * 100)
+    expect(cookedWeightText(info)).toMatch(/väger 27 % mer färdig/)
+    // Utan tillagad vikt räknas med ingrediensernas vikt, med rå och okokt omräknat till tillagat.
+    const noCooked = weightInfo(recipe({ ingredients }))
+    expect(noCooked.final).toBe(910)
+    expect(cookedWeightText(noCooked)).toMatch(/omräknat till tillagat/)
+  })
+
   it('förklarar viktökning utan att påstå att det är ris eller pasta', () => {
     // Mjöl (spannmål) kan suga upp vätska.
     const withFlour = weightInfo(recipe({ cookedWeightG: 450 }))

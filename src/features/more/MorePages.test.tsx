@@ -168,7 +168,8 @@ describe('FoodCalendarPage', () => {
 
   it('visar veckans traditioner', () => {
     inRouter(<FoodCalendarPage />)
-    expect(screen.getByRole('button', { name: /Ärtsoppa och pannkakor/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Fredagsmys/ })).toBeInTheDocument()
+    // Beroende på veckodag kan traditionen även visas som nästa matdag överst – därför getAll.
+    expect(screen.getAllByRole('button', { name: /Ärtsoppa och pannkakor/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /Fredagsmys/ }).length).toBeGreaterThan(0)
   })
 })

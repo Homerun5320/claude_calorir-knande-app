@@ -487,12 +487,14 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
               step={50}
               decimals={0}
               suffix="g"
-              placeholder={weight.raw > 0 ? formatNumber(Math.round(weight.raw)) : 'T.ex. 1 450'}
+              placeholder={weight.estimated > 0 ? formatNumber(Math.round(weight.estimated)) : 'T.ex. 1 450'}
               error={shownErrors.cookedWeightG}
               hint={
-                weight.raw > 0
-                  ? `Råvikt ${formatGrams(weight.raw)}. Utan tillagad vikt räknar Lagom med råvikten.`
-                  : 'Utan tillagad vikt räknar Lagom med ingrediensernas råvikt.'
+                weight.raw <= 0
+                  ? 'Utan tillagad vikt räknar Lagom med ingrediensernas råvikt.'
+                  : weight.rawUnits
+                    ? `Råvikt ${formatGrams(weight.raw)}. Utan tillagad vikt räknar Lagom med ca ${formatGrams(weight.estimated)} – det du angett i rå eller okokt vikt räknas som tillagat.`
+                    : `Råvikt ${formatGrams(weight.raw)}. Utan tillagad vikt räknar Lagom med råvikten.`
               }
             />
             {weightWarning && (
@@ -501,7 +503,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                 {weightWarning}
               </p>
             )}
-            {weight.raw > 0 && (
+            {weight.final > 0 && (
               <p className="mt-3 text-sm text-ink-2 tabular-nums">
                 1 portion väger ungefär <span className="font-semibold text-ink">{formatGrams(weight.perServing)}</span>
                 {weight.cooked && weight.changePct !== undefined && Math.abs(weight.changePct) >= 2 && (

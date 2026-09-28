@@ -1,6 +1,16 @@
 /**
  * Färdigrätter, husmanskost, smörgåsar och snabbmat.
  *
+ * Grova linjer: en rad per rätt så som den brukar ätas ("Kycklinggryta med ris", "Pizza med skinka",
+ * "Korv med bröd"). Nästan likadana varianter är sammanslagna – t.ex. kycklinggrytor med grädde, curry,
+ * kokosmjölk eller tikka masala, eller pizzorna Vesuvio, Capricciosa, Hawaii och Calzone – och de gamla
+ * id:na pekar hit via alias (`aliases/fardigratter-snabbmat.ts`). Sökorden (syn) innehåller de gamla namnen.
+ *
+ * Samlingsvärden (`avg`) finns för produkttyper med många märken eller kedjor: frysta färdigrätter och
+ * matlådor, fryst pytt i panna, fryspizza, färdiga pannkakor, frysta vårrullar och dumplings samt
+ * hamburgare och nuggets från snabbmatskedjor.
+ * Exakta värden för ett visst märke får man genom att skanna streckkoden (Open Food Facts).
+ *
  * Värden per 100 g av rätten som den serveras (inklusive sås och tillbehör när det står i namnet).
  * Näringsvärdena är receptberäknade på samma sätt som Livsmedelsverket gör för sammansatta rätter:
  * typiska svenska recept och portioner, tillagade ingredienser (stekt kött, kokt potatis, kokt pasta …)
@@ -19,15 +29,16 @@
  *
  * Rätter med `lmv` är samma rätt (samma tillagning) som Livsmedelsverkets post med det numret och har
  * dess värden för energi och makronäringsämnen; övriga näringsämnen fylls i därifrån. Flera tallrikar
- * med tillbehör (t.ex. "… med kokt potatis och gräddsås") är beräknade från Livsmedelsverkets värden
- * för de ingående delarna.
+ * med tillbehör (t.ex. "… med potatis och gräddsås") är beräknade från Livsmedelsverkets värden
+ * för de ingående delarna, och sammanslagna rätter har medelvärdet av de ingående varianterna.
  *
  * Klimatavtryck (co2e) i kg CO2e per kg färdig rätt, beräknat från ingrediensernas ungefärliga
  * klimatavtryck enligt RISE/Livsmedelsverket (exklusive tillagningsenergi).
- *
- * Genererad från ett receptunderlag – ändra hellre recepten än enskilda siffror så att allt hänger ihop.
  */
 import { defineFoods, type FoodSeed } from './define'
+
+const SKANNA = 'Skanna streckkoden för exakta värden för ditt märke.'
+const KEDJA = 'Kedjornas exakta värden finns på deras webbplatser och i apparna.'
 
 // ---------------------------------------------------------------------------
 // Husmanskost – klassiska svenska vardagsrätter
@@ -36,7 +47,7 @@ import { defineFoods, type FoodSeed } from './define'
 const husmanskost: FoodSeed[] = [
   {
     id: 'kottbullar-potatismos-grasas-lingon',
-    name: 'Köttbullar med potatismos, gräddsås och lingon',
+    name: 'Köttbullar med potatismos och gräddsås',
     cat: 'fardigratt',
     kcal: 139, prot: 6.1, carb: 12.1, fat: 7.2, fiber: 0.9, sugar: 3.8, addedSugar: 2.1, satFat: 3.3, salt: 0.83,
     n: {
@@ -44,13 +55,17 @@ const husmanskost: FoodSeed[] = [
       vitA: 32, vitD: 0.2, vitE: 0.3, vitC: 4, thiamin: 0.14, riboflavin: 0.09, niacin: 1.7, vitB6: 0.19, folate: 10, vitB12: 0.44,
       calcium: 29, iron: 0.6, magnesium: 16, potassium: 256, phosphorus: 84, zinc: 1, selenium: 2.9,
     },
-    portions: [['portion', '1 portion (450 g)', 450], ['liten', '1 liten portion (300 g)', 300], ['barn', '1 barnportion (200 g)', 200]],
+    portions: [['portion', '1 portion (450 g)', 450], ['liten', '1 liten portion (300 g)', 300], ['barn', '1 barnportion (200 g)', 200], ['lada', '1 fryst matlåda (ca 350 g)', 350]],
     tags: ['klassiker', 'svensk'],
-    syn: ['köttbullar och mos', 'köttbullar med mos', 'köttbullar potatismos', 'köttbullar med gräddsås', 'köttbullar med brunsås', 'swedish meatballs', 'köttbullar med lingon', 'kottbullar med mos', 'kötbullar', 'köttbullar med potatismos och gräddsås', 'husmanskost'],
+    syn: [
+      'köttbullar och mos', 'köttbullar med mos', 'köttbullar potatismos', 'köttbullar med gräddsås', 'köttbullar med brunsås',
+      'swedish meatballs', 'köttbullar med lingon', 'kottbullar med mos', 'kötbullar', 'köttbullar med potatismos och gräddsås',
+      'husmanskost', 'köttbullar med potatismos, gräddsås och lingon', 'köttbullar och mos fryst', 'fryst köttbullar med mos',
+    ],
     co2e: 4.9,
     plate: { veg: 0.03, carb: 0.44, protein: 0.31 },
     kostrad: { fruktGront: 3, rottKott: 25 },
-    note: 'Beräknat på en portion med 140 g köttbullar, 200 g potatismos, 70 g gräddsås, 25 g rårörda lingon och 15 g saltgurka.',
+    note: 'Beräknat på en portion med 140 g köttbullar, 200 g potatismos, 70 g gräddsås, 25 g rårörda lingon och 15 g saltgurka. Frysta matlådor med köttbullar och mos (t.ex. Dafgårds, Findus) ligger på ungefär samma nivå, ca 135–145 kcal per 100 g.',
   },
   {
     id: 'pytt-i-panna',
@@ -58,50 +73,53 @@ const husmanskost: FoodSeed[] = [
     cat: 'fardigratt',
     lmv: 7188,
     kcal: 139, prot: 6, carb: 15.1, fat: 5.6, fiber: 2, sugar: 1.3, addedSugar: 0, satFat: 3, salt: 0.8,
-    portions: [['portion', '1 portion (350 g)', 350], ['liten', '1 liten portion (250 g)', 250]],
+    portions: [['portion', '1 portion (350 g)', 350], ['liten', '1 liten portion (250 g)', 250], ['agg', '1 portion med stekt ägg och rödbetor (ca 435 g)', 435]],
     tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['pytt', 'pyttipanna', 'pytt i pannan', 'biffpytt', 'pytt-i-panna', 'pyttipana', 'pyttipanna fryst', 'rester'],
+    syn: [
+      'pytt', 'pyttipanna', 'pytt i pannan', 'biffpytt', 'pytt-i-panna', 'pyttipana', 'rester', 'pytt i panna med ägg',
+      'pytt med ägg', 'pytt med ägg och rödbetor', 'pyttipanna med ägg och rödbetor', 'pytt med rödbetor', 'pytt och ägg',
+    ],
     co2e: 4.9,
     plate: { veg: 0.13, carb: 0.63, protein: 0.24 },
     kostrad: { fruktGront: 13, rottKott: 24 },
-    note: 'Tärnad stekt potatis med kött, korv, skinka och lök. Stekt ägg och rödbetor räknas separat – eller välj "Pytt i panna med stekt ägg och rödbetor".',
+    note: 'Hemlagad: tärnad stekt potatis med kött, korv, skinka och lök. Med stekt ägg och inlagda rödbetor blir värdet per 100 g nästan detsamma. Fryst pytt steks i mer fett – välj då "Fryst pytt i panna".',
   },
   {
-    id: 'pytt-i-panna-agg-rodbetor',
-    name: 'Pytt i panna med stekt ägg och rödbetor',
+    id: 'pytt-i-panna-fryst',
+    name: 'Fryst pytt i panna',
     cat: 'fardigratt',
-    kcal: 137, prot: 6.3, carb: 13.3, fat: 6.1, fiber: 1.8, sugar: 2.2, addedSugar: 0.9, satFat: 3, salt: 0.72,
-    n: {
-      monoFat: 2.1, polyFat: 0.4, omega3: 0.02, cholesterol: 63,
-      vitA: 41, vitD: 0.23, vitE: 1, vitC: 9.3, thiamin: 0.07, riboflavin: 0.13, niacin: 3.3, vitB6: 0.18, folate: 20, vitB12: 0.32,
-      calcium: 17, iron: 0.9, magnesium: 20, potassium: 317, phosphorus: 87, zinc: 1, selenium: 3.8,
-    },
-    portions: [['portion', '1 portion (435 g)', 435]],
-    tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['pytt med ägg', 'pytt i panna med ägg', 'pyttipanna med ägg och rödbetor', 'pytt med rödbetor', 'pytt och ägg'],
-    co2e: 4.2,
-    plate: { veg: 0.2, carb: 0.5, protein: 0.3 },
-    kostrad: { fruktGront: 20, rottKott: 20 },
-    note: 'Beräknat på en portion med 350 g pytt i panna, 45 g stekt ägg och 40 g inlagda rödbetor.',
+    lmv: 255,
+    avg: true,
+    kcal: 196, prot: 4.5, carb: 23.3, fat: 8.8, fiber: 2.9, sugar: 1.8, addedSugar: 1.5, satFat: 2, salt: 1.6,
+    portions: [['portion', '1 portion (ca 300 g)', 300], ['liten', '1 liten portion (200 g)', 200]],
+    tags: ['svensk'],
+    syn: ['fryst pytt', 'pyttipanna fryst', 'pytt fryst', 'fryst pyttipanna', 'frusen pytt', 'pytt i panna frysvara', 'findus pytt', 'felix pytt', 'originalpytt'],
+    co2e: 3.5,
+    plate: { veg: 0.1, carb: 0.7, protein: 0.2 },
+    kostrad: { fruktGront: 10, rottKott: 18 },
+    note: `Samlingsvärde: Livsmedelsverkets värde för fryst pytt i panna, stekt enligt förpackningen – representativt för vanliga märken (t.ex. Findus, Felix och ICA). ${SKANNA}`,
   },
   {
     id: 'artsoppa-med-flask',
-    name: 'Ärtsoppa med fläsk',
+    name: 'Ärtsoppa',
     cat: 'fardigratt',
     lmv: 897,
     kcal: 85, prot: 6.4, carb: 8.9, fat: 2.1, fiber: 2.3, sugar: 0.8, addedSugar: 0, satFat: 0.9, salt: 0.7,
     portions: [['tallrik', '1 tallrik (3 dl, ca 320 g)', 320], ['dl', '1 dl', 105], ['stor', '1 stor portion (450 g)', 450]],
     density: 1.05,
     tags: ['klassiker', 'svensk', 'glutenfri', 'laktosfri'],
-    syn: ['ärtsoppa', 'ärter och fläsk', 'gul ärtsoppa', 'artsoppa', 'torsdagssoppa', 'ärtsoppa med fläsk och senap', 'ärtsoppa fläsk', 'ärtsoppa med senap', 'artsoppa med flask'],
+    syn: [
+      'ärtsoppa', 'ärter och fläsk', 'gul ärtsoppa', 'artsoppa', 'torsdagssoppa', 'ärtsoppa med fläsk och senap',
+      'ärtsoppa fläsk', 'ärtsoppa med senap', 'artsoppa med flask', 'ärtsoppa på burk', 'ärtsoppa konserv',
+    ],
     co2e: 0.9,
     plate: { veg: 0.04, carb: 0, protein: 0.54 },
     kostrad: { fruktGront: 4, baljvaxter: 44, rottKott: 10 },
-    note: 'Gula ärtor kokta med rimmat fläsk, lök, timjan och mejram. Senap räknas separat.',
+    note: 'Gula ärtor kokta med rimmat fläsk, lök, timjan och mejram. Ärtsoppa på burk ligger på samma nivå. Senap räknas separat.',
   },
   {
     id: 'artsoppa-vegetarisk',
-    name: 'Ärtsoppa, vegetarisk (utan fläsk)',
+    name: 'Vegetarisk ärtsoppa',
     cat: 'fardigratt',
     lmv: 904,
     kcal: 78, prot: 5.1, carb: 12, fat: 0.3, fiber: 2.7, sugar: 1.1, addedSugar: 0, satFat: 0.1, salt: 0.7,
@@ -116,16 +134,36 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'pannkakor-tunna',
-    name: 'Pannkakor, tunna (hemlagade)',
+    name: 'Pannkakor',
     cat: 'fardigratt',
     lmv: 2769,
     kcal: 136, prot: 5.5, carb: 13.6, fat: 6.5, fiber: 0.5, sugar: 3.7, addedSugar: 0, satFat: 3.6, salt: 0.6,
     portions: [['st', '1 pannkaka (ca 60 g)', 60], ['portion', '1 portion (3 st, 180 g)', 180], ['platt', '1 plätt (ca 20 g)', 20]],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['pannkaka', 'pannkakor', 'tunnpannkakor', 'tunna pannkakor', 'plättar', 'plätt', 'crêpes', 'crepes', 'torsdagspannkakor', 'pankakor'],
+    syn: [
+      'pannkaka', 'pannkakor', 'tunnpannkakor', 'tunna pannkakor', 'plättar', 'plätt', 'crêpes', 'crepes', 'torsdagspannkakor',
+      'pankakor', 'tunna pannkakor hemlagade', 'hemlagade pannkakor',
+    ],
     co2e: 1.8,
     plate: { veg: 0, carb: 0.75, protein: 0.15 },
-    note: 'Vetemjöl, mellanmjölk, ägg och smör, stekta i smör. Sylt och grädde räknas separat.',
+    note: 'Hemlagade: vetemjöl, mellanmjölk, ägg och smör, stekta i smör. Sylt och grädde räknas separat. Köpta frysta eller kylda pannkakor ligger högre – välj då "Färdiga pannkakor".',
+  },
+  {
+    id: 'pannkakor-fardiga',
+    name: 'Färdiga pannkakor',
+    cat: 'fardigratt',
+    lmv: 6079,
+    avg: true,
+    kcal: 186, prot: 6.5, carb: 25.9, fat: 5.8, fiber: 1.3, sugar: 6.2, satFat: 1.1, salt: 0.6,
+    portions: [['st', '1 pannkaka (ca 45 g)', 45], ['portion', '1 portion (4 st, 180 g)', 180]],
+    tags: ['vegetarisk'],
+    syn: [
+      'frysta pannkakor', 'fryst pannkaka', 'kylda pannkakor', 'färdiga pannkakor', 'köpta pannkakor', 'pannkakor fryst',
+      'pannkakor från frysen', 'mikropannkakor', 'findus pannkakor',
+    ],
+    co2e: 1.7,
+    plate: { veg: 0, carb: 0.75, protein: 0.15 },
+    note: `Samlingsvärde: Livsmedelsverkets värde för färdiga tunna pannkakor från fabrik (frys- eller kylvara), uppvärmda – representativt för vanliga märken (t.ex. Findus och butikernas egna märken). Sylt och grädde räknas separat. ${SKANNA}`,
   },
   {
     id: 'ugnspannkaka',
@@ -148,42 +186,30 @@ const husmanskost: FoodSeed[] = [
     kcal: 199, prot: 7.6, carb: 14.4, fat: 12.2, fiber: 0.9, sugar: 2.7, addedSugar: 0, satFat: 5.7, salt: 1,
     portions: [['bit', '1 bit (ca 200 g)', 200], ['portion', '1 portion (300 g)', 300]],
     tags: ['klassiker', 'svensk'],
-    syn: ['fläskpannkakor', 'ugnspannkaka med fläsk', 'pannkaka med fläsk', 'flaskpannkaka', 'baconpannkaka', 'fläskpankaka'],
+    syn: [
+      'fläskpannkakor', 'ugnspannkaka med fläsk', 'pannkaka med fläsk', 'flaskpannkaka', 'baconpannkaka', 'fläskpankaka',
+      'äggakaka', 'aggakaka', 'skånsk äggakaka', 'äggakaka med fläsk', 'äggkaka', 'äggakaka med fläsk och lingon',
+    ],
     co2e: 2.4,
     plate: { veg: 0, carb: 0.55, protein: 0.3 },
     kostrad: { rottKott: 16 },
-    note: 'Ugnspannkaka med stekt rimmat sidfläsk (ca 200 g stekt fläsk per långpanna). Lingon räknas separat.',
+    note: 'Ugnspannkaka med stekt rimmat sidfläsk (ca 200 g stekt fläsk per långpanna). Skånsk äggakaka med fläsk har ett liknande näringsvärde. Lingon räknas separat.',
   },
   {
     id: 'raggmunk',
-    name: 'Raggmunk (potatisplättar), stekt',
+    name: 'Raggmunk',
     cat: 'fardigratt',
     lmv: 271,
     kcal: 149, prot: 4.2, carb: 20, fat: 5.5, fiber: 1, sugar: 2.4, addedSugar: 0, satFat: 2.2, salt: 0.8,
     portions: [['st', '1 raggmunk (ca 70 g)', 70], ['portion', '1 portion (3 st, 210 g)', 210]],
     tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['raggmunkar', 'rårakor', 'råraka', 'potatisplättar', 'potatispannkaka', 'ragg munk', 'raggmunk'],
+    syn: [
+      'raggmunkar', 'rårakor', 'råraka', 'potatisplättar', 'potatispannkaka', 'ragg munk', 'raggmunk', 'raggmunk med fläsk',
+      'raggmunk med fläsk och lingon', 'raggmunkar med fläsk och lingon', 'raggmunk och fläsk',
+    ],
     co2e: 1.2,
     plate: { veg: 0, carb: 0.75, protein: 0.05 },
-    note: 'Riven rå potatis i pannkakssmet, stekt i smör. Fläsk och lingon räknas separat.',
-  },
-  {
-    id: 'raggmunk-flask-lingon',
-    name: 'Raggmunk med stekt fläsk och lingon',
-    cat: 'fardigratt',
-    kcal: 190, prot: 5.1, carb: 17.5, fat: 10.9, fiber: 0.9, sugar: 4.4, addedSugar: 2, satFat: 4.2, salt: 1.03,
-    n: {
-      monoFat: 4.7, polyFat: 1.2, omega3: 0.14, cholesterol: 28,
-      vitA: 38, vitD: 0.22, vitE: 0.6, vitC: 4, thiamin: 0.22, riboflavin: 0.06, niacin: 2.9, vitB6: 0.2, folate: 14, vitB12: 0.24,
-      calcium: 45, iron: 0.5, magnesium: 19, potassium: 262, phosphorus: 95, zinc: 0.7, selenium: 3,
-    },
-    portions: [['portion', '1 portion (340 g)', 340]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['raggmunk med fläsk', 'raggmunkar med fläsk och lingon', 'rårakor med fläsk', 'raggmunk och fläsk'],
-    co2e: 2.2,
-    plate: { veg: 0, carb: 0.55, protein: 0.23 },
-    kostrad: { rottKott: 18 },
-    note: 'Beräknat på en portion med 250 g raggmunk, 60 g stekt rimmat sidfläsk och 30 g rårörda lingon.',
+    note: 'Riven rå potatis i pannkakssmet, stekt i smör. Stekt fläsk och lingon räknas separat.',
   },
   {
     id: 'kaldolmar',
@@ -193,51 +219,18 @@ const husmanskost: FoodSeed[] = [
     kcal: 108, prot: 5.3, carb: 8.5, fat: 5.6, fiber: 1.1, sugar: 4.5, addedSugar: 2, satFat: 1.8, salt: 1.1,
     portions: [['st', '1 kåldolme (ca 75 g)', 75], ['portion', '1 portion (3 st, 225 g)', 225]],
     tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['kåldolme', 'kaldolmar', 'kåldolmer', 'kåldolmar med sirap', 'kåldolmar ugn'],
+    syn: [
+      'kåldolme', 'kaldolmar', 'kåldolmer', 'kåldolmar med sirap', 'kåldolmar ugn', 'kålpudding', 'kalpudding', 'lat kåldolme',
+      'kålpudding med potatis', 'kåldolmar med potatis', 'kåldolmar och potatis', 'kåldolmar med sås', 'kåldolmar lunch',
+    ],
     co2e: 8.4,
     plate: { veg: 0.46, carb: 0.11, protein: 0.37 },
     kostrad: { fruktGront: 46, rottKott: 37 },
-    note: 'Vitkålsblad fyllda med blandfärs och ris, bryntade med sirap och smör. Utan sås och tillbehör.',
-  },
-  {
-    id: 'kaldolmar-potatis-grasas',
-    name: 'Kåldolmar med kokt potatis, gräddsås och lingon',
-    cat: 'fardigratt',
-    kcal: 120, prot: 3.3, carb: 13, fat: 5.8, fiber: 1.4, sugar: 4.6, addedSugar: 2.6, satFat: 2.8, salt: 0.81,
-    n: {
-      monoFat: 2, polyFat: 0.6, omega3: 0.13, cholesterol: 14,
-      vitA: 35, vitD: 0.2, vitE: 0.6, vitC: 7.8, thiamin: 0.05, riboflavin: 0.05, niacin: 1.8, vitB6: 0.12, folate: 12, vitB12: 0.12,
-      calcium: 25, iron: 0.4, magnesium: 14, potassium: 200, phosphorus: 54, zinc: 0.6, selenium: 0.8,
-    },
-    portions: [['portion', '1 portion (445 g)', 445], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['kåldolmar med potatis', 'kåldolmar och potatis', 'kåldolmar med sås', 'kåldolmar lunch'],
-    co2e: 4.1,
-    plate: { veg: 0.21, carb: 0.41, protein: 0.17 },
-    kostrad: { fruktGront: 21, rottKott: 17 },
-    note: 'Beräknat på en portion med 200 g kåldolmar, 160 g kokt potatis, 60 g gräddsås och 25 g rårörda lingon.',
-  },
-  {
-    id: 'kalpudding-potatis-grasas',
-    name: 'Kålpudding med kokt potatis, gräddsås och lingon',
-    cat: 'fardigratt',
-    kcal: 125, prot: 4.5, carb: 13.5, fat: 5.7, fiber: 1.4, sugar: 5.5, addedSugar: 3.1, satFat: 3, salt: 0.93,
-    n: {
-      monoFat: 1.9, polyFat: 0.4, omega3: 0.03, cholesterol: 25,
-      vitA: 36, vitD: 0.26, vitE: 0.4, vitC: 8, thiamin: 0.07, riboflavin: 0.08, niacin: 2.1, vitB6: 0.14, folate: 14, vitB12: 0.21,
-      calcium: 36, iron: 0.5, magnesium: 16, potassium: 218, phosphorus: 73, zinc: 0.8, selenium: 1.7,
-    },
-    portions: [['portion', '1 portion (455 g)', 455], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['kålpudding', 'kalpudding', 'kålpudding med potatis', 'kålpudding med sås', 'lat kåldolme', 'kålpudding lingon'],
-    co2e: 4.2,
-    plate: { veg: 0.25, carb: 0.34, protein: 0.19 },
-    kostrad: { fruktGront: 25, rottKott: 17 },
-    note: 'Beräknat på en portion med 220 g kålpudding, 150 g kokt potatis, 60 g gräddsås och 25 g rårörda lingon. Kålpudding: vitkål varvad med blandfärs, bryntad med sirap och gräddad i ugn.',
+    note: 'Vitkålsblad fyllda med blandfärs och ris, bryntade med sirap och smör. Kålpudding (samma fyllning varvad med kål i form) har nästan samma näringsvärde. Sås, potatis och lingon räknas separat.',
   },
   {
     id: 'kalops-potatis-rodbetor',
-    name: 'Kalops med kokt potatis och rödbetor',
+    name: 'Kalops med potatis',
     cat: 'fardigratt',
     kcal: 78, prot: 4.5, carb: 9.6, fat: 2, fiber: 1.4, sugar: 2.3, addedSugar: 0.9, satFat: 0.7, salt: 0.47,
     n: {
@@ -247,7 +240,10 @@ const husmanskost: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
     tags: ['klassiker', 'svensk'],
-    syn: ['kalops', 'kalopsgryta', 'kalops med potatis', 'nötkalops', 'kalops med rödbetor', 'skånsk kalops', 'köttgryta'],
+    syn: [
+      'kalops', 'kalopsgryta', 'kalops med potatis', 'nötkalops', 'kalops med rödbetor', 'skånsk kalops', 'köttgryta',
+      'köttgryta med potatis',
+    ],
     co2e: 9.4,
     plate: { veg: 0.2, carb: 0.41, protein: 0.23 },
     kostrad: { fruktGront: 20, rottKott: 23 },
@@ -255,7 +251,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'dillkott-potatis',
-    name: 'Dillkött med kokt potatis',
+    name: 'Dillkött med potatis',
     cat: 'fardigratt',
     kcal: 100, prot: 5.3, carb: 10.6, fat: 3.8, fiber: 1.3, sugar: 1, addedSugar: 0, satFat: 1.4, salt: 0.47,
     n: {
@@ -265,7 +261,7 @@ const husmanskost: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (400 g)', 400], ['liten', '1 liten portion (300 g)', 300]],
     tags: ['klassiker', 'svensk'],
-    syn: ['dillkött', 'dillkott', 'dillkött på kalv', 'kalvkött i dillsås', 'dillsås', 'lamm i dillsås'],
+    syn: ['dillkött', 'dillkott', 'dillkött med potatis', 'dillkött på kalv', 'kalvkött i dillsås', 'dillsås', 'lamm i dillsås'],
     co2e: 9.3,
     plate: { veg: 0.03, carb: 0.47, protein: 0.22 },
     kostrad: { fruktGront: 3, rottKott: 22 },
@@ -326,29 +322,14 @@ const husmanskost: FoodSeed[] = [
     portions: [['portion', '1 portion (200 g)', 200], ['dl', '1 dl', 105]],
     density: 1.05,
     tags: ['klassiker', 'svensk'],
-    syn: ['korvstroganoff', 'korvgryta', 'stroganoff', 'falukorv stroganoff', 'korv strogonoff', 'korvstrogonoff', 'korv stroganof'],
+    syn: [
+      'korvstroganoff', 'korvgryta', 'stroganoff', 'falukorv stroganoff', 'korv strogonoff', 'korvstrogonoff', 'korv stroganof',
+      'korv stroganoff med ris', 'korvstroganoff och ris', 'korvgryta med ris', 'stroganoff med ris',
+    ],
     co2e: 3.2,
     plate: { veg: 0.27, carb: 0, protein: 0.43 },
     kostrad: { fruktGront: 27, rottKott: 43 },
-    note: 'Falukorv i tomat- och gräddsås med senap. Utan ris.',
-  },
-  {
-    id: 'korv-stroganoff-ris',
-    name: 'Korv Stroganoff med ris',
-    cat: 'fardigratt',
-    kcal: 187, prot: 4.5, carb: 14.7, fat: 12.2, fiber: 0.4, sugar: 1.2, addedSugar: 0, satFat: 5.3, salt: 1.29,
-    n: {
-      monoFat: 5, polyFat: 1.2, omega3: 0.16, cholesterol: 22,
-      vitA: 42, vitD: 0.16, vitE: 0.7, vitC: 1.2, thiamin: 0.13, riboflavin: 0.05, niacin: 1.9, vitB6: 0.12, folate: 4, vitB12: 0.22,
-      calcium: 20, iron: 0.3, magnesium: 9, potassium: 116, phosphorus: 68, zinc: 0.6, selenium: 2.3,
-    },
-    portions: [['portion', '1 portion (380 g)', 380], ['liten', '1 liten portion (280 g)', 280]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['korv stroganoff med ris', 'korvstroganoff och ris', 'korvgryta med ris', 'stroganoff med ris'],
-    co2e: 2.2,
-    plate: { veg: 0.14, carb: 0.47, protein: 0.22 },
-    kostrad: { fruktGront: 14, rottKott: 22 },
-    note: 'Beräknat på en portion med 200 g korv Stroganoff och 180 g kokt ris.',
+    note: 'Falukorv i tomat- och gräddsås med senap. Ris räknas separat (en vanlig portion är ca 180 g kokt ris).',
   },
   {
     id: 'flygande-jacob-ris',
@@ -370,7 +351,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'wallenbergare-potatismos-arter',
-    name: 'Wallenbergare med potatismos, ärtor och lingon',
+    name: 'Wallenbergare med potatismos och ärtor',
     cat: 'fardigratt',
     kcal: 164, prot: 7.1, carb: 11.1, fat: 9.8, fiber: 1.5, sugar: 3.6, addedSugar: 1.9, satFat: 5.3, salt: 0.59,
     n: {
@@ -388,7 +369,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'isterband-dillstuvad-potatis',
-    name: 'Isterband med dillstuvad potatis och rödbetor',
+    name: 'Isterband med stuvad potatis',
     cat: 'fardigratt',
     kcal: 150, prot: 5.8, carb: 10.7, fat: 9.1, fiber: 0.8, sugar: 2.3, addedSugar: 0.9, satFat: 3.7, salt: 1.3,
     n: {
@@ -420,7 +401,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'falukorv-makaroner-ketchup',
-    name: 'Stekt falukorv med makaroner och ketchup',
+    name: 'Falukorv med makaroner',
     cat: 'fardigratt',
     kcal: 174, prot: 6.9, carb: 19.8, fat: 7.2, fiber: 1.1, sugar: 2.5, addedSugar: 1.3, satFat: 2.7, salt: 1.1,
     n: {
@@ -438,39 +419,24 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'falukorv-potatismos',
-    name: 'Stekt falukorv med potatismos',
+    name: 'Falukorv med potatismos',
     cat: 'fardigratt',
-    kcal: 146, prot: 5.1, carb: 11.7, fat: 8.6, fiber: 0.8, sugar: 2.6, addedSugar: 0.8, satFat: 3.8, salt: 1.2,
+    kcal: 149, prot: 5.3, carb: 11.1, fat: 8.9, fiber: 0.8, sugar: 2.7, addedSugar: 0.7, satFat: 4.2, salt: 1.1,
     n: {
-      monoFat: 3.4, polyFat: 0.8, omega3: 0.1, cholesterol: 24,
-      vitA: 22, vitD: 0.2, vitE: 0.2, vitC: 5, thiamin: 0.11, riboflavin: 0.07, niacin: 1.4, vitB6: 0.16, folate: 9, vitB12: 0.37,
-      calcium: 26, iron: 0.5, magnesium: 17, potassium: 274, phosphorus: 80, zinc: 0.7, selenium: 3,
+      monoFat: 3.4, polyFat: 0.8, omega3: 0.11, cholesterol: 25,
+      vitA: 31, vitD: 0.2, vitE: 0.25, vitC: 5, thiamin: 0.11, riboflavin: 0.08, niacin: 1.4, vitB6: 0.15, folate: 9.5, vitB12: 0.38,
+      calcium: 44.5, iron: 0.5, magnesium: 17, potassium: 267, phosphorus: 88.5, zinc: 0.75, selenium: 3.3,
     },
-    portions: [['portion', '1 portion (355 g)', 355], ['barn', '1 barnportion (230 g)', 230]],
-    tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['korv och mos', 'falukorv och mos', 'korv med mos', 'falukorv med mos', 'stekt korv med mos'],
-    co2e: 2.3,
-    plate: { veg: 0, carb: 0.62, protein: 0.34 },
-    kostrad: { rottKott: 34 },
-    note: 'Beräknat på en portion med 120 g stekt falukorv, 220 g potatismos och 15 g ketchup.',
-  },
-  {
-    id: 'ugnskorv-potatismos',
-    name: 'Ugnskorv med potatismos',
-    cat: 'fardigratt',
-    kcal: 151, prot: 5.6, carb: 10.6, fat: 9.3, fiber: 0.8, sugar: 2.7, addedSugar: 0.6, satFat: 4.5, salt: 1.1,
-    n: {
-      monoFat: 3.4, polyFat: 0.8, omega3: 0.12, cholesterol: 26,
-      vitA: 40, vitD: 0.2, vitE: 0.3, vitC: 5, thiamin: 0.11, riboflavin: 0.09, niacin: 1.3, vitB6: 0.15, folate: 10, vitB12: 0.39,
-      calcium: 63, iron: 0.5, magnesium: 17, potassium: 259, phosphorus: 97, zinc: 0.8, selenium: 3.5,
-    },
-    portions: [['portion', '1 portion (380 g)', 380], ['barn', '1 barnportion (250 g)', 250]],
+    portions: [['portion', '1 portion (370 g)', 370], ['barn', '1 barnportion (240 g)', 240]],
     tags: ['klassiker', 'svensk'],
-    syn: ['ugnskorv', 'ugnsbakad falukorv', 'falukorv i ugn', 'gratinerad falukorv', 'korv i ugn', 'ugnsfalukorv'],
-    co2e: 2.6,
-    plate: { veg: 0.08, carb: 0.53, protein: 0.35 },
-    kostrad: { fruktGront: 8, rottKott: 31 },
-    note: 'Beräknat på en portion med 180 g ugnskorv och 200 g potatismos. Ugnskorv: falukorv med tomat, senap, grädde och riven ost, gratinerad i ugn.',
+    syn: [
+      'korv och mos', 'falukorv och mos', 'korv med mos', 'falukorv med mos', 'stekt korv med mos', 'ugnskorv',
+      'ugnskorv med potatismos', 'ugnsbakad falukorv', 'falukorv i ugn', 'gratinerad falukorv', 'korv i ugn', 'ugnsfalukorv',
+    ],
+    co2e: 2.5,
+    plate: { veg: 0.04, carb: 0.57, protein: 0.34 },
+    kostrad: { rottKott: 32, fruktGront: 4 },
+    note: 'Beräknat på en portion med 120–180 g stekt falukorv eller ugnskorv (falukorv med tomat, senap, grädde och riven ost, gratinerad i ugn) och 200–220 g potatismos med lite ketchup.',
   },
   {
     id: 'kottfarssas',
@@ -489,7 +455,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'spagetti-kottfarssas',
-    name: 'Spagetti och köttfärssås',
+    name: 'Spagetti med köttfärssås',
     cat: 'fardigratt',
     lmv: 858,
     kcal: 128, prot: 6.7, carb: 17, fat: 3.3, fiber: 1.6, sugar: 1.9, addedSugar: 0, satFat: 1.1, salt: 1.1,
@@ -503,21 +469,21 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'lasagne-kottfars',
-    name: 'Lasagne med köttfärs',
+    name: 'Lasagne',
     cat: 'fardigratt',
     lmv: 6463,
     kcal: 126, prot: 7.4, carb: 12.1, fat: 5.1, fiber: 0.9, sugar: 3.3, addedSugar: 0, satFat: 2.8, salt: 0.9,
     portions: [['portion', '1 portion (350 g)', 350], ['bit', '1 bit (250 g)', 250], ['fryst', '1 portionsförpackning (375 g)', 375]],
     tags: ['klassiker'],
-    syn: ['lasagne', 'lasagnje', 'lasange', 'köttfärslasagne', 'lasagne bolognese', 'lasagna', 'lassagne'],
+    syn: ['lasagne', 'lasagnje', 'lasange', 'köttfärslasagne', 'lasagne bolognese', 'lasagna', 'lassagne', 'fryst lasagne', 'lasagne fryst'],
     co2e: 7.8,
     plate: { veg: 0.31, carb: 0.2, protein: 0.25 },
     kostrad: { fruktGront: 31, rottKott: 18 },
-    note: 'Lasagneplattor varvade med köttfärssås och vit sås, gratinerad med riven ost.',
+    note: 'Lasagneplattor varvade med köttfärssås och vit sås, gratinerad med riven ost. Fryst lasagne (t.ex. Findus, Dafgårds) ligger något högre, ca 140 kcal per 100 g.',
   },
   {
     id: 'makaronilada',
-    name: 'Makaronilåda med köttfärs',
+    name: 'Makaronilåda',
     cat: 'fardigratt',
     kcal: 148, prot: 10.6, carb: 14.4, fat: 5.2, fiber: 0.9, sugar: 1.6, addedSugar: 0, satFat: 2.4, salt: 0.85,
     n: {
@@ -535,7 +501,7 @@ const husmanskost: FoodSeed[] = [
   },
   {
     id: 'flasklagg-rotmos',
-    name: 'Fläsklägg med rotmos och senap',
+    name: 'Fläsklägg med rotmos',
     cat: 'fardigratt',
     kcal: 127, prot: 8.5, carb: 5.4, fat: 7.7, fiber: 1.1, sugar: 2.2, addedSugar: 0.3, satFat: 3.1, salt: 1.1,
     n: {
@@ -570,33 +536,40 @@ const fiskratter: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (400 g)', 400], ['liten', '1 liten portion (300 g)', 300]],
     tags: ['klassiker', 'svensk'],
-    syn: ['fiskgratang', 'fisk i ugn med mos', 'fiskgratäng med räkor', 'sejgratäng', 'torskgratäng', 'fiskgratäng med mos'],
+    syn: [
+      'fiskgratang', 'fisk i ugn med mos', 'fiskgratäng med räkor', 'sejgratäng', 'torskgratäng', 'fiskgratäng med mos',
+      'fryst fiskgratäng', 'fiskgratäng fryst',
+    ],
     co2e: 2.6,
     plate: { veg: 0, carb: 0.4, protein: 0.42 },
     kostrad: { fisk: 39 },
-    note: 'Vit fisk (torsk eller sej) och räkor i gräddsås, gratinerad med potatismos och riven ost.',
+    note: 'Vit fisk (torsk eller sej) och räkor i gräddsås, gratinerad med potatismos och riven ost. Fryst fiskgratäng med potatismos (t.ex. Findus) ligger på ca 110–125 kcal per 100 g.',
   },
   {
     id: 'fiskpinnar-potatismos-remoulad',
-    name: 'Fiskpinnar med potatismos och remouladsås',
+    name: 'Fiskpinnar med potatismos',
     cat: 'fardigratt',
-    kcal: 170, prot: 6.3, carb: 14.1, fat: 9.7, fiber: 1.1, sugar: 1.8, addedSugar: 0.6, satFat: 1.7, salt: 0.7,
+    kcal: 176, prot: 7.3, carb: 13.1, fat: 10.3, fiber: 1.2, sugar: 1.2, addedSugar: 0.3, satFat: 1.5, salt: 0.88,
     n: {
-      monoFat: 5, polyFat: 2.4, omega3: 0.74, cholesterol: 19,
-      vitA: 21, vitD: 0.4, vitE: 1.6, vitC: 4, thiamin: 0.08, riboflavin: 0.06, niacin: 1.3, vitB6: 0.17, folate: 11, vitB12: 0.37,
-      calcium: 22, iron: 0.4, magnesium: 20, potassium: 272, phosphorus: 91, zinc: 0.3, selenium: 7.4,
+      monoFat: 5.7, polyFat: 2.4, omega3: 0.66, cholesterol: 34,
+      vitA: 24.5, vitD: 0.43, vitE: 2.3, vitC: 6.5, thiamin: 0.07, riboflavin: 0.07, niacin: 2.3, vitB6: 0.17, folate: 16, vitB12: 0.42,
+      calcium: 18.5, iron: 0.45, magnesium: 21.5, potassium: 287, phosphorus: 102, zinc: 0.35, selenium: 8.8,
     },
-    portions: [['portion', '1 portion (380 g)', 380], ['barn', '1 barnportion (250 g)', 250]],
+    portions: [['portion', '1 portion (370 g)', 370], ['barn', '1 barnportion (250 g)', 250]],
     tags: ['klassiker', 'svensk'],
-    syn: ['fiskpinnar och mos', 'fiskpinnar med mos', 'fiskpinnar med potatismos', 'fiskpinnar remoulad', 'fish fingers med mos'],
+    syn: [
+      'fiskpinnar och mos', 'fiskpinnar med mos', 'fiskpinnar med potatismos', 'fiskpinnar remoulad', 'fish fingers med mos',
+      'panerad fisk', 'panerad fisk med potatis', 'panerad fisk med remouladsås', 'stekt fisk med potatis', 'panerad sej',
+      'panerad torsk', 'fiskfilé med remoulad', 'fisk med remouladsås', 'panetten fisk',
+    ],
     co2e: 1.4,
-    plate: { veg: 0, carb: 0.66, protein: 0.26 },
-    kostrad: { fisk: 24 },
-    note: 'Beräknat på en portion med 150 g fiskpinnar, 200 g potatismos och 30 g remouladsås.',
+    plate: { veg: 0, carb: 0.62, protein: 0.3 },
+    kostrad: { fisk: 28 },
+    note: 'Beräknat på en portion med 150 g fiskpinnar eller panerad fiskfilé, 180–200 g potatismos eller kokt potatis och 30 g remouladsås.',
   },
   {
     id: 'strommning-potatismos-lingon',
-    name: 'Stekt strömming med potatismos och lingon',
+    name: 'Stekt strömming med potatismos',
     cat: 'fardigratt',
     kcal: 147, prot: 7.7, carb: 12.4, fat: 7.2, fiber: 0.9, sugar: 3.6, addedSugar: 2.3, satFat: 2.2, salt: 0.66,
     n: {
@@ -614,25 +587,30 @@ const fiskratter: FoodSeed[] = [
   },
   {
     id: 'lax-potatis-hollandaise',
-    name: 'Ugnsbakad lax med kokt potatis och hollandaisesås',
+    name: 'Lax med potatis och sås',
     cat: 'fardigratt',
-    kcal: 158, prot: 9, carb: 7.8, fat: 9.8, fiber: 1, sugar: 0.6, addedSugar: 0, satFat: 3.6, salt: 0.55,
+    kcal: 149, prot: 8.1, carb: 9.9, fat: 8.4, fiber: 0.95, sugar: 1.6, addedSugar: 1, satFat: 2.3, salt: 0.93,
     n: {
-      monoFat: 3.7, polyFat: 1.9, omega3: 0.96, cholesterol: 38,
-      vitA: 55, vitD: 2.5, vitE: 1.2, vitC: 11, thiamin: 0.11, riboflavin: 0.07, niacin: 3.3, vitB6: 0.33, folate: 25, vitB12: 1.2,
-      calcium: 14, iron: 0.4, magnesium: 21, potassium: 326, phosphorus: 122, zinc: 0.4, selenium: 9.8,
+      monoFat: 3.6, polyFat: 2, omega3: 0.92, cholesterol: 27.5,
+      vitA: 30.5, vitD: 2.3, vitE: 1.2, vitC: 8.5, thiamin: 0.11, riboflavin: 0.06, niacin: 3, vitB6: 0.32, folate: 20.5, vitB12: 1.1,
+      calcium: 11, iron: 0.4, magnesium: 20.5, potassium: 326, phosphorus: 109, zinc: 0.35, selenium: 8.7,
     },
-    portions: [['portion', '1 portion (400 g)', 400]],
+    portions: [['portion', '1 portion (370 g)', 370], ['liten', '1 liten portion (280 g)', 280]],
     tags: ['glutenfri'],
-    syn: ['lax med potatis', 'laxfilé med hollandaise', 'ugnslax med potatis', 'lax och potatis', 'lax med hollandaisesås', 'laxlunch', 'lax med hollandaise', 'lax hollandaise'],
-    co2e: 2.1,
-    plate: { veg: 0.12, carb: 0.45, protein: 0.32 },
-    kostrad: { fruktGront: 12, fisk: 32 },
-    note: 'Beräknat på en portion med 130 g ugnsbakad lax, 180 g kokt potatis, 40 g hollandaisesås och 50 g broccoli.',
+    syn: [
+      'lax med potatis', 'laxfilé med hollandaise', 'ugnslax med potatis', 'lax och potatis', 'lax med hollandaisesås',
+      'laxlunch', 'lax med hollandaise', 'lax hollandaise', 'gravlax med potatis', 'gravad lax med sås',
+      'gravlax och hovmästarsås', 'gravlax med hovmästarsås', 'gravlax med senapssås', 'gravlax lunch',
+      'lax med potatis och hollandaise',
+    ],
+    co2e: 2,
+    plate: { veg: 0.06, carb: 0.53, protein: 0.31 },
+    kostrad: { fruktGront: 6, fisk: 31 },
+    note: 'Beräknat på en portion med 100–130 g lax (ugnsbakad eller gravad), 180–200 g kokt potatis, 30–40 g sås (hollandaise eller hovmästarsås) och lite broccoli.',
   },
   {
     id: 'torsk-aggsas-potatis',
-    name: 'Kokt torsk med äggsås och potatis',
+    name: 'Torsk med äggsås och potatis',
     cat: 'fardigratt',
     kcal: 106, prot: 12.1, carb: 8.3, fat: 2.4, fiber: 0.9, sugar: 0.5, addedSugar: 0, satFat: 0.9, salt: 0.78,
     n: {
@@ -649,26 +627,8 @@ const fiskratter: FoodSeed[] = [
     note: 'Beräknat på en portion med 150 g kokt torsk, 100 g äggsås och 180 g kokt potatis.',
   },
   {
-    id: 'panerad-fisk-potatis-remoulad',
-    name: 'Panerad fisk med kokt potatis och remouladsås',
-    cat: 'fardigratt',
-    kcal: 181, prot: 8.3, carb: 12, fat: 10.9, fiber: 1.3, sugar: 0.6, addedSugar: 0, satFat: 1.4, salt: 1.05,
-    n: {
-      monoFat: 6.4, polyFat: 2.4, omega3: 0.58, cholesterol: 49,
-      vitA: 28, vitD: 0.46, vitE: 2.9, vitC: 9.1, thiamin: 0.06, riboflavin: 0.08, niacin: 3.2, vitB6: 0.17, folate: 21, vitB12: 0.46,
-      calcium: 15, iron: 0.5, magnesium: 23, potassium: 301, phosphorus: 113, zinc: 0.4, selenium: 10.1,
-    },
-    portions: [['portion', '1 portion (360 g)', 360]],
-    tags: ['svensk'],
-    syn: ['panerad fisk', 'stekt fisk med potatis', 'panerad sej', 'panerad torsk', 'fiskfilé med remoulad', 'fisk med remouladsås', 'panetten fisk'],
-    co2e: 1.5,
-    plate: { veg: 0, carb: 0.58, protein: 0.33 },
-    kostrad: { fisk: 33 },
-    note: 'Beräknat på en portion med 150 g panerad fiskfilé, 180 g kokt potatis och 30 g remouladsås.',
-  },
-  {
     id: 'fiskbullar-hummersas-potatis',
-    name: 'Fiskbullar i hummersås med kokt potatis',
+    name: 'Fiskbullar i hummersås med potatis',
     cat: 'fardigratt',
     kcal: 86, prot: 4, carb: 11.4, fat: 2.6, fiber: 0.8, sugar: 1.2, addedSugar: 0.3, satFat: 0.8, salt: 0.81,
     n: {
@@ -686,7 +646,7 @@ const fiskratter: FoodSeed[] = [
   },
   {
     id: 'sill-potatis-graddfil',
-    name: 'Sill med färskpotatis, gräddfil och gräslök',
+    name: 'Sill med potatis och gräddfil',
     cat: 'fardigratt',
     kcal: 112, prot: 4, carb: 14.4, fat: 4, fiber: 0.9, sugar: 4.6, addedSugar: 3.7, satFat: 1.5, salt: 0.74,
     n: {
@@ -696,47 +656,15 @@ const fiskratter: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (325 g)', 325]],
     tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['sill och potatis', 'midsommartallrik', 'sill med potatis', 'sillunch', 'inlagd sill med färskpotatis', 'midsommar', 'sill och nypotatis'],
+    syn: [
+      'sill och potatis', 'midsommartallrik', 'sill med potatis', 'sillunch', 'inlagd sill med färskpotatis', 'midsommar',
+      'sill och nypotatis', 'surströmming', 'surströmmingsklämma', 'surströmmingsmacka', 'surströmming med tunnbröd',
+      'surströmmingsskiva', 'strömming med potatis',
+    ],
     co2e: 0.9,
     plate: { veg: 0.01, carb: 0.62, protein: 0.25 },
     kostrad: { fisk: 15 },
-    note: 'Beräknat på en portion med 80 g inlagd sill, 200 g kokt potatis, 40 g gräddfil och 3 g lök.',
-  },
-  {
-    id: 'gravlax-hovmastarsas-potatis',
-    name: 'Gravlax med hovmästarsås och kokt potatis',
-    cat: 'fardigratt',
-    kcal: 140, prot: 7.1, carb: 12.1, fat: 6.9, fiber: 0.9, sugar: 2.6, addedSugar: 2, satFat: 0.9, salt: 1.3,
-    n: {
-      monoFat: 3.5, polyFat: 2.1, omega3: 0.88, cholesterol: 17,
-      vitA: 6, vitD: 2, vitE: 1.2, vitC: 6, thiamin: 0.11, riboflavin: 0.05, niacin: 2.8, vitB6: 0.31, folate: 16, vitB12: 0.92,
-      calcium: 8, iron: 0.4, magnesium: 20, potassium: 325, phosphorus: 95, zinc: 0.3, selenium: 7.6,
-    },
-    portions: [['portion', '1 portion (330 g)', 330]],
-    tags: ['klassiker', 'svensk', 'glutenfri'],
-    syn: ['gravlax med potatis', 'gravad lax med sås', 'gravlax och hovmästarsås', 'gravlax med senapssås', 'gravlax lunch'],
-    co2e: 1.8,
-    plate: { veg: 0, carb: 0.61, protein: 0.3 },
-    kostrad: { fisk: 30 },
-    note: 'Beräknat på en portion med 100 g gravad lax, 30 g hovmästarsås och 200 g kokt potatis.',
-  },
-  {
-    id: 'surstrommingsklamma',
-    name: 'Surströmmingsklämma',
-    cat: 'fardigratt',
-    kcal: 170, prot: 6, carb: 21.2, fat: 6.4, fiber: 1.5, sugar: 2.5, addedSugar: 1.4, satFat: 2.8, salt: 1.8,
-    n: {
-      monoFat: 2.2, polyFat: 0.8, omega3: 0.39, cholesterol: 23,
-      vitA: 41, vitD: 1.5, vitE: 0.5, vitC: 4, thiamin: 0.1, riboflavin: 0.08, niacin: 1.4, vitB6: 0.16, folate: 15, vitB12: 1.5,
-      calcium: 33, iron: 0.9, magnesium: 22, potassium: 223, phosphorus: 92, zinc: 0.5, selenium: 7.2,
-    },
-    portions: [['st', '1 klämma (ca 160 g)', 160]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['surströmming', 'surströmmingsmacka', 'surströmming med tunnbröd', 'surströmmingsskiva', 'surströmmingsklämma'],
-    co2e: 1.2,
-    plate: { veg: 0.06, carb: 0.65, protein: 0.19 },
-    kostrad: { fruktGront: 6, fisk: 19 },
-    note: 'Beräknat på en portion med 45 g mjukt tunnbröd, 60 g kokt potatis, 30 g surströmming, 10 g lök, 6 g smör och 10 g gräddfil.',
+    note: 'Beräknat på en portion med 80 g inlagd sill, 200 g kokt potatis, 40 g gräddfil och 3 g lök. Surströmmingsklämma (med tunnbröd, potatis, lök och gräddfil) ger mer, ca 170 kcal per 100 g.',
   },
   {
     id: 'toast-skagen',
@@ -765,43 +693,30 @@ const fiskratter: FoodSeed[] = [
 const kottFagelRatter: FoodSeed[] = [
   {
     id: 'kycklinggryta-gradde-ris',
-    name: 'Kycklinggryta med grädde och paprika, med ris',
+    name: 'Kycklinggryta med ris',
     cat: 'fardigratt',
-    kcal: 122, prot: 7.6, carb: 13.2, fat: 4.2, fiber: 0.5, sugar: 1.3, addedSugar: 0, satFat: 1.8, salt: 0.71,
+    kcal: 124, prot: 7.9, carb: 14.1, fat: 3.9, fiber: 0.47, sugar: 1.4, addedSugar: 0.25, satFat: 2.1, salt: 0.72,
     n: {
-      monoFat: 1.6, polyFat: 0.6, omega3: 0.15, cholesterol: 23,
-      vitA: 38, vitD: 0.09, vitE: 0.5, vitC: 7, thiamin: 0.04, riboflavin: 0.08, niacin: 2.8, vitB6: 0.16, folate: 8, vitB12: 0.12,
-      calcium: 21, iron: 0.2, magnesium: 14, potassium: 152, phosphorus: 86, zinc: 0.5, selenium: 5.8,
+      monoFat: 1.2, polyFat: 0.4, omega3: 0.1, cholesterol: 22.3,
+      vitA: 29.8, vitD: 0.1, vitE: 0.4, vitC: 3.9, thiamin: 0.04, riboflavin: 0.06, niacin: 2.8, vitB6: 0.15, folate: 6.8, vitB12: 0.11,
+      calcium: 17.8, iron: 0.3, magnesium: 15.5, potassium: 151, phosphorus: 86.5, zinc: 0.53, selenium: 5.9,
     },
-    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['glutenfri'],
-    syn: ['kycklinggryta', 'krämig kycklinggryta', 'kyckling i gräddsås', 'kycklinggryta med ris', 'kycklinggryta paprika'],
+    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300], ['lada', '1 fryst matlåda (ca 350 g)', 350]],
+    syn: [
+      'kycklinggryta', 'krämig kycklinggryta', 'kyckling i gräddsås', 'kycklinggryta med ris', 'kycklinggryta paprika',
+      'kyckling med ris', 'kyckling och ris', 'kyckling curry', 'kycklingcurry', 'kyckling i currysås', 'currykyckling',
+      'kyckling med curry och ris', 'thaigryta', 'thai curry', 'röd curry', 'grön curry', 'kokosgryta', 'kycklinggryta med kokos',
+      'thailändsk gryta', 'tikka masala', 'kyckling tikka masala', 'chicken tikka masala', 'butter chicken', 'kyckling masala',
+      'indisk kyckling', 'indisk gryta', 'indiskt',
+    ],
     co2e: 1.9,
-    plate: { veg: 0.18, carb: 0.42, protein: 0.18 },
-    kostrad: { fruktGront: 18 },
-    note: 'Beräknat på en portion med 250 g kycklinggryta och 180 g kokt ris.',
-  },
-  {
-    id: 'kyckling-currysas-ris',
-    name: 'Kyckling i currysås med ris',
-    cat: 'fardigratt',
-    kcal: 125, prot: 10.7, carb: 13.9, fat: 2.9, fiber: 0.2, sugar: 1.2, addedSugar: 0.2, satFat: 1.6, salt: 0.71,
-    n: {
-      monoFat: 0.8, polyFat: 0.2, omega3: 0.04, cholesterol: 31,
-      vitA: 24, vitD: 0.2, vitE: 0.2, vitC: 0.3, thiamin: 0.04, riboflavin: 0.07, niacin: 3.8, vitB6: 0.18, folate: 5, vitB12: 0.18,
-      calcium: 25, iron: 0.2, magnesium: 16, potassium: 158, phosphorus: 108, zinc: 0.6, selenium: 7.1,
-    },
-    portions: [['portion', '1 portion (420 g)', 420], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['svensk'],
-    syn: ['kyckling curry', 'kycklingcurry', 'kyckling med curry och ris', 'kyckling i curry', 'currykyckling', 'kyckling currysås'],
-    co2e: 2.2,
-    plate: { veg: 0.01, carb: 0.44, protein: 0.29 },
-    kostrad: { fruktGront: 1 },
-    note: 'Beräknat på en portion med 120 g stekt kycklingfilé, 120 g currysås och 180 g kokt ris.',
+    plate: { veg: 0.13, carb: 0.45, protein: 0.2 },
+    kostrad: { fruktGront: 13 },
+    note: 'Samlar krämiga kycklinggrytor med ris – med grädde och paprika, currysås, kokosmjölk (thaigryta) eller tikka masala. De skiljer sig lite per 100 g (122–126 kcal). Beräknat på en portion med ca 250 g gryta och 180 g kokt ris.',
   },
   {
     id: 'tacos-fredagstacos',
-    name: 'Tacos, fredagstacos (tallrik)',
+    name: 'Tacos',
     cat: 'fardigratt',
     kcal: 162, prot: 10.2, carb: 12.9, fat: 7.5, fiber: 1.2, sugar: 2.2, addedSugar: 0.6, satFat: 3.5, salt: 0.84,
     n: {
@@ -852,7 +767,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'pannbiff-lok-potatis',
-    name: 'Pannbiff med stekt lök, kokt potatis och gräddsås',
+    name: 'Pannbiff med potatis och gräddsås',
     cat: 'fardigratt',
     kcal: 139, prot: 6.4, carb: 12.6, fat: 6.8, fiber: 1, sugar: 3.1, addedSugar: 1.5, satFat: 3, salt: 0.71,
     n: {
@@ -870,7 +785,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'stekt-flask-loksas-potatis',
-    name: 'Stekt fläsk med löksås och kokt potatis',
+    name: 'Stekt fläsk med löksås och potatis',
     cat: 'fardigratt',
     kcal: 155, prot: 3.6, carb: 12, fat: 10.1, fiber: 1.3, sugar: 2.6, addedSugar: 1.6, satFat: 3.7, salt: 1.13, alc: 0,
     n: {
@@ -888,7 +803,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'bruna-bonor-flask',
-    name: 'Bruna bönor med stekt fläsk',
+    name: 'Bruna bönor med fläsk',
     cat: 'fardigratt',
     kcal: 198, prot: 10.5, carb: 11.7, fat: 11.2, fiber: 4.4, sugar: 3.7, addedSugar: 3.4, satFat: 4.1, salt: 1.3,
     n: {
@@ -924,7 +839,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'plankstek',
-    name: 'Plankstek med duchessepotatis och bearnaisesås',
+    name: 'Plankstek',
     cat: 'fardigratt',
     kcal: 161, prot: 12.8, carb: 5.7, fat: 9.5, fiber: 0.8, sugar: 0.8, addedSugar: 0, satFat: 5.1, salt: 0.64,
     n: {
@@ -942,7 +857,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'schnitzel-stekt-potatis',
-    name: 'Schnitzel med stekt potatis och gräddsås',
+    name: 'Schnitzel med potatis och gräddsås',
     cat: 'fardigratt',
     kcal: 166, prot: 9.5, carb: 13.1, fat: 8.1, fiber: 1.5, sugar: 1, addedSugar: 0, satFat: 2.2, salt: 0.58,
     n: {
@@ -974,7 +889,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'flaskfilegryta-ris',
-    name: 'Fläskfilégryta med champinjoner och grädde, med ris',
+    name: 'Fläskfilégryta med ris',
     cat: 'fardigratt',
     kcal: 129, prot: 8.3, carb: 12.9, fat: 4.9, fiber: 0.4, sugar: 1.1, addedSugar: 0, satFat: 2.1, salt: 0.76,
     n: {
@@ -991,7 +906,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'renskavsgryta-potatismos',
-    name: 'Renskavsgryta med potatismos och lingon',
+    name: 'Renskav med potatismos',
     cat: 'fardigratt',
     kcal: 115, prot: 4.9, carb: 12.8, fat: 4.5, fiber: 1.2, sugar: 6.1, addedSugar: 3.9, satFat: 2.5, salt: 1.4,
     n: {
@@ -1026,7 +941,7 @@ const kottFagelRatter: FoodSeed[] = [
   },
   {
     id: 'kycklingfile-klyftpotatis-tzatziki',
-    name: 'Kycklingfilé med klyftpotatis och tzatziki',
+    name: 'Kycklingtallrik',
     cat: 'fardigratt',
     kcal: 114, prot: 10.9, carb: 9.3, fat: 3.4, fiber: 1.2, sugar: 1, addedSugar: 0, satFat: 1, salt: 0.63,
     n: {
@@ -1036,15 +951,19 @@ const kottFagelRatter: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (400 g)', 400]],
     tags: ['glutenfri'],
-    syn: ['kyckling med klyftpotatis', 'kycklingfilé och klyftpotatis', 'grillad kyckling med tzatziki', 'kyckling tzatziki', 'kycklingtallrik'],
+    syn: [
+      'kyckling med klyftpotatis', 'kycklingfilé och klyftpotatis', 'grillad kyckling med tzatziki', 'kyckling tzatziki', 'kycklingtallrik',
+      'kycklingtallrik med klyftpotatis',
+      'kyckling med klyftpotatis och tzatziki', 'kycklingfilé med klyftpotatis och tzatziki',
+    ],
     co2e: 1.8,
     plate: { veg: 0.12, carb: 0.45, protein: 0.3 },
     kostrad: { fruktGront: 12 },
-    note: 'Beräknat på en portion med 120 g stekt kycklingfilé, 180 g klyftpotatis, 50 g tzatziki, 30 g isbergssallad och 20 g tomat.',
+    note: 'Grillad eller stekt kycklingfilé med klyftpotatis, tzatziki och sallad – som på lunchrestaurang och gatukök. Beräknat på en portion med 120 g stekt kycklingfilé, 180 g klyftpotatis, 50 g tzatziki, 30 g isbergssallad och 20 g tomat.',
   },
   {
     id: 'biff-pommes-bearnaise',
-    name: 'Biff med pommes frites och bearnaisesås',
+    name: 'Biff med pommes frites och bearnaise',
     cat: 'fardigratt',
     kcal: 282, prot: 11.8, carb: 19.4, fat: 17.3, fiber: 1.5, sugar: 0.3, addedSugar: 0, satFat: 3.5, salt: 0.58,
     n: {
@@ -1083,7 +1002,7 @@ const soppor: FoodSeed[] = [
   },
   {
     id: 'kottsoppa-rotsaker',
-    name: 'Köttsoppa med rotsaker',
+    name: 'Köttsoppa',
     cat: 'fardigratt',
     lmv: 1073,
     kcal: 39, prot: 4.5, carb: 2.3, fat: 1.1, fiber: 1.1, sugar: 2.2, addedSugar: 0, satFat: 0.5, salt: 0.8,
@@ -1098,7 +1017,7 @@ const soppor: FoodSeed[] = [
   },
   {
     id: 'fisksoppa-gradde',
-    name: 'Fisksoppa med grädde (lax, torsk och räkor)',
+    name: 'Fisksoppa',
     cat: 'fardigratt',
     kcal: 61, prot: 4.9, carb: 2.7, fat: 3.3, fiber: 0.4, sugar: 1.2, addedSugar: 0, satFat: 1.6, salt: 0.93,
     n: {
@@ -1113,6 +1032,7 @@ const soppor: FoodSeed[] = [
     co2e: 1.4,
     plate: { veg: 0.11, carb: 0.08, protein: 0.19 },
     kostrad: { fruktGront: 11, fisk: 19 },
+    note: 'Krämig soppa med lax, torsk och räkor, grädde och grönsaker.',
   },
   {
     id: 'gronsakssoppa',
@@ -1123,15 +1043,18 @@ const soppor: FoodSeed[] = [
     portions: [['tallrik', '1 tallrik (3 dl, ca 300 g)', 300], ['dl', '1 dl', 100], ['stor', '1 stor portion (4 dl, ca 400 g)', 400]],
     density: 1.0,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['gronsakssoppa', 'vegetarisk soppa', 'rotfruktssoppa', 'buljongsoppa', 'höstsoppa', 'vegansk soppa'],
+    syn: [
+      'gronsakssoppa', 'vegetarisk soppa', 'rotfruktssoppa', 'buljongsoppa', 'höstsoppa', 'vegansk soppa', 'nässelsoppa',
+      'nasselsoppa', 'brännässelsoppa', 'nässlesoppa', 'vårsoppa', 'spenatsoppa', 'grönkålssoppa',
+    ],
     co2e: 0.1,
     plate: { veg: 0.34, carb: 0.08, protein: 0 },
     kostrad: { fruktGront: 34 },
-    note: 'Buljongbaserad soppa med potatis, rotfrukter, kål, blomkål och ärter.',
+    note: 'Buljongbaserad soppa med potatis, rotfrukter, kål, blomkål och ärter. Nässelsoppa och andra gröna soppor ligger på ungefär samma nivå (ca 25–45 kcal per 100 g) – ägg och bröd räknas separat.',
   },
   {
     id: 'tomatsoppa',
-    name: 'Tomatsoppa med grädde',
+    name: 'Tomatsoppa',
     cat: 'fardigratt',
     kcal: 49, prot: 1.1, carb: 4.4, fat: 2.8, fiber: 1, sugar: 4, addedSugar: 0.7, satFat: 0.9, salt: 0.86,
     n: {
@@ -1142,7 +1065,7 @@ const soppor: FoodSeed[] = [
     portions: [['tallrik', '1 tallrik (3 dl, ca 300 g)', 300], ['dl', '1 dl', 100], ['stor', '1 stor portion (4 dl, ca 400 g)', 400]],
     density: 1.0,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['tomatsoppa', 'krämig tomatsoppa', 'tomat soppa'],
+    syn: ['tomatsoppa', 'krämig tomatsoppa', 'tomat soppa', 'tomatsoppa med grädde'],
     co2e: 0.7,
     plate: { veg: 0.67, carb: 0, protein: 0 },
     kostrad: { fruktGront: 67 },
@@ -1162,27 +1085,8 @@ const soppor: FoodSeed[] = [
     kostrad: { fruktGront: 15 },
   },
   {
-    id: 'nasselsoppa-agg',
-    name: 'Nässelsoppa med ägghalvor',
-    cat: 'fardigratt',
-    kcal: 44, prot: 2.1, carb: 3, fat: 2.5, fiber: 0.7, sugar: 0.7, addedSugar: 0, satFat: 1.3, salt: 0.83,
-    n: {
-      monoFat: 0.7, polyFat: 0.2, omega3: 0.04, cholesterol: 31,
-      vitA: 85, vitD: 0.2, vitE: 0.4, vitC: 4, thiamin: 0.02, riboflavin: 0.06, niacin: 0.2, vitB6: 0.04, folate: 11, vitB12: 0.12,
-      calcium: 74, iron: 0.4, magnesium: 11, potassium: 91, phosphorus: 36, zinc: 0.2, selenium: 2.2,
-    },
-    portions: [['tallrik', '1 tallrik (3 dl, ca 300 g)', 300], ['dl', '1 dl', 100], ['stor', '1 stor portion (4 dl, ca 400 g)', 400]],
-    density: 1.0,
-    tags: ['vegetarisk', 'klassiker', 'svensk'],
-    syn: ['nässelsoppa', 'nasselsoppa', 'brännässelsoppa', 'nässlesoppa', 'vårsoppa'],
-    co2e: 0.4,
-    plate: { veg: 0.17, carb: 0.07, protein: 0.07 },
-    kostrad: { fruktGront: 17 },
-    note: 'Brännässlor, buljong och en skvätt mjölk, serverad med kokt ägg (ca ett halvt ägg per tallrik).',
-  },
-  {
     id: 'linssoppa',
-    name: 'Linssoppa med röda linser',
+    name: 'Linssoppa',
     cat: 'fardigratt',
     kcal: 45, prot: 1.9, carb: 4.2, fat: 2, fiber: 1.1, sugar: 1.2, addedSugar: 0, satFat: 0.9, salt: 0.82,
     n: {
@@ -1201,7 +1105,7 @@ const soppor: FoodSeed[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Regionala klassiker, mos, gratänger och sallader
+// Regionala klassiker, mos, gratänger, sallader och pajer
 // ---------------------------------------------------------------------------
 
 const regionalt: FoodSeed[] = [
@@ -1218,7 +1122,7 @@ const regionalt: FoodSeed[] = [
     co2e: 0.4,
     plate: { veg: 0.56, carb: 0.3, protein: 0 },
     kostrad: { fruktGront: 56 },
-    note: 'Kålrot, potatis och morot mosade med smör och spad. Fläsklägg räknas separat – eller välj "Fläsklägg med rotmos och senap".',
+    note: 'Kålrot, potatis och morot mosade med smör och spad. Fläsklägg räknas separat – eller välj "Fläsklägg med rotmos".',
   },
   {
     id: 'potatisgratang',
@@ -1236,35 +1140,25 @@ const regionalt: FoodSeed[] = [
   },
   {
     id: 'potatissallad-majonnas',
-    name: 'Potatissallad med majonnäs',
+    name: 'Potatissallad',
     cat: 'fardigratt',
     lmv: 261,
     kcal: 154, prot: 1.9, carb: 14.1, fat: 9.7, fiber: 1.7, sugar: 0.8, addedSugar: 0, satFat: 1.7, salt: 1.3,
     portions: [['portion', '1 portion (150 g)', 150], ['dl', '1 dl', 80]],
     density: 0.8,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['potatissallad', 'krämig potatissallad', 'potatissallad med gräddfil', 'potatis sallad', 'potatissallad majonnäs'],
+    syn: [
+      'potatissallad', 'krämig potatissallad', 'potatissallad med gräddfil', 'potatis sallad', 'potatissallad majonnäs',
+      'potatissallad med vinägrett', 'potatissallad vinägrett', 'fransk potatissallad', 'potatissallad utan majonnäs',
+    ],
     co2e: 0.6,
     plate: { veg: 0.08, carb: 0.71, protein: 0 },
     kostrad: { fruktGront: 8 },
-  },
-  {
-    id: 'potatissallad-vinagrett',
-    name: 'Potatissallad med vinägrett',
-    cat: 'fardigratt',
-    lmv: 264,
-    kcal: 113, prot: 1.8, carb: 14.5, fat: 4.8, fiber: 2, sugar: 0.8, addedSugar: 0, satFat: 0.3, salt: 0.5,
-    portions: [['portion', '1 portion (150 g)', 150], ['dl', '1 dl', 75]],
-    density: 0.75,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['fransk potatissallad', 'potatissallad vinägrett', 'potatissallad utan majonnäs', 'ljummen potatissallad'],
-    co2e: 0.4,
-    plate: { veg: 0.05, carb: 0.84, protein: 0 },
-    kostrad: { fruktGront: 5 },
+    note: 'Hemlagad: kokt potatis med majonnäs eller gräddfilsdressing, lök och gräslök. Potatissallad med vinägrett (olja och vinäger) är lättare, ca 115 kcal per 100 g, medan färdigköpt potatissallad i bytta är fetare, ca 220–240 kcal per 100 g – skanna streckkoden för just ditt märke.',
   },
   {
     id: 'pastasallad-kyckling',
-    name: 'Pastasallad med kyckling',
+    name: 'Pastasallad',
     cat: 'fardigratt',
     kcal: 130, prot: 8, carb: 12.1, fat: 5.2, fiber: 1.2, sugar: 1.6, addedSugar: 0.4, satFat: 1.2, salt: 0.72,
     n: {
@@ -1273,14 +1167,15 @@ const regionalt: FoodSeed[] = [
       calcium: 28, iron: 0.4, magnesium: 17, potassium: 158, phosphorus: 87, zinc: 0.5, selenium: 7.3,
     },
     portions: [['portion', '1 portion (350 g)', 350], ['lada', '1 matlåda (300 g)', 300]],
-    syn: ['pastasallad', 'pasta sallad', 'kycklingpastasallad', 'kall pasta', 'pastasallad kyckling', 'matlåda'],
+    syn: ['pastasallad', 'pasta sallad', 'kycklingpastasallad', 'kall pasta', 'pastasallad kyckling', 'pastasallad i matlåda'],
     co2e: 1.7,
     plate: { veg: 0.34, carb: 0.37, protein: 0.21 },
     kostrad: { fruktGront: 34 },
+    note: 'Kall pasta med kyckling, grönsaker och dressing.',
   },
   {
     id: 'kycklingsallad',
-    name: 'Kycklingsallad med dressing',
+    name: 'Kycklingsallad',
     cat: 'fardigratt',
     kcal: 87, prot: 7.6, carb: 2.9, fat: 4.8, fiber: 0.8, sugar: 2.1, addedSugar: 0.4, satFat: 0.6, salt: 0.55,
     n: {
@@ -1297,7 +1192,7 @@ const regionalt: FoodSeed[] = [
   },
   {
     id: 'caesarsallad-kyckling',
-    name: 'Caesarsallad med kyckling',
+    name: 'Caesarsallad',
     cat: 'fardigratt',
     lmv: 513,
     kcal: 302, prot: 12, carb: 9.7, fat: 23.9, fiber: 1.3, sugar: 1.1, addedSugar: 1, satFat: 4.4, salt: 1,
@@ -1310,7 +1205,7 @@ const regionalt: FoodSeed[] = [
   },
   {
     id: 'raksallad-agg',
-    name: 'Räksallad med ägg och dressing',
+    name: 'Räksallad',
     cat: 'fardigratt',
     kcal: 97, prot: 6.3, carb: 2, fat: 6.9, fiber: 0.9, sugar: 1.8, addedSugar: 0.4, satFat: 1.2, salt: 0.58,
     n: {
@@ -1339,24 +1234,6 @@ const regionalt: FoodSeed[] = [
     kostrad: { fruktGront: 76 },
   },
   {
-    id: 'aggakaka-flask-lingon',
-    name: 'Äggakaka med stekt fläsk och lingon',
-    cat: 'fardigratt',
-    kcal: 176, prot: 7.1, carb: 9.9, fat: 12, fiber: 0.4, sugar: 5.1, addedSugar: 2.2, satFat: 4.1, salt: 0.98,
-    n: {
-      monoFat: 5.3, polyFat: 1.6, omega3: 0.21, cholesterol: 109,
-      vitA: 29, vitD: 0.91, vitE: 2, vitC: 1.2, thiamin: 0.17, riboflavin: 0.18, niacin: 2.6, vitB6: 0.11, folate: 20, vitB12: 0.64,
-      calcium: 71, iron: 0.6, magnesium: 13, potassium: 168, phosphorus: 145, zinc: 0.9, selenium: 7.6,
-    },
-    portions: [['portion', '1 portion (310 g)', 310]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['äggakaka', 'aggakaka', 'skånsk äggakaka', 'äggakaka med fläsk', 'äggkaka'],
-    co2e: 2.6,
-    plate: { veg: 0, carb: 0.11, protein: 0.46 },
-    kostrad: { rottKott: 19 },
-    note: 'Beräknat på en portion med 220 g äggakaka, 60 g stekt rimmat sidfläsk och 30 g rårörda lingon.',
-  },
-  {
     id: 'polsa',
     name: 'Pölsa',
     cat: 'fardigratt',
@@ -1373,31 +1250,20 @@ const regionalt: FoodSeed[] = [
   },
   {
     id: 'kroppkakor',
-    name: 'Kroppkakor med fläskfyllning',
+    name: 'Kroppkakor och palt',
     cat: 'fardigratt',
-    lmv: 2165,
-    kcal: 156, prot: 4.6, carb: 19.7, fat: 6.1, fiber: 1.9, sugar: 1, addedSugar: 0, satFat: 2.2, salt: 1.1,
-    portions: [['st', '1 kroppkaka (ca 100 g)', 100], ['portion', '1 portion (3 st, 300 g)', 300]],
+    lmv: 248,
+    kcal: 169, prot: 5.7, carb: 22.8, fat: 5.7, fiber: 1.5, sugar: 0.6, addedSugar: 0, satFat: 2.5, salt: 1,
+    portions: [['st', '1 kroppkaka eller palt (ca 110 g)', 110], ['portion', '1 portion (3 st, 330 g)', 330]],
     tags: ['klassiker', 'svensk'],
-    syn: ['kroppkakor', 'kroppkaka', 'öländska kroppkakor', 'småländska kroppkakor', 'kroppkakor med fläsk', 'kroppkakor med lingon'],
+    syn: [
+      'kroppkakor', 'kroppkaka', 'öländska kroppkakor', 'småländska kroppkakor', 'kroppkakor med fläsk', 'kroppkakor med lingon',
+      'palt', 'pitepalt', 'palt med fläsk', 'norrländsk palt', 'paltar', 'potatispalt', 'kroppkakor och palt',
+    ],
     co2e: 0.9,
-    plate: { veg: 0.03, carb: 0.87, protein: 0.09 },
-    kostrad: { fruktGront: 3, rottKott: 9 },
-    note: 'Potatisdeg fylld med rimmat fläsk och lök. Smält smör och lingon räknas separat.',
-  },
-  {
-    id: 'palt',
-    name: 'Palt med fläskfyllning (pitepalt)',
-    cat: 'fardigratt',
-    lmv: 253,
-    kcal: 180, prot: 4.8, carb: 25.1, fat: 6, fiber: 2.6, sugar: 0.6, addedSugar: 0, satFat: 2.4, salt: 1.4,
-    portions: [['st', '1 palt (ca 120 g)', 120], ['portion', '1 portion (3 st, 360 g)', 360]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['palt', 'pitepalt', 'palt med fläsk', 'norrländsk palt', 'paltar'],
-    co2e: 1,
-    plate: { veg: 0, carb: 0.83, protein: 0.12 },
-    kostrad: { rottKott: 12 },
-    note: 'Rå riven potatis och mjöl, fylld med rimmat fläsk och kokt. Smör och lingon räknas separat.',
+    plate: { veg: 0.02, carb: 0.85, protein: 0.1 },
+    kostrad: { fruktGront: 2, rottKott: 10 },
+    note: 'Potatisdeg fylld med rimmat fläsk och lök – kroppkakor och palt har ett gemensamt värde hos Livsmedelsverket. Smält smör och lingon räknas separat.',
   },
   // Pajer
   {
@@ -1419,7 +1285,7 @@ const regionalt: FoodSeed[] = [
   },
   {
     id: 'skinkpaj',
-    name: 'Skinkpaj (quiche med skinka och ost)',
+    name: 'Skinkpaj',
     cat: 'fardigratt',
     lmv: 789,
     kcal: 286, prot: 11.4, carb: 15, fat: 19.8, fiber: 2.1, sugar: 1.2, addedSugar: 0, satFat: 9.2, salt: 0.9,
@@ -1440,7 +1306,7 @@ const regionalt: FoodSeed[] = [
 const smorgasar: FoodSeed[] = [
   {
     id: 'smorgastarta',
-    name: 'Smörgåstårta med räkor och skinka',
+    name: 'Smörgåstårta',
     cat: 'fardigratt',
     lmv: 797,
     kcal: 237, prot: 8.7, carb: 15.1, fat: 15.5, fiber: 1.8, sugar: 2.5, addedSugar: 1, satFat: 4.6, salt: 1.3,
@@ -1472,7 +1338,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'knackebrod-smor-ost',
-    name: 'Knäckebrödsmörgås med smör och ost',
+    name: 'Knäckebrödsmacka med ost',
     cat: 'fardigratt',
     kcal: 408, prot: 15.6, carb: 25.3, fat: 25.7, fiber: 6.7, sugar: 0.7, addedSugar: 0, satFat: 13.8, salt: 1.3,
     n: {
@@ -1489,7 +1355,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'smorgas-grovt-ost',
-    name: 'Smörgås, grovt bröd med smör och ost',
+    name: 'Smörgås med ost',
     cat: 'fardigratt',
     kcal: 319, prot: 13, carb: 25.8, fat: 17.2, fiber: 4.5, sugar: 3.3, addedSugar: 1.9, satFat: 8.3, salt: 1.2,
     n: {
@@ -1506,7 +1372,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'smorgas-skinka',
-    name: 'Smörgås med skinka och gurka',
+    name: 'Smörgås med skinka',
     cat: 'fardigratt',
     kcal: 213, prot: 10, carb: 22.4, fat: 8.4, fiber: 3.9, sugar: 3.2, addedSugar: 1.6, satFat: 3, salt: 1.3,
     n: {
@@ -1524,7 +1390,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'smorgas-leverpastej',
-    name: 'Smörgås med leverpastej och saltgurka',
+    name: 'Smörgås med leverpastej',
     cat: 'fardigratt',
     kcal: 251, prot: 8.2, carb: 24.8, fat: 12.4, fiber: 4, sugar: 4.1, addedSugar: 2.4, satFat: 4.4, salt: 1.2,
     n: {
@@ -1559,7 +1425,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'fralla-ost-skinka',
-    name: 'Fralla med ost, skinka och grönsaker',
+    name: 'Fralla med ost och skinka',
     cat: 'fardigratt',
     kcal: 238, prot: 10.3, carb: 25.1, fat: 10.3, fiber: 1.7, sugar: 3.2, addedSugar: 1.8, satFat: 4.7, salt: 1.1,
     n: {
@@ -1576,7 +1442,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'baguette-kyckling',
-    name: 'Baguette med kyckling, sallad och dressing',
+    name: 'Kycklingbaguette',
     cat: 'fardigratt',
     kcal: 200, prot: 11.2, carb: 24.2, fat: 6.2, fiber: 1.4, sugar: 1.6, addedSugar: 0.3, satFat: 1, salt: 0.71,
     n: {
@@ -1593,7 +1459,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'wrap-kyckling',
-    name: 'Wrap med kyckling',
+    name: 'Kycklingwrap',
     cat: 'fardigratt',
     kcal: 187, prot: 12.2, carb: 16.8, fat: 7.7, fiber: 1.1, sugar: 1.9, addedSugar: 0.5, satFat: 2.6, salt: 0.61,
     n: {
@@ -1610,7 +1476,7 @@ const smorgasar: FoodSeed[] = [
   },
   {
     id: 'toast-skinka-ost',
-    name: 'Varm smörgås med skinka och ost (toast)',
+    name: 'Toast med skinka och ost',
     cat: 'fardigratt',
     lmv: 5574,
     kcal: 282, prot: 15.2, carb: 22.8, fat: 13.9, fiber: 2.3, sugar: 2.3, addedSugar: 2, satFat: 7.2, salt: 1.6,
@@ -1630,7 +1496,7 @@ const smorgasar: FoodSeed[] = [
 const internationellt: FoodSeed[] = [
   {
     id: 'sushi-blandad',
-    name: 'Sushi, blandad (lax, nigiri och maki)',
+    name: 'Sushi',
     cat: 'fardigratt',
     kcal: 152, prot: 7, carb: 22, fat: 3.9, fiber: 0.6, sugar: 2.7, addedSugar: 2.6, satFat: 0.7, salt: 0.55,
     n: {
@@ -1648,7 +1514,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'pokebowl-lax',
-    name: 'Pokébowl med lax',
+    name: 'Pokébowl',
     cat: 'fardigratt',
     kcal: 158, prot: 6.2, carb: 15.1, fat: 7.7, fiber: 1.5, sugar: 3, addedSugar: 1.6, satFat: 1, salt: 0.59,
     n: {
@@ -1658,7 +1524,7 @@ const internationellt: FoodSeed[] = [
     },
     portions: [['portion', '1 bowl (ca 400 g)', 400], ['liten', '1 liten bowl (300 g)', 300]],
     tags: ['laktosfri'],
-    syn: ['poké', 'poke bowl', 'pokebowl', 'poké bowl', 'laxbowl', 'sushibowl', 'poke'],
+    syn: ['poké', 'poke bowl', 'pokebowl', 'poké bowl', 'laxbowl', 'sushibowl', 'poke', 'pokébowl med lax', 'bowl'],
     co2e: 1.6,
     plate: { veg: 0.29, carb: 0.37, protein: 0.28 },
     kostrad: { fruktGront: 29, baljvaxter: 8, fisk: 19 },
@@ -1666,7 +1532,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'pad-thai-kyckling',
-    name: 'Pad thai med kyckling',
+    name: 'Pad thai',
     cat: 'fardigratt',
     kcal: 163, prot: 8.6, carb: 15.9, fat: 7, fiber: 1.2, sugar: 2.9, addedSugar: 2.2, satFat: 1, salt: 1.1,
     n: {
@@ -1683,7 +1549,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'ramen-flask',
-    name: 'Ramen med fläsk och ägg',
+    name: 'Ramen',
     cat: 'fardigratt',
     kcal: 76, prot: 3.5, carb: 7.8, fat: 3.4, fiber: 0.5, sugar: 0.4, addedSugar: 0, satFat: 1.1, salt: 1.3,
     n: {
@@ -1693,51 +1559,15 @@ const internationellt: FoodSeed[] = [
     },
     portions: [['skal', '1 skål (ca 550 g)', 550], ['liten', '1 liten skål (400 g)', 400]],
     tags: ['laktosfri'],
-    syn: ['ramen', 'ramensoppa', 'nudelsoppa', 'tonkotsu', 'shoyu ramen', 'japansk nudelsoppa'],
+    syn: ['ramen', 'ramensoppa', 'nudelsoppa', 'tonkotsu', 'shoyu ramen', 'japansk nudelsoppa', 'pho', 'nudelsoppa med fläsk'],
     co2e: 0.8,
     plate: { veg: 0.07, carb: 0.29, protein: 0.13 },
     kostrad: { fruktGront: 7, rottKott: 8 },
     note: 'Buljong med vetenudlar, kokt fläsk (chashu), ägg, majs, spenat och salladslök.',
   },
   {
-    id: 'thaigryta-kyckling-ris',
-    name: 'Thaigryta med kyckling, kokosmjölk och jasminris',
-    cat: 'fardigratt',
-    kcal: 124, prot: 6.4, carb: 14.3, fat: 4.5, fiber: 0.7, sugar: 1.5, addedSugar: 0.5, satFat: 3.2, salt: 0.67,
-    n: {
-      monoFat: 0.7, polyFat: 0.3, omega3: 0.07, cholesterol: 13,
-      vitA: 24, vitD: 0.03, vitE: 0.3, vitC: 7, thiamin: 0.03, riboflavin: 0.03, niacin: 2.3, vitB6: 0.13, folate: 9, vitB12: 0.06,
-      calcium: 8, iron: 0.5, magnesium: 18, potassium: 139, phosphorus: 75, zinc: 0.5, selenium: 5.6,
-    },
-    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['glutenfri', 'laktosfri'],
-    syn: ['thaigryta', 'röd curry', 'thai curry', 'kycklinggryta med kokos', 'thailändsk gryta', 'grön curry', 'kokosgryta'],
-    co2e: 1.6,
-    plate: { veg: 0.14, carb: 0.45, protein: 0.15 },
-    kostrad: { fruktGront: 14 },
-    note: 'Kyckling och grönsaker i kokosmjölk med röd currypasta, serverad med jasminris.',
-  },
-  {
-    id: 'tikka-masala-ris',
-    name: 'Kyckling tikka masala med ris',
-    cat: 'fardigratt',
-    kcal: 126, prot: 7.1, carb: 15, fat: 4.1, fiber: 0.5, sugar: 1.7, addedSugar: 0.3, satFat: 1.8, salt: 0.79,
-    n: {
-      monoFat: 1.5, polyFat: 0.5, omega3: 0.13, cholesterol: 22,
-      vitA: 33, vitD: 0.06, vitE: 0.6, vitC: 1.3, thiamin: 0.03, riboflavin: 0.05, niacin: 2.5, vitB6: 0.14, folate: 5, vitB12: 0.1,
-      calcium: 17, iron: 0.3, magnesium: 14, potassium: 156, phosphorus: 77, zinc: 0.5, selenium: 5.2,
-    },
-    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['glutenfri'],
-    syn: ['tikka masala', 'chicken tikka masala', 'butter chicken', 'indisk kyckling', 'kyckling masala', 'indisk gryta', 'indiskt'],
-    co2e: 1.8,
-    plate: { veg: 0.2, carb: 0.47, protein: 0.17 },
-    kostrad: { fruktGront: 20 },
-    note: 'Kyckling i kryddig tomat- och gräddsås, serverad med ris.',
-  },
-  {
     id: 'sotsur-kyckling-ris',
-    name: 'Friterad kyckling i sötsur sås med ris',
+    name: 'Sötsur kyckling med ris',
     cat: 'fardigratt',
     kcal: 149, prot: 5.9, carb: 23.3, fat: 3.4, fiber: 0.6, sugar: 7.2, addedSugar: 6.2, satFat: 0.4, salt: 0.54,
     n: {
@@ -1755,7 +1585,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'kycklingwok-ris',
-    name: 'Kycklingwok med grönsaker och ris',
+    name: 'Kycklingwok med ris',
     cat: 'fardigratt',
     kcal: 132, prot: 8.2, carb: 15.5, fat: 3.9, fiber: 0.9, sugar: 2.6, addedSugar: 1.7, satFat: 0.4, salt: 0.68,
     n: {
@@ -1772,7 +1602,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'burrito-kyckling',
-    name: 'Burrito med kyckling, ris och bönor',
+    name: 'Burrito',
     cat: 'snabbmat',
     kcal: 161, prot: 10.7, carb: 18.5, fat: 4.5, fiber: 1.8, sugar: 1.6, addedSugar: 0.6, satFat: 2.4, salt: 0.69,
     n: {
@@ -1789,7 +1619,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'pasta-carbonara',
-    name: 'Pasta carbonara med bacon och grädde',
+    name: 'Pasta carbonara',
     cat: 'fardigratt',
     lmv: 5804,
     kcal: 189, prot: 8.7, carb: 19.3, fat: 8.3, fiber: 1.4, sugar: 0.6, addedSugar: 0, satFat: 4.1, salt: 0.9,
@@ -1802,7 +1632,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'pasta-lax-gradde',
-    name: 'Pasta med lax och grädde',
+    name: 'Laxpasta',
     cat: 'fardigratt',
     kcal: 150, prot: 7.3, carb: 16.5, fat: 5.8, fiber: 1.2, sugar: 1.2, addedSugar: 0, satFat: 2.3, salt: 0.64,
     n: {
@@ -1852,7 +1682,7 @@ const internationellt: FoodSeed[] = [
   },
   {
     id: 'nachos-kottfars-ost',
-    name: 'Nachos med köttfärs, ost och gräddfil',
+    name: 'Nachos',
     cat: 'snabbmat',
     kcal: 271, prot: 12.9, carb: 17.9, fat: 16.1, fiber: 1.6, sugar: 1.7, addedSugar: 0.4, satFat: 6, salt: 1.2,
     n: {
@@ -1867,6 +1697,43 @@ const internationellt: FoodSeed[] = [
     kostrad: { fruktGront: 15, rottKott: 30 },
     note: 'Beräknat på en portion med 70 g tortillachips, 80 g stekt nötfärs med tacokrydda, 40 g riven ost, 40 g salsa, 30 g gräddfil och 10 g jalapeño, gratinerat i ugn.',
   },
+  {
+    id: 'pasta-tomatsas',
+    name: 'Pasta med tomatsås',
+    cat: 'fardigratt',
+    kcal: 130, prot: 4.1, carb: 19.4, fat: 3.5, fiber: 1.7, sugar: 1.8, addedSugar: 0.3, satFat: 0.7, salt: 0.76,
+    portions: [['portion', '1 portion (390 g)', 390], ['liten', '1 liten portion (280 g)', 280], ['barn', '1 barnportion (200 g)', 200]],
+    tags: ['vegetarisk'],
+    syn: ['pasta pomodoro', 'pasta al pomodoro', 'pasta napoli', 'spagetti med tomatsås', 'spaghetti pomodoro', 'pasta med röd sås', 'pasta arrabbiata', 'tomatpasta', 'pasta med tomat', 'makaroner med tomatsås'],
+    co2e: 0.9,
+    plate: { veg: 0.33, carb: 0.64, protein: 0.03 },
+    kostrad: { fruktGront: 33 },
+    note: 'Beräknat på en portion med 250 g kokt pasta, 130 g tomatsås (krossade tomater, lök, vitlök och olivolja) och 10 g riven parmesan.',
+  },
+  {
+    id: 'pasta-kyckling-gradde',
+    name: 'Kycklingpasta',
+    cat: 'fardigratt',
+    kcal: 127, prot: 8.4, carb: 15.2, fat: 3.4, fiber: 1.2, sugar: 1, addedSugar: 0, satFat: 1.8, salt: 0.6,
+    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
+    syn: ['pasta med kyckling', 'krämig kycklingpasta', 'pasta med kyckling och grädde', 'kycklingpasta med grädde', 'pasta kyckling', 'kyckling pasta', 'pasta alfredo med kyckling'],
+    co2e: 1.8,
+    plate: { veg: 0.05, carb: 0.51, protein: 0.21 },
+    kostrad: { fruktGront: 5 },
+    note: 'Beräknat på en portion med 220 g kokt pasta, 90 g stekt kycklingfilé, 110 g gräddsås (matlagningsgrädde, lök, champinjoner och buljong) och 10 g riven parmesan.',
+  },
+  {
+    id: 'dumplings',
+    name: 'Dumplings',
+    cat: 'fardigratt',
+    avg: true,
+    kcal: 188, prot: 7.2, carb: 22, fat: 7.5, fiber: 1.8, sugar: 2.6, satFat: 2, salt: 1.1,
+    portions: [['portion', '1 portion (8 st, ca 160 g)', 160], ['st', '1 dumpling (ca 20 g)', 20], ['stor', '1 stor portion (12 st, ca 240 g)', 240]],
+    syn: ['dumpling', 'gyoza', 'gyozas', 'jiaozi', 'dim sum', 'wonton', 'wontons', 'mandu', 'potstickers', 'frysta dumplings', 'dumplings kyckling', 'dumplings fläsk', 'ajinomoto', 'bibigo'],
+    co2e: 2.5,
+    plate: { veg: 0.15, carb: 0.55, protein: 0.25 },
+    note: `Samlingsvärde: genomsnitt av vanliga frysta dumplings (gyoza) med kyckling, fläsk eller grönsaker, stekta eller ångkokta (t.ex. Ajinomoto, Bibigo och ICA). Dippsås räknas separat. ${SKANNA}`,
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -1875,45 +1742,8 @@ const internationellt: FoodSeed[] = [
 
 const vegetariskt: FoodSeed[] = [
   {
-    id: 'linsgryta-kokos',
-    name: 'Linsgryta med kokosmjölk',
-    cat: 'fardigratt',
-    kcal: 94, prot: 3.9, carb: 8.7, fat: 4.4, fiber: 2.2, sugar: 2.7, addedSugar: 0, satFat: 2.5, salt: 0.84,
-    n: {
-      monoFat: 1.1, polyFat: 0.6, omega3: 0.14, cholesterol: 0,
-      vitA: 67, vitD: 0, vitE: 0.8, vitC: 2, thiamin: 0.06, riboflavin: 0.03, niacin: 0.7, vitB6: 0.1, folate: 29, vitB12: 0,
-      calcium: 17, iron: 1.3, magnesium: 22, potassium: 246, phosphorus: 78, zinc: 0.5, selenium: 1.9,
-    },
-    portions: [['portion', '1 portion (250 g)', 250], ['dl', '1 dl', 100]],
-    density: 1.0,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['linsgryta', 'röd linsgryta', 'linsgryta kokos', 'vegansk gryta', 'vegetarisk gryta', 'linsgryta med tomat'],
-    co2e: 0.8,
-    plate: { veg: 0.41, carb: 0, protein: 0.35 },
-    kostrad: { fruktGront: 41, baljvaxter: 35 },
-    note: 'Röda linser med krossade tomater, kokosmjölk, lök och morot. Utan ris.',
-  },
-  {
-    id: 'linsgryta-ris',
-    name: 'Linsgryta med ris (vegetarisk dagens lunch)',
-    cat: 'fardigratt',
-    kcal: 108, prot: 3.4, carb: 16.8, fat: 2.7, fiber: 1.5, sugar: 1.6, addedSugar: 0, satFat: 1.5, salt: 0.61,
-    n: {
-      monoFat: 0.7, polyFat: 0.4, omega3: 0.09, cholesterol: 0,
-      vitA: 39, vitD: 0, vitE: 0.5, vitC: 1.2, thiamin: 0.04, riboflavin: 0.02, niacin: 0.5, vitB6: 0.08, folate: 18, vitB12: 0,
-      calcium: 11, iron: 0.9, magnesium: 17, potassium: 155, phosphorus: 62, zinc: 0.5, selenium: 3.2,
-    },
-    portions: [['portion', '1 portion (430 g)', 430], ['liten', '1 liten portion (300 g)', 300]],
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['dagens vegetariska', 'vegetarisk lunch', 'linsgryta och ris', 'vegansk lunch', 'dagens vego', 'linsgryta med ris'],
-    co2e: 0.9,
-    plate: { veg: 0.24, carb: 0.42, protein: 0.2 },
-    kostrad: { fruktGront: 24, baljvaxter: 20 },
-    note: 'Beräknat på en portion med 250 g linsgryta och 180 g kokt ris.',
-  },
-  {
     id: 'bonchili',
-    name: 'Bönchili (vegetarisk chili)',
+    name: 'Bönchili',
     cat: 'fardigratt',
     kcal: 73, prot: 3.8, carb: 8.6, fat: 1.8, fiber: 3.6, sugar: 3, addedSugar: 0, satFat: 0.2, salt: 0.97,
     n: {
@@ -1932,7 +1762,7 @@ const vegetariskt: FoodSeed[] = [
   },
   {
     id: 'gronsakslasagne',
-    name: 'Grönsakslasagne',
+    name: 'Vegetarisk lasagne',
     cat: 'fardigratt',
     lmv: 6437,
     kcal: 129, prot: 4.6, carb: 17.8, fat: 4, fiber: 1.7, sugar: 3.3, addedSugar: 0, satFat: 1.4, salt: 0.6,
@@ -1945,7 +1775,7 @@ const vegetariskt: FoodSeed[] = [
   },
   {
     id: 'wok-gronsaker-nudlar',
-    name: 'Wok med grönsaker, tofu och nudlar',
+    name: 'Nudelwok med tofu',
     cat: 'fardigratt',
     kcal: 118, prot: 4.4, carb: 13.9, fat: 4.6, fiber: 1.6, sugar: 2.5, addedSugar: 1.1, satFat: 0.5, salt: 0.65,
     n: {
@@ -1962,26 +1792,30 @@ const vegetariskt: FoodSeed[] = [
   },
   {
     id: 'dal-linsgryta',
-    name: 'Dal (indisk linsgryta)',
+    name: 'Linsgryta',
     cat: 'fardigratt',
-    kcal: 95, prot: 5.1, carb: 10.1, fat: 3.3, fiber: 2.4, sugar: 1, addedSugar: 0, satFat: 0.2, salt: 0.81,
+    kcal: 94, prot: 4.5, carb: 9.4, fat: 3.9, fiber: 2.3, sugar: 1.9, addedSugar: 0, satFat: 1.4, salt: 0.82,
     n: {
-      monoFat: 1.9, polyFat: 1, omega3: 0.29, cholesterol: 0,
-      vitA: 4, vitD: 0, vitE: 0.7, vitC: 1.1, thiamin: 0.07, riboflavin: 0.03, niacin: 0.5, vitB6: 0.1, folate: 39, vitB12: 0,
-      calcium: 10, iron: 1.4, magnesium: 18, potassium: 193, phosphorus: 87, zinc: 0.6, selenium: 1.7,
+      monoFat: 1.5, polyFat: 0.8, omega3: 0.21, cholesterol: 0,
+      vitA: 35.5, vitD: 0, vitE: 0.75, vitC: 1.6, thiamin: 0.07, riboflavin: 0.03, niacin: 0.6, vitB6: 0.1, folate: 34, vitB12: 0,
+      calcium: 13.5, iron: 1.4, magnesium: 20, potassium: 220, phosphorus: 82.5, zinc: 0.55, selenium: 1.8,
     },
     portions: [['portion', '1 portion (250 g)', 250], ['dl', '1 dl', 100]],
     density: 1.0,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['dahl', 'daal', 'dal', 'linsdal', 'tarka dal', 'indisk linsgryta'],
-    co2e: 0.6,
-    plate: { veg: 0.13, carb: 0, protein: 0.56 },
-    kostrad: { fruktGront: 13, baljvaxter: 56 },
-    note: 'Röda linser kokta med lök, tomat, gurkmeja, spiskummin och ingefära. Utan ris.',
+    syn: [
+      'dahl', 'daal', 'dal', 'linsdal', 'tarka dal', 'indisk linsgryta', 'linsgryta', 'röd linsgryta', 'linsgryta kokos',
+      'linsgryta med kokosmjölk', 'vegansk gryta', 'vegetarisk gryta', 'linsgryta med tomat', 'linsgryta med ris',
+      'linsgryta och ris', 'dagens vegetariska', 'vegetarisk lunch', 'vegansk lunch', 'dagens vego',
+    ],
+    co2e: 0.7,
+    plate: { veg: 0.27, carb: 0, protein: 0.46 },
+    kostrad: { fruktGront: 27, baljvaxter: 46 },
+    note: 'Röda linser kokta med lök, tomat och kryddor, med eller utan kokosmjölk (som indisk dal). Ris räknas separat – en vanlig portion är ca 180 g kokt ris.',
   },
   {
     id: 'falafeltallrik',
-    name: 'Falafeltallrik med bulgur, hummus och sallad',
+    name: 'Falafeltallrik',
     cat: 'fardigratt',
     kcal: 132, prot: 4.3, carb: 13.2, fat: 6, fiber: 4, sugar: 1.6, addedSugar: 0, satFat: 1, salt: 0.5,
     n: {
@@ -1991,7 +1825,10 @@ const vegetariskt: FoodSeed[] = [
     },
     portions: [['portion', '1 portion (430 g)', 430]],
     tags: ['vegetarisk'],
-    syn: ['falafel tallrik', 'falafel med bulgur', 'falafelplatta', 'mezetallrik', 'falafellunch', 'falafeltallrik'],
+    syn: [
+      'falafel tallrik', 'falafel med bulgur', 'falafelplatta', 'mezetallrik', 'falafellunch', 'falafeltallrik',
+      'falafeltallrik med bulgur och hummus',
+    ],
     co2e: 1,
     plate: { veg: 0.26, carb: 0.28, protein: 0.37 },
     kostrad: { fruktGront: 26, baljvaxter: 20 },
@@ -2000,30 +1837,13 @@ const vegetariskt: FoodSeed[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Gröt och våfflor
+// Våfflor
 // ---------------------------------------------------------------------------
 
-const grotOchVafflor: FoodSeed[] = [
-  {
-    id: 'risgrynsgrot-mjolk-socker',
-    name: 'Risgrynsgröt med mjölk, socker och kanel (julgröt)',
-    cat: 'spannmal',
-    kcal: 77, prot: 4, carb: 11.6, fat: 1.6, fiber: 0.1, sugar: 6.7, addedSugar: 1.7, satFat: 1, salt: 0.2,
-    n: {
-      monoFat: 0.4, polyFat: 0.1, omega3: 0.01, cholesterol: 5,
-      vitA: 16, vitD: 1, vitE: 0, vitC: 0.6, thiamin: 0.04, riboflavin: 0.18, niacin: 0.2, vitB6: 0.05, folate: 6, vitB12: 0.41,
-      calcium: 125, iron: 0.1, magnesium: 12, potassium: 157, phosphorus: 100, zinc: 0.5, selenium: 2.7,
-    },
-    portions: [['portion', '1 portion med mjölk (ca 355 g)', 355], ['liten', '1 liten portion (200 g)', 200]],
-    tags: ['vegetarisk', 'glutenfri', 'klassiker', 'svensk'],
-    syn: ['julgröt', 'risgrynsgröt med mjölk', 'tomtegröt', 'gröt med kanel och socker', 'risgröt', 'julaftonsgröt'],
-    co2e: 1.3,
-    plate: { veg: 0, carb: 0.7, protein: 0 },
-    note: 'Beräknat på en portion med 250 g risgrynsgröt, 100 g mellanmjölk och 6 g socker.',
-  },
+const vafflor: FoodSeed[] = [
   {
     id: 'vafflor-sylt-gradde',
-    name: 'Våfflor med sylt och vispgrädde',
+    name: 'Våfflor med sylt och grädde',
     cat: 'bakverk',
     kcal: 266, prot: 3.7, carb: 20, fat: 19, fiber: 0.7, sugar: 9, addedSugar: 6.1, satFat: 12.1, salt: 0.45,
     n: {
@@ -2047,7 +1867,7 @@ const grotOchVafflor: FoodSeed[] = [
 const pizza: FoodSeed[] = [
   {
     id: 'pizza-margherita',
-    name: 'Pizza Margherita (pizzeria)',
+    name: 'Pizza Margherita',
     cat: 'snabbmat',
     lmv: 6760,
     kcal: 328, prot: 16.5, carb: 22.9, fat: 18.2, fiber: 3.7, sugar: 2.6, addedSugar: 0, satFat: 10, salt: 1.5,
@@ -2061,49 +1881,25 @@ const pizza: FoodSeed[] = [
   },
   {
     id: 'pizza-vesuvio',
-    name: 'Pizza Vesuvio (skinka)',
+    name: 'Pizza med skinka',
     cat: 'snabbmat',
     lmv: 6624,
     kcal: 297, prot: 17, carb: 19.9, fat: 16, fiber: 3.2, sugar: 2.4, addedSugar: 0, satFat: 8.7, salt: 1.9,
-    portions: [['pizza', '1 pizza (ca 400 g)', 400], ['halv', '1/2 pizza', 200], ['bit', '1 bit (1/8 pizza)', 50]],
+    portions: [['pizza', '1 pizza (ca 420 g)', 420], ['halv', '1/2 pizza', 210], ['bit', '1 bit (1/8 pizza)', 53]],
     tags: ['klassiker', 'svensk'],
-    syn: ['vesuvio', 'pizza skinka', 'skinkpizza', 'vesuvio pizza', 'pizza med skinka'],
+    syn: [
+      'vesuvio', 'pizza skinka', 'skinkpizza', 'vesuvio pizza', 'pizza med skinka', 'capricciosa', 'capricosa', 'kapricciosa',
+      'caprichosa', 'pizza capricciosa', 'pizza skinka champinjoner', 'hawaii', 'hawaiipizza', 'pizza hawaii', 'pizza ananas',
+      'pizza skinka ananas', 'calzone', 'inbakad pizza', 'calzone skinka', 'kalzone', 'inbakad', 'pizza vesuvio', 'pizzeria',
+    ],
     co2e: 2.8,
     plate: { veg: 0.13, carb: 0.54, protein: 0.32 },
     kostrad: { fruktGront: 10, rottKott: 13 },
-    note: 'Svensk pizzeriapizza (ca 30 cm) med tomatsås och riven pizzaost. Topping: skinka.',
-  },
-  {
-    id: 'pizza-capricciosa',
-    name: 'Pizza Capricciosa (skinka och champinjoner)',
-    cat: 'snabbmat',
-    lmv: 6625,
-    kcal: 295, prot: 16, carb: 20.2, fat: 16, fiber: 3.4, sugar: 2.3, addedSugar: 0, satFat: 8.7, salt: 1.6,
-    portions: [['pizza', '1 pizza (ca 430 g)', 430], ['halv', '1/2 pizza', 215], ['bit', '1 bit (1/8 pizza)', 55]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['capricciosa', 'capricosa', 'kapricciosa', 'caprichosa', 'pizza skinka champinjoner', 'pizza capricciosa'],
-    co2e: 2.6,
-    plate: { veg: 0.2, carb: 0.5, protein: 0.29 },
-    kostrad: { fruktGront: 18, rottKott: 12 },
-    note: 'Svensk pizzeriapizza (ca 30 cm) med tomatsås och riven pizzaost. Topping: skinka och champinjoner.',
-  },
-  {
-    id: 'pizza-hawaii',
-    name: 'Pizza Hawaii (skinka och ananas)',
-    cat: 'snabbmat',
-    lmv: 2139,
-    kcal: 299, prot: 16.1, carb: 20.6, fat: 16.3, fiber: 3.3, sugar: 3, addedSugar: 0, satFat: 8.9, salt: 1.6,
-    portions: [['pizza', '1 pizza (ca 430 g)', 430], ['halv', '1/2 pizza', 215], ['bit', '1 bit (1/8 pizza)', 55]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['hawaii', 'hawaiipizza', 'pizza ananas', 'pizza skinka ananas', 'pizza hawaii'],
-    co2e: 2.6,
-    plate: { veg: 0.22, carb: 0.49, protein: 0.29 },
-    kostrad: { fruktGront: 19, rottKott: 11 },
-    note: 'Svensk pizzeriapizza (ca 30 cm) med tomatsås och riven pizzaost. Topping: skinka och ananas.',
+    note: 'Svensk pizzeriapizza (ca 30 cm) med tomatsås, riven pizzaost och skinka. Vesuvio, Capricciosa (med champinjoner), Hawaii (med ananas) och Calzone (inbakad) har nästan samma näringsvärde, 295–299 kcal per 100 g.',
   },
   {
     id: 'pizza-kebab',
-    name: 'Kebabpizza med kebabsås',
+    name: 'Kebabpizza',
     cat: 'snabbmat',
     kcal: 298, prot: 14, carb: 17.9, fat: 18.5, fiber: 3, sugar: 2.3, addedSugar: 0, satFat: 8.5, salt: 1.53,
     n: {
@@ -2120,42 +1916,29 @@ const pizza: FoodSeed[] = [
     note: 'Svensk pizzeriapizza (ca 30 cm) med tomatsås och riven pizzaost. Topping: kebabkött, lök, peperoni, lite sallad och vitlökssås.',
   },
   {
-    id: 'pizza-calzone',
-    name: 'Calzone (inbakad pizza med skinka)',
-    cat: 'snabbmat',
-    kcal: 297, prot: 17, carb: 19.9, fat: 16, fiber: 3.2, sugar: 2.4, addedSugar: 0, satFat: 8.7, salt: 1.9,
-    n: {
-      monoFat: 5, polyFat: 1.4, omega3: 0.3, cholesterol: 41,
-      vitA: 107, vitD: 0, vitE: 1.3, vitC: 0, thiamin: 0.17, riboflavin: 0.15, niacin: 7.5, vitB6: 0.21, folate: 18, vitB12: 0.71,
-      calcium: 302, iron: 0.6, magnesium: 29, potassium: 181, phosphorus: 275, zinc: 1.8, selenium: 6,
-    },
-    portions: [['st', '1 calzone (ca 420 g)', 420], ['halv', '1/2 calzone', 210]],
-    syn: ['calzone', 'inbakad pizza', 'calzone skinka', 'kalzone', 'inbakad'],
-    co2e: 2.9,
-    plate: { veg: 0.1, carb: 0.55, protein: 0.35 },
-    kostrad: { fruktGront: 8, rottKott: 15 },
-    note: 'Inbakad pizza fylld med tomatsås, ost och skinka.',
-  },
-  {
     id: 'fryspizza-skinka-ost',
-    name: 'Fryspizza med skinka och ost, tillagad',
+    name: 'Fryspizza',
     cat: 'snabbmat',
+    avg: true,
     kcal: 238, prot: 10.3, carb: 28.9, fat: 8.7, fiber: 1.6, sugar: 2, addedSugar: 0.4, satFat: 3, salt: 1.3,
     n: {
       monoFat: 4, polyFat: 1.2, omega3: 0.27, cholesterol: 17,
       vitA: 41, vitD: 0.09, vitE: 1.3, vitC: 1.2, thiamin: 0.16, riboflavin: 0.11, niacin: 1.5, vitB6: 0.09, folate: 18, vitB12: 0.27,
       calcium: 107, iron: 0.8, magnesium: 22, potassium: 157, phosphorus: 145, zinc: 1.1, selenium: 8.6,
     },
-    portions: [['pizza', '1 pizza (ca 350 g)', 350], ['halv', '1/2 pizza', 175], ['stor', '1 stor fryspizza (ca 575 g)', 575]],
-    syn: ['fryspizza', 'djupfryst pizza', 'frozen pizza', 'ugnspizza', 'pizza fryst', 'frysdiskpizza'],
+    portions: [['pizza', '1 pizza (ca 350 g)', 350], ['halv', '1/2 pizza', 175], ['stor', '1 stor fryspizza (ca 575 g)', 575], ['liten', '1 liten panpizza (ca 170 g)', 170]],
+    syn: [
+      'fryspizza', 'djupfryst pizza', 'frozen pizza', 'ugnspizza', 'pizza fryst', 'frysdiskpizza', 'grandiosa', 'ristorante',
+      'dr oetker', 'billys', 'billys pan pizza', 'panpizza', 'fryspizza skinka', 'pizza från frysen',
+    ],
     co2e: 2.5,
     plate: { veg: 0.14, carb: 0.56, protein: 0.28 },
     kostrad: { fruktGront: 12, rottKott: 11 },
-    note: 'Typisk djupfryst pizza med tomatsås, ost och skinka, gräddad i ugn.',
+    note: `Samlingsvärde: genomsnitt av vanliga frysta pizzor med skinka, kött eller ost, gräddade i ugn (t.ex. Grandiosa, Dr. Oetker Ristorante, Billys och ICA). ${SKANNA}`,
   },
   {
     id: 'pizzasallad',
-    name: 'Pizzasallad (vitkålssallad)',
+    name: 'Pizzasallad',
     cat: 'gronsaker',
     lmv: 467,
     kcal: 90, prot: 1, carb: 4.9, fat: 7.1, fiber: 1.6, sugar: 3.6, addedSugar: 0, satFat: 0.5, salt: 0.5,
@@ -2177,20 +1960,23 @@ const pizza: FoodSeed[] = [
 const kebabFalafel: FoodSeed[] = [
   {
     id: 'kebab-pitabrod',
-    name: 'Kebab i pitabröd',
+    name: 'Kebab i bröd',
     cat: 'snabbmat',
     lmv: 2506,
     kcal: 216, prot: 7.8, carb: 18.8, fat: 12, fiber: 1.2, sugar: 2, addedSugar: 1, satFat: 3.9, salt: 1.4,
-    portions: [['st', '1 kebab i bröd (ca 290 g)', 290]],
-    syn: ['kebab', 'kebab i bröd', 'kebab i pita', 'pitakebab', 'döner', 'kebabbröd', 'kebab pitabröd'],
+    portions: [['st', '1 kebab i pitabröd (ca 290 g)', 290], ['rulle', '1 kebabrulle (ca 345 g)', 345]],
+    syn: [
+      'kebab', 'kebab i bröd', 'kebab i pita', 'pitakebab', 'döner', 'kebabbröd', 'kebab pitabröd', 'kebabrulle', 'kebab rulle',
+      'rulle', 'dürüm', 'durum', 'kebabwrap', 'yufka', 'shawarma',
+    ],
     co2e: 6.3,
     plate: { veg: 0.22, carb: 0.22, protein: 0.38 },
     kostrad: { fruktGront: 22, rottKott: 38 },
-    note: 'Portionsvikten utgår från 65 g pitabröd, 110 g kebabkött, 20 g isbergssallad, 20 g tomat, 15 g gurka, 10 g lök, 40 g vitlökssås och 10 g tacosås.',
+    note: 'Kebabkött med sallad, tomat, gurka, lök, vitlökssås och tacosås i pitabröd eller rullat i tunnbröd (kebabrulle) – värdet per 100 g är nästan detsamma. Portionsvikten för pitabröd utgår från 65 g pitabröd, 110 g kebabkött, 65 g grönsaker och 50 g sås.',
   },
   {
     id: 'kebabtallrik',
-    name: 'Kebabtallrik med pommes frites och sås',
+    name: 'Kebabtallrik',
     cat: 'snabbmat',
     lmv: 2507,
     kcal: 254, prot: 6.4, carb: 19.2, fat: 16.6, fiber: 1.5, sugar: 1.1, addedSugar: 0, satFat: 4.7, salt: 1.1,
@@ -2200,23 +1986,6 @@ const kebabFalafel: FoodSeed[] = [
     plate: { veg: 0.19, carb: 0.36, protein: 0.3 },
     kostrad: { fruktGront: 19, rottKott: 30 },
     note: 'Portionsvikten utgår från 150 g kebabkött, 180 g pommes frites, 30 g isbergssallad, 30 g tomat, 20 g gurka, 15 g lök, 50 g vitlökssås och 20 g tacosås.',
-  },
-  {
-    id: 'kebabrulle',
-    name: 'Kebabrulle',
-    cat: 'snabbmat',
-    kcal: 198, prot: 8.4, carb: 16.4, fat: 10.7, fiber: 1.1, sugar: 3.2, addedSugar: 1.8, satFat: 3.1, salt: 1.2,
-    n: {
-      monoFat: 4.8, polyFat: 1.8, omega3: 0.41, cholesterol: 24,
-      vitA: 11, vitD: 0.08, vitE: 0.8, vitC: 2, thiamin: 0.09, riboflavin: 0.11, niacin: 1.9, vitB6: 0.13, folate: 14, vitB12: 0.53,
-      calcium: 23, iron: 1.2, magnesium: 18, potassium: 195, phosphorus: 102, zinc: 1.5, selenium: 5,
-    },
-    portions: [['st', '1 kebabrulle (ca 345 g)', 345]],
-    syn: ['kebab rulle', 'rulle', 'dürüm', 'durum', 'kebabwrap', 'yufka', 'kebabrulle'],
-    co2e: 5.8,
-    plate: { veg: 0.22, carb: 0.26, protein: 0.35 },
-    kostrad: { fruktGront: 22, rottKott: 35 },
-    note: 'Beräknat på en portion med 90 g mjukt tunnbröd, 120 g kebabkött, 25 g isbergssallad, 25 g tomat, 15 g gurka, 12 g lök, 45 g vitlökssås och 15 g tacosås.',
   },
   {
     id: 'falafelrulle',
@@ -2244,73 +2013,49 @@ const kebabFalafel: FoodSeed[] = [
 
 const hamburgare: FoodSeed[] = [
   {
-    id: 'hamburgare-enkel',
-    name: 'Hamburgare, enkel (snabbmatsrestaurang)',
-    cat: 'snabbmat',
-    kcal: 231, prot: 12.3, carb: 27.5, fat: 7.7, fiber: 1.5, sugar: 5.7, addedSugar: 4.7, satFat: 2.5, salt: 1.2,
-    n: {
-      monoFat: 3.5, polyFat: 1, omega3: 0.26, cholesterol: 25,
-      vitA: 6, vitD: 0.09, vitE: 0.6, vitC: 0.7, thiamin: 0.1, riboflavin: 0.12, niacin: 2.4, vitB6: 0.13, folate: 16, vitB12: 0.75,
-      calcium: 27, iron: 1.5, magnesium: 22, potassium: 204, phosphorus: 114, zinc: 2, selenium: 8.2,
-    },
-    portions: [['st', '1 hamburgare (ca 105 g)', 105], ['tva', '2 hamburgare', 210]],
-    syn: ['hamburgare', 'burgare', 'hamburger', 'enkel hamburgare', 'liten hamburgare', 'burgare snabbmat'],
-    co2e: 11.5,
-    plate: { veg: 0.07, carb: 0.5, protein: 0.31 },
-    kostrad: { fruktGront: 7, rottKott: 31 },
-    note: 'Typisk liten hamburgare med ketchup, senap, lök och pickles.',
-  },
-  {
     id: 'cheeseburgare',
-    name: 'Hamburgare med ost (cheeseburgare), snabbmatsrestaurang',
+    name: 'Hamburgare med ost',
     cat: 'snabbmat',
     lmv: 2512,
+    avg: true,
     kcal: 259, prot: 14.2, carb: 22.9, fat: 11.8, fiber: 1.9, sugar: 4.8, addedSugar: 4.8, satFat: 4.8, salt: 1,
-    portions: [['st', '1 cheeseburgare (ca 120 g)', 120], ['tva', '2 cheeseburgare', 240]],
-    syn: ['cheeseburgare', 'cheeseburger', 'ostburgare', 'hamburgare med ost', 'cheese burger'],
+    portions: [['st', '1 hamburgare med ost (ca 120 g)', 120], ['utan-ost', '1 hamburgare utan ost (ca 105 g)', 105], ['tva', '2 hamburgare', 240]],
+    syn: [
+      'cheeseburgare', 'cheeseburger', 'ostburgare', 'hamburgare med ost', 'cheese burger', 'hamburgare', 'burgare', 'hamburger',
+      'enkel hamburgare', 'liten hamburgare', 'burgare snabbmat', 'mcdonalds', 'max burgare', 'burger king',
+    ],
     co2e: 11.1,
     plate: { veg: 0.07, carb: 0.43, protein: 0.39 },
     kostrad: { fruktGront: 7, rottKott: 28 },
-    note: 'Typisk cheeseburgare med en skiva smältost, ketchup, senap, lök och pickles.',
+    note: `Samlingsvärde: Livsmedelsverkets värde för hamburgare med ost från snabbmatsrestaurang, som ligger nära genomsnittet för vanliga kedjor (t.ex. McDonald's, Max och Burger King, ca 240–280 kcal per 100 g). En hamburgare utan ost har nästan samma värde per 100 g. ${KEDJA}`,
   },
   {
     id: 'dubbel-hamburgare-ost-dressing',
-    name: 'Dubbel hamburgare med ost och dressing, snabbmatsrestaurang',
+    name: 'Stor hamburgare med ost',
     cat: 'snabbmat',
-    kcal: 244, prot: 12.1, carb: 19.8, fat: 12.7, fiber: 1.1, sugar: 4, addedSugar: 2.9, satFat: 3.6, salt: 0.99,
+    avg: true,
+    kcal: 242, prot: 13, carb: 17.5, fat: 13.1, fiber: 1, sugar: 3.7, addedSugar: 2.5, satFat: 4.3, salt: 0.95,
     n: {
-      monoFat: 5.9, polyFat: 2.1, omega3: 0.56, cholesterol: 32,
-      vitA: 18, vitD: 0.1, vitE: 1.2, vitC: 0.7, thiamin: 0.07, riboflavin: 0.12, niacin: 2.2, vitB6: 0.13, folate: 16, vitB12: 0.83,
-      calcium: 60, iron: 1.3, magnesium: 19, potassium: 188, phosphorus: 144, zinc: 2.1, selenium: 6.7,
+      monoFat: 5.9, polyFat: 1.9, omega3: 0.43, cholesterol: 37,
+      vitA: 23, vitD: 0.1, vitE: 1, vitC: 1.2, thiamin: 0.08, riboflavin: 0.12, niacin: 2.4, vitB6: 0.14, folate: 15, vitB12: 0.92,
+      calcium: 64, iron: 1.4, magnesium: 19, potassium: 198, phosphorus: 141, zinc: 2.5, selenium: 6.8,
     },
-    portions: [['st', '1 hamburgare (ca 220 g)', 220]],
-    syn: ['dubbelburgare', 'dubbel hamburgare', 'dubbel cheeseburgare', 'stor hamburgare', 'big burger', 'dubbelburgare med dressing'],
-    co2e: 12.1,
-    plate: { veg: 0.15, carb: 0.36, protein: 0.38 },
-    kostrad: { fruktGront: 15, rottKott: 32 },
-    note: 'Stor hamburgare med två biffar, ost, dressing, sallad, lök och pickles.',
-  },
-  {
-    id: 'hamburgare-restaurang-ost',
-    name: 'Hamburgare med ost, restaurang (150 g nötfärs)',
-    cat: 'snabbmat',
-    kcal: 240, prot: 13.9, carb: 15.2, fat: 13.6, fiber: 0.9, sugar: 3.4, addedSugar: 2.2, satFat: 5.1, salt: 0.9,
-    n: {
-      monoFat: 5.9, polyFat: 1.6, omega3: 0.3, cholesterol: 42,
-      vitA: 28, vitD: 0.1, vitE: 0.8, vitC: 1.7, thiamin: 0.09, riboflavin: 0.12, niacin: 2.5, vitB6: 0.15, folate: 14, vitB12: 1,
-      calcium: 68, iron: 1.4, magnesium: 19, potassium: 207, phosphorus: 137, zinc: 2.8, selenium: 7,
-    },
-    portions: [['st', '1 hamburgare (ca 300 g)', 300]],
-    syn: ['restauranghamburgare', 'gourmetburgare', 'grillburgare', 'hamburgare restaurang', 'cheeseburgare restaurang', 'burgare med ost', 'hemmagjord hamburgare', 'hamburgare 150 g', 'burger'],
-    co2e: 14.3,
-    plate: { veg: 0.2, carb: 0.27, protein: 0.45 },
-    kostrad: { fruktGront: 17, rottKott: 38 },
-    note: 'Beräknat på en portion med 80 g hamburgerbröd, 115 g stekt biff (150 g rå nötfärs), 20 g cheddar, 25 g hamburgerdressing, 50 g sallad, tomat och rödlök samt 10 g pickles. Pommes frites räknas separat.',
+    portions: [['st', '1 stor hamburgare (ca 220 g)', 220], ['restaurang', '1 restauranghamburgare (ca 300 g)', 300]],
+    syn: [
+      'dubbelburgare', 'dubbel hamburgare', 'dubbel cheeseburgare', 'stor hamburgare', 'big burger', 'dubbelburgare med dressing',
+      'restauranghamburgare', 'gourmetburgare', 'grillburgare', 'hamburgare restaurang', 'cheeseburgare restaurang',
+      'burgare med ost', 'hemmagjord hamburgare', 'hamburgare 150 g', 'burger', 'big mac', 'whopper',
+    ],
+    co2e: 13.2,
+    plate: { veg: 0.17, carb: 0.32, protein: 0.42 },
+    kostrad: { fruktGront: 16, rottKott: 35 },
+    note: `Samlingsvärde: genomsnitt av stora hamburgare med ost och dressing – dubbelburgare från kedjor (t.ex. Big Mac och Whopper) och restauranghamburgare med ca 150 g kött. Pommes frites räknas separat. ${KEDJA}`,
   },
   {
     id: 'kycklingburgare',
-    name: 'Kycklingburgare med friterad kyckling, snabbmatsrestaurang',
+    name: 'Kycklingburgare',
     cat: 'snabbmat',
+    avg: true,
     kcal: 257, prot: 11.2, carb: 26.6, fat: 11.4, fiber: 1.5, sugar: 3.1, addedSugar: 2.2, satFat: 1.2, salt: 1.1,
     n: {
       monoFat: 6.4, polyFat: 3.4, omega3: 0.78, cholesterol: 21,
@@ -2318,10 +2063,14 @@ const hamburgare: FoodSeed[] = [
       calcium: 27, iron: 0.9, magnesium: 22, potassium: 191, phosphorus: 124, zinc: 0.6, selenium: 9.1,
     },
     portions: [['st', '1 kycklingburgare (ca 165 g)', 165]],
-    syn: ['kycklingburgare', 'chickenburger', 'crispy chicken', 'kyckling burgare', 'chicken burger', 'kycklingburger'],
+    syn: [
+      'kycklingburgare', 'chickenburger', 'crispy chicken', 'kyckling burgare', 'chicken burger', 'kycklingburger', 'mcchicken',
+      'chicken royale',
+    ],
     co2e: 1.9,
     plate: { veg: 0.13, carb: 0.52, protein: 0.3 },
     kostrad: { fruktGront: 13 },
+    note: `Samlingsvärde: typiskt värde för kycklingburgare med panerad, friterad kyckling från hamburgerkedjor (t.ex. McDonald's, Max och Burger King). ${KEDJA}`,
   },
   {
     id: 'halloumiburgare',
@@ -2342,7 +2091,7 @@ const hamburgare: FoodSeed[] = [
   },
   {
     id: 'vegoburgare-brod-dressing',
-    name: 'Vegoburgare med bröd och dressing',
+    name: 'Vegoburgare med bröd',
     cat: 'snabbmat',
     kcal: 216, prot: 9, carb: 23.1, fat: 9.2, fiber: 2.6, sugar: 4.2, addedSugar: 2.7, satFat: 0.9, salt: 1,
     n: {
@@ -2360,36 +2109,23 @@ const hamburgare: FoodSeed[] = [
   },
   {
     id: 'kycklingnuggets',
-    name: 'Kycklingnuggets, friterade',
+    name: 'Kycklingnuggets',
     cat: 'snabbmat',
     lmv: 1207,
+    avg: true,
     kcal: 221, prot: 16.8, carb: 14.2, fat: 10.4, fiber: 1.4, sugar: 0.3, addedSugar: 0, satFat: 2, salt: 1.2,
     portions: [['sex', '6 st (ca 100 g)', 100], ['st', '1 nugget (ca 17 g)', 17], ['nio', '9 st (ca 150 g)', 150], ['tjugo', '20 st (ca 340 g)', 340]],
-    syn: ['nuggets', 'chicken nuggets', 'nuggets friterade', 'kyckling nuggets', 'kycklingnuggets'],
+    syn: [
+      'nuggets', 'chicken nuggets', 'nuggets friterade', 'kyckling nuggets', 'kycklingnuggets', 'mcnuggets', 'chicken mcnuggets',
+      'frysta nuggets',
+    ],
     co2e: 3.5,
     plate: { veg: 0, carb: 0.35, protein: 0.65 },
-    note: 'Panerad kycklingfärs, friterad. Dippsås räknas separat.',
-  },
-  {
-    id: 'kycklingvingar-friterade',
-    name: 'Kycklingvingar, friterade med sås (buffalo wings)',
-    cat: 'snabbmat',
-    kcal: 256, prot: 18.1, carb: 4.2, fat: 18.6, fiber: 0, sugar: 1.3, addedSugar: 1.1, satFat: 6.1, salt: 1.3,
-    n: {
-      monoFat: 7.6, polyFat: 3.3, omega3: 0.3, cholesterol: 108,
-      vitA: 68, vitD: 0.3, vitE: 1.1, vitC: 0.3, thiamin: 0.05, riboflavin: 0.11, niacin: 5.5, vitB6: 0.28, folate: 5, vitB12: 0.28,
-      calcium: 15, iron: 0.8, magnesium: 17, potassium: 198, phosphorus: 138, zinc: 1.4, selenium: 13,
-    },
-    portions: [['portion', '1 portion (10 vingar, ca 250 g)', 250], ['st', '1 vinge (ätlig del, ca 25 g)', 25], ['sex', '6 vingar (ca 150 g)', 150]],
-    tags: ['glutenfri'],
-    syn: ['buffalo wings', 'chicken wings', 'wings', 'friterade vingar', 'hot wings', 'kycklingvingar friterade'],
-    co2e: 4,
-    plate: { veg: 0, carb: 0, protein: 0.9 },
-    note: 'Ätlig del (utan ben) av friterade vingar vända i stark smörsås.',
+    note: `Samlingsvärde: Livsmedelsverkets värde för friterade kycklingnuggets från restaurang, i nivå med vanliga kedjor (t.ex. McDonald's, Max och Burger King, ca 220–260 kcal per 100 g). Dippsås räknas separat. ${KEDJA}`,
   },
   {
     id: 'fish-and-chips',
-    name: 'Fish and chips med remouladsås',
+    name: 'Fish and chips',
     cat: 'snabbmat',
     kcal: 291, prot: 7.8, carb: 24.8, fat: 17.4, fiber: 2.3, sugar: 0.8, addedSugar: 0.4, satFat: 1.8, salt: 0.75,
     n: {
@@ -2406,7 +2142,7 @@ const hamburgare: FoodSeed[] = [
   },
   {
     id: 'mozzarellasticks',
-    name: 'Mozzarellasticks, friterade',
+    name: 'Mozzarellasticks',
     cat: 'snabbmat',
     kcal: 314, prot: 15.4, carb: 18.5, fat: 19.7, fiber: 0.9, sugar: 1.6, addedSugar: 0.6, satFat: 8.4, salt: 0.91,
     n: {
@@ -2422,7 +2158,7 @@ const hamburgare: FoodSeed[] = [
   },
   {
     id: 'lokringar',
-    name: 'Lökringar, friterade',
+    name: 'Lökringar',
     cat: 'snabbmat',
     kcal: 291, prot: 3.7, carb: 24.3, fat: 19.5, fiber: 1.9, sugar: 3.5, addedSugar: 0.3, satFat: 1.4, salt: 1.1,
     n: {
@@ -2439,17 +2175,20 @@ const hamburgare: FoodSeed[] = [
   },
   {
     id: 'varrullar',
-    name: 'Vårrullar, friterade',
+    name: 'Vårrullar',
     cat: 'snabbmat',
-    lmv: 751,
-    kcal: 316, prot: 6.6, carb: 18.7, fat: 23.8, fiber: 1.1, sugar: 3.2, addedSugar: 0, satFat: 3.5, salt: 1.4,
-    portions: [['st', '1 vårrulle (ca 60 g)', 60], ['mini', '1 minivårrulle (ca 20 g)', 20]],
-    tags: ['vegan', 'laktosfri'],
-    syn: ['vårrulle', 'spring rolls', 'friterade vårrullar', 'kinesiska vårrullar', 'varrulle', 'vårrullar'],
+    lmv: 750,
+    avg: true,
+    kcal: 217, prot: 6.9, carb: 22.4, fat: 10.8, fiber: 1.1, sugar: 2.8, addedSugar: 2, satFat: 3, salt: 1.3,
+    portions: [['st', '1 vårrulle (ca 60 g)', 60], ['mini', '1 minivårrulle (ca 20 g)', 20], ['portion', '1 portion (4 st, ca 240 g)', 240]],
+    syn: [
+      'vårrulle', 'spring rolls', 'friterade vårrullar', 'kinesiska vårrullar', 'varrulle', 'vårrullar', 'daloon',
+      'daloon vårrullar', 'frysta vårrullar', 'vårrullar ugn',
+    ],
     co2e: 0.8,
     plate: { veg: 0.35, carb: 0.41, protein: 0 },
     kostrad: { fruktGront: 35 },
-    note: 'Vetedeg fylld med kål, morot, böngroddar och glasnudlar, friterad.',
+    note: `Samlingsvärde: Livsmedelsverkets värde för frysta vårrullar, värmda i ugn – representativt för vanliga märken (t.ex. Daloon och ICA). Friterade vårrullar från restaurang innehåller mer fett, ca 315 kcal per 100 g. ${SKANNA}`,
   },
 ]
 
@@ -2459,40 +2198,25 @@ const hamburgare: FoodSeed[] = [
 
 const korv: FoodSeed[] = [
   {
-    id: 'korv-med-brod-grillkorv',
-    name: 'Korv med bröd (grillkorv med senap och ketchup)',
-    cat: 'snabbmat',
-    kcal: 234, prot: 7.1, carb: 26, fat: 10.8, fiber: 2.2, sugar: 4.5, addedSugar: 3.2, satFat: 3.4, salt: 2.07,
-    n: {
-      monoFat: 5, polyFat: 1.3, omega3: 0.19, cholesterol: 24,
-      vitA: 15, vitD: 0.2, vitE: 0.7, vitC: 0.1, thiamin: 0.18, riboflavin: 0.21, niacin: 3.1, vitB6: 0.11, folate: 15, vitB12: 0.28,
-      calcium: 23, iron: 0.7, magnesium: 15, potassium: 162, phosphorus: 85, zinc: 0.7, selenium: 3.9,
-    },
-    portions: [['st', '1 korv med bröd (ca 125 g)', 125], ['tva', '2 korv med bröd', 250]],
-    tags: ['klassiker', 'svensk'],
-    syn: ['korv med bröd', 'grillkorv med bröd', 'korvmedbröd', 'hot dog', 'grillad korv', 'kiosk', 'gatukök'],
-    co2e: 3.2,
-    plate: { veg: 0, carb: 0.32, protein: 0.56 },
-    kostrad: { rottKott: 56 },
-    note: 'Beräknat på en portion med 40 g korvbröd, 70 g grillkorv, 8 g senap och 8 g ketchup.',
-  },
-  {
     id: 'varmkorv-med-brod',
-    name: 'Varmkorv med bröd, senap och ketchup',
+    name: 'Korv med bröd',
     cat: 'snabbmat',
     lmv: 2509,
     kcal: 259, prot: 8.5, carb: 22.4, fat: 14.7, fiber: 2, sugar: 4.5, addedSugar: 3, satFat: 4.9, salt: 1.5,
-    portions: [['st', '1 varmkorv med bröd (ca 105 g)', 105], ['tva', '2 varmkorvar med bröd', 210]],
+    portions: [['st', '1 korv med bröd (ca 110 g)', 110], ['grill', '1 grillkorv med bröd (ca 125 g)', 125], ['tva', '2 korv med bröd', 220]],
     tags: ['klassiker', 'svensk'],
-    syn: ['varmkorv med bröd', 'kokt korv med bröd', 'wienerkorv med bröd', 'hot dog', 'korv med bröd kokt', 'varmkorv'],
+    syn: [
+      'varmkorv med bröd', 'kokt korv med bröd', 'wienerkorv med bröd', 'hot dog', 'korv med bröd kokt', 'varmkorv',
+      'grillkorv med bröd', 'korvmedbröd', 'grillad korv', 'grillkorv i bröd', 'kiosk', 'gatukök',
+    ],
     co2e: 2.8,
     plate: { veg: 0, carb: 0.38, protein: 0.47 },
     kostrad: { rottKott: 47 },
-    note: 'Portionsvikten utgår från 40 g korvbröd, 50 g varmkorv, 8 g senap och 8 g ketchup.',
+    note: 'Kokt eller grillad korv i korvbröd med senap och ketchup. Portionsvikten utgår från 40 g korvbröd, 50–70 g korv och 16 g senap och ketchup.',
   },
   {
     id: 'korv-brod-mos',
-    name: 'Korv med bröd och mos (halv special)',
+    name: 'Korv med bröd och mos',
     cat: 'snabbmat',
     kcal: 173, prot: 6.1, carb: 18.3, fat: 8.1, fiber: 1.1, sugar: 3.3, addedSugar: 1.9, satFat: 3.2, salt: 1.2,
     n: {
@@ -2510,7 +2234,7 @@ const korv: FoodSeed[] = [
   },
   {
     id: 'tunnbrodsrulle',
-    name: 'Tunnbrödsrulle (korv, mos och räksallad)',
+    name: 'Tunnbrödsrulle',
     cat: 'snabbmat',
     lmv: 1551,
     kcal: 186, prot: 4.5, carb: 16.4, fat: 11.1, fiber: 1.6, sugar: 3.5, addedSugar: 2, satFat: 2.5, salt: 0.9,
@@ -2524,16 +2248,41 @@ const korv: FoodSeed[] = [
   },
   {
     id: 'pirog-kottfars',
-    name: 'Pirog med köttfärs',
+    name: 'Pirog',
     cat: 'snabbmat',
     lmv: 758,
     kcal: 243, prot: 9.6, carb: 19.9, fat: 13.2, fiber: 3.7, sugar: 2.7, addedSugar: 0, satFat: 4, salt: 1.7,
     portions: [['st', '1 pirog (ca 125 g)', 125], ['tva', '2 piroger', 250]],
-    syn: ['pirog', 'piroger', 'köttfärspirog', 'rysk pirog', 'piroj', 'pirogg', 'kioskpirog', 'pirog köttfärs', 'friterad pirog'],
+    syn: [
+      'pirog', 'piroger', 'köttfärspirog', 'rysk pirog', 'piroj', 'pirogg', 'kioskpirog', 'pirog köttfärs', 'friterad pirog',
+      'gorbys', 'gorbys piroger', 'frysta piroger',
+    ],
     co2e: 4.5,
     plate: { veg: 0.05, carb: 0.65, protein: 0.25 },
     kostrad: { fruktGront: 3, rottKott: 18 },
-    note: 'Friterad vetedeg fylld med köttfärs, ris och lök – från kiosk och gatukök eller fryst och uppvärmd. Färdiga piroger ligger ofta mellan 200 och 260 kcal per 100 g.',
+    note: `Friterad vetedeg fylld med köttfärs, ris och lök – från kiosk och gatukök eller fryst och uppvärmd. Färdiga och frysta piroger (t.ex. Gorby's) ligger ofta mellan 220 och 300 kcal per 100 g.`,
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Färdiga matlådor – samlingsvärde för frysta och kylda färdigrätter
+// ---------------------------------------------------------------------------
+
+const matlador: FoodSeed[] = [
+  {
+    id: 'fardigratt-matlada',
+    name: 'Färdig matlåda',
+    cat: 'fardigratt',
+    avg: true,
+    kcal: 140, prot: 6.7, carb: 12.8, fat: 6.7, fiber: 1, sugar: 1.5, satFat: 3.1, salt: 1,
+    portions: [['lada', '1 matlåda (ca 375 g)', 375], ['liten', '1 liten matlåda (ca 300 g)', 300], ['stor', '1 stor matlåda (ca 450 g)', 450]],
+    syn: [
+      'matlåda', 'matlådor', 'färdigrätt', 'färdigrätter', 'färdigmat', 'fryst matlåda', 'kyld matlåda', 'frysmat', 'mikromat', 'mikrolåda',
+      'portionsrätt', 'lunchlåda', 'fryst färdigrätt', 'kyld färdigrätt', 'dafgårds', 'findus', 'felix', 'ica matlåda', 'gooh',
+    ],
+    co2e: 3.5,
+    plate: { veg: 0.08, carb: 0.5, protein: 0.3 },
+    note: `Samlingsvärde: genomsnitt av vanliga frysta och kylda matlådor med kött, kyckling eller fisk och potatis, ris eller pasta – t.ex. köttbullar med potatismos, lasagne, kycklinggryta med ris, korv Stroganoff med ris, pasta carbonara och fiskgratäng (Dafgårds, Findus, Felix, ICA m.fl.). Finns just din rätt i Lagom ger den ett säkrare värde. ${SKANNA}`,
   },
 ]
 
@@ -2546,9 +2295,10 @@ export const fardigratterSnabbmat = defineFoods([
   ...smorgasar,
   ...internationellt,
   ...vegetariskt,
-  ...grotOchVafflor,
+  ...vafflor,
   ...pizza,
   ...kebabFalafel,
   ...hamburgare,
   ...korv,
+  ...matlador,
 ])

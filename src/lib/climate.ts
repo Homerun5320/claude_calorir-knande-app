@@ -124,9 +124,15 @@ export function foodClimateFactor(food: Food): ClimateFactor {
       break
     }
   }
-  // Torrvaruvärden (pasta, ris, torkade baljväxter) räknas om när varan är kokt.
-  if ((food.category === 'pasta_ris' || food.category === 'spannmal') && COOKED.test(name)) {
-    factor = { kgPerKg: factor.kgPerKg * COOKED_FACTOR, source: `${factor.source}, omräknat till kokt vikt` }
+  // Torrvaruvärden (pasta, ris, gryn) räknas om när varan är kokt: med livsmedlets egen omräkning
+  // från okokt vikt (`rawWeight`, t.ex. "Pasta" ×2,5) eller, för äldre namn, när namnet säger "kokt".
+  if (food.category === 'pasta_ris' || food.category === 'spannmal') {
+    const rw = food.rawWeight
+    if (rw && rw.kind !== 'ra' && Number.isFinite(rw.factor) && rw.factor > 1) {
+      factor = { kgPerKg: factor.kgPerKg / rw.factor, source: `${factor.source}, omräknat till kokt vikt` }
+    } else if (COOKED.test(name)) {
+      factor = { kgPerKg: factor.kgPerKg * COOKED_FACTOR, source: `${factor.source}, omräknat till kokt vikt` }
+    }
   }
   return factor
 }

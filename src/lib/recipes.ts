@@ -3,8 +3,11 @@
  *
  * Principer
  * - Ingrediensernas näringsvärden summeras utifrån deras vikt i gram (`ingredient.grams`).
- * - Färdig vikt = uppmätt vikt efter tillagning (`cookedWeightG`) om den finns, annars råvikten.
+ * - Färdig vikt = uppmätt vikt efter tillagning (`cookedWeightG`) om den finns, annars ingrediensernas
+ *   vikt (`recipeRawWeight`), där varor angivna i rå/okokt vikt ("g rå", "dl okokt") räknas tillagade.
  *   Vatten som kokar bort koncentrerar näringen per 100 g; vatten som sugs upp (ris, pasta) späder ut den.
+ * - Den verkliga råvikten (`recipeUncookedWeight`) räknar i stället rå/okokt vikt – den visas som
+ *   "råvikt" och används för viktförändringen vid tillagning.
  * - Ett näringsämne som saknas i en ingrediens räknas inte som 0 – summan bygger på de ingredienser
  *   där värdet är känt. `recipeNutrientCoverage` visar hur stor andel av vikten som har kända värden.
  * - Tallriksmodell, kostråd och klimat vägs ihop från ingredienserna (via `foodPlate`, `foodKostrad`
@@ -12,7 +15,7 @@
  */
 import type { Food, FoodTag, Nutrients, PlateSplit, Portion, Recipe, RecipeIngredient } from '../types'
 import { NUTRIENT_KEYS, scaleNutrients, sumNutrients, nutrientsForGrams, type NutrientKey } from './nutrients'
-import { gramsFor } from './units'
+import { gramsFor, isRawUnit, rawGramsFor } from './units'
 import { plural } from './format'
 import { foodPlate } from './plate'
 import { foodKostrad, type KostradContribFull } from './kostrad'
@@ -47,12 +50,33 @@ export function recipeTotals(recipe: Pick<Recipe, 'ingredients'>): Nutrients {
   return sumNutrients(recipe.ingredients.map((i) => nutrientsForGrams(i.food.nutrients, ingredientGrams(i))))
 }
 
-/** Summan av ingrediensernas vikt i gram (före tillagning). */
+/**
+ * Summan av ingrediensernas vikt i gram så som de räknas i näringen: varor angivna i rå/okokt vikt
+ * räknas tillagade (500 g rå nötfärs = 400 g stekt, 1 dl okokt ris = 230 g kokt). Färdig vikt när
+ * tillagad vikt saknas – och vikten som tallriksmodellen och täckningen vägs efter.
+ */
 export function recipeRawWeight(recipe: Pick<Recipe, 'ingredients'>): number {
   return recipe.ingredients.reduce((sum, i) => sum + ingredientGrams(i), 0)
 }
 
-/** Färdig vikt i gram: uppmätt vikt efter tillagning, annars råvikten. */
+/**
+ * En ingrediens vikt före tillagning: rå/okokt vikt för varor angivna i "g rå" eller "dl okokt"
+ * (500 g rå nötfärs = 500 g), annars samma som `ingredientGrams`.
+ */
+export function ingredientUncookedGrams(ingredient: RecipeIngredient): number {
+  if (isRawUnit(ingredient.unit)) {
+    const raw = rawGramsFor(ingredient.food, ingredient.amount, ingredient.unit)
+    if (Number.isFinite(raw) && raw > 0) return raw
+  }
+  return ingredientGrams(ingredient)
+}
+
+/** Ingrediensernas verkliga råvikt i gram (före tillagning) – se `ingredientUncookedGrams`. */
+export function recipeUncookedWeight(recipe: Pick<Recipe, 'ingredients'>): number {
+  return recipe.ingredients.reduce((sum, i) => sum + ingredientUncookedGrams(i), 0)
+}
+
+/** Färdig vikt i gram: uppmätt vikt efter tillagning, annars ingrediensernas vikt (`recipeRawWeight`). */
 export function recipeFinalWeight(recipe: Pick<Recipe, 'ingredients' | 'cookedWeightG'>): number {
   const cooked = recipe.cookedWeightG
   if (cooked !== undefined && Number.isFinite(cooked) && cooked > 0) return cooked

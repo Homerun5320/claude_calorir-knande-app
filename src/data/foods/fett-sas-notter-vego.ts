@@ -4,10 +4,16 @@
  *
  * Värden per 100 g ätlig del, baserade på Livsmedelsverkets livsmedelsdatabas och typiska
  * svenska förpackningsuppgifter. Livsmedel med `lmv` är samma livsmedel (samma tillagning) som
- * Livsmedelsverkets post med det numret: makronäringsämnena är Livsmedelsverkets, och vitaminer,
- * mineraler och fettsyror som inte anges här hämtas därifrån. Här anges bara det som saknas i
- * Livsmedelsverkets databas (vitamin K) och medvetna avvikelser. För kryddor och nötter utan
- * motsvarighet kompletteras mikronäringsämnen med etablerade internationella tabellvärden.
+ * Livsmedelsverkets post med det numret: vitaminer, mineraler och fettsyror som inte anges här
+ * hämtas därifrån. Här anges bara det som saknas i Livsmedelsverkets databas (vitamin K) och
+ * medvetna avvikelser. För kryddor och nötter utan motsvarighet kompletteras mikronäringsämnen med
+ * etablerade internationella tabellvärden.
+ *
+ * Grova linjer: en rad per vardagsbegrepp ("Smör", "Senap", "Cashewnötter", "Tofu") i stället för
+ * en rad per variant. Produkttyper med många märken (växtdrycker, margarin, majonnäs, ketchup,
+ * vegofärs …) är samlingsvärden (`avg`) utan varumärke – exakta värden för ett märke får man via
+ * streckkoden. Vegofärs och vegobitar anges stekta och torkad sojafärs blötlagd; `raw` gör att man
+ * ändå kan väga den frysta eller torra varan.
  *
  * Berikning i Sverige:
  * - Margarin och matfettsblandningar (t.ex. Bregott, Lätta, Becel) ska enligt LIVSFS 2018:5 berikas
@@ -18,12 +24,18 @@
  *   oftast inte berikade.
  * - Hushållssalt berikas med jod (50 mg/kg, dvs. 50 µg per gram salt).
  *
- * Märkesnamn anges bara där värdena följer förpackningen. Annars används ett generiskt namn
- * ("typ Lätta") och märket som sökord. Oljor och fett mäts ofta i matsked – därför anges
- * densitet så att msk/tsk fungerar.
+ * Oljor och fett mäts ofta i matsked – därför anges densitet så att msk/tsk fungerar.
  */
 import { defineFoods, type FoodSeed } from './define'
 import type { KostradContribFull } from '../../lib/kostrad'
+
+/** Förklaring för samlingsvärden: genomsnitt av flera märken. */
+const samling = (brands: string, extra = ''): string =>
+  `Samlingsvärde: genomsnitt av vanliga märken (t.ex. ${brands}).${extra ? ` ${extra}` : ''} Skanna streckkoden för exakta värden för ditt märke.`
+
+/** Samlingsvärde där Livsmedelsverkets (marknadsviktade) värde för produkttypen används. */
+const samlingLmv = (what: string, brands: string, extra = ''): string =>
+  `Samlingsvärde: Livsmedelsverkets värde för ${what}, som motsvarar vanliga märken (t.ex. ${brands}).${extra ? ` ${extra}` : ''} Skanna streckkoden för exakta värden för ditt märke.`
 
 const OIL_PORTIONS: Array<[string, string, number]> = [
   ['msk', '1 msk (14 g)', 14],
@@ -59,7 +71,7 @@ const SPREAD_FORTIFIED = { vitA: 900, vitD: 20 } as const
 const fett: FoodSeed[] = [
   {
     id: 'smor-normalsaltat-82',
-    name: 'Smör, normalsaltat (ca 80 % fett)',
+    name: 'Smör',
     cat: 'fett_olja',
     lmv: 29,
     kcal: 766, prot: 0.6, carb: 0, fat: 86.3, fiber: 0, sugar: 0, addedSugar: 0, satFat: 58.8, salt: 1.2,
@@ -67,91 +79,79 @@ const fett: FoodSeed[] = [
     portions: SPREAD_PORTIONS,
     density: 0.91,
     tags: ['vegetarisk', 'glutenfri', 'svensk'],
-    syn: ['smör', 'svenskt smör', 'normalsaltat smör', 'bordssmör', 'smor', 'smörgåssmör', 'smöret', 'saltat smör'],
+    syn: [
+      'smör', 'svenskt smör', 'normalsaltat smör', 'bordssmör', 'smor', 'smörgåssmör', 'smöret', 'saltat smör',
+      'osaltat smör', 'bakelsesmör', 'bak smör', 'smör utan salt', 'smor osaltat', 'smör 82 %',
+    ],
     co2e: 9,
-    note: 'Smör berikas inte med vitamin D i Sverige – till skillnad från margarin och Bregott.',
-  },
-  {
-    id: 'smor-osaltat-82',
-    name: 'Smör, osaltat (ca 80 % fett)',
-    cat: 'fett_olja',
-    lmv: 31,
-    kcal: 766, prot: 0.6, carb: 0, fat: 86.3, fiber: 0, sugar: 0, addedSugar: 0, satFat: 58.8, salt: 0,
-    n: { vitK: 7 },
-    portions: SPREAD_PORTIONS,
-    density: 0.91,
-    tags: ['vegetarisk', 'glutenfri', 'svensk'],
-    syn: ['osaltat smör', 'bakelsesmör', 'bak smör', 'smör utan salt', 'smor osaltat'],
-    co2e: 9,
+    note: 'Normalsaltat smör (ca 80 % fett). Osaltat smör har samma värden men nästan inget salt. Smör berikas inte med vitamin D i Sverige – till skillnad från margarin och Bregott.',
   },
   {
     id: 'bregott-normalsaltat-75',
-    name: 'Bregott normalsaltat 75 %',
-    brand: 'Arla',
+    name: 'Smör och rapsolja',
     cat: 'fett_olja',
+    avg: true,
     lmv: 2190,
     kcal: 678, prot: 0.4, carb: 0.4, fat: 75, fiber: 0, sugar: 0.4, addedSugar: 0, satFat: 33, salt: 1.2,
     portions: TUB_PORTIONS,
     density: 0.92,
     tags: ['vegetarisk', 'glutenfri', 'svensk', 'klassiker'],
-    syn: ['bregott', 'bregott original', 'breggot', 'bregot', 'smör och rapsolja', 'matfettsblandning', 'smörgåsfett'],
+    syn: [
+      'bregott', 'bregott original', 'bregott normalsaltat', 'breggot', 'bregot', 'smör och rapsolja', 'smör & rapsolja',
+      'smör och raps', 'matfettsblandning', 'smörgåsfett', 'smörblandning 75',
+    ],
     co2e: 7,
-    note: 'Blandning av smör (gräddfett) och rapsolja. Berikad med vitamin A och D (20 µg per 100 g).',
-  },
-  {
-    id: 'matfettsblandning-60',
-    name: 'Smör- och rapsoljeblandning 60 % fett',
-    cat: 'fett_olja',
-    lmv: 6,
-    kcal: 512, prot: 0, carb: 0.5, fat: 57.7, fiber: 0, sugar: 0.1, addedSugar: 0, satFat: 20.8, salt: 1,
-    portions: TUB_PORTIONS,
-    density: 0.94,
-    tags: ['vegetarisk', 'glutenfri', 'svensk'],
-    syn: ['bregott mellan', 'mellanbregott', 'matfettsblandning 60', 'smörblandning'],
-    co2e: 5.5,
-    note: 'Berikad med vitamin A (900 µg) och D (20 µg) per 100 g.',
-  },
-  {
-    id: 'matfettsblandning-40',
-    name: 'Smör- och rapsoljeblandning ca 40 % fett (typ Lätt & Lagom)',
-    cat: 'fett_olja',
-    lmv: 20,
-    kcal: 381, prot: 0.5, carb: 6.2, fat: 40, fiber: 0, sugar: 0.5, addedSugar: 0, satFat: 12.4, salt: 1.2,
-    portions: TUB_PORTIONS,
-    density: 0.96,
-    tags: ['vegetarisk', 'glutenfri', 'svensk'],
-    syn: ['lätt & lagom', 'lätt och lagom', 'latt och lagom', 'lättsmör', 'lätt smör', 'matfettsblandning 40', 'bregott mindre'],
-    co2e: 4,
-    note: 'Berikad med vitamin A och D (20 µg per 100 g).',
-  },
-  {
-    id: 'margarin-latt-39',
-    name: 'Lättmargarin 39 % fett (typ Lätta)',
-    cat: 'fett_olja',
-    lmv: 2192,
-    kcal: 345, prot: 0, carb: 1.3, fat: 38.4, fiber: 0, sugar: 0.2, addedSugar: 0, satFat: 12.7, salt: 1.4,
-    portions: TUB_PORTIONS,
-    density: 0.97,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['lätta', 'latta', 'lätta original', 'lätta 39', 'lättmargarin', 'lätt margarin', 'margarin', 'smörgåsmargarin', 'lätta margarin'],
-    note: 'Berikad med vitamin A (900 µg) och D (20 µg) per 100 g.',
+    note: samlingLmv(
+      'matfettsblandning med 75 % fett',
+      'Bregott, ICA, Coop, Garant',
+      'Blandning av smör (gräddfett) och rapsolja, berikad med vitamin A och D (20 µg per 100 g).',
+    ),
   },
   {
     id: 'margarin-bord-60',
-    name: 'Bordsmargarin ca 60 % fett (typ Becel, Flora)',
+    name: 'Margarin',
     cat: 'fett_olja',
+    avg: true,
     lmv: 5085,
     kcal: 531, prot: 0, carb: 0, fat: 60, fiber: 0, sugar: 0, addedSugar: 0, satFat: 21.9, salt: 1.2,
     portions: TUB_PORTIONS,
     density: 0.95,
     tags: ['vegetarisk', 'glutenfri', 'nyckelhal'],
-    syn: ['becel', 'flora', 'margarin', 'bordsmargarin', 'växtmargarin', 'smörgåsmargarin', 'becel original'],
-    note: 'Berikad med vitamin A (900 µg) och D (20 µg) per 100 g. Rik på omättat fett från raps-, solros- och linfröolja.',
+    syn: [
+      'becel', 'flora', 'margarin', 'bordsmargarin', 'växtmargarin', 'smörgåsmargarin', 'becel original',
+      'bregott mellan', 'mellanbregott', 'matfettsblandning 60', 'smörblandning',
+    ],
+    note: samlingLmv(
+      'bordsmargarin med ca 60 % fett',
+      'Becel, Flora, ICA, Garant',
+      'Gäller även smör- och rapsoljeblandningar med ca 60 % fett. Berikat med vitamin A (900 µg) och D (20 µg) per 100 g.',
+    ),
+  },
+  {
+    id: 'margarin-latt-39',
+    name: 'Lättmargarin',
+    cat: 'fett_olja',
+    avg: true,
+    lmv: 2192,
+    kcal: 345, prot: 0, carb: 1.3, fat: 38.4, fiber: 0, sugar: 0.2, addedSugar: 0, satFat: 12.7, salt: 1.4,
+    portions: TUB_PORTIONS,
+    density: 0.97,
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: [
+      'lätta', 'latta', 'lätta original', 'lätta 39', 'lättmargarin', 'lätt margarin', 'margarin', 'lätta margarin',
+      'lätt & lagom', 'lätt och lagom', 'latt och lagom', 'lättsmör', 'lätt smör', 'matfettsblandning 40', 'bregott mindre',
+    ],
+    note: samlingLmv(
+      'lättmargarin med ca 40 % fett',
+      'Lätta, Lätt & Lagom, Becel, ICA',
+      'Gäller även lätta smör- och rapsoljeblandningar. Berikat med vitamin A (900 µg) och D (20 µg) per 100 g.',
+    ),
   },
   {
     id: 'margarin-bak-stek-80',
-    name: 'Hushållsmargarin ca 80 % fett för bak och stek (typ Milda)',
+    name: 'Hushållsmargarin',
     cat: 'fett_olja',
+    avg: true,
     lmv: 13,
     kcal: 722, prot: 0, carb: 0, fat: 81.7, fiber: 0, sugar: 0, addedSugar: 0, satFat: 35.5, salt: 1.4,
     portions: [
@@ -162,12 +162,17 @@ const fett: FoodSeed[] = [
     density: 0.92,
     tags: ['vegetarisk', 'glutenfri'],
     syn: ['milda', 'milda hushåll', 'bakmargarin', 'hushållsmargarin', 'stekmargarin', 'margarin 80', 'milda bak', 'baksmör', 'margarin bak', 'carlshamn', 'pellefant'],
-    note: 'Berikat med vitamin A (900 µg) och D (20 µg) per 100 g.',
+    note: samlingLmv(
+      'hushållsmargarin med ca 80 % fett',
+      'Milda, Carlshamn, Pellefant, ICA',
+      'För bak och stekning. Berikat med vitamin A (900 µg) och D (20 µg) per 100 g.',
+    ),
   },
   {
     id: 'margarin-flytande-80',
-    name: 'Flytande margarin ca 80 % fett (typ Milda Culinesse, Becel flytande)',
+    name: 'Flytande margarin',
     cat: 'fett_olja',
+    avg: true,
     lmv: 10,
     kcal: 725, prot: 0, carb: 0, fat: 82, fiber: 0, sugar: 0, addedSugar: 0, satFat: 7.3, salt: 1.5,
     n: { ...SPREAD_FORTIFIED },
@@ -178,7 +183,11 @@ const fett: FoodSeed[] = [
     density: 0.93,
     tags: ['vegetarisk', 'glutenfri', 'nyckelhal'],
     syn: ['flytande margarin', 'culinesse', 'milda culinesse', 'milda flytande', 'flytande becel', 'becel flytande', 'stekfett', 'flytande smör', 'eldorado flytande'],
-    note: 'Berikat med vitamin A och D (20 µg per 100 g).',
+    note: samlingLmv(
+      'flytande margarin med ca 80 % fett',
+      'Milda Culinesse, Becel, ICA, Garant',
+      'Berikat med vitamin A och D (20 µg per 100 g).',
+    ),
   },
   {
     id: 'rapsolja',
@@ -190,25 +199,15 @@ const fett: FoodSeed[] = [
     portions: OIL_PORTIONS,
     density: 0.92,
     tags: ['vegan', 'glutenfri', 'laktosfri', 'nyckelhal', 'svensk'],
-    syn: ['raps', 'rapsolja', 'matolja', 'olja', 'stekolja', 'rypsolja', 'canolaolja', 'raffinerad rapsolja', 'zeta rapsolja'],
-    note: 'Bra balans mellan omega-6 och omega-3. Tål höga temperaturer.',
-  },
-  {
-    id: 'rapsolja-kallpressad',
-    name: 'Rapsolja, kallpressad',
-    cat: 'fett_olja',
-    lmv: 4661,
-    kcal: 884, prot: 0, carb: 0, fat: 100, fiber: 0, sugar: 0, addedSugar: 0, satFat: 7, salt: 0,
-    n: { vitK: 70 },
-    portions: OIL_PORTIONS,
-    density: 0.92,
-    tags: ['vegan', 'glutenfri', 'laktosfri', 'svensk'],
-    syn: ['kallpressad rapsolja', 'gul rapsolja', 'gourmetrapsolja', 'rapsolja kallpressad', 'svensk rapsolja'],
-    note: 'Mer smak än raffinerad rapsolja – passar i dressing och till lägre stektemperatur.',
+    syn: [
+      'raps', 'rapsolja', 'matolja', 'olja', 'stekolja', 'rypsolja', 'canolaolja', 'raffinerad rapsolja', 'zeta rapsolja',
+      'kallpressad rapsolja', 'gul rapsolja', 'gourmetrapsolja', 'rapsolja kallpressad', 'svensk rapsolja',
+    ],
+    note: 'Bra balans mellan omega-6 och omega-3. Raffinerad rapsolja tål höga temperaturer. Kallpressad har samma näringsvärden men mer smak – passar i dressing och till lägre stektemperatur.',
   },
   {
     id: 'olivolja-extra-virgin',
-    name: 'Olivolja, extra virgin',
+    name: 'Olivolja',
     cat: 'fett_olja',
     lmv: 4659,
     kcal: 884, prot: 0, carb: 0, fat: 100, fiber: 0, sugar: 0, addedSugar: 0, satFat: 13.8, salt: 0,
@@ -216,7 +215,7 @@ const fett: FoodSeed[] = [
     portions: OIL_PORTIONS,
     density: 0.92,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['olivolja', 'oliv olja', 'extra virgin', 'evoo', 'jungfruolja', 'olivoljan', 'olive oil', 'olivolja extra virgin'],
+    syn: ['olivolja', 'oliv olja', 'extra virgin', 'evoo', 'jungfruolja', 'olivoljan', 'olive oil', 'olivolja extra virgin', 'ren olivolja'],
     co2e: 3.5,
   },
   {
@@ -233,7 +232,7 @@ const fett: FoodSeed[] = [
   },
   {
     id: 'kokosolja',
-    name: 'Kokosolja (kokosfett)',
+    name: 'Kokosolja',
     cat: 'fett_olja',
     lmv: 6165,
     kcal: 881, prot: 0, carb: 0.7, fat: 99.3, fiber: 0, sugar: 0, addedSugar: 0, satFat: 87.3, salt: 0,
@@ -246,7 +245,7 @@ const fett: FoodSeed[] = [
   },
   {
     id: 'ghee-skirat-smor',
-    name: 'Ghee (skirat smör)',
+    name: 'Ghee',
     cat: 'fett_olja',
     lmv: 7269,
     kcal: 875, prot: 0, carb: 1.7, fat: 98.2, fiber: 0, sugar: 0, addedSugar: 0, satFat: 66.5, salt: 0.1,
@@ -259,6 +258,7 @@ const fett: FoodSeed[] = [
     tags: ['vegetarisk', 'glutenfri', 'laktosfri'],
     syn: ['ghee', 'skirat smör', 'klarat smör', 'smörolja', 'skirat', 'butter ghee'],
     co2e: 11,
+    note: 'Skirat smör – nästan rent smörfett.',
   },
   {
     id: 'sesamolja',
@@ -304,17 +304,26 @@ const fett: FoodSeed[] = [
 const TZATZIKI_KOSTRAD: KostradContribFull = { fruktGront: 20, mejeri: 70 }
 /** Ca 60 % kikärtor och 8 % tahini (sesam). */
 const HUMMUS_KOSTRAD: KostradContribFull = { baljvaxter: 60, notter: 8 }
+/** Jordnötssås: ca en fjärdedel jordnötter (jordnötssmör). */
+const JORDNOTSSAS_KOSTRAD: KostradContribFull = { notter: 25 }
 
 const MSK_SAUCE: Array<[string, string, number]> = [
   ['msk', '1 msk (15 g)', 15],
   ['portion', '1 portion (2 msk, 30 g)', 30],
 ]
 
+/** Varma såser: 1 portion ≈ 1 dl. */
+const WARM_SAUCE: Array<[string, string, number]> = [
+  ['portion', '1 portion (1 dl)', 103],
+  ['slev', '1 slev (0,5 dl)', 52],
+]
+
 const saser: FoodSeed[] = [
   {
     id: 'majonnas-80',
-    name: 'Majonnäs (ca 80 % fett)',
+    name: 'Majonnäs',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 50,
     kcal: 666, prot: 1.3, carb: 5, fat: 72.4, fiber: 0, sugar: 1.5, addedSugar: 1.5, satFat: 5, salt: 1.1,
     n: { vitK: 60 },
@@ -322,15 +331,27 @@ const saser: FoodSeed[] = [
       ['msk', '1 msk (14 g)', 14],
       ['tsk', '1 tsk (5 g)', 5],
       ['smorgas', 'på 1 smörgås (10 g)', 10],
+      // Samma portions-id som den tidigare aiolin, så att sparade portioner fortsätter att fungera.
+      ['portion', '1 portion (2 msk, 30 g)', 30],
     ],
     density: 0.92,
     tags: ['vegetarisk', 'glutenfri', 'laktosfri'],
-    syn: ['majonnäs', 'majo', 'mayo', 'majonäs', 'majones', 'majonnas', 'hellmanns', 'kavli majonnäs', 'mayonnaise'],
+    syn: [
+      'majonnäs', 'majo', 'mayo', 'majonäs', 'majones', 'majonnas', 'hellmanns', 'kavli majonnäs', 'mayonnaise',
+      'aioli', 'aïoli', 'vitlöksmajonnäs', 'vitlöksmajo', 'aoli', 'ajoli', 'garlic mayo',
+      'vegansk majonnäs', 'vegan majo', 'vegomajo', 'vegomajonnäs', 'äggfri majonnäs', 'vegansk mayo', 'växtbaserad majonnäs',
+    ],
+    note: samlingLmv(
+      'majonnäs med ca 80 % fett',
+      "Hellmann's, Kavli, Felix, ICA",
+      'Gäller även aioli (vitlöksmajonnäs). Vegansk, äggfri majonnäs har oftast något mindre fett.',
+    ),
   },
   {
     id: 'majonnas-latt-30',
-    name: 'Majonnäs, lätt (ca 30 % fett)',
+    name: 'Lättmajonnäs',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 53,
     kcal: 323, prot: 1.5, carb: 10.7, fat: 30.9, fiber: 0, sugar: 3.9, addedSugar: 3.9, satFat: 2.1, salt: 1.4,
     portions: [
@@ -340,53 +361,44 @@ const saser: FoodSeed[] = [
     density: 0.98,
     tags: ['vegetarisk', 'glutenfri', 'laktosfri'],
     syn: ['lättmajonnäs', 'lätt majonnäs', 'light majonnäs', 'lätt majo', 'mayo light', 'lätt mayo'],
-  },
-  {
-    id: 'majonnas-vegansk',
-    name: 'Majonnäs, vegansk (ca 70 % fett)',
-    cat: 'sas_krydda',
-    kcal: 640, prot: 0.3, carb: 3, fat: 70, fiber: 0.2, sugar: 2, addedSugar: 1.5, satFat: 5.5, salt: 1.3,
-    n: {
-      monoFat: 41, polyFat: 20, omega3: 6, cholesterol: 0,
-      vitD: 0, vitE: 11, vitC: 0, vitB12: 0,
-      calcium: 3, iron: 0.1, potassium: 10,
-    },
-    portions: [
-      ['msk', '1 msk (14 g)', 14],
-      ['tsk', '1 tsk (5 g)', 5],
-      ['smorgas', 'på 1 smörgås (10 g)', 10],
-    ],
-    density: 0.92,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['vegansk majonnäs', 'vegan majo', 'vegomajo', 'vegomajonnäs', 'äggfri majonnäs', 'vegansk mayo', 'vegan mayo', 'växtbaserad majonnäs', 'hellmanns vegan'],
-    note: 'Utan ägg – emulgeras i stället med t.ex. ärt- eller sojaprotein. Görs oftast på rapsolja.',
+    note: samlingLmv('lätt majonnäs med ca 30 % fett', "Hellmann's, Kavli, ICA"),
   },
   {
     id: 'remouladsas',
     name: 'Remouladsås',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 25,
     kcal: 707, prot: 1.5, carb: 1.2, fat: 78.7, fiber: 0.3, sugar: 0.4, addedSugar: 0, satFat: 8.3, salt: 0.9,
     portions: MSK_SAUCE,
     density: 0.95,
     tags: ['vegetarisk', 'laktosfri', 'klassiker'],
     syn: ['remoulad', 'remouladsås', 'remulad', 'remuladsås', 'remoulad sås', 'fiskpinnesås', 'remouladsas'],
+    note: samlingLmv('remouladsås', 'Felix, Kavli, ICA'),
   },
   {
     id: 'bearnaisesas-fardig',
-    name: 'Bearnaisesås, färdig (ca 40 % fett)',
+    name: 'Bearnaisesås',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 2231,
     kcal: 342, prot: 1, carb: 5.9, fat: 35.5, fiber: 0, sugar: 3, addedSugar: 3, satFat: 5.1, salt: 1.2,
     portions: MSK_SAUCE,
     density: 0.95,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['bearnaise', 'bearnaisesås', 'bea', 'béarnaise', 'bearnes', 'bearnessås', 'bernaise', 'bearnaise kall', 'kall bearnaise'],
-    note: 'Färdiga bearnaisesåser på burk eller tub görs oftast på rapsolja. Fetthalten varierar (ca 40–60 %).',
+    syn: [
+      'bearnaise', 'bearnaisesås', 'bea', 'béarnaise', 'bearnes', 'bearnessås', 'bernaise', 'bearnaise kall', 'kall bearnaise',
+      'färdig bearnaise',
+    ],
+    note: samlingLmv(
+      'färdig bearnaisesås med ca 40 % fett',
+      'Felix, Kavli, ICA, Garant',
+      'Kall bearnaise på tub eller burk, oftast gjord på rapsolja. Hemlagad bearnaise på smör och äggula – som på restaurang – finns som egen rad.',
+    ),
   },
   {
     id: 'bearnaisesas-hemlagad',
-    name: 'Bearnaisesås, hemlagad (smör och äggula)',
+    name: 'Hemlagad bearnaisesås',
     cat: 'sas_krydda',
     kcal: 585, prot: 2.5, carb: 1, fat: 63, fiber: 0, sugar: 0.8, addedSugar: 0, satFat: 40, salt: 1.1,
     n: {
@@ -397,18 +409,20 @@ const saser: FoodSeed[] = [
     portions: MSK_SAUCE,
     density: 0.95,
     tags: ['vegetarisk', 'glutenfri', 'klassiker'],
-    syn: ['hemgjord bearnaise', 'hemlagad bearnaise', 'bearnaise smör', 'varm bearnaise', 'bearnaisesås hemgjord'],
+    syn: [
+      'hemgjord bearnaise', 'hemlagad bearnaise', 'bearnaise smör', 'varm bearnaise', 'bearnaisesås hemgjord',
+      'restaurangbearnaise', 'bearnaise restaurang',
+    ],
     co2e: 7.5,
+    note: 'Varm bearnaise på smör och äggula, som på restaurang och till hemlagad oxfilé.',
   },
   {
     id: 'hollandaisesas-fardig',
-    name: 'Hollandaisesås, färdig (ca 30 % fett)',
+    name: 'Hollandaisesås',
     cat: 'sas_krydda',
-    kcal: 310, prot: 1.2, carb: 5, fat: 31, fiber: 0.2, sugar: 2, addedSugar: 1, satFat: 11, salt: 1.3,
-    n: {
-      cholesterol: 60, vitA: 150, vitD: 0.3, vitC: 0, folate: 5, vitB12: 0.2,
-      calcium: 25, iron: 0.2, potassium: 40,
-    },
+    avg: true,
+    lmv: 64,
+    kcal: 232, prot: 2.6, carb: 6.6, fat: 22, fiber: 0, sugar: 3.1, addedSugar: 3, satFat: 7.8, salt: 1.4,
     portions: [
       ['portion', '1 portion (0,5 dl, 50 g)', 50],
       ['msk', '1 msk (15 g)', 15],
@@ -416,10 +430,15 @@ const saser: FoodSeed[] = [
     density: 1.0,
     tags: ['vegetarisk'],
     syn: ['hollandaise', 'hollandaisesås', 'hollandäs', 'hollandes', 'holländsk sås', 'sparrissås'],
+    note: samlingLmv(
+      'färdig hollandaisesås (kylvara, fryst eller pulver)',
+      'Knorr, ICA, Garant',
+      'Hemlagad hollandaise på smör och äggula har mer än dubbelt så mycket fett.',
+    ),
   },
   {
     id: 'hovmastarsas',
-    name: 'Hovmästarsås (senapssås till gravlax)',
+    name: 'Hovmästarsås',
     cat: 'sas_krydda',
     lmv: 23,
     kcal: 438, prot: 2.1, carb: 13.3, fat: 42.4, fiber: 0.4, sugar: 7.8, addedSugar: 7.8, satFat: 3, salt: 1.4,
@@ -427,54 +446,32 @@ const saser: FoodSeed[] = [
     density: 1.05,
     tags: ['vegetarisk', 'laktosfri', 'klassiker', 'svensk'],
     syn: ['hovmästarsås', 'gravlaxsås', 'senapssås', 'senapsdillsås', 'dillsenapssås', 'hovmastarsas', 'gravlax sås', 'senapsås'],
+    note: 'Senapssås med dill till gravlax.',
   },
   {
     id: 'hamburgerdressing',
     name: 'Hamburgerdressing',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 2973,
     kcal: 542, prot: 1.3, carb: 10.1, fat: 56, fiber: 0.4, sugar: 7.4, addedSugar: 7, satFat: 3.9, salt: 0.9,
     portions: MSK_SAUCE,
     density: 1.0,
     tags: ['vegetarisk'],
     syn: ['hamburgerdressing', 'burgerdressing', 'burgersås', 'hamburgersås', 'felix hamburgerdressing', 'burger dressing', 'bigmacsås'],
-  },
-  {
-    id: 'rhode-island-dressing',
-    name: 'Rhode Island-dressing',
-    cat: 'sas_krydda',
-    kcal: 380, prot: 1, carb: 11, fat: 37, fiber: 0.5, sugar: 9.5, addedSugar: 8.5, satFat: 3, salt: 1.6,
-    n: {
-      monoFat: 22, polyFat: 10, omega3: 3.3, cholesterol: 25,
-      vitD: 0.1, vitC: 1, folate: 3, vitB12: 0.1,
-      calcium: 12, iron: 0.2, potassium: 70,
-    },
-    portions: MSK_SAUCE,
-    density: 1.0,
-    tags: ['vegetarisk'],
-    syn: ['rhode island', 'rhode islanddressing', 'rhodeisland', 'rodeisland', 'tusen öar', 'thousand island', 'räksås', 'cocktailsås'],
+    note: samlingLmv('hamburgerdressing', 'Felix, Heinz, ICA'),
   },
   {
     id: 'vitloksdressing',
-    name: 'Vitlöksdressing (kebabsås)',
+    name: 'Vitlökssås',
     cat: 'sas_krydda',
     lmv: 2233,
     kcal: 300, prot: 1.7, carb: 5, fat: 30.8, fiber: 0, sugar: 2, addedSugar: 0, satFat: 5.7, salt: 0.9,
     portions: MSK_SAUCE,
     density: 1.0,
     tags: ['vegetarisk'],
-    syn: ['vitlökssås', 'kebabsås', 'vitlöksdressing', 'vitlöksås', 'garlic dressing', 'kebab sås', 'vitlökssas', 'pizzasås vitlök'],
-  },
-  {
-    id: 'aioli',
-    name: 'Aioli (vitlöksmajonnäs)',
-    cat: 'sas_krydda',
-    lmv: 5758,
-    kcal: 762, prot: 1.7, carb: 1.2, fat: 84.8, fiber: 0.3, sugar: 0.3, addedSugar: 0, satFat: 9, salt: 0.7,
-    portions: MSK_SAUCE,
-    density: 0.94,
-    tags: ['vegetarisk', 'glutenfri', 'laktosfri'],
-    syn: ['aioli', 'aïoli', 'vitlöksmajonnäs', 'vitlöksmajo', 'aoli', 'ajoli', 'garlic mayo'],
+    syn: ['vitlökssås', 'kebabsås', 'vitlöksdressing', 'vitlöksås', 'garlic dressing', 'kebab sås', 'vitlökssas', 'pizzasås vitlök', 'vit sås kebab'],
+    note: 'Vit kebabsås med vitlök (ca 30 % fett).',
   },
   {
     id: 'tzatziki',
@@ -493,8 +490,24 @@ const saser: FoodSeed[] = [
     kostrad: TZATZIKI_KOSTRAD,
   },
   {
+    id: 'dippsas',
+    name: 'Dippsås',
+    cat: 'sas_krydda',
+    lmv: 7016,
+    kcal: 142, prot: 3.2, carb: 8.2, fat: 10.7, fiber: 0.4, sugar: 5, addedSugar: 2, satFat: 7.2, salt: 1.3,
+    portions: [
+      ['portion', '1 portion (0,5 dl, 50 g)', 50],
+      ['msk', '1 msk (15 g)', 15],
+    ],
+    density: 1.0,
+    tags: ['vegetarisk', 'glutenfri'],
+    syn: ['dipp', 'dip', 'dippsås', 'dipsås', 'dippmix', 'dipmix', 'gräddfilsdipp', 'chipsdipp', 'holiday dip', 'gräddfilssås', 'dippsås gräddfil'],
+    co2e: 3,
+    note: 'Gräddfil blandad med dippmix (en påse per 3 dl gräddfil).',
+  },
+  {
     id: 'vinagrett-hemlagad',
-    name: 'Vinägrett, hemlagad (olja, vinäger och senap)',
+    name: 'Vinägrett',
     cat: 'sas_krydda',
     kcal: 640, prot: 0.3, carb: 2, fat: 70, fiber: 0.2, sugar: 1.5, addedSugar: 1, satFat: 5.5, salt: 1.2,
     n: {
@@ -509,29 +522,40 @@ const saser: FoodSeed[] = [
     density: 0.93,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['vinägrett', 'vinaigrette', 'vinägrettsås', 'olja och vinäger', 'hemgjord dressing', 'salladsdressing hemlagad', 'vinegrett'],
-    note: 'Beräknad på 3 delar olja och 1 del vinäger.',
+    note: 'Hemlagad: 3 delar olja och 1 del vinäger, med lite senap.',
   },
   {
     id: 'salladsdressing-fardig',
-    name: 'Salladsdressing, färdig (italiensk/vinägrett)',
+    name: 'Salladsdressing',
     cat: 'sas_krydda',
-    kcal: 350, prot: 0.5, carb: 9, fat: 35, fiber: 0.3, sugar: 8, addedSugar: 7, satFat: 2.8, salt: 2.0,
+    avg: true,
+    kcal: 370, prot: 1, carb: 9, fat: 37, fiber: 0.3, sugar: 7, addedSugar: 6, satFat: 3, salt: 1.8,
     n: {
-      monoFat: 20, polyFat: 10, omega3: 3, cholesterol: 0,
+      monoFat: 21, polyFat: 10.5, omega3: 3, cholesterol: 10,
       vitD: 0, vitE: 6, vitC: 1, folate: 2, vitB12: 0,
-      calcium: 10, iron: 0.2, potassium: 40,
+      calcium: 20, iron: 0.2, potassium: 50,
     },
     portions: [
       ['msk', '1 msk (15 g)', 15],
       ['portion', 'till 1 portion sallad (2 msk, 30 g)', 30],
     ],
     density: 1.0,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['salladsdressing', 'dressing', 'italiensk dressing', 'örtdressing', 'fransk dressing', 'kavli dressing', 'salads dressing', 'salladsås'],
+    // Inte 'vegetarisk': caesardressing innehåller ofta ansjovis.
+    tags: ['glutenfri'],
+    syn: [
+      'salladsdressing', 'dressing', 'italiensk dressing', 'örtdressing', 'fransk dressing', 'kavli dressing', 'salads dressing', 'salladsås',
+      'caesar', 'caesardressing', 'cesardressing', 'ceasardressing', 'caesarsallad dressing', 'ceasar',
+      'rhode island', 'rhode islanddressing', 'rhodeisland', 'rodeisland', 'tusen öar', 'thousand island', 'räksås', 'cocktailsås',
+      'ranchdressing', 'honung senap dressing',
+    ],
+    note: samling(
+      'Kavli, Paul Newman, ICA, Garant',
+      'Färdig dressing på flaska – genomsnitt av italiensk dressing, örtdressing, caesar- och Rhode Island-dressing. Hemlagad vinägrett finns som egen rad.',
+    ),
   },
   {
     id: 'balsamvinager',
-    name: 'Balsamvinäger (aceto balsamico)',
+    name: 'Balsamvinäger',
     cat: 'sas_krydda',
     kcal: 95, prot: 0.5, carb: 22.5, fat: 0, fiber: 0, sugar: 20, satFat: 0, salt: 0.05,
     n: { vitD: 0, vitC: 0, vitB12: 0, calcium: 27, iron: 0.7, magnesium: 12, potassium: 112 },
@@ -544,58 +568,48 @@ const saser: FoodSeed[] = [
     syn: ['balsamvinäger', 'balsamico', 'aceto balsamico', 'balsamicovinäger', 'balsamvinager', 'balsamico vinäger', 'balsamik', 'balsamvinäger modena'],
     note: 'Sockret kommer främst från druvmust. Tjock balsamicokräm (glaze) innehåller betydligt mer socker.',
   },
-  {
-    id: 'caesardressing',
-    name: 'Caesardressing',
-    cat: 'sas_krydda',
-    kcal: 450, prot: 2.5, carb: 6, fat: 46, fiber: 0.2, sugar: 3, addedSugar: 2.5, satFat: 4.5, salt: 2.2,
-    n: {
-      monoFat: 26, polyFat: 13, omega3: 3.5, cholesterol: 40,
-      vitD: 0.2, vitC: 0, folate: 4, vitB12: 0.3,
-      calcium: 60, iron: 0.3, potassium: 50,
-    },
-    portions: [
-      ['msk', '1 msk (15 g)', 15],
-      ['portion', 'till 1 portion sallad (2 msk, 30 g)', 30],
-    ],
-    density: 1.0,
-    syn: ['caesar', 'caesardressing', 'cesardressing', 'ceasardressing', 'caesarsallad dressing', 'ceasar'],
-    note: 'Innehåller vanligen ansjovis och parmesan.',
-  },
   // -------------------------------------------------------------------------
   // Varma såser
   // -------------------------------------------------------------------------
   {
     id: 'gradsas-brunsas-tillagad',
-    name: 'Gräddsås (brunsås med grädde), tillagad',
+    name: 'Gräddsås',
     cat: 'sas_krydda',
     lmv: 1993,
     kcal: 110, prot: 1.3, carb: 7.3, fat: 8.5, fiber: 0.2, sugar: 3.8, addedSugar: 3, satFat: 2.2, salt: 1.8,
-    portions: [
-      ['portion', '1 portion (1 dl)', 103],
-      ['slev', '1 slev (0,5 dl)', 52],
-    ],
+    portions: WARM_SAUCE,
     density: 1.03,
     tags: ['klassiker', 'svensk'],
-    syn: ['gräddsås', 'brunsås', 'brun sås', 'köttbullssås', 'sås till köttbullar', 'graddsas', 'brunsas', 'sås', 'gräddig sås'],
+    syn: [
+      'gräddsås', 'brunsås', 'brun sås', 'köttbullssås', 'sås till köttbullar', 'graddsas', 'brunsas', 'sås', 'gräddig sås',
+      'brunsås med grädde', 'hemlagad brunsås',
+    ],
     co2e: 2.5,
+    note: 'Brunsås med buljong och grädde – klassisk sås till köttbullar. Brunsås av pulver utan grädde finns som egen rad ("Brunsås") och har ungefär hälften så mycket energi.',
   },
   {
     id: 'brunsas-pulver-vatten',
-    name: 'Brunsås, tillagad av pulver och vatten',
+    name: 'Brunsås',
     cat: 'sas_krydda',
-    kcal: 45, prot: 1, carb: 6, fat: 2, fiber: 0.2, sugar: 1, addedSugar: 0.5, satFat: 1, salt: 1.1,
-    n: { vitD: 0, vitC: 0, folate: 2, vitB12: 0, calcium: 10, iron: 0.2, potassium: 40 },
-    portions: [
-      ['portion', '1 portion (1 dl)', 103],
-      ['slev', '1 slev (0,5 dl)', 52],
-    ],
+    avg: true,
+    lmv: 1998,
+    kcal: 56, prot: 2.2, carb: 7.1, fat: 2, fiber: 0.1, sugar: 2.5, addedSugar: 2, satFat: 0.9, salt: 1.4,
+    portions: WARM_SAUCE,
     density: 1.03,
-    syn: ['brunsås pulver', 'lätt brunsås', 'brun sås pulver', 'såspulver', 'knorr brunsås', 'brunsås utan grädde'],
+    tags: ['svensk'],
+    syn: [
+      'brunsås', 'brun sås', 'brunsas', 'brunsås pulver', 'brun sås pulver', 'såspulver', 'pulversås', 'knorr brunsås',
+      'blå band brunsås', 'brunsås utan grädde', 'lätt brunsås',
+    ],
+    note: samlingLmv(
+      'brunsås av pulver, tillagad med mjölk och vatten',
+      'Knorr, Blå Band, ICA',
+      'Med grädde blir den gräddsås, som finns som egen rad.',
+    ),
   },
   {
     id: 'pepparsas-gradde',
-    name: 'Pepparsås, gräddig (färdig)',
+    name: 'Pepparsås',
     cat: 'sas_krydda',
     kcal: 130, prot: 1.5, carb: 7, fat: 11, fiber: 0.3, sugar: 2, addedSugar: 1, satFat: 6.5, salt: 1.2,
     n: {
@@ -610,10 +624,23 @@ const saser: FoodSeed[] = [
     tags: ['vegetarisk'],
     syn: ['pepparsås', 'grönpepparsås', 'gräddig pepparsås', 'peppar sås', 'sås till kött', 'pepparsas', 'sås till biff'],
     co2e: 3,
+    note: 'Gräddig pepparsås, färdig eller hemlagad.',
+  },
+  {
+    id: 'rodvinssas',
+    name: 'Rödvinssås',
+    cat: 'sas_krydda',
+    lmv: 2232,
+    kcal: 65, prot: 1.2, carb: 12.1, fat: 1.2, fiber: 0, sugar: 1.3, addedSugar: 1, satFat: 0.8, salt: 1.4,
+    portions: WARM_SAUCE,
+    density: 1.03,
+    tags: ['laktosfri'],
+    syn: ['rödvinssås', 'rödvin sås', 'rödvinsås', 'vinsås', 'mörk sås', 'sås till oxfilé', 'demi-glace', 'rodvinssas'],
+    note: 'Färdig rödvinssås (kylvara eller pulver). Alkoholen kokar bort.',
   },
   {
     id: 'vitsas-bechamel',
-    name: 'Vitsås (béchamel)',
+    name: 'Vitsås',
     cat: 'sas_krydda',
     lmv: 1985,
     kcal: 122, prot: 4.3, carb: 8.1, fat: 8, fiber: 0.1, sugar: 5.2, addedSugar: 0, satFat: 3, salt: 0.8,
@@ -625,7 +652,7 @@ const saser: FoodSeed[] = [
     tags: ['vegetarisk', 'klassiker'],
     syn: ['vit sås', 'bechamel', 'béchamel', 'bechamelsås', 'vit grundsås', 'mjölksås', 'vitsas', 'lasagnesås'],
     co2e: 1.5,
-    note: 'Gjord på mellanmjölk, smör och vetemjöl.',
+    note: 'Béchamel på mellanmjölk, smör och vetemjöl.',
   },
   {
     id: 'ostsas',
@@ -644,8 +671,9 @@ const saser: FoodSeed[] = [
   },
   {
     id: 'pastasas-tomat-burk',
-    name: 'Tomatsås/pastasås, färdig (burk)',
+    name: 'Pastasås',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 2009,
     kcal: 51, prot: 1.6, carb: 5.3, fat: 2.1, fiber: 2.2, sugar: 5.3, addedSugar: 4, satFat: 0.2, salt: 1.2,
     portions: [
@@ -654,15 +682,17 @@ const saser: FoodSeed[] = [
     ],
     density: 1.05,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['pastasås', 'tomatsås', 'spagettisås', 'spaghettisås', 'dolmio', 'barilla', 'napoli', 'arrabbiata', 'tomat basilika', 'pasta sås'],
+    syn: ['pastasås', 'tomatsås', 'spagettisås', 'spaghettisås', 'dolmio', 'barilla', 'napoli', 'arrabbiata', 'tomat basilika', 'pasta sås', 'tomatsås burk'],
     co2e: 1.2,
     plate: { veg: 0.8, carb: 0, protein: 0 },
     kostrad: { fruktGront: 70 },
+    note: samlingLmv('tomatbaserad pastasås med basilika', 'Dolmio, Barilla, Zeta, ICA'),
   },
   {
     id: 'pesto-gron',
-    name: 'Pesto, grön (basilika)',
+    name: 'Pesto',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 2004,
     kcal: 581, prot: 4.2, carb: 12.6, fat: 57.1, fiber: 4.1, sugar: 2.3, addedSugar: 0, satFat: 7.9, salt: 3.2,
     portions: [
@@ -671,13 +701,18 @@ const saser: FoodSeed[] = [
     ],
     density: 1.0,
     tags: ['glutenfri'],
-    syn: ['pesto', 'basilikapesto', 'pesto genovese', 'grön pesto', 'pesto alla genovese', 'basilika pesto'],
+    syn: ['pesto', 'basilikapesto', 'pesto genovese', 'grön pesto', 'pesto alla genovese', 'basilika pesto', 'röd pesto'],
     co2e: 3.5,
+    note: samlingLmv('grön pesto med basilika', 'Zeta, Barilla, ICA, Garant'),
   },
+  // -------------------------------------------------------------------------
+  // Ketchup, senap, asiatiska såser och chili
+  // -------------------------------------------------------------------------
   {
     id: 'ketchup',
     name: 'Ketchup',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 1969,
     kcal: 91, prot: 1, carb: 18.5, fat: 0.5, fiber: 3.9, sugar: 18.5, addedSugar: 16, satFat: 0, salt: 1.7,
     portions: [
@@ -686,27 +721,17 @@ const saser: FoodSeed[] = [
     ],
     density: 1.14,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['ketchup', 'felix', 'heinz', 'tomatketchup', 'ketsup', 'kätchup', 'ketchupp', 'felix ketchup'],
-  },
-  {
-    id: 'ketchup-utan-socker',
-    name: 'Ketchup utan tillsatt socker',
-    cat: 'sas_krydda',
-    lmv: 7245,
-    kcal: 47, prot: 2, carb: 8.3, fat: 0.2, fiber: 2.2, sugar: 6.3, addedSugar: 0, satFat: 0, salt: 1,
-    portions: [
-      ['msk', '1 msk (17 g)', 17],
-      ['klick', '1 klick (10 g)', 10],
+    syn: [
+      'ketchup', 'felix', 'heinz', 'tomatketchup', 'ketsup', 'kätchup', 'ketchupp', 'felix ketchup',
+      'sockerfri ketchup', 'ketchup utan socker', 'ketchup light',
     ],
-    density: 1.1,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sockerfri ketchup', 'ketchup utan socker', 'ketchup light', 'lchf ketchup', 'ketchup sötningsmedel'],
-    note: 'Sötad med sötningsmedel. Sockret kommer från tomaten.',
+    note: samlingLmv('ketchup', 'Felix, Heinz, Slotts, ICA', 'Ketchup utan tillsatt socker har ungefär hälften så mycket energi.'),
   },
   {
     id: 'senap-mild-svensk',
-    name: 'Senap, mild och söt (svensk senap)',
+    name: 'Senap',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 1972,
     kcal: 173, prot: 4.5, carb: 23.1, fat: 6.8, fiber: 0, sugar: 10.8, addedSugar: 10.8, satFat: 0.4, salt: 1.2,
     portions: [
@@ -716,41 +741,15 @@ const saser: FoodSeed[] = [
     ],
     density: 1.1,
     tags: ['vegan', 'glutenfri', 'laktosfri', 'svensk'],
-    syn: ['senap', 'slotts senap', 'mild senap', 'söt senap', 'svensk senap', 'korvsenap', 'senapen', 'slotts'],
-  },
-  {
-    id: 'senap-skansk',
-    name: 'Senap, skånsk (grov, söt och stark)',
-    cat: 'sas_krydda',
-    kcal: 165, prot: 6.5, carb: 18, fat: 6.5, fiber: 3, sugar: 15, addedSugar: 13, satFat: 0.4, salt: 3.0,
-    n: {
-      vitD: 0, vitC: 0, folate: 12, vitB12: 0,
-      calcium: 60, iron: 1.5, magnesium: 40, potassium: 150,
-    },
-    portions: [
-      ['tsk', '1 tsk (5 g)', 5],
-      ['msk', '1 msk (16 g)', 16],
+    syn: [
+      'senap', 'slotts senap', 'mild senap', 'söt senap', 'svensk senap', 'korvsenap', 'senapen', 'slotts',
+      'skånsk senap', 'skånesenap', 'grov senap', 'stark senap', 'julsenap', 'skanes senap', 'grovmald senap',
     ],
-    density: 1.1,
-    tags: ['vegan', 'glutenfri', 'laktosfri', 'svensk', 'klassiker'],
-    syn: ['skånsk senap', 'skånesenap', 'grov senap', 'stark senap', 'julsenap', 'skanes senap', 'grovmald senap'],
-  },
-  {
-    id: 'senap-fransk',
-    name: 'Senap, fransk (mild)',
-    cat: 'sas_krydda',
-    kcal: 115, prot: 5.5, carb: 10, fat: 5.5, fiber: 2, sugar: 8, addedSugar: 7, satFat: 0.3, salt: 3.2,
-    n: {
-      vitD: 0, vitC: 0, folate: 10, vitB12: 0,
-      calcium: 50, iron: 1.2, potassium: 120,
-    },
-    portions: [
-      ['tsk', '1 tsk (5 g)', 5],
-      ['msk', '1 msk (16 g)', 16],
-    ],
-    density: 1.1,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['fransk senap', 'franska senapen', 'gul senap', 'mild fransk senap'],
+    note: samlingLmv(
+      'svensk senap',
+      "Slotts, Johnny's, Felix, ICA",
+      'Mild och söt svensk senap. Skånsk senap har ungefär samma energi men mer salt.',
+    ),
   },
   {
     id: 'senap-dijon',
@@ -767,29 +766,17 @@ const saser: FoodSeed[] = [
     ],
     density: 1.1,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['dijon', 'dijonsenap', 'dijon senap', 'maille', 'stark fransk senap', 'dijonnaise'],
-  },
-  {
-    id: 'senap-grovkornig',
-    name: 'Senap, grovkornig osötad (à l’ancienne)',
-    cat: 'sas_krydda',
-    kcal: 165, prot: 8, carb: 6, fat: 11, fiber: 5, sugar: 3, addedSugar: 1, satFat: 0.7, salt: 4.5,
-    n: {
-      vitD: 0, vitC: 0, folate: 15, vitB12: 0,
-      calcium: 80, iron: 2, magnesium: 60, potassium: 160,
-    },
-    portions: [
-      ['tsk', '1 tsk (5 g)', 5],
-      ['msk', '1 msk (16 g)', 16],
+    syn: [
+      'dijon', 'dijonsenap', 'dijon senap', 'maille', 'stark fransk senap', 'dijonnaise',
+      'fransk senap', 'franska senapen', 'grovkornig senap', 'ancienne', 'a lancienne', 'fullkornssenap', 'senapskorn senap', 'grov dijon',
     ],
-    density: 1.1,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['grovkornig senap', 'ancienne', 'a lancienne', 'fullkornssenap', 'senapskorn senap', 'grov dijon'],
+    note: 'Osötad fransk senap. Gäller även grovkornig senap (à l’ancienne).',
   },
   {
     id: 'sweet-chilisas',
     name: 'Sweet chilisås',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 2007,
     kcal: 207, prot: 0.8, carb: 43.4, fat: 2.9, fiber: 1.3, sugar: 43.3, addedSugar: 43, satFat: 0.3, salt: 2.9,
     portions: [
@@ -799,10 +786,11 @@ const saser: FoodSeed[] = [
     density: 1.27,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['sweet chili', 'sweetchili', 'söt chilisås', 'thai chilisås', 'chilisås söt', 'sweet chilli', 'sweetchilisås'],
+    note: samlingLmv('sweet chilisås', 'Blue Dragon, Santa Maria, ICA'),
   },
   {
     id: 'sojasas',
-    name: 'Sojasås (japansk, bryggd)',
+    name: 'Sojasås',
     cat: 'sas_krydda',
     lmv: 6682,
     kcal: 72, prot: 7.7, carb: 10.1, fat: 0, fiber: 0, sugar: 1.1, addedSugar: 0, satFat: 0, salt: 14.2,
@@ -812,44 +800,38 @@ const saser: FoodSeed[] = [
     ],
     density: 1.17,
     tags: ['vegan', 'laktosfri'],
-    syn: ['soja', 'sojasås', 'soya', 'kikkoman', 'japansk soja', 'shoyu', 'soja sås', 'soyasås', 'sojasas'],
-    note: 'Mycket salt – 1 msk (18 g) ger ca 2,5 g salt. Innehåller vete (gluten); tamari är ett glutenfritt alternativ.',
+    syn: [
+      'soja', 'sojasås', 'soya', 'kikkoman', 'japansk soja', 'shoyu', 'soja sås', 'soyasås', 'sojasas',
+      'tamari', 'tamarisoja', 'glutenfri soja', 'glutenfri sojasås', 'sojasås glutenfri',
+    ],
+    note: 'Bryggd japansk sojasås. Mycket salt – 1 msk (18 g) ger ca 2,5 g salt. Innehåller vete (gluten); tamari är ett glutenfritt alternativ med ungefär samma värden.',
   },
   {
     id: 'teriyakisas',
-    name: 'Teriyakisås',
+    name: 'Woksås',
     cat: 'sas_krydda',
-    lmv: 2012,
-    kcal: 110, prot: 3.2, carb: 22.2, fat: 0.8, fiber: 0, sugar: 22.2, addedSugar: 22.2, satFat: 0.1, salt: 6.2,
-    portions: [
-      ['msk', '1 msk (18 g)', 18],
-      ['portion', '1 portion (3 msk, 54 g)', 54],
-    ],
-    density: 1.2,
-    tags: ['vegan', 'laktosfri'],
-    syn: ['teriyaki', 'teriyakisås', 'teriyaki marinad', 'teriyakimarinad', 'terriyaki'],
-  },
-  {
-    id: 'tamari',
-    name: 'Tamari (glutenfri sojasås)',
-    cat: 'sas_krydda',
-    kcal: 66, prot: 10.5, carb: 5.5, fat: 0.1, fiber: 0.8, sugar: 1.5, addedSugar: 0, satFat: 0, salt: 14.5,
-    n: {
-      vitD: 0, vitC: 0, niacin: 4, vitB6: 0.2, vitB12: 0,
-      calcium: 20, iron: 2.4, magnesium: 40, potassium: 212, phosphorus: 130,
-    },
+    avg: true,
+    kcal: 120, prot: 2.5, carb: 26, fat: 0.8, fiber: 0.5, sugar: 20, addedSugar: 18, satFat: 0.1, salt: 7,
+    n: { vitD: 0, vitC: 0, calcium: 25, iron: 0.4, potassium: 150 },
     portions: [
       ['msk', '1 msk (18 g)', 18],
       ['tsk', '1 tsk (6 g)', 6],
+      ['portion', '1 portion (3 msk, 54 g)', 54],
     ],
-    density: 1.18,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['tamari', 'tamarisoja', 'tamari soja', 'glutenfri soja', 'glutenfri sojasås', 'sojasås glutenfri'],
-    note: 'Bryggd på sojabönor utan vete – kontrollera att förpackningen är märkt glutenfri. Lika salt som vanlig sojasås.',
+    density: 1.2,
+    tags: ['laktosfri'],
+    syn: [
+      'woksås', 'wok sås', 'teriyaki', 'teriyakisås', 'teriyaki marinad', 'teriyakimarinad', 'terriyaki',
+      'ostronsås', 'oyster sauce', 'ostron sås', 'ostronsas', 'lee kum kee', 'hoisin', 'hoisinsås', 'stir fry sauce', 'wokmarinad',
+    ],
+    note: samling(
+      'Blue Dragon, Santa Maria, Lee Kum Kee, ICA',
+      'Genomsnitt av teriyaki-, ostron-, hoisin- och andra woksåser. De innehåller mycket salt och socker, och många innehåller vete.',
+    ),
   },
   {
     id: 'fisksas',
-    name: 'Fisksås (thailändsk)',
+    name: 'Fisksås',
     cat: 'sas_krydda',
     lmv: 6675,
     kcal: 48, prot: 9.1, carb: 2.6, fat: 0.1, fiber: 0, sugar: 2.6, addedSugar: 2.6, satFat: 0, salt: 22.5,
@@ -863,24 +845,10 @@ const saser: FoodSeed[] = [
     note: 'Mycket salt – 1 tsk ger drygt 1 g salt.',
   },
   {
-    id: 'ostronsas',
-    name: 'Ostronsås',
-    cat: 'sas_krydda',
-    kcal: 100, prot: 2, carb: 23, fat: 0.1, fiber: 0.3, sugar: 16, addedSugar: 14, satFat: 0, salt: 10.5,
-    n: { vitD: 0, vitC: 0, vitB12: 0.4, calcium: 32, iron: 0.2, potassium: 54, zinc: 0.1 },
-    portions: [
-      ['msk', '1 msk (19 g)', 19],
-      ['tsk', '1 tsk (6 g)', 6],
-    ],
-    density: 1.25,
-    tags: ['laktosfri'],
-    syn: ['ostronsås', 'oyster sauce', 'ostron sås', 'ostronsas', 'woksås', 'wok sås', 'lee kum kee'],
-    note: 'Innehåller ostronextrakt och ofta vete. Salt- och sockerhalten varierar mellan märken.',
-  },
-  {
     id: 'srirachasas',
-    name: 'Srirachasås (chilisås)',
+    name: 'Chilisås',
     cat: 'sas_krydda',
+    avg: true,
     kcal: 100, prot: 1.8, carb: 20, fat: 0.9, fiber: 2, sugar: 18, addedSugar: 12, satFat: 0.1, salt: 5.3,
     n: {
       vitA: 100, vitD: 0, vitC: 25, vitB12: 0,
@@ -889,31 +857,23 @@ const saser: FoodSeed[] = [
     portions: [
       ['tsk', '1 tsk (5 g)', 5],
       ['msk', '1 msk (16 g)', 16],
+      ['stank', '5 stänk (1 g)', 1],
     ],
     density: 1.08,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sriracha', 'srirascha', 'siracha', 'sriracha chilisås', 'het chilisås', 'chilisås'],
-  },
-  {
-    id: 'chilisas-stark-tunn',
-    name: 'Chilisås, stark och tunn (typ Tabasco)',
-    cat: 'sas_krydda',
-    kcal: 14, prot: 1.3, carb: 0.8, fat: 0.8, fiber: 0.6, sugar: 0.1, addedSugar: 0, satFat: 0.1, salt: 1.6,
-    n: {
-      vitA: 100, vitD: 0, vitC: 4.5, vitB12: 0,
-      calcium: 8, iron: 1.2, potassium: 130,
-    },
-    portions: [
-      ['stank', '5 stänk (1 g)', 1],
-      ['tsk', '1 tsk (5 g)', 5],
+    syn: [
+      'chilisås', 'stark chilisås', 'het chilisås', 'sriracha', 'srirascha', 'siracha', 'sriracha chilisås',
+      'tabasco', 'tabascosås', 'hot sauce', 'stark sås', 'pepparsås stark', 'louisiana hot sauce',
+      'sambal', 'sambal oelek', 'sambal olek', 'chilipasta', 'chilipuré', 'sambaloelek',
     ],
-    density: 1.0,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['tabasco', 'tabascosås', 'hot sauce', 'stark sås', 'pepparsås stark', 'chilisås stark', 'louisiana hot sauce'],
+    note: samling(
+      'Flying Goose, Santa Maria, Blue Dragon, ICA',
+      'Värden för sriracha. Sambal oelek har ungefär hälften så mycket energi, och tunna chilisåser som Tabasco nästan ingen.',
+    ),
   },
   {
     id: 'bbq-sas',
-    name: 'BBQ-sås (grillsås)',
+    name: 'BBQ-sås',
     cat: 'sas_krydda',
     kcal: 150, prot: 1, carb: 35, fat: 0.5, fiber: 1, sugar: 30, addedSugar: 27, satFat: 0.1, salt: 2.0,
     n: { vitA: 20, vitD: 0, vitC: 1, vitB12: 0, calcium: 30, iron: 0.6, potassium: 230 },
@@ -924,6 +884,7 @@ const saser: FoodSeed[] = [
     density: 1.15,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['bbq', 'bbq-sås', 'bbqsås', 'barbecuesås', 'grillsås', 'bbq sås', 'barbecue sås', 'grill sås', 'rökig bbq'],
+    note: 'Söt, tomatbaserad grill- och barbecuesås.',
   },
   {
     id: 'worcestershiresas',
@@ -944,8 +905,9 @@ const saser: FoodSeed[] = [
   },
   {
     id: 'tacosas',
-    name: 'Tacosås (mild/medium)',
+    name: 'Tacosås',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 5916,
     kcal: 32, prot: 1.9, carb: 5.1, fat: 0, fiber: 1.6, sugar: 4, addedSugar: 0, satFat: 0, salt: 1.6,
     portions: [
@@ -954,23 +916,12 @@ const saser: FoodSeed[] = [
     ],
     density: 1.05,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['tacosås', 'taco sås', 'taco sauce', 'tacosas', 'santa maria tacosås', 'tacosås mild', 'tacosås medium', 'fredagstaco'],
-    kostrad: { fruktGront: 50 },
-  },
-  {
-    id: 'salsa-tomat',
-    name: 'Salsa, tomatsalsa (burk)',
-    cat: 'sas_krydda',
-    kcal: 35, prot: 1.3, carb: 6, fat: 0.2, fiber: 1.5, sugar: 4.5, addedSugar: 1, satFat: 0.03, salt: 1.3,
-    n: { vitA: 30, vitD: 0, vitC: 5, folate: 10, vitB12: 0, calcium: 25, iron: 0.4, potassium: 270 },
-    portions: [
-      ['portion', '1 portion (50 g)', 50],
-      ['msk', '1 msk (16 g)', 16],
+    syn: [
+      'tacosås', 'taco sås', 'taco sauce', 'tacosas', 'santa maria tacosås', 'tacosås mild', 'tacosås medium', 'fredagstaco',
+      'salsa', 'tomatsalsa', 'salsa dip', 'chunky salsa', 'salsasås', 'nachos dip',
     ],
-    density: 1.05,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['salsa', 'tomatsalsa', 'salsa dip', 'dipsås', 'chunky salsa', 'salsasås', 'nachos dip'],
-    kostrad: { fruktGront: 60 },
+    kostrad: { fruktGront: 50 },
+    note: samlingLmv('tacosås', 'Santa Maria, Old El Paso, ICA', 'Gäller även salsa på burk, som har ungefär samma värden.'),
   },
   {
     id: 'guacamole',
@@ -993,6 +944,7 @@ const saser: FoodSeed[] = [
     id: 'hummus-naturell',
     name: 'Hummus',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 3051,
     kcal: 306, prot: 5.8, carb: 8.3, fat: 26.5, fiber: 7.4, sugar: 0.7, addedSugar: 0, satFat: 3.7, salt: 1.6,
     portions: [
@@ -1005,8 +957,71 @@ const saser: FoodSeed[] = [
     syn: ['hummus', 'humus', 'hommus', 'houmous', 'kikärtsröra', 'kikärtsdip', 'hummos', 'hummous'],
     co2e: 1.3,
     kostrad: HUMMUS_KOSTRAD,
+    note: samlingLmv('hummus', 'ICA, Coop, Garant'),
+  },
+  {
+    id: 'jordnotssas',
+    name: 'Jordnötssås',
+    cat: 'sas_krydda',
+    lmv: 2073,
+    kcal: 281, prot: 6.3, carb: 8.5, fat: 24.2, fiber: 3.5, sugar: 6, addedSugar: 4, satFat: 8.3, salt: 1.3,
+    portions: [
+      ['msk', '1 msk (16 g)', 16],
+      ['portion', '1 portion (0,5 dl, 50 g)', 50],
+    ],
+    density: 1.05,
+    tags: ['vegan', 'laktosfri'],
+    syn: ['jordnötssås', 'satay', 'sataysås', 'satésås', 'saté', 'peanut sauce', 'jordnötsdipp', 'satay sås', 'jordnotssas'],
+    kostrad: JORDNOTSSAS_KOSTRAD,
+    note: 'Satay – gjord på jordnötter och kokosmjölk.',
+  },
+  {
+    id: 'sotsur-sas',
+    name: 'Sötsur sås',
+    cat: 'sas_krydda',
+    lmv: 1974,
+    kcal: 96, prot: 0.2, carb: 23.3, fat: 0, fiber: 0, sugar: 11.6, addedSugar: 10, satFat: 0, salt: 0.6,
+    portions: [
+      ['portion', '1 portion (1 dl)', 110],
+      ['msk', '1 msk (17 g)', 17],
+    ],
+    density: 1.1,
+    tags: ['vegan', 'laktosfri'],
+    syn: ['sötsur sås', 'sötsur', 'sötsursås', 'sweet and sour', 'sweet sour', 'sötsur sås burk', 'kinasås'],
+    note: 'Färdig sötsur sås på burk eller flaska.',
+  },
+  {
+    id: 'bostongurka',
+    name: 'Bostongurka',
+    cat: 'sas_krydda',
+    lmv: 488,
+    kcal: 78, prot: 1, carb: 16.6, fat: 0.4, fiber: 1.8, sugar: 15.7, addedSugar: 15.5, satFat: 0.1, salt: 1.5,
+    portions: [
+      ['korv', 'på 1 korv (15 g)', 15],
+      ['msk', '1 msk (15 g)', 15],
+    ],
+    density: 1.05,
+    tags: ['vegan', 'glutenfri', 'laktosfri', 'svensk', 'klassiker'],
+    syn: ['bostongurka', 'boston gurka', 'relish', 'gurkrelish', 'korvgurka', 'felix bostongurka', 'hackad inlagd gurka'],
+    note: 'Söt relish på hackad inlagd gurka – klassiskt tillbehör till korv.',
+  },
+  {
+    id: 'rostad-lok',
+    name: 'Rostad lök',
+    cat: 'sas_krydda',
+    lmv: 2058,
+    kcal: 607, prot: 6.4, carb: 35, fat: 48.5, fiber: 4.9, sugar: 6.2, addedSugar: 0, satFat: 13.4, salt: 1.6,
+    portions: [
+      ['korv', 'på 1 korv (5 g)', 5],
+      ['msk', '1 msk (4 g)', 4],
+    ],
+    density: 0.3,
+    tags: ['vegan', 'laktosfri'],
+    syn: ['rostad lök', 'rostade lökar', 'friterad lök', 'krispig lök', 'stekt lök påse', 'crispy onions', 'lökflarn', 'rostadlök'],
+    note: 'Friterad, torkad lök i påse. Mycket fett – en matsked väger bara några gram.',
   },
 ]
+
 // ---------------------------------------------------------------------------
 // Salt, kryddor, buljong och fond
 // ---------------------------------------------------------------------------
@@ -1019,7 +1034,7 @@ const SPICE_PORTIONS: Array<[string, string, number]> = [
 const kryddor: FoodSeed[] = [
   {
     id: 'salt-jodberikat',
-    name: 'Salt, jodberikat (hushållssalt)',
+    name: 'Salt',
     cat: 'sas_krydda',
     lmv: 1975,
     kcal: 0, prot: 0, carb: 0, fat: 0, fiber: 0, sugar: 0, addedSugar: 0, satFat: 0, salt: 99,
@@ -1032,11 +1047,11 @@ const kryddor: FoodSeed[] = [
     density: 1.2,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['salt', 'bordssalt', 'jodsalt', 'jodberikat salt', 'jozo', 'falksalt', 'koksalt', 'hushållssalt', 'matsalt', 'finsalt'],
-    note: 'Svenskt jodberikat salt innehåller ca 50 mg jod per kg – ungefär 50 µg jod per gram salt – och är en av de viktigaste jodkällorna i Sverige. Rekommendationen är högst 6 g salt per dag.',
+    note: 'Jodberikat hushållssalt. Svenskt jodberikat salt innehåller ca 50 mg jod per kg – ungefär 50 µg jod per gram salt – och är en av de viktigaste jodkällorna i Sverige. Rekommendationen är högst 6 g salt per dag.',
   },
   {
     id: 'salt-ej-jodberikat',
-    name: 'Salt, ej jodberikat (flingsalt, havssalt)',
+    name: 'Flingsalt',
     cat: 'sas_krydda',
     lmv: 2883,
     kcal: 0, prot: 0, carb: 0, fat: 0, fiber: 0, sugar: 0, addedSugar: 0, satFat: 0, salt: 98.2,
@@ -1047,12 +1062,12 @@ const kryddor: FoodSeed[] = [
     ],
     density: 0.8,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['flingsalt', 'havssalt', 'maldon', 'salt utan jod', 'himalayasalt', 'grovsalt', 'örtsalt', 'kristallsalt'],
+    syn: ['flingsalt', 'havssalt', 'maldon', 'salt utan jod', 'himalayasalt', 'grovsalt', 'örtsalt', 'kristallsalt', 'salt ej jodberikat'],
     note: 'Flingsalt, havssalt och de flesta specialsalter är inte jodberikade. Välj gärna jodberikat salt till vardags.',
   },
   {
     id: 'svartpeppar-malen',
-    name: 'Svartpeppar, malen',
+    name: 'Svartpeppar',
     cat: 'sas_krydda',
     kcal: 275, prot: 10.4, carb: 38.7, fat: 3.3, fiber: 25.3, sugar: 0.6, addedSugar: 0, satFat: 1.4, salt: 0.05,
     n: {
@@ -1066,11 +1081,11 @@ const kryddor: FoodSeed[] = [
     ],
     density: 0.46,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['peppar', 'svartpeppar', 'svart peppar', 'malen peppar', 'pepparkorn', 'nymalen peppar', 'svartpepar'],
+    syn: ['peppar', 'svartpeppar', 'svart peppar', 'malen peppar', 'pepparkorn', 'nymalen peppar', 'svartpepar', 'vitpeppar'],
   },
   {
     id: 'kanel-malen',
-    name: 'Kanel, malen',
+    name: 'Kanel',
     cat: 'sas_krydda',
     lmv: 2306,
     kcal: 255, prot: 3.6, carb: 26.5, fat: 3.5, fiber: 53.1, sugar: 2.2, addedSugar: 0, satFat: 1.5, salt: 0.1,
@@ -1083,7 +1098,7 @@ const kryddor: FoodSeed[] = [
   },
   {
     id: 'kardemumma-malen',
-    name: 'Kardemumma, malen',
+    name: 'Kardemumma',
     cat: 'sas_krydda',
     lmv: 7195,
     kcal: 292, prot: 6.7, carb: 48, fat: 2.8, fiber: 23.5, sugar: 2.3, addedSugar: 0, satFat: 0.5, salt: 0,
@@ -1137,11 +1152,11 @@ const kryddor: FoodSeed[] = [
     portions: SPICE_PORTIONS,
     density: 0.45,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['curry', 'currypulver', 'curry pulver', 'currykrydda', 'madras curry', 'kari'],
+    syn: ['curry', 'currypulver', 'curry pulver', 'currykrydda', 'madras curry', 'kari', 'gurkmeja'],
   },
   {
     id: 'oregano-torkad',
-    name: 'Oregano, torkad',
+    name: 'Oregano',
     cat: 'sas_krydda',
     kcal: 265, prot: 9, carb: 26.5, fat: 4.3, fiber: 42.5, sugar: 4.1, addedSugar: 0, satFat: 1.6, salt: 0.07,
     n: {
@@ -1154,11 +1169,12 @@ const kryddor: FoodSeed[] = [
     ],
     density: 0.2,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['oregano', 'torkad oregano', 'kryddor', 'pizzakrydda', 'origano', 'torkade örter'],
+    syn: ['oregano', 'torkad oregano', 'kryddor', 'pizzakrydda', 'origano', 'torkade örter', 'timjan', 'basilika torkad', 'provencekryddor'],
+    note: 'Torkad. Andra torkade örter (timjan, basilika, rosmarin) har liknande värden och används i så små mängder att skillnaden inte märks.',
   },
   {
     id: 'chilipulver-cayenne',
-    name: 'Chilipulver (cayennepeppar)',
+    name: 'Chilipulver',
     cat: 'sas_krydda',
     kcal: 360, prot: 12, carb: 29.4, fat: 17.3, fiber: 27.2, sugar: 10.3, addedSugar: 0, satFat: 3.3, salt: 0.08,
     n: {
@@ -1176,8 +1192,9 @@ const kryddor: FoodSeed[] = [
   },
   {
     id: 'tacokryddmix',
-    name: 'Tacokryddmix (påse)',
+    name: 'Tacokrydda',
     cat: 'sas_krydda',
+    avg: true,
     lmv: 5973,
     kcal: 284, prot: 5.6, carb: 50.9, fat: 3.6, fiber: 12.2, sugar: 23.7, addedSugar: 23, satFat: 0.5, salt: 20.2,
     portions: [
@@ -1185,26 +1202,16 @@ const kryddor: FoodSeed[] = [
       ['portion', 'per portion (7 g)', 7],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['tacokrydda', 'taco krydda', 'tacokryddmix', 'tacopåse', 'santa maria taco', 'taco spice mix', 'kryddmix taco', 'fredagstaco'],
-    note: 'En påse ger ca 6 g salt – lika mycket som hela dagsrekommendationen. Fördelat på 4 portioner blir det ca 1,5 g salt per portion.',
-  },
-  {
-    id: 'sambal-oelek',
-    name: 'Sambal oelek',
-    cat: 'sas_krydda',
-    kcal: 50, prot: 1.5, carb: 7, fat: 1, fiber: 3, sugar: 5, addedSugar: 3, satFat: 0.1, salt: 6,
-    n: { vitD: 0, vitB12: 0 },
-    portions: [
-      ['tsk', '1 tsk (5 g)', 5],
-      ['msk', '1 msk (16 g)', 16],
-    ],
-    density: 1.05,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sambal', 'sambal oelek', 'sambal olek', 'chilipasta', 'chilipuré', 'sambaloelek'],
+    syn: ['tacokrydda', 'taco krydda', 'tacokryddmix', 'tacopåse', 'santa maria taco', 'taco spice mix', 'kryddmix taco', 'fredagstaco', 'kryddmix'],
+    note: samlingLmv(
+      'kryddblandning för taco',
+      'Santa Maria, Old El Paso, ICA',
+      'En påse ger ca 6 g salt – lika mycket som hela dagsrekommendationen. Fördelat på 4 portioner blir det ca 1,5 g salt per portion.',
+    ),
   },
   {
     id: 'miso',
-    name: 'Misopasta',
+    name: 'Miso',
     cat: 'sas_krydda',
     lmv: 908,
     kcal: 208, prot: 9.7, carb: 15.5, fat: 10.5, fiber: 6.5, sugar: 1.2, addedSugar: 0, satFat: 1.6, salt: 10.8,
@@ -1220,8 +1227,9 @@ const kryddor: FoodSeed[] = [
   },
   {
     id: 'buljongtarning',
-    name: 'Buljongtärning (kött, kyckling eller grönsak)',
+    name: 'Buljongtärning',
     cat: 'sas_krydda',
+    avg: true,
     kcal: 260, prot: 7, carb: 13, fat: 20, fiber: 0.5, sugar: 3, addedSugar: 1, satFat: 10, salt: 55,
     n: { vitD: 0, vitB12: 0 },
     portions: [
@@ -1229,12 +1237,15 @@ const kryddor: FoodSeed[] = [
       ['halv', '½ tärning (5 g)', 5],
     ],
     tags: ['laktosfri'],
-    syn: ['buljong', 'buljongtärning', 'tärning', 'knorr', 'kycklingbuljong', 'köttbuljong', 'grönsaksbuljong', 'hönsbuljong', 'bouillon', 'buljongpulver', 'fiskbuljong'],
-    note: 'En tärning (ca 10 g) ger ca 5 g salt. Välj gärna en variant med mindre salt.',
+    syn: ['buljong', 'buljongtärning', 'tärning', 'knorr', 'kycklingbuljong', 'köttbuljong', 'grönsaksbuljong', 'hönsbuljong', 'bouillon', 'buljongpulver', 'fiskbuljong', 'kallo'],
+    note: samling(
+      'Knorr, Kallo, ICA, Garant',
+      'Kött-, kyckling- och grönsaksbuljong. En tärning (ca 10 g) ger ca 5 g salt – välj gärna en variant med mindre salt.',
+    ),
   },
   {
     id: 'buljong-tillagad',
-    name: 'Buljong, tillagad (1 tärning per 5 dl vatten)',
+    name: 'Buljong',
     cat: 'sas_krydda',
     lmv: 1222,
     kcal: 4, prot: 0.3, carb: 0.5, fat: 0.1, fiber: 0, sugar: 0.2, addedSugar: 0, satFat: 0, salt: 1,
@@ -1244,11 +1255,12 @@ const kryddor: FoodSeed[] = [
     ],
     liquid: true,
     tags: ['laktosfri'],
-    syn: ['buljong', 'buljongsoppa', 'klar buljong', 'köttbuljong', 'kycklingbuljong', 'grönsaksbuljong', 'buljong dryck'],
+    syn: ['buljong', 'buljongsoppa', 'klar buljong', 'köttbuljong', 'kycklingbuljong', 'grönsaksbuljong', 'buljong dryck', 'bone broth'],
+    note: 'Tillagad av tärning (1 tärning per 5 dl vatten).',
   },
   {
     id: 'fond-koncentrerad',
-    name: 'Fond, koncentrerad (kalv, kyckling, fisk eller grönsak)',
+    name: 'Fond',
     cat: 'sas_krydda',
     kcal: 90, prot: 5, carb: 15, fat: 1, fiber: 0.3, sugar: 7, addedSugar: 5, satFat: 0.3, salt: 18,
     n: { vitD: 0, vitB12: 0 },
@@ -1259,9 +1271,10 @@ const kryddor: FoodSeed[] = [
     density: 1.15,
     tags: ['laktosfri'],
     syn: ['fond', 'kalvfond', 'kycklingfond', 'hummerfond', 'svampfond', 'viltfond', 'fiskfond', 'oxfond', 'grönsaksfond', 'flytande fond', 'touch of taste'],
-    note: 'Salthalten varierar mellan märken – 1 msk ger ca 3 g salt.',
+    note: 'Koncentrerad flytande fond (kalv, kyckling, fisk eller grönsak). Salthalten varierar mellan märken – 1 msk ger ca 3 g salt.',
   },
 ]
+
 // ---------------------------------------------------------------------------
 // Nötter och frön
 // Livsmedelsverket rekommenderar ca 30 g osaltade nötter eller frön om dagen.
@@ -1280,7 +1293,7 @@ const SEED_PORTIONS: Array<[string, string, number]> = [
 const notterFron: FoodSeed[] = [
   {
     id: 'mandel-naturell',
-    name: 'Mandel, naturell',
+    name: 'Mandel',
     cat: 'notter_fron',
     lmv: 1575,
     kcal: 592, prot: 20.7, carb: 0.5, fat: 53.2, fiber: 18.7, sugar: 0.5, addedSugar: 0, satFat: 4.4, salt: 0,
@@ -1288,7 +1301,7 @@ const notterFron: FoodSeed[] = [
     portions: [...NUT_PORTIONS, ['st', '1 st (1,2 g)', 1.2]],
     density: 0.6,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['mandel', 'mandlar', 'sötmandel', 'naturella mandlar', 'almond', 'mandlarna', 'skalad mandel', 'nötter'],
+    syn: ['mandel', 'mandlar', 'sötmandel', 'naturella mandlar', 'almond', 'mandlarna', 'skalad mandel', 'nötter', 'rostade mandlar'],
   },
   {
     id: 'hasselnotter',
@@ -1317,35 +1330,23 @@ const notterFron: FoodSeed[] = [
   },
   {
     id: 'cashewnotter-naturella',
-    name: 'Cashewnötter, naturella',
+    name: 'Cashewnötter',
     cat: 'notter_fron',
-    kcal: 580, prot: 18.2, carb: 26.9, fat: 43.9, fiber: 3.3, sugar: 5.9, addedSugar: 0, satFat: 7.8, salt: 0.03,
-    n: {
-      monoFat: 23.8, polyFat: 7.8, omega3: 0.06, cholesterol: 0,
-      vitA: 0, vitD: 0, vitE: 0.9, vitK: 34, vitC: 0.5, thiamin: 0.42, riboflavin: 0.06, niacin: 1.1, vitB6: 0.42,
-      folate: 25, vitB12: 0,
-      calcium: 37, iron: 6.7, magnesium: 292, potassium: 660, phosphorus: 593, zinc: 5.8, selenium: 19.9,
-    },
+    lmv: 1557,
+    kcal: 597, prot: 18, carb: 19.1, fat: 48.7, fiber: 8.3, sugar: 5.9, addedSugar: 0, satFat: 8.7, salt: 0,
+    n: { vitK: 34.1 },
     portions: NUT_PORTIONS,
     density: 0.55,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['cashew', 'cashewnötter', 'cashewnöt', 'cashew nötter', 'kashew', 'cashewnotter', 'osaltade cashewnötter'],
-  },
-  {
-    id: 'cashewnotter-rostade-saltade',
-    name: 'Cashewnötter, rostade och saltade',
-    cat: 'notter_fron',
-    lmv: 6053,
-    kcal: 597, prot: 18, carb: 19.1, fat: 48.7, fiber: 8.3, sugar: 5.9, addedSugar: 0, satFat: 8.7, salt: 0.7,
-    n: { vitK: 34.7 },
-    portions: NUT_PORTIONS,
-    density: 0.55,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['salta cashewnötter', 'saltade cashewnötter', 'rostade cashewnötter', 'cashew salt', 'cashewnötter salta', 'snacksnötter'],
+    syn: [
+      'cashew', 'cashewnötter', 'cashewnöt', 'cashew nötter', 'kashew', 'cashewnotter', 'osaltade cashewnötter', 'naturella cashewnötter',
+      'salta cashewnötter', 'saltade cashewnötter', 'rostade cashewnötter', 'cashew salt', 'snacksnötter',
+    ],
+    note: 'Osaltade. Rostade och saltade cashewnötter har samma energi och ca 0,7 g salt per 100 g.',
   },
   {
     id: 'jordnotter-rostade-saltade',
-    name: 'Jordnötter, rostade och saltade',
+    name: 'Jordnötter',
     cat: 'notter_fron',
     lmv: 1562,
     kcal: 605, prot: 22.4, carb: 9.3, fat: 51.3, fiber: 11.6, sugar: 4.6, addedSugar: 0, satFat: 6.4, salt: 1.9,
@@ -1353,23 +1354,15 @@ const notterFron: FoodSeed[] = [
     portions: [...NUT_PORTIONS, ['skal', '1 liten skål (50 g)', 50]],
     density: 0.6,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['jordnötter', 'salta jordnötter', 'saltade jordnötter', 'jordnöt', 'peanuts', 'olw jordnötter', 'jordnotter', 'salta nötter', 'ölnötter'],
-  },
-  {
-    id: 'jordnotter-naturella',
-    name: 'Jordnötter, naturella (osaltade)',
-    cat: 'notter_fron',
-    lmv: 1560,
-    kcal: 586, prot: 25.7, carb: 8.2, fat: 49, fiber: 8.1, sugar: 2, addedSugar: 0, satFat: 6.8, salt: 0,
-    n: { vitK: 0 },
-    portions: NUT_PORTIONS,
-    density: 0.6,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['osaltade jordnötter', 'naturella jordnötter', 'jordnötter utan salt', 'jordnötskärnor', 'peanuts naturella'],
+    syn: [
+      'jordnötter', 'salta jordnötter', 'saltade jordnötter', 'jordnöt', 'peanuts', 'olw jordnötter', 'jordnotter', 'salta nötter', 'ölnötter',
+      'osaltade jordnötter', 'naturella jordnötter', 'jordnötter utan salt', 'jordnötskärnor', 'cocktailnötter',
+    ],
+    note: 'Rostade och saltade – så äts jordnötter oftast. Naturella (osaltade) jordnötter har ungefär samma energi men nästan inget salt.',
   },
   {
     id: 'pistagenotter-rostade-saltade',
-    name: 'Pistagenötter, rostade och saltade',
+    name: 'Pistagenötter',
     cat: 'notter_fron',
     kcal: 585, prot: 21, carb: 18, fat: 45.8, fiber: 10.3, sugar: 7.7, addedSugar: 0, satFat: 5.6, salt: 1.1,
     n: {
@@ -1384,8 +1377,8 @@ const notterFron: FoodSeed[] = [
     ],
     density: 0.55,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['pistage', 'pistagenötter', 'pistasch', 'pistachio', 'pistagenöt', 'pistachnötter', 'pistagenotter'],
-    note: 'Värden för skalade kärnor. Ungefär hälften av vikten med skal är ätlig.',
+    syn: ['pistage', 'pistagenötter', 'pistasch', 'pistachio', 'pistagenöt', 'pistachnötter', 'pistagenotter', 'pistaschnötter'],
+    note: 'Rostade och saltade. Värden för skalade kärnor – ungefär hälften av vikten med skal är ätlig.',
   },
   {
     id: 'paranotter',
@@ -1442,7 +1435,7 @@ const notterFron: FoodSeed[] = [
   },
   {
     id: 'notmix-naturell',
-    name: 'Nötmix, naturell (osaltad)',
+    name: 'Nötmix',
     cat: 'notter_fron',
     lmv: 3140,
     kcal: 629, prot: 16.6, carb: 7.7, fat: 57.2, fiber: 12.8, sugar: 4, addedSugar: 0, satFat: 7.8, salt: 0,
@@ -1450,10 +1443,11 @@ const notterFron: FoodSeed[] = [
     density: 0.55,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['nötmix', 'blandade nötter', 'nötblandning', 'nötter', 'mixade nötter', 'naturella nötter', 'notmix'],
+    note: 'Blandade naturella (osaltade) nötter.',
   },
   {
     id: 'studentskagg',
-    name: 'Studentskagg (nötter och russin)',
+    name: 'Studentskagg',
     cat: 'notter_fron',
     kcal: 460, prot: 10.5, carb: 40, fat: 27.3, fiber: 5.5, sugar: 35, addedSugar: 0, satFat: 3, salt: 0.03,
     n: {
@@ -1470,7 +1464,7 @@ const notterFron: FoodSeed[] = [
   },
   {
     id: 'kokos-riven',
-    name: 'Kokos, riven (torkad)',
+    name: 'Riven kokos',
     cat: 'notter_fron',
     lmv: 1564,
     kcal: 690, prot: 6.2, carb: 13.1, fat: 67.2, fiber: 9.2, sugar: 5.4, addedSugar: 0, satFat: 60.7, salt: 0.1,
@@ -1483,11 +1477,11 @@ const notterFron: FoodSeed[] = [
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['kokos', 'riven kokos', 'kokosflingor', 'kokosnöt', 'kokosrasp', 'torkad kokos', 'kokoschips', 'kokosnötsflingor'],
     kostrad: {},
-    note: 'Består till största delen av mättat fett och räknas inte in i kostrådet om nötter och frön.',
+    note: 'Torkad kokos. Består till största delen av mättat fett och räknas inte in i kostrådet om nötter och frön.',
   },
   {
     id: 'solrosfron',
-    name: 'Solrosfrön, skalade',
+    name: 'Solrosfrön',
     cat: 'notter_fron',
     lmv: 1574,
     kcal: 618, prot: 20.6, carb: 3.9, fat: 56.1, fiber: 11.5, sugar: 2.9, addedSugar: 0, satFat: 4.9, salt: 0,
@@ -1495,11 +1489,11 @@ const notterFron: FoodSeed[] = [
     portions: SEED_PORTIONS,
     density: 0.55,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['solrosfrön', 'solrosfrö', 'solroskärnor', 'solrosfron', 'sunflower seeds', 'fröer', 'frön'],
+    syn: ['solrosfrön', 'solrosfrö', 'solroskärnor', 'solrosfron', 'sunflower seeds', 'fröer', 'frön', 'skalade solrosfrön'],
   },
   {
     id: 'pumpafron',
-    name: 'Pumpafrön, skalade',
+    name: 'Pumpafrön',
     cat: 'notter_fron',
     lmv: 1571,
     kcal: 573, prot: 29.8, carb: 2.4, fat: 48, fiber: 9.2, sugar: 1.4, addedSugar: 0, satFat: 7.3, salt: 0,
@@ -1527,35 +1521,23 @@ const notterFron: FoodSeed[] = [
   },
   {
     id: 'linfron-hela',
-    name: 'Linfrön, hela',
+    name: 'Linfrön',
     cat: 'notter_fron',
     lmv: 1567,
     kcal: 522, prot: 18.7, carb: 0, fat: 43.8, fiber: 30.4, sugar: 0, addedSugar: 0, satFat: 3.4, salt: 0.1,
     n: { vitK: 4.3 },
     portions: [
-      ['msk', '1 msk (10 g)', 10],
-      ['tsk', '1 tsk (3,5 g)', 3.5],
+      ['msk', '1 msk hela (10 g)', 10],
+      ['tsk', '1 tsk hela (3,5 g)', 3.5],
+      ['msk-krossade', '1 msk krossade (7 g)', 7],
     ],
     density: 0.68,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['linfrön', 'linfrö', 'hela linfrön', 'linfron', 'flaxseed', 'lin', 'brunt linfrö', 'gyllene linfrö'],
-    note: 'Hela linfrön passerar ofta osmälta genom tarmen – näringen tas bättre upp från krossade.',
-  },
-  {
-    id: 'linfron-krossade',
-    name: 'Linfrön, krossade',
-    cat: 'notter_fron',
-    lmv: 1567,
-    kcal: 522, prot: 18.7, carb: 0, fat: 43.8, fiber: 30.4, sugar: 0, addedSugar: 0, satFat: 3.4, salt: 0.1,
-    n: { vitK: 4.3 },
-    portions: [
-      ['msk', '1 msk (7 g)', 7],
-      ['tsk', '1 tsk (2,5 g)', 2.5],
+    syn: [
+      'linfrön', 'linfrö', 'hela linfrön', 'linfron', 'flaxseed', 'lin', 'brunt linfrö', 'gyllene linfrö',
+      'krossade linfrön', 'malda linfrön', 'linfrömjöl', 'krossat linfrö', 'linfrö krossat', 'malet linfrö',
     ],
-    density: 0.47,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['krossade linfrön', 'malda linfrön', 'linfrömjöl', 'krossat linfrö', 'linfrö krossat', 'malet linfrö'],
-    note: 'Krossade och malda linfrön innehåller cyanogena glykosider som kan bilda cyanid. Livsmedelsverket råder att bara äta små mängder och att inte ge krossade eller malda linfrön till barn.',
+    note: 'Hela linfrön passerar ofta osmälta genom tarmen – näringen tas bättre upp från krossade. Krossade och malda linfrön innehåller cyanogena glykosider som kan bilda cyanid. Livsmedelsverket råder att bara äta små mängder och att inte ge krossade eller malda linfrön till barn.',
   },
   {
     id: 'sesamfron',
@@ -1574,7 +1556,7 @@ const notterFron: FoodSeed[] = [
   },
   {
     id: 'hampafron-skalade',
-    name: 'Hampafrön, skalade',
+    name: 'Hampafrön',
     cat: 'notter_fron',
     lmv: 6159,
     kcal: 609, prot: 28, carb: 2.6, fat: 53.6, fiber: 5.4, sugar: 1.4, addedSugar: 0, satFat: 4.1, salt: 0,
@@ -1582,12 +1564,32 @@ const notterFron: FoodSeed[] = [
     density: 0.55,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['hampafrön', 'hampafrö', 'hampa', 'hemp seeds', 'hampakärnor', 'skalade hampafrön'],
+    note: 'Skalade.',
+  },
+  {
+    id: 'froblandning',
+    name: 'Fröblandning',
+    cat: 'notter_fron',
+    kcal: 580, prot: 22.2, carb: 2.7, fat: 50.7, fiber: 15.8, sugar: 1.6, addedSugar: 0, satFat: 5.6, salt: 0.03,
+    // Medelvärde av Livsmedelsverkets poster för solrosfrön, pumpafrön, linfrön och sesamfrön.
+    n: {
+      monoFat: 15.8, polyFat: 26.5, omega3: 6.1, cholesterol: 0,
+      vitA: 0.6, vitD: 0, vitE: 10.6, vitC: 0.6, thiamin: 0.99, riboflavin: 0.18, niacin: 7.6, vitB6: 0.39, folate: 117, vitB12: 0,
+      calcium: 337, iron: 8.3, magnesium: 410, potassium: 721, phosphorus: 794, zinc: 6.8, selenium: 21.7,
+    },
+    portions: SEED_PORTIONS,
+    density: 0.6,
+    tags: ['vegan', 'glutenfri', 'laktosfri'],
+    syn: ['fröblandning', 'frömix', 'fröer', 'frön', 'blandade frön', 'fröblandning till gröt', 'salladsfrön', 'fröblanding'],
+    note: 'Beräknad på lika delar solrosfrön, pumpafrön, linfrön och sesamfrön – en vanlig fröblandning till gröt, sallad och bröd.',
   },
   {
     id: 'jordnotssmor-100',
-    name: 'Jordnötssmör, 100 % jordnötter',
+    name: 'Jordnötssmör',
     cat: 'notter_fron',
-    kcal: 615, prot: 25, carb: 12, fat: 50, fiber: 8, sugar: 5, addedSugar: 0, satFat: 8, salt: 0.05,
+    avg: true,
+    lmv: 1559,
+    kcal: 615, prot: 23.8, carb: 13.2, fat: 50.5, fiber: 7.8, sugar: 10, addedSugar: 5.5, satFat: 8.3, salt: 0.6,
     n: {
       monoFat: 25, polyFat: 14, omega3: 0, cholesterol: 0,
       vitD: 0, vitE: 9.1, vitC: 0, thiamin: 0.15, riboflavin: 0.1, niacin: 13.1, vitB6: 0.44, folate: 87, vitB12: 0,
@@ -1600,25 +1602,19 @@ const notterFron: FoodSeed[] = [
     ],
     density: 1.08,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['jordnötssmör', 'peanut butter', 'jordnötsmör', 'jordnötsmos', 'jordnotssmor', 'naturellt jordnötssmör', 'crunchy'],
-  },
-  {
-    id: 'jordnotssmor-sotat-saltat',
-    name: 'Jordnötssmör med socker och salt (typ Skippy)',
-    cat: 'notter_fron',
-    lmv: 1559,
-    kcal: 615, prot: 22.6, carb: 14.3, fat: 51, fiber: 7.6, sugar: 14.3, addedSugar: 11, satFat: 8.5, salt: 1.2,
-    portions: [
-      ['msk', '1 msk (16 g)', 16],
-      ['smorgas', 'på 1 smörgås (10 g)', 10],
+    syn: [
+      'jordnötssmör', 'peanut butter', 'jordnötsmör', 'jordnötsmos', 'jordnotssmor', 'naturellt jordnötssmör', 'crunchy',
+      'skippy', 'jordnötssmör sötat', 'jordnötssmör creamy', 'jordnötssmör smooth', 'jordnötssmör med salt', 'peanut butter creamy',
+      '100 % jordnötter',
     ],
-    density: 1.08,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['skippy', 'jordnötssmör sötat', 'jordnötssmör creamy', 'jordnötssmör smooth', 'jordnötssmör med salt', 'peanut butter creamy'],
+    note: samling(
+      'Skippy, Paulúns, Green Choice, ICA',
+      'Genomsnitt av jordnötssmör av 100 % jordnötter och sötat och saltat jordnötssmör – de sötade har ca 15 g socker per 100 g.',
+    ),
   },
   {
     id: 'mandelsmor',
-    name: 'Mandelsmör, 100 % mandel',
+    name: 'Mandelsmör',
     cat: 'notter_fron',
     kcal: 625, prot: 21, carb: 8.5, fat: 55.5, fiber: 10.3, sugar: 4.4, addedSugar: 0, satFat: 4.2, salt: 0.02,
     n: {
@@ -1633,11 +1629,12 @@ const notterFron: FoodSeed[] = [
     ],
     density: 1.05,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['mandelsmör', 'mandelmos', 'almond butter', 'mandel smör', 'mandelsmor', 'nötsmör', 'mandelsmör crunchy'],
+    syn: ['mandelsmör', 'mandelmos', 'almond butter', 'mandel smör', 'mandelsmor', 'nötsmör', 'mandelsmör crunchy', 'cashewsmör'],
+    note: 'Av 100 % mandel.',
   },
   {
     id: 'tahini',
-    name: 'Tahini (sesampasta)',
+    name: 'Tahini',
     cat: 'notter_fron',
     lmv: 3602,
     kcal: 625, prot: 20.4, carb: 3.6, fat: 57.2, fiber: 11.2, sugar: 0.8, addedSugar: 0, satFat: 7.2, salt: 0,
@@ -1648,14 +1645,31 @@ const notterFron: FoodSeed[] = [
     density: 1.0,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['tahini', 'tahin', 'sesampasta', 'sesamsmör', 'tahina', 'sesampuré'],
+    note: 'Sesampasta.',
+  },
+  {
+    id: 'mandelmjol',
+    name: 'Mandelmjöl',
+    cat: 'notter_fron',
+    lmv: 6087,
+    kcal: 610, prot: 22.4, carb: 7.4, fat: 53.1, fiber: 9.8, sugar: 4, addedSugar: 0, satFat: 4.2, salt: 0,
+    portions: [
+      ['msk', '1 msk (7 g)', 7],
+      ['portion', '1 portion i bakning (50 g)', 50],
+    ],
+    density: 0.45,
+    tags: ['vegan', 'glutenfri', 'laktosfri'],
+    syn: ['mandelmjöl', 'malen mandel', 'mald mandel', 'almond flour', 'mandelmjol', 'lchf mjöl'],
+    note: 'Finmalen mandel – används i glutenfritt bak.',
   },
 ]
+
 // ---------------------------------------------------------------------------
 // Vegetariska proteinkällor
 // ---------------------------------------------------------------------------
 
 /** Sojabönan och ärtan är baljväxter – vegoprodukter av dem räknas mot baljväxtrådet (tillagad vikt). */
-const TVP_KOSTRAD: KostradContribFull = { baljvaxter: 250 }
+const SOJA_KOSTRAD: KostradContribFull = { baljvaxter: 100 }
 const VEGOBULLAR_KOSTRAD: KostradContribFull = { baljvaxter: 70 }
 const BONBIFF_KOSTRAD: KostradContribFull = { fruktGront: 25, baljvaxter: 35 }
 const NUGGETS_KOSTRAD: KostradContribFull = { baljvaxter: 60 }
@@ -1663,8 +1677,9 @@ const NUGGETS_KOSTRAD: KostradContribFull = { baljvaxter: 60 }
 const vego: FoodSeed[] = [
   {
     id: 'tofu-naturell',
-    name: 'Tofu, naturell (fast)',
+    name: 'Tofu',
     cat: 'vegoprotein',
+    avg: true,
     kcal: 130, prot: 14, carb: 1.2, fat: 7.5, fiber: 1.5, sugar: 0.5, addedSugar: 0, satFat: 1.2, salt: 0.03,
     n: {
       monoFat: 1.7, polyFat: 4.2, omega3: 0.5, cholesterol: 0,
@@ -1678,31 +1693,19 @@ const vego: FoodSeed[] = [
       ['skiva', '1 skiva (30 g)', 30],
     ],
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['tofu', 'naturell tofu', 'fast tofu', 'sojaost', 'tofu naturell', 'bönost', 'tufu'],
-    plate: { veg: 0, carb: 0, protein: 1 },
-    note: 'Kalciumhalten beror på koaguleringsmedlet – tofu gjord med kalciumsulfat kan innehålla över 300 mg/100 g.',
-  },
-  {
-    id: 'tofu-rokt',
-    name: 'Tofu, rökt',
-    cat: 'vegoprotein',
-    kcal: 150, prot: 16, carb: 1.5, fat: 8.5, fiber: 1.5, sugar: 0.5, addedSugar: 0, satFat: 1.3, salt: 1.2,
-    n: {
-      monoFat: 1.9, polyFat: 4.8, omega3: 0.55, cholesterol: 0,
-      vitD: 0, vitC: 0, folate: 20, vitB12: 0,
-      calcium: 200, iron: 2.6, magnesium: 65, potassium: 160, phosphorus: 190, zinc: 1.5,
-    },
-    portions: [
-      ['portion', '1 portion (100 g)', 100],
-      ['forp', '1 förpackning (200 g)', 200],
+    syn: [
+      'tofu', 'naturell tofu', 'fast tofu', 'sojaost', 'tofu naturell', 'bönost', 'tufu', 'stekt tofu',
+      'rökt tofu', 'tofu rökt', 'smoked tofu', 'räuchertofu', 'rokt tofu',
     ],
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['rökt tofu', 'tofu rökt', 'smoked tofu', 'räuchertofu', 'rokt tofu'],
     plate: { veg: 0, carb: 0, protein: 1 },
+    note: samling(
+      'Yipin, Kung Markatta, Taifun, ICA',
+      'Fast tofu. Rökt tofu har något mer energi och salt. Mjuk silkestofu finns som egen rad. Kalciumhalten beror på koaguleringsmedlet – tofu gjord med kalciumsulfat kan innehålla över 300 mg/100 g.',
+    ),
   },
   {
     id: 'tofu-silken',
-    name: 'Silkestofu (mjuk)',
+    name: 'Silkestofu',
     cat: 'vegoprotein',
     kcal: 55, prot: 4.8, carb: 2.8, fat: 2.7, fiber: 0.1, sugar: 1.3, addedSugar: 0, satFat: 0.4, salt: 0.02,
     n: {
@@ -1717,6 +1720,7 @@ const vego: FoodSeed[] = [
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['silkestofu', 'silken tofu', 'mjuk tofu', 'silkes tofu', 'silkeslen tofu'],
     plate: { veg: 0, carb: 0, protein: 1 },
+    note: 'Mjuk och krämig tofu med mycket vatten – till smoothies, soppor, desserter och som äggersättning.',
   },
   {
     id: 'tempeh',
@@ -1731,10 +1735,11 @@ const vego: FoodSeed[] = [
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['tempeh', 'tempe', 'fermenterad soja', 'sojatempeh'],
     plate: { veg: 0, carb: 0, protein: 1 },
+    note: 'Fermenterade sojabönor.',
   },
   {
     id: 'seitan',
-    name: 'Seitan (vetekött)',
+    name: 'Seitan',
     cat: 'vegoprotein',
     kcal: 135, prot: 25, carb: 4, fat: 2, fiber: 0.6, sugar: 0.5, addedSugar: 0, satFat: 0.3, salt: 1.5,
     n: {
@@ -1748,77 +1753,89 @@ const vego: FoodSeed[] = [
     tags: ['vegan', 'laktosfri'],
     syn: ['seitan', 'vetekött', 'veteprotein', 'seitanbitar', 'wheat meat', 'glutenkött', 'vetegluten'],
     plate: { veg: 0, carb: 0, protein: 1 },
-    note: 'Görs av vetegluten – inte för den som undviker gluten.',
+    note: 'Vetekött – görs av vetegluten och passar inte den som undviker gluten.',
   },
   {
-    id: 'sojaprotein-torkat',
-    name: 'Sojafärs/sojabitar, torkade (texturerat sojaprotein)',
+    id: 'sojafars-blotlagd',
+    name: 'Sojafärs',
     cat: 'vegoprotein',
-    kcal: 330, prot: 52, carb: 17, fat: 1.5, fiber: 18, sugar: 8, addedSugar: 0, satFat: 0.2, salt: 0.05,
+    // Torkat texturerat sojaprotein (330 kcal, 52 g protein per 100 g) blötlagt i vatten: 1 g torr → 3 g.
+    kcal: 110, prot: 17.3, carb: 5.7, fat: 0.5, fiber: 6, sugar: 2.7, addedSugar: 0, satFat: 0.1, salt: 0.02,
     n: {
-      monoFat: 0.3, polyFat: 0.7, omega3: 0.1, cholesterol: 0,
-      vitD: 0, vitC: 0, thiamin: 0.7, riboflavin: 0.25, niacin: 2.6, vitB6: 0.57, folate: 305, vitB12: 0,
-      calcium: 241, iron: 9.2, magnesium: 290, potassium: 2384, phosphorus: 674, zinc: 2.5,
+      monoFat: 0.1, polyFat: 0.23, omega3: 0.03, cholesterol: 0,
+      vitD: 0, vitC: 0, thiamin: 0.23, riboflavin: 0.08, niacin: 0.87, vitB6: 0.19, folate: 102, vitB12: 0,
+      calcium: 80, iron: 3.1, magnesium: 97, potassium: 795, phosphorus: 225, zinc: 0.83,
     },
+    raw: [3, 'torkad', 0.3],
     portions: [
-      ['portion', '1 portion torr (35 g)', 35],
-      ['pase', '1 påse (250 g)', 250],
+      ['portion', '1 portion (105 g, ca 35 g torr)', 105],
+      ['pase', '1 påse (250 g torr ≈ 750 g blötlagd)', 750],
     ],
-    density: 0.3,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sojafärs', 'torkad sojafärs', 'sojafärs torkad', 'sojabitar', 'sojastrimlor', 'tvp', 'sojaprotein', 'soja färs', 'sojakött', 'sojafars'],
+    syn: [
+      'sojafärs', 'torkad sojafärs', 'sojafärs torkad', 'sojabitar', 'torkade sojabitar', 'sojastrimlor', 'tvp', 'sojaprotein',
+      'soja färs', 'sojakött', 'sojafars', 'texturerat sojaprotein', 'blötlagd sojafärs',
+    ],
     plate: { veg: 0, carb: 0, protein: 1 },
-    kostrad: TVP_KOSTRAD,
-    note: 'Torr vikt. 1 dl torr sojafärs (ca 30 g) blir ca 2,5 dl färdig (ca 90 g) efter blötläggning i buljong eller vatten.',
+    kostrad: SOJA_KOSTRAD,
+    note: 'Torkad sojafärs eller torkade sojabitar efter blötläggning i vatten – 1 del torr vara blir ca 3 delar. Väg gärna den torra varan och välj "g torkad" eller "dl torkad" (1 dl torr ≈ 30 g). Blötlagd i buljong blir den saltare.',
   },
   {
-    id: 'vegofars-fryst',
-    name: 'Vegofärs, fryst (soja- eller ärtprotein)',
+    id: 'vegofars-stekt',
+    name: 'Vegofärs',
     cat: 'vegoprotein',
-    lmv: 2068,
-    kcal: 167, prot: 15.2, carb: 4.8, fat: 8.6, fiber: 5.3, sugar: 0, addedSugar: 0, satFat: 1, salt: 1,
+    avg: true,
+    lmv: 6287,
+    kcal: 252, prot: 22.9, carb: 7.2, fat: 13, fiber: 8, sugar: 0, addedSugar: 0, satFat: 1.5, salt: 1.5,
+    raw: [0.66, 'fryst'],
     portions: [
-      ['portion', '1 portion (125 g)', 125],
-      ['forp', '1 förpackning (1 kg)', 1000],
+      ['portion', '1 portion (85 g stekt, ca 125 g fryst)', 85],
+      ['forp', '1 förpackning (1 kg fryst ≈ 660 g stekt)', 660],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['vegofärs', 'vegansk färs', 'vegetarisk färs', 'anamma färs', 'hälsans kök färs', 'sojafärs fryst', 'växtbaserad färs', 'vego färs', 'färs vego'],
+    syn: [
+      'vegofärs', 'vegansk färs', 'vegetarisk färs', 'anamma färs', 'hälsans kök färs', 'sojafärs fryst', 'växtbaserad färs',
+      'vego färs', 'färs vego', 'stekt vegofärs', 'fryst vegofärs', 'ärtfärs', 'ärtproteinfärs', 'vegofärs tacos',
+    ],
     plate: { veg: 0, carb: 0, protein: 1 },
-    note: 'Många vegofärser är berikade med järn och vitamin B12 – se förpackningen.',
+    kostrad: SOJA_KOSTRAD,
+    note: samlingLmv(
+      'stekt vegofärs av sojaprotein',
+      'Anamma, Hälsans Kök, ICA, Garant',
+      'Fryst vegofärs tappar ungefär en tredjedel av vikten i stekpannan – väg gärna fryst och välj "g fryst". Många sorter är berikade med järn och vitamin B12.',
+    ),
   },
   {
     id: 'sojabitar-frysta',
-    name: 'Sojabitar, frysta (typ Oumph! The Chunk)',
+    name: 'Vegobitar',
     cat: 'vegoprotein',
-    lmv: 6265,
-    kcal: 91, prot: 18.6, carb: 0, fat: 0.5, fiber: 5.9, sugar: 0, addedSugar: 0, satFat: 0.1, salt: 0.6,
+    avg: true,
+    lmv: 6289,
+    kcal: 97, prot: 19.8, carb: 0, fat: 0.5, fiber: 6.3, sugar: 0, addedSugar: 0, satFat: 0.1, salt: 0.6,
+    raw: [0.94, 'fryst'],
     portions: [
-      ['portion', '1 portion (125 g)', 125],
-      ['forp', '1 förpackning (280 g)', 280],
+      ['portion', '1 portion (120 g)', 120],
+      ['forp', '1 förpackning (280 g fryst ≈ 260 g stekt)', 260],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['oumph', 'oumph!', 'the chunk', 'sojabitar', 'vegobitar', 'sojastrimlor frysta', 'vegansk kyckling', 'vegokyckling', 'kycklingersättning'],
-    plate: { veg: 0, carb: 0, protein: 1 },
-  },
-  {
-    id: 'mykoprotein-fars',
-    name: 'Mykoprotein, färs eller bitar (typ Quorn)',
-    cat: 'vegoprotein',
-    kcal: 105, prot: 14.5, carb: 4.5, fat: 2, fiber: 5.5, sugar: 0.6, addedSugar: 0, satFat: 0.5, salt: 0.3,
-    n: { vitD: 0, vitC: 0 },
-    portions: [
-      ['portion', '1 portion (125 g)', 125],
-      ['forp', '1 förpackning (300 g)', 300],
+    syn: [
+      'vegobitar', 'oumph', 'oumph!', 'the chunk', 'sojabitar', 'sojastrimlor frysta', 'vegansk kyckling', 'vegokyckling',
+      'kycklingersättning', 'pulled oumph', 'vegokebab', 'quorn', 'quornfärs', 'quorn färs', 'quornbitar', 'quorn bitar',
+      'mykoprotein', 'svampprotein', 'mycoprotein', 'tzay', 'vegobitar stekta',
     ],
-    tags: ['vegetarisk', 'laktosfri'],
-    syn: ['quorn', 'quornfärs', 'quorn färs', 'quornbitar', 'quorn bitar', 'mykoprotein', 'svampprotein', 'mycoprotein'],
     plate: { veg: 0, carb: 0, protein: 1 },
-    note: 'Klassiska Quorn innehåller äggvita och är vegetariskt men inte veganskt.',
+    kostrad: SOJA_KOSTRAD,
+    note: samlingLmv(
+      'stekta sojabitar',
+      'Oumph!, Hälsans Kök, Quorn, ICA',
+      'Gäller även mykoprotein (Quorn) i bitar eller färs, som har ungefär samma energi – men Quorn innehåller ofta ägg och är då inte veganskt. Marinerade sorter har mer fett och salt.',
+    ),
   },
   {
     id: 'vegoburgare-stekt',
-    name: 'Vegoburgare (soja- eller ärtprotein), stekt',
+    name: 'Vegoburgare',
     cat: 'vegoprotein',
+    avg: true,
     kcal: 220, prot: 17, carb: 6, fat: 14, fiber: 4, sugar: 1, addedSugar: 0, satFat: 4, salt: 1.2,
     n: {
       monoFat: 5.5, polyFat: 3.5, cholesterol: 0,
@@ -1830,14 +1847,20 @@ const vego: FoodSeed[] = [
       ['stor', '1 stor (typ Beyond Burger, 113 g)', 113],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['vegoburgare', 'vegansk burgare', 'vegburgare', 'vegoburger', 'beyond burger', 'sojaburgare', 'vegetarisk hamburgare', 'växtbaserad burgare', 'plant burger'],
+    syn: [
+      'vegoburgare', 'vegansk burgare', 'vegburgare', 'vegoburger', 'beyond burger', 'sojaburgare', 'vegetarisk hamburgare',
+      'växtbaserad burgare', 'plant burger', 'vegobiff', 'vegobiffar', 'vegansk biff',
+    ],
     co2e: 2.5,
     plate: { veg: 0, carb: 0, protein: 1 },
+    kostrad: VEGOBULLAR_KOSTRAD,
+    note: samling('Anamma, Hälsans Kök, Beyond Meat, ICA', 'Stekta burgare och biffar av soja- eller ärtprotein.'),
   },
   {
     id: 'bonbiff-gronsaksbiff',
-    name: 'Bönbiff/grönsaksbiff, stekt',
+    name: 'Grönsaksbiff',
     cat: 'vegoprotein',
+    avg: true,
     kcal: 195, prot: 6, carb: 20, fat: 9, fiber: 5, sugar: 3, addedSugar: 0.5, satFat: 1, salt: 1.0,
     n: {
       monoFat: 5, polyFat: 2.5, omega3: 0.7,
@@ -1849,14 +1872,15 @@ const vego: FoodSeed[] = [
       ['portion', '1 portion (2 st, 150 g)', 150],
     ],
     tags: ['vegetarisk', 'laktosfri'],
-    syn: ['bönbiff', 'bönbiffar', 'grönsaksbiff', 'grönsaksbiffar', 'kikärtsbiff', 'linsbiff', 'vegetarisk biff', 'rotfruktsbiff', 'vegobiff'],
+    syn: ['bönbiff', 'bönbiffar', 'grönsaksbiff', 'grönsaksbiffar', 'kikärtsbiff', 'linsbiff', 'vegetarisk biff', 'rotfruktsbiff', 'broccolibiff'],
     co2e: 1.2,
     plate: { veg: 0.35, carb: 0.15, protein: 0.4 },
     kostrad: BONBIFF_KOSTRAD,
+    note: samling('Findus, Hälsans Kök, ICA', 'Stekta bönbiffar, linsbiffar, kikärtsbiffar och grönsaksbiffar.'),
   },
   {
     id: 'falafel-friterad',
-    name: 'Falafel, friterad',
+    name: 'Falafel',
     cat: 'vegoprotein',
     kcal: 320, prot: 12, carb: 27, fat: 17, fiber: 6, sugar: 2, addedSugar: 0, satFat: 1.8, salt: 1.2,
     n: {
@@ -1869,33 +1893,34 @@ const vego: FoodSeed[] = [
       ['portion', '1 portion (5 st, 100 g)', 100],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['falafel', 'falaffel', 'felafel', 'falafelbollar', 'kikärtsbollar', 'falafels'],
+    syn: ['falafel', 'falaffel', 'felafel', 'falafelbollar', 'kikärtsbollar', 'falafels', 'fryst falafel'],
     co2e: 1.5,
     plate: { veg: 0.15, carb: 0.1, protein: 0.6 },
-    note: 'Friterad (restaurang eller hemlagad). Frysta falafel som värms i ugn har ofta ca 220–250 kcal per 100 g.',
+    note: 'Friterad (restaurang eller hemlagad). Frysta falafel som värms i ugnen har ca 250–290 kcal per 100 g.',
   },
   {
     id: 'vegokorv',
-    name: 'Vegokorv (soja- eller ärtprotein)',
+    name: 'Vegokorv',
     cat: 'vegoprotein',
-    kcal: 200, prot: 14, carb: 6, fat: 13, fiber: 3, sugar: 1, addedSugar: 0.5, satFat: 4, salt: 1.8,
-    n: {
-      vitD: 0, vitC: 0, folate: 20,
-      calcium: 40, iron: 2.5, potassium: 200,
-    },
+    avg: true,
+    lmv: 6893,
+    kcal: 186, prot: 12.7, carb: 3.6, fat: 12.2, fiber: 6, sugar: 0.6, addedSugar: 0, satFat: 0.8, salt: 1.7,
     portions: [
       ['st', '1 st (60 g)', 60],
       ['stor', '1 stor grillkorv (90 g)', 90],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['vegokorv', 'vegansk korv', 'vegetarisk korv', 'sojakorv', 'vegkorv', 'vego korv', 'växtbaserad korv', 'vegogrillkorv', 'vegansk grillkorv'],
+    syn: ['vegokorv', 'vegansk korv', 'vegetarisk korv', 'sojakorv', 'vegkorv', 'vego korv', 'växtbaserad korv', 'vegogrillkorv', 'vegansk grillkorv', 'vegofalukorv'],
     co2e: 1.8,
     plate: { veg: 0, carb: 0, protein: 1 },
+    kostrad: VEGOBULLAR_KOSTRAD,
+    note: samlingLmv('tillagad vegokorv av sojaprotein', 'Anamma, Hälsans Kök, Oumph!, ICA'),
   },
   {
     id: 'vegobullar-stekta',
-    name: 'Vegobullar (vegetariska köttbullar), stekta',
+    name: 'Vegobullar',
     cat: 'vegoprotein',
+    avg: true,
     lmv: 6294,
     kcal: 206, prot: 15.7, carb: 6.3, fat: 12, fiber: 5.4, sugar: 0, addedSugar: 0, satFat: 0.8, salt: 1.3,
     portions: [
@@ -1907,32 +1932,38 @@ const vego: FoodSeed[] = [
     co2e: 1.8,
     plate: { veg: 0, carb: 0, protein: 1 },
     kostrad: VEGOBULLAR_KOSTRAD,
+    note: samlingLmv('stekta vegobullar av sojaprotein', 'Anamma, Hälsans Kök, ICA, Garant'),
   },
   {
     id: 'vegonuggets-panerade',
-    name: 'Vegonuggets, panerade (soja- eller ärtprotein)',
+    name: 'Vegonuggets',
     cat: 'vegoprotein',
-    kcal: 230, prot: 13, carb: 18, fat: 11, fiber: 4, sugar: 1.5, addedSugar: 0.5, satFat: 1, salt: 1.3,
-    n: {
-      monoFat: 6, polyFat: 3, omega3: 0.9, cholesterol: 0,
-      vitD: 0, vitC: 0,
-      calcium: 40, iron: 2.5, potassium: 250,
-    },
+    avg: true,
+    lmv: 6302,
+    kcal: 216, prot: 11.4, carb: 16, fat: 10.7, fiber: 5.1, sugar: 0.8, addedSugar: 0, satFat: 1, salt: 1.2,
     portions: [
       ['portion', '1 portion (8 st, 125 g)', 125],
       ['st', '1 st (16 g)', 16],
     ],
     tags: ['vegan', 'laktosfri'],
-    syn: ['vegonuggets', 'vegansk nuggets', 'veganska nuggets', 'vegetariska nuggets', 'vego nuggets', 'sojanuggets', 'vegoschnitzel', 'vegansk schnitzel', 'panerade vegobitar', 'vegokyckling nuggets'],
+    syn: [
+      'vegonuggets', 'vegansk nuggets', 'veganska nuggets', 'vegetariska nuggets', 'vego nuggets', 'sojanuggets', 'vegoschnitzel',
+      'vegansk schnitzel', 'panerade vegobitar', 'vegokyckling nuggets', 'quorn nuggets',
+    ],
     co2e: 1.8,
     plate: { veg: 0, carb: 0.3, protein: 0.7 },
     kostrad: NUGGETS_KOSTRAD,
-    note: 'Ugnsbakade eller stekta. Många sorter är berikade med järn och vitamin B12 – se förpackningen.',
+    note: samlingLmv(
+      'ugnsstekta vegonuggets av sojaprotein',
+      'Anamma, Hälsans Kök, Quorn, ICA',
+      'Gäller även vegoschnitzel. Många sorter är berikade med järn och vitamin B12.',
+    ),
   },
   {
     id: 'vegansk-ost-kokos',
-    name: 'Vegansk ost (kokosoljebaserad)',
+    name: 'Vegansk ost',
     cat: 'vegoprotein',
+    avg: true,
     lmv: 7012,
     kcal: 282, prot: 0, carb: 20.4, fat: 22, fiber: 2.3, sugar: 0, addedSugar: 0, satFat: 15, salt: 2.2,
     portions: [
@@ -1944,11 +1975,15 @@ const vego: FoodSeed[] = [
     syn: ['vegansk ost', 'veganost', 'vegoost', 'violife', 'växtbaserad ost', 'mjölkfri ost', 'vegan ost', 'vegansk riven ost'],
     // Nästan inget protein – räknas inte som proteinkälla på tallriken.
     plate: { veg: 0, carb: 0, protein: 0 },
-    note: 'Nästan inget protein och oftast inget kalcium – till skillnad från vanlig ost. Vissa sorter är berikade med vitamin B12.',
+    note: samlingLmv(
+      'kokosoljebaserad vegansk ost',
+      'Violife, ICA, Garant',
+      'Nästan inget protein och oftast inget kalcium – till skillnad från vanlig ost. Vissa sorter är berikade med vitamin B12.',
+    ),
   },
   {
     id: 'naringsjast',
-    name: 'Näringsjäst (flingor)',
+    name: 'Näringsjäst',
     cat: 'vegoprotein',
     lmv: 6998,
     kcal: 332, prot: 46.6, carb: 12.6, fat: 5.2, fiber: 23.4, sugar: 0, addedSugar: 0, satFat: 1.1, salt: 0.1,
@@ -1959,9 +1994,10 @@ const vego: FoodSeed[] = [
     density: 0.33,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['näringsjäst', 'näringsjästflingor', 'jästflingor', 'nutritional yeast', 'nooch', 'engevita', 'inaktiv jäst'],
-    note: 'Innehållet av B-vitaminer (inklusive B12) beror helt på om produkten är berikad – se förpackningen.',
+    note: 'Flingor av inaktiv jäst. Innehållet av B-vitaminer (inklusive B12) beror helt på om produkten är berikad – se förpackningen.',
   },
 ]
+
 // ---------------------------------------------------------------------------
 // Växtdrycker och växtbaserade alternativ till mejeriprodukter
 // ---------------------------------------------------------------------------
@@ -1972,26 +2008,40 @@ const PLANT_DRINK_PORTIONS: Array<[string, string, number]> = [
   ['skvatt', '1 skvätt i kaffet (2 cl)', 21],
 ]
 
+const PLANT_YOGHURT_PORTIONS: Array<[string, string, number]> = [
+  ['portion', '1 portion (2 dl)', 206],
+  ['skal', '1 liten skål (1,5 dl)', 155],
+]
+
 /** Typisk berikning av svenska växtdrycker (per 100 g). */
 const PLANT_FORTIFIED = { vitD: 0.75, riboflavin: 0.21, vitB12: 0.38, calcium: 120 } as const
 
 const vaxtdrycker: FoodSeed[] = [
   {
     id: 'havredryck-berikad-1-5',
-    name: 'Havredryck, berikad (ca 1,5 % fett)',
+    name: 'Havredryck',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 700,
     kcal: 48, prot: 1, carb: 7.1, fat: 1.5, fiber: 0.8, sugar: 3.4, addedSugar: 0, satFat: 0.2, salt: 0.1,
     portions: PLANT_DRINK_PORTIONS,
     density: 1.03, liquid: true,
     tags: ['vegan', 'laktosfri', 'svensk'],
-    syn: ['havredryck', 'havremjölk', 'oatly', 'oatly original', 'havre dryck', 'havremjolk', 'oat milk', 'växtmjölk', 'havre'],
-    note: 'Sockret (främst maltos) bildas när havrens stärkelse bryts ned med enzymer – inget socker tillsätts.',
+    syn: [
+      'havredryck', 'havremjölk', 'oatly', 'oatly original', 'havre dryck', 'havremjolk', 'oat milk', 'växtmjölk', 'havre',
+      'planti', 'ekologisk havredryck', 'eko havredryck', 'havredryck eko', 'oatly eko', 'havredryck berikad', 'havredryck mellan',
+    ],
+    note: samlingLmv(
+      'berikad havredryck med 1,5 % fett',
+      'Oatly, Planti, ICA, Garant',
+      'Sockret (främst maltos) bildas när havrens stärkelse bryts ned med enzymer – inget socker tillsätts. Ekologisk havredryck är oftast inte berikad med kalcium, vitamin D och B12.',
+    ),
   },
   {
     id: 'havredryck-barista-3',
-    name: 'Havredryck, barista/iKaffe (ca 3 % fett)',
+    name: 'Baristahavredryck',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 6813,
     kcal: 60, prot: 1, carb: 6.6, fat: 3, fiber: 0.8, sugar: 2.9, addedSugar: 0, satFat: 0.2, salt: 0.1,
     portions: [
@@ -2001,73 +2051,48 @@ const vaxtdrycker: FoodSeed[] = [
     ],
     density: 1.03, liquid: true,
     tags: ['vegan', 'laktosfri', 'svensk'],
-    syn: ['ikaffe', 'barista', 'havredryck barista', 'oatly barista', 'oatly ikaffe', 'havre barista', 'kaffehavre', 'havredryck ikaffe', 'havremjölk kaffe'],
-  },
-  {
-    id: 'havredryck-ekologisk',
-    name: 'Havredryck, ekologisk (ej berikad)',
-    cat: 'vaxtdryck',
-    kcal: 45, prot: 1, carb: 6.5, fat: 1.5, fiber: 0.8, sugar: 4, addedSugar: 0, satFat: 0.2, salt: 0.1,
-    n: {
-      monoFat: 0.9, polyFat: 0.4, omega3: 0.1, cholesterol: 0,
-      vitD: 0, vitC: 0, vitB12: 0, calcium: 5, iron: 0.1,
-    },
-    portions: PLANT_DRINK_PORTIONS,
-    density: 1.03, liquid: true,
-    tags: ['vegan', 'laktosfri', 'ekologisk', 'svensk'],
-    syn: ['ekologisk havredryck', 'eko havredryck', 'havredryck eko', 'oatly eko', 'havremjölk ekologisk', 'havredryck oberikad'],
-    // Kostrådet gäller mejeriprodukter eller berikade växtbaserade alternativ.
-    kostrad: {},
-    note: 'Ekologiska växtdrycker är oftast inte berikade med kalcium, vitamin D eller B12 och räknas därför inte som alternativ till mjölk i kostråden.',
-  },
-  {
-    id: 'sojadryck-osotad',
-    name: 'Sojadryck, osötad och berikad',
-    cat: 'vaxtdryck',
-    lmv: 6902,
-    kcal: 33, prot: 3.4, carb: 1.7, fat: 1.3, fiber: 0.6, sugar: 0.3, addedSugar: 0, satFat: 0.2, salt: 0.1,
-    portions: PLANT_DRINK_PORTIONS,
-    density: 1.03, liquid: true,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sojadryck', 'sojamjölk', 'soja dryck', 'alpro', 'alpro osötad', 'soy milk', 'soyadryck', 'sojamjolk', 'osötad soja'],
-    note: 'Den växtdryck som har mest protein – i nivå med mjölk.',
+    syn: ['ikaffe', 'barista', 'havredryck barista', 'oatly barista', 'oatly ikaffe', 'havre barista', 'kaffehavre', 'havredryck ikaffe', 'havremjölk kaffe', 'havredryck 3 %'],
+    note: samlingLmv('berikad havredryck med 3 % fett', 'Oatly Barista, Oatly iKaffe, Planti, ICA', 'Fetare havredryck som skummar bra i kaffe.'),
   },
   {
     id: 'sojadryck-original',
-    name: 'Sojadryck, original (sötad, berikad)',
+    name: 'Sojadryck',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 3668,
     kcal: 37, prot: 2.6, carb: 3.2, fat: 1.5, fiber: 0, sugar: 2.4, addedSugar: 2, satFat: 0.2, salt: 0.1,
     portions: PLANT_DRINK_PORTIONS,
     density: 1.03, liquid: true,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['sojadryck original', 'alpro original', 'alpro soja', 'söt sojadryck', 'sojamjölk sötad'],
-  },
-  {
-    id: 'mandeldryck-osotad',
-    name: 'Mandeldryck, osötad och berikad',
-    cat: 'vaxtdryck',
-    lmv: 6903,
-    kcal: 15, prot: 0, carb: 1, fat: 1.2, fiber: 0.3, sugar: 0.1, addedSugar: 0, satFat: 0.1, salt: 0.1,
-    portions: PLANT_DRINK_PORTIONS,
-    density: 1.02, liquid: true,
-    tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['mandeldryck', 'mandelmjölk', 'almond milk', 'mandel dryck', 'mandelmjolk', 'alpro mandel', 'osötad mandeldryck'],
+    syn: [
+      'sojadryck', 'sojamjölk', 'soja dryck', 'alpro', 'alpro soja', 'alpro original', 'soy milk', 'soyadryck', 'sojamjolk',
+      'sojadryck original', 'osötad soja', 'alpro osötad', 'sojadryck osötad',
+    ],
+    note: samlingLmv(
+      'berikad sojadryck',
+      'Alpro, ICA, Garant',
+      'Den växtdryck som har mest protein. Osötad sojadryck har ca 2 g mindre socker och något mer protein per 100 g.',
+    ),
   },
   {
     id: 'mandeldryck-original',
-    name: 'Mandeldryck, original (sötad, berikad)',
+    name: 'Mandeldryck',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 5150,
     kcal: 26, prot: 0, carb: 3.5, fat: 1.3, fiber: 0.2, sugar: 3.1, addedSugar: 3, satFat: 0, salt: 0.1,
     portions: PLANT_DRINK_PORTIONS,
     density: 1.02, liquid: true,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
-    syn: ['mandeldryck original', 'söt mandeldryck', 'mandelmjölk sötad', 'alpro mandel original'],
+    syn: [
+      'mandeldryck', 'mandelmjölk', 'almond milk', 'mandel dryck', 'mandelmjolk', 'alpro mandel', 'mandeldryck original',
+      'osötad mandeldryck', 'mandeldryck osötad', 'alpro mandel osötad',
+    ],
+    note: samlingLmv('berikad mandeldryck', 'Alpro, ICA, Garant', 'Osötad mandeldryck har ungefär hälften så mycket energi. Nästan inget protein.'),
   },
   {
     id: 'artdryck-berikad',
-    name: 'Ärtdryck, berikad',
+    name: 'Ärtdryck',
     cat: 'vaxtdryck',
     kcal: 40, prot: 2, carb: 3.5, fat: 1.9, fiber: 0.3, sugar: 3, addedSugar: 2.5, satFat: 0.2, salt: 0.1,
     n: {
@@ -2077,11 +2102,11 @@ const vaxtdrycker: FoodSeed[] = [
     density: 1.03, liquid: true,
     tags: ['vegan', 'glutenfri', 'laktosfri', 'svensk'],
     syn: ['ärtdryck', 'ärtmjölk', 'sproud', 'pea milk', 'ärt dryck', 'ärtproteindryck', 'artdryck'],
-    note: 'Värden för original/sötad variant – osötade ärtdrycker har ca 1 g kolhydrater per 100 g.',
+    note: 'Berikad. Värden för original (sötad) – osötade ärtdrycker har ca 1 g kolhydrater per 100 g.',
   },
   {
     id: 'risdryck-berikad',
-    name: 'Risdryck, berikad',
+    name: 'Risdryck',
     cat: 'vaxtdryck',
     kcal: 47, prot: 0.1, carb: 9.5, fat: 1, fiber: 0.1, sugar: 7, addedSugar: 0, satFat: 0.1, salt: 0.1,
     n: {
@@ -2091,11 +2116,11 @@ const vaxtdrycker: FoodSeed[] = [
     density: 1.02, liquid: true,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['risdryck', 'rismjölk', 'rice milk', 'ris dryck', 'rismjolk'],
-    note: 'Livsmedelsverket avråder från att ge risdryck till barn under 6 år, eftersom ris kan innehålla oorganisk arsenik.',
+    note: 'Berikad. Livsmedelsverket avråder från att ge risdryck till barn under 6 år, eftersom ris kan innehålla oorganisk arsenik.',
   },
   {
     id: 'kokosdryck-berikad',
-    name: 'Kokosdryck, berikad',
+    name: 'Kokosdryck',
     cat: 'vaxtdryck',
     kcal: 20, prot: 0.1, carb: 2.7, fat: 0.9, fiber: 0.1, sugar: 1.9, addedSugar: 1.9, satFat: 0.9, salt: 0.13,
     n: {
@@ -2105,28 +2130,31 @@ const vaxtdrycker: FoodSeed[] = [
     density: 1.02, liquid: true,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['kokosdryck', 'kokos dryck', 'coconut drink', 'alpro kokos', 'kokosdryck original', 'kokosmjölk att dricka'],
-    note: 'Nästan inget protein – till skillnad från mjölk och sojadryck.',
+    note: 'Berikad. Nästan inget protein – till skillnad från mjölk och sojadryck.',
   },
   {
     id: 'havregradde-matlagning-13',
-    name: 'Havrebaserad matlagningsgrädde (ca 13 % fett, typ iMat)',
+    name: 'Havregrädde',
     cat: 'vaxtdryck',
-    kcal: 150, prot: 1, carb: 6.8, fat: 13, fiber: 0.8, sugar: 2.5, addedSugar: 0, satFat: 1.2, salt: 0.1,
-    n: { monoFat: 8, polyFat: 3.5, omega3: 1.2, cholesterol: 0 },
+    avg: true,
+    lmv: 1712,
+    kcal: 145, prot: 0.7, carb: 6.7, fat: 12.8, fiber: 0.8, sugar: 3.2, addedSugar: 0, satFat: 1, salt: 0.1,
     portions: [
       ['portion', '1 portion i sås (0,5 dl)', 50],
       ['forp', '1 förpackning (2,5 dl)', 250],
     ],
     density: 1.0,
     tags: ['vegan', 'laktosfri', 'svensk'],
-    syn: ['imat', 'havregrädde', 'havre grädde', 'oatly imat', 'matlagningsgrädde havre', 'vegansk grädde', 'växtbaserad grädde', 'havrebaserad grädde', 'mjölkfri grädde'],
+    syn: ['imat', 'havregrädde', 'havre grädde', 'oatly imat', 'matlagningsgrädde havre', 'vegansk grädde', 'växtbaserad grädde', 'havrebaserad grädde', 'mjölkfri grädde', 'havrevisp'],
+    note: samlingLmv('matlagningsbas av havre med 13 % fett', 'Oatly iMat, Planti, ICA'),
   },
   {
     id: 'havrefraiche-15',
-    name: 'Havrefraiche (ca 15 % fett)',
+    name: 'Havrefraiche',
     cat: 'vaxtdryck',
-    kcal: 170, prot: 1, carb: 7.5, fat: 15, fiber: 1, sugar: 2.5, addedSugar: 0, satFat: 1.5, salt: 0.2,
-    n: { monoFat: 9, polyFat: 4, omega3: 1.3, cholesterol: 0 },
+    avg: true,
+    lmv: 5957,
+    kcal: 185, prot: 0.8, carb: 10.1, fat: 15.7, fiber: 1, sugar: 2.8, addedSugar: 0, satFat: 1.3, salt: 0,
     portions: [
       ['msk', '1 msk (15 g)', 15],
       ['portion', '1 portion (0,5 dl)', 50],
@@ -2137,11 +2165,13 @@ const vaxtdrycker: FoodSeed[] = [
     syn: ['havrefraiche', 'havre fraiche', 'imat fraiche', 'oatly fraiche', 'vegansk crème fraiche', 'vegansk creme fraiche', 'växtbaserad fraiche', 'mjölkfri fraiche'],
     // Matfett, inte ett alternativ till mjölk/fil i kostråden.
     kostrad: {},
+    note: samlingLmv('havrefraiche med 15 % fett', 'Oatly iMat Fraiche, Planti, ICA'),
   },
   {
     id: 'kokosmjolk-burk',
-    name: 'Kokosmjölk (burk, ca 18 % fett)',
+    name: 'Kokosmjölk',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 7266,
     kcal: 168, prot: 1.2, carb: 0, fat: 18.3, fiber: 0.8, sugar: 0, addedSugar: 0, satFat: 16.4, salt: 0.1,
     portions: [
@@ -2155,10 +2185,11 @@ const vaxtdrycker: FoodSeed[] = [
     co2e: 1.2,
     // Inte berikad och mest mättat fett – räknas inte som alternativ till mjölk i kostråden.
     kostrad: {},
+    note: samlingLmv('kokosmjölk med ca 18 % fett', 'Santa Maria, Blue Dragon, ICA, Garant', 'Kokosgrädde har ännu mer fett (ca 20–25 %).'),
   },
   {
     id: 'kokosmjolk-latt',
-    name: 'Kokosmjölk, lätt (ca 7 % fett)',
+    name: 'Lätt kokosmjölk',
     cat: 'vaxtdryck',
     lmv: 1566,
     kcal: 80, prot: 0.6, carb: 3, fat: 7.1, fiber: 1.3, sugar: 0.8, addedSugar: 0, satFat: 6.2, salt: 0.1,
@@ -2171,49 +2202,41 @@ const vaxtdrycker: FoodSeed[] = [
     syn: ['lätt kokosmjölk', 'kokosmjölk lätt', 'light coconut milk', 'kokosmjölk light', 'lättkokosmjölk'],
     co2e: 0.6,
     kostrad: {},
+    note: 'Ca 7 % fett.',
   },
   {
     id: 'havreyoghurt-naturell',
-    name: 'Havreyoghurt naturell, berikad (havregurt)',
+    name: 'Havregurt',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 5956,
-    kcal: 76, prot: 1.5, carb: 11.7, fat: 2.4, fiber: 0.9, sugar: 4, addedSugar: 0, satFat: 0.2, salt: 0.1,
-    portions: [
-      ['portion', '1 portion (2 dl)', 206],
-      ['skal', '1 liten skål (1,5 dl)', 155],
-    ],
+    // Medel av Livsmedelsverkets naturella (5956) och smaksatta (6812) berikade havregurt.
+    kcal: 79, prot: 1.2, carb: 13.2, fat: 2.1, fiber: 0.9, sugar: 6, addedSugar: 2, satFat: 0.2, salt: 0.1,
+    portions: PLANT_YOGHURT_PORTIONS,
     density: 1.03,
     tags: ['vegan', 'laktosfri', 'svensk'],
-    syn: ['havregurt', 'havreyoghurt', 'oatgurt', 'havre yoghurt', 'vegansk yoghurt', 'växtbaserad yoghurt', 'oatly havregurt', 'havrefil'],
-    note: 'Betydligt mindre protein än vanlig yoghurt.',
-  },
-  {
-    id: 'havreyoghurt-vanilj',
-    name: 'Havreyoghurt vanilj, berikad (havregurt vanilj)',
-    cat: 'vaxtdryck',
-    lmv: 6793,
-    kcal: 84, prot: 0.9, carb: 15, fat: 2, fiber: 0.9, sugar: 7.9, addedSugar: 4, satFat: 0.2, salt: 0.1,
-    portions: [
-      ['portion', '1 portion (2 dl)', 206],
-      ['skal', '1 liten skål (1,5 dl)', 155],
+    syn: [
+      'havregurt', 'havreyoghurt', 'oatgurt', 'havre yoghurt', 'vegansk yoghurt', 'växtbaserad yoghurt', 'oatly havregurt', 'havrefil',
+      'havregurt vanilj', 'havreyoghurt vanilj', 'oatly vanilj', 'vaniljhavregurt', 'vegansk vaniljyoghurt', 'havregurt jordgubb', 'havregurt blåbär',
     ],
-    density: 1.03,
-    tags: ['vegan', 'laktosfri', 'svensk'],
-    syn: ['havregurt vanilj', 'havreyoghurt vanilj', 'oatly vanilj', 'vaniljhavregurt', 'vegansk vaniljyoghurt', 'havre yoghurt vanilj', 'oatgurt vanilj'],
+    note: samlingLmv(
+      'berikad havregurt (medel av naturell och med smak)',
+      'Oatly, ICA, Garant',
+      'Naturell havregurt har ca 4 g socker per 100 g, havregurt med smak ca 8 g. Betydligt mindre protein än vanlig yoghurt.',
+    ),
   },
   {
     id: 'sojayoghurt-naturell',
-    name: 'Sojayoghurt naturell, berikad',
+    name: 'Sojayoghurt',
     cat: 'vaxtdryck',
+    avg: true,
     lmv: 7145,
     kcal: 56, prot: 3.6, carb: 4.3, fat: 2.3, fiber: 2, sugar: 2.5, addedSugar: 2, satFat: 0.3, salt: 0.2,
-    portions: [
-      ['portion', '1 portion (2 dl)', 206],
-      ['skal', '1 liten skål (1,5 dl)', 155],
-    ],
+    portions: PLANT_YOGHURT_PORTIONS,
     density: 1.03,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['sojayoghurt', 'soja yoghurt', 'sojagurt', 'alpro yoghurt', 'alpro naturell', 'vegansk yoghurt', 'sojayogurt', 'sojajoghurt'],
+    note: samlingLmv('berikad naturell sojayoghurt', 'Alpro, ICA'),
   },
 ]
 
@@ -2221,51 +2244,43 @@ const vaxtdrycker: FoodSeed[] = [
 // Kosttillskott
 // ---------------------------------------------------------------------------
 
+const PROTEIN_PORTIONS: Array<[string, string, number]> = [
+  ['skopa', '1 skopa (30 g)', 30],
+  ['halv-skopa', '½ skopa (15 g)', 15],
+]
+
 const tillskott: FoodSeed[] = [
   {
     id: 'proteinpulver-vassle',
-    name: 'Proteinpulver, vassleprotein (koncentrat)',
+    name: 'Proteinpulver',
     cat: 'kosttillskott',
+    avg: true,
     kcal: 385, prot: 75, carb: 8, fat: 6, fiber: 0.5, sugar: 5, addedSugar: 0, satFat: 3.8, salt: 0.5,
     n: { vitD: 0, vitC: 0, calcium: 400, iron: 1, potassium: 500 },
-    portions: [
-      ['skopa', '1 skopa (30 g)', 30],
-      ['halv-skopa', '½ skopa (15 g)', 15],
-    ],
+    portions: PROTEIN_PORTIONS,
     density: 0.4,
     tags: ['vegetarisk', 'glutenfri'],
-    syn: ['proteinpulver', 'vassleprotein', 'whey', 'whey protein', 'proteinshake', 'vassle', 'wpc', 'protein pulver', 'shake', 'proteinpulver whey'],
-    note: 'Näringsinnehållet varierar mellan märken och smaker – jämför med förpackningen.',
-  },
-  {
-    id: 'proteinpulver-vassle-isolat',
-    name: 'Proteinpulver, vassleprotein (isolat)',
-    cat: 'kosttillskott',
-    kcal: 370, prot: 88, carb: 2, fat: 1, fiber: 0, sugar: 1.5, addedSugar: 0, satFat: 0.6, salt: 0.5,
-    n: { vitD: 0, vitC: 0, calcium: 450, iron: 0.5, potassium: 400 },
-    portions: [
-      ['skopa', '1 skopa (30 g)', 30],
-      ['halv-skopa', '½ skopa (15 g)', 15],
+    syn: [
+      'proteinpulver', 'vassleprotein', 'whey', 'whey protein', 'proteinshake', 'vassle', 'wpc', 'protein pulver', 'shake',
+      'proteinpulver whey', 'wpi', 'whey isolat', 'vassleisolat', 'isolat', 'proteinisolat', 'whey isolate', 'kasein',
     ],
-    density: 0.4,
-    tags: ['vegetarisk', 'glutenfri'],
-    syn: ['wpi', 'whey isolat', 'vassleisolat', 'isolat', 'proteinisolat', 'whey isolate', 'laktosfattigt proteinpulver'],
-    note: 'Isolat innehåller mycket lite laktos och fett.',
+    note: samling(
+      'Star Nutrition, Tyngre, Body Science, Nutramino',
+      'Smaksatt vassleprotein (koncentrat). Isolat har något mer protein och nästan ingen laktos eller fett.',
+    ),
   },
   {
     id: 'proteinpulver-veganskt',
-    name: 'Proteinpulver, veganskt (ärt, ris eller soja)',
+    name: 'Veganskt proteinpulver',
     cat: 'kosttillskott',
+    avg: true,
     kcal: 380, prot: 75, carb: 5, fat: 7, fiber: 4, sugar: 2, addedSugar: 1, satFat: 1.5, salt: 2.0,
     n: { vitD: 0, vitC: 0, vitB12: 0 },
-    portions: [
-      ['skopa', '1 skopa (30 g)', 30],
-      ['halv-skopa', '½ skopa (15 g)', 15],
-    ],
+    portions: PROTEIN_PORTIONS,
     density: 0.4,
     tags: ['vegan', 'glutenfri', 'laktosfri'],
     syn: ['veganskt proteinpulver', 'vegan protein', 'ärtprotein', 'risprotein', 'sojaprotein pulver', 'växtprotein', 'vegoprotein pulver', 'plant protein'],
-    note: 'Ärtprotein är ofta relativt salt. Näringsinnehållet varierar mellan märken.',
+    note: samling('Tyngre, Star Nutrition, Body Science', 'Ärt-, ris- eller sojaprotein. Ärtprotein är ofta relativt salt.'),
   },
 ]
 

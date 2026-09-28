@@ -13,6 +13,7 @@ import { useDiaryStore } from '../stores/diaryStore'
 import { useProfileStore } from '../stores/profileStore'
 import { useFoodStore, usageFromEntries } from '../stores/foodStore'
 import { setDemoFlag } from './demoFlag'
+import { aliasAmount, canonicalFoodId, resolveFoodAlias } from '../data/foods/aliases'
 
 export { DEMO_FLAG_KEY, clearDemoFlag, isDemoData, subscribeDemoFlag } from './demoFlag'
 
@@ -34,8 +35,11 @@ export const DEMO_PROFILE: Omit<Profile, 'createdAt'> = {
   macroPreset: 'nnr',
 }
 
-/** [livsmedels-id (utan 'lagom:'), antal portioner (första portionen) eller gram med suffix 'g', måltid, tid] */
-type Item = [string, number | `${number}g`, MealId, string]
+/**
+ * [livsmedels-id (utan 'lagom:'), antal portioner eller gram med suffix 'g', måltid, tid, portion?]
+ * Antal portioner avser den angivna portionen, annars livsmedlets första portion.
+ */
+type Item = [string, number | `${number}g`, MealId, string, portion?: string]
 
 /** Favoriter i exemplet – livsmedel och en svensk klassiker (inbyggt recept). */
 export const DEMO_FAVORITES: readonly string[] = [
@@ -48,7 +52,7 @@ export const DEMO_FAVORITES: readonly string[] = [
 
 const FRUKOST_A: Item[] = [
   ['havregrynsgrot-mellanmjolk', 1, 'frukost', '07:10'],
-  ['lingon-rarorda', '30g', 'frukost', '07:10'],
+  ['lingonsylt', '30g', 'frukost', '07:10'],
   ['kaffe-bryggt', 1, 'frukost', '07:15'],
 ]
 const FRUKOST_B: Item[] = [
@@ -56,7 +60,7 @@ const FRUKOST_B: Item[] = [
   ['bregott-normalsaltat-75', '8g', 'frukost', '07:05'],
   ['hushallsost-26', '20g', 'frukost', '07:05'],
   ['filmjolk-3', '200g', 'frukost', '07:05'],
-  ['musli-osotad', '40g', 'frukost', '07:05'],
+  ['musli-sotad', '40g', 'frukost', '07:05'],
   ['kaffe-bryggt', 1, 'frukost', '07:20'],
 ]
 const FIKA: Item[] = [
@@ -85,7 +89,7 @@ const DAYS: Array<{ lunch: Item[]; middag: Item[]; extra?: Item[] }> = [
   {
     // Torsdag: ärtsoppa och pannkakor
     lunch: [['artsoppa-med-flask', 1, 'lunch', '12:00'], ['pannkakor-tunna', 2, 'lunch', '12:15'], ['jordgubbssylt', '30g', 'lunch', '12:15']],
-    middag: [['pytt-i-panna-agg-rodbetor', 1, 'middag', '18:30']],
+    middag: [['pytt-i-panna', 1, 'middag', '18:30', 'agg']],
   },
   {
     lunch: [['kycklingwok-ris', 1, 'lunch', '12:00']],
@@ -124,18 +128,20 @@ function noise(i: number): number {
   return x - Math.floor(x) - 0.5
 }
 
-function resolveItem(foods: Map<string, Food>, item: Item, date: ISODate): Omit<DiaryEntry, 'id' | 'createdAt'> | null {
-  const [slug, qty, meal, time] = item
-  const food = foods.get(`lagom:${slug}`)
+function resolveItem(foods: ReadonlyMap<string, Food>, item: Item, date: ISODate): Omit<DiaryEntry, 'id' | 'createdAt'> | null {
+  const [slug, qty, meal, time, portion] = item
+  const id = `lagom:${slug}`
+  // Sammanslagna livsmedel följer sitt alias (gram för en rå rad blir rå vikt).
+  const alias = resolveFoodAlias(id)
+  const food = foods.get(id) ?? (alias ? foods.get(alias.to) : undefined)
   if (!food) return null
   let amount: number
   let unit: UnitKey
   if (typeof qty === 'string') {
-    amount = Number.parseFloat(qty)
-    unit = 'g'
+    ;({ amount, unit } = aliasAmount(food.id === id ? undefined : alias, Number.parseFloat(qty), 'g'))
   } else if (food.portions.length) {
     amount = qty
-    unit = `portion:${food.portions[0].id}`
+    unit = `portion:${(food.portions.find((p) => p.id === portion) ?? food.portions[0]).id}`
   } else {
     amount = qty * 100
     unit = 'g'
@@ -151,8 +157,8 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   const now = opts.now ?? new Date()
   const today = todayISO(now)
   const days = opts.days ?? 14
-  const { loadBuiltinFoods } = await import('./foodRepo')
-  const foods = new Map((await loadBuiltinFoods()).map((f) => [f.id, f]))
+  const { loadBuiltinCatalog } = await import('./foodRepo')
+  const foods = (await loadBuiltinCatalog()).byId
 
   // Profil och inställningar
   useProfileStore.setState((s) => ({
@@ -229,7 +235,7 @@ export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Pr
   // Favoriter och "Senaste" (samma statistik som `recordUsage` ger när man loggar själv: antal,
   // senast använd, senaste mängd och enhet samt måltider – det styr förslagen per måltid).
   useFoodStore.setState({
-    favorites: [...DEMO_FAVORITES],
+    favorites: [...new Set(DEMO_FAVORITES.map((id) => canonicalFoodId(id)))],
     usage: usageFromEntries(entries),
   })
 

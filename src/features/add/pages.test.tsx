@@ -72,7 +72,7 @@ describe('AddFoodPage', () => {
   it('söker lokalt, lägger i korgen och lägger till allt', async () => {
     const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-01-15')
     fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle' } })
-    const row = await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }, { timeout: 3000 })
+    const row = await screen.findByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ }, { timeout: 3000 })
     fireEvent.click(row)
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
@@ -88,7 +88,7 @@ describe('AddFoodPage', () => {
   it('lägger till ett enskilt livsmedel direkt – och korgen blir huvudvalet när den har innehåll', async () => {
     const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
     fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
-    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }, { timeout: 3000 }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ }, { timeout: 3000 }))
     let dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg till i Fika' }))
     expect(useDiaryStore.getState().entries['2026-09-26']).toHaveLength(1)
@@ -98,7 +98,7 @@ describe('AddFoodPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     useBasketStore.getState().add(bulle, 1, 'portion:st', 'search')
-    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, bageri/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ }))
     dialog = await screen.findByRole('dialog')
     const buttons = within(dialog).getAllByRole('button').map((b) => b.textContent)
     // Huvudknappen ligger sist i sidfoten.
@@ -111,7 +111,7 @@ describe('AddFoodPage', () => {
     fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
     await waitFor(() => expect(screen.getByText(/träff(ar)? för ”kanelbulle bageri”/)).toHaveAttribute('role', 'status'), { timeout: 3000 })
     // Radens namn nämner inte längre en gest som bara finns på pekskärm.
-    const row = screen.getByRole('button', { name: /^Kanelbulle, bageri/ })
+    const row = screen.getByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ })
     expect(row.getAttribute('aria-label')).not.toMatch(/Håll inne/)
     expect(row.getAttribute('aria-label')).toMatch(/kcal/)
   })
@@ -119,7 +119,7 @@ describe('AddFoodPage', () => {
   it('snabbknappen lägger till direkt med förvald mängd', async () => {
     renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
     fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
-    const plus = await screen.findByRole('button', { name: /^Lägg till Kanelbulle, bageri direkt/ }, { timeout: 3000 })
+    const plus = await screen.findByRole('button', { name: /^Lägg till Kanelbulle direkt/ }, { timeout: 3000 })
     fireEvent.click(plus)
     const [entry] = useDiaryStore.getState().entries['2026-09-26']
     expect(entry).toMatchObject({ kind: 'food', meal: 'fika', amount: 1 })
@@ -151,7 +151,7 @@ describe('AddFoodPage', () => {
 describe('FoodDetailPage', () => {
   it('visar ursprung, portionsväljare och näringsinnehåll', async () => {
     renderAt('/livsmedel/lagom%3Akanelbulle-bageri?maltid=fika&datum=2026-09-26')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Kanelbulle, bageri' }, { timeout: 3000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Kanelbulle' }, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByText(/^Värden från Livsmedelsverkets livsmedelsdatabas \(nr \d+\), med svenska portioner/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Tallriksmodellen' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Klimatavtryck' })).toBeInTheDocument()

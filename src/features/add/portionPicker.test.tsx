@@ -15,7 +15,7 @@ import {
 } from '../../components/domain/PortionPicker'
 import { useFoodStore } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
-import { bulle, havregryn, mjolk } from './testFoods'
+import { bulle, havregryn, kycklingbrost, mjolk, risKokt } from './testFoods'
 
 describe('initialSelection', () => {
   it('använder livsmedlets första portion som standard', () => {
@@ -175,5 +175,65 @@ describe('<PortionPicker />', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Mängd' }), { target: { value: '' } })
     expect(screen.getByRole('button', { name: 'Lägg till' })).toBeDisabled()
+  })
+})
+
+describe('rå/okokt vikt i väljaren', () => {
+  beforeEach(() => {
+    useFoodStore.setState({ usage: {} })
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, mindfulMode: false, energyUnit: 'kcal' } }))
+  })
+
+  it('har chips, efterled och hjälprad för rå vikt', () => {
+    expect(isUsableUnit(kycklingbrost, 'g-ra')).toBe(true)
+    expect(isUsableUnit(bulle, 'g-ra')).toBe(false)
+    expect(isUsableUnit(kycklingbrost, 'dl-ra')).toBe(false)
+    expect(unitChipLabel(kycklingbrost, 'g-ra')).toEqual({ label: 'g rå' })
+    expect(unitChipLabel(risKokt, 'g-ra')).toEqual({ label: 'g okokt' })
+    expect(unitChipLabel(risKokt, 'dl-ra')).toEqual({ label: 'dl okokt', detail: '230 g tillagat' })
+    // Vanlig volym gäller den tillagade varan.
+    expect(unitChipLabel({ ...risKokt, density: 0.8 }, 'dl')).toEqual({ label: 'dl tillagat', detail: '80 g' })
+    expect(amountSuffix(kycklingbrost, 'g-ra')).toBe('g rå')
+    expect(amountSuffix(risKokt, 'dl-ra')).toBe('dl okokt')
+    expect(amountHint(kycklingbrost, 150, 'g-ra')).toBe('≈ 113 g tillagat')
+    expect(quickChoices('g-ra')).toEqual([
+      { amount: 50, label: '50 g' },
+      { amount: 100, label: '100 g' },
+      { amount: 150, label: '150 g' },
+      { amount: 200, label: '200 g' },
+    ])
+    expect(quickChoices('dl-ra').map((q) => q.label)).toEqual(['½ dl', '1 dl', '1½ dl', '2 dl'])
+  })
+
+  it('behåller vikten när man byter mellan tillagat och rått', () => {
+    // 113 g tillagat ≈ 151 g rått
+    expect(amountForUnitChange(kycklingbrost, 113, 'g', 'g-ra')).toBe(151)
+    expect(amountForUnitChange(kycklingbrost, 200, 'g-ra', 'g')).toBe(150)
+    // 1 filé (95 g tillagat) ≈ 127 g rått
+    expect(amountForUnitChange(kycklingbrost, 1, 'portion:file', 'g-ra')).toBe(127)
+    // 2 dl okokt ris → 459 g kokt; tillbaka blir det 2 dl
+    expect(amountForUnitChange(risKokt, 459, 'g', 'dl-ra')).toBe(2)
+  })
+
+  it('visar en hjälptext och bekräftar i rå vikt', () => {
+    const onConfirm = vi.fn()
+    render(<PortionPicker food={kycklingbrost} onConfirm={onConfirm} />)
+    expect(screen.queryByText(/Väg rått/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^g rå/ }))
+    expect(screen.getByText('Väg rått – Lagom räknar om till tillagad vikt (1 g rå ≈ 0,75 g tillagat).')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Mängd' }), { target: { value: '200' } })
+    expect(screen.getByText('≈ 150 g tillagat')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till' }))
+    expect(onConfirm).toHaveBeenCalledWith(200, 'g-ra', 150)
+  })
+
+  it('startar i rå vikt när den användes senast', () => {
+    act(() => {
+      useFoodStore.getState().recordUsage(kycklingbrost.id, 180, 'g-ra', 'middag')
+    })
+    const onChange = vi.fn()
+    render(<PortionPicker food={kycklingbrost} onConfirm={() => {}} onChange={onChange} />)
+    expect(onChange).toHaveBeenLastCalledWith({ amount: 180, unit: 'g-ra', grams: 135 })
+    expect(screen.getByText(/1 g rå ≈ 0,75 g tillagat/)).toBeInTheDocument()
   })
 })

@@ -11,7 +11,7 @@ import type { DiaryEntry, Food, FoodCategory, UnitKey } from '../../types'
 import { entryNutrients } from '../../lib/diary'
 import { nutrientsForGrams } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
-import { defaultAmount, defaultUnit, formatAmount, gramsFor, isPortionUnit, isVolumeUnit } from '../../lib/units'
+import { defaultAmount, defaultUnit, formatAmount, gramsFor, isPortionUnit, isRawUnit, isVolumeUnit, type UnitFood } from '../../lib/units'
 import { CategoryIcon } from './CategoryIcon'
 import { EnergyValue, useEnergyFormatter } from './EnergyValue'
 
@@ -55,11 +55,12 @@ export interface FoodRowProps extends FoodRowData {
 }
 
 /**
- * Läsbar mängd med vikten för portioner och volymer: "2 dl (76 g)", "1 glas (2 dl, 206 g)",
- * "2 smörgåsar (124 g)". Gramvikten upprepas aldrig om etiketten redan anger den.
+ * Läsbar mängd med vikten för portioner, volymer och rå vikt: "2 dl (76 g)", "1 glas (2 dl, 206 g)",
+ * "2 smörgåsar (124 g)", "150 g rå (113 g tillagat)". Gramvikten upprepas aldrig om
+ * etiketten redan anger den.
  */
-export function describeAmount(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): string {
-  return formatAmount(food, amount, unit, isPortionUnit(unit) || isVolumeUnit(unit))
+export function describeAmount(food: UnitFood, amount: number, unit: UnitKey): string {
+  return formatAmount(food, amount, unit, isPortionUnit(unit) || isVolumeUnit(unit) || isRawUnit(unit))
 }
 
 /** Props för en dagbokspost. */

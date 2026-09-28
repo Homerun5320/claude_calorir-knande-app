@@ -16,7 +16,7 @@ import {
   validateDraft,
   type CustomFoodDraft,
 } from './customFood'
-import { bulle, mjolk, offBar } from './testFoods'
+import { bulle, havredryckSnitt, kycklingbrost, mjolk, offBar } from './testFoods'
 
 function draft(patch: Partial<CustomFoodDraft> = {}): CustomFoodDraft {
   return { ...emptyDraft(), name: 'Proteinbar', energy: 200, ...patch }
@@ -196,6 +196,15 @@ describe('draftToFood', () => {
     expect(food.extra?.nutriscore).toBe('c')
     expect(food.nutrients.kcal).toBeCloseTo(380)
     expect(food.portions[0]).toMatchObject({ id: 'serving', grams: 55 })
+  })
+
+  it('gör en kopia av ett samlingsvärde till ett vanligt eget livsmedel', () => {
+    const food = draftToFood(draftFromFood(havredryckSnitt), { id: 'custom:min-havredryck', from: havredryckSnitt })
+    expect(food.isAverage).toBeUndefined()
+    expect(food.note).toBeUndefined()
+    expect(food.nutrients.kcal).toBeCloseTo(45)
+    // Omräkningen från rå vikt följer inte med (egna värden kan gälla rå eller tillagad vara).
+    expect(draftToFood(draftFromFood(kycklingbrost), { id: 'custom:k', from: kycklingbrost }).rawWeight).toBeUndefined()
   })
 
   it('tål en rundtur via formuläret utan att ändra värdena', () => {

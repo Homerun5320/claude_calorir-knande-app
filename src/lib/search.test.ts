@@ -219,6 +219,22 @@ describe('searchFoods', () => {
     expect(top('arla mellanmjölk').food.id).toBe('off:7310865004703')
   })
 
+  it('sätter vardagsbegreppet först när sökningen är exakt en synonym: "kyckling" → Kycklingbröst', () => {
+    const foods = [
+      food('Grillkyckling', 'fagel', { id: 'lagom:grill' }),
+      food('Kycklingwrap', 'fardigratt', { id: 'lagom:wrap' }),
+      food('Kycklingbröst', 'fagel', { id: 'lagom:brost', synonyms: ['kyckling', 'kycklingfilé'] }),
+      food('Hårdost 17 %', 'ost', { id: 'lagom:hardost' }),
+      food('Hushållsost 26 %', 'ost', { id: 'lagom:hushallsost', synonyms: ['ost'] }),
+    ]
+    const idx = createSearchIndex(foods)
+    expect(searchFoods(idx, 'kyckling')[0].food.id).toBe('lagom:brost')
+    expect(searchFoods(idx, 'kyckling').map((r) => r.food.id)).toContain('lagom:grill')
+    expect(searchFoods(idx, 'ost')[0].food.id).toBe('lagom:hushallsost')
+    // Ett exakt namn går fortfarande först.
+    expect(searchFoods(idx, 'grillkyckling')[0].food.id).toBe('lagom:grill')
+  })
+
   it('förstår böjningsformer', () => {
     expect(ids('köttbulle')[0]).toBe('lagom:kottbullar')
     expect(ids('tomater')[0]).toBe('lagom:tomat')

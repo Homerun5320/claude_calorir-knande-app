@@ -3,7 +3,9 @@
  *
  * Allt om ett livsmedel på ett ställe: var värdena kommer ifrån, välj mängd och lägg till,
  * energi och makron per portion eller 100 g, näringsämnen mot NNR 2023, Tallriksmodellen,
- * kostråden, klimatavtryck, märkningar och Open Food Facts-information.
+ * kostråden, klimatavtryck, märkningar och Open Food Facts-information. Samlingsvärden (genomsnitt
+ * av vanliga märken) hänvisar till streckkoden för exakta värden, och tillagade livsmedel med
+ * `rawWeight` förklarar att man kan väga rått.
  */
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -17,6 +19,8 @@ import {
   Leaf,
   Pencil,
   Plus,
+  Scale,
+  ScanBarcode,
   ShieldCheck,
   Trash2,
   Users,
@@ -68,6 +72,7 @@ import {
   novaInfo,
   nutriScoreInfo,
   parseAddParams,
+  scanHref,
   sourceMeta,
 } from './addLogic'
 import { useAddFood } from './useAddFood'
@@ -250,7 +255,28 @@ function FoodDetail({ food }: { food: Food }) {
               )}
             </div>
           </div>
-          <Provenance source={food.source} note={food.note} lmvNumber={food.lmvNumber} brand={food.brand} />
+          <Provenance
+            source={food.source}
+            note={food.isAverage ? undefined : food.note}
+            lmvNumber={food.lmvNumber}
+            brand={food.brand}
+            isAverage={food.isAverage}
+            averageFromLmv={food.isAverage === true && averageUsesLmvValues(food.note)}
+          />
+          {food.isAverage && (
+            <div className="flex flex-col items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-sm" role="note" aria-labelledby="samlingsvarde-rubrik">
+              <div>
+                <p id="samlingsvarde-rubrik" className="font-semibold text-ink">
+                  Samlingsvärde
+                </p>
+                <p className="mt-1 text-ink-2">{averageNoteText(food.note)}</p>
+              </div>
+              <Button variant="soft" size="sm" iconLeft={ScanBarcode} to={scanHref({ meal, date })} state={{ from: 'lagg-till' }}>
+                Skanna streckkod
+              </Button>
+            </div>
+          )}
+          {food.rawWeight && <RawWeightNote food={food} />}
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs text-ink-2">
               <span>Näringsdata</span>
@@ -409,6 +435,42 @@ function Hero({ food }: { food: Food }) {
   return <CategoryIcon category={food.category} size="xl" labelled />
 }
 
+/**
+ * Tillagat som standard: "Värdena gäller tillagad vara. Väger du rått kan du välja ”g rå” – Lagom
+ * räknar om (1 g rå ≈ 0,75 g tillagat)."
+ */
+function RawWeightNote({ food }: { food: Food }) {
+  const rw = food.rawWeight
+  if (!rw || !(rw.factor > 0)) return null
+  const units = [unitLabel(food, 'g-ra'), ...(rw.density ? [unitLabel(food, 'dl-ra')] : [])].map((u) => `”${u}”`).join(' eller ')
+  const kind = unitLabel(food, 'g-ra').replace(/^g /, '')
+  // "Väger du rått", "Väger eller mäter du okokt" (när "dl okokt" finns), "Väger du fryst".
+  const neuter = rw.kind === 'ra' ? 'rått' : rw.kind === 'torkad' ? 'torkat' : kind
+  const verb = `${rw.density ? 'Väger eller mäter du' : 'Väger du'} ${neuter}`
+  return (
+    <p className="flex items-start gap-2.5 text-sm text-ink-2">
+      <Scale className="mt-0.5 size-4 shrink-0 text-gran" aria-hidden />
+      <span>
+        Värdena gäller tillagad vara. {verb} kan du välja {units} när du lägger till – Lagom räknar om till tillagad vikt (1{'\u00a0'}g {kind} ≈{' '}
+        {formatNumber(rw.factor, 2)}
+        {'\u00a0'}g tillagat).
+      </span>
+    </p>
+  )
+}
+
+/** Samlingsvärdets förklaring utan ett inledande "Samlingsvärde:" – rubriken står redan ovanför. */
+function averageNoteText(note: string | undefined): string {
+  const text = note?.replace(/^\s*Samlingsvärde\s*:\s*/i, '').trim()
+  if (!text) return 'Genomsnitt av vanliga märken i svenska butiker. Skanna streckkoden för exakta värden för ditt märke.'
+  return text.charAt(0).toLocaleUpperCase('sv-SE') + text.slice(1)
+}
+
+/** true när samlingsvärdet är Livsmedelsverkets värde för produkttypen (inte Lagoms eget genomsnitt). */
+function averageUsesLmvValues(note: string | undefined): boolean {
+  return /^\s*Samlingsvärde\s*:\s*Livsmedelsverkets/i.test(note ?? '')
+}
+
 const PROVENANCE_ICON: Record<FoodSource, LucideIcon> = {
   lagom: ShieldCheck,
   livsmedelsverket: ShieldCheck,
@@ -420,17 +482,43 @@ const PROVENANCE_ICON: Record<FoodSource, LucideIcon> = {
 /**
  * Var värdena kommer ifrån. Lagoms livsmedel som länkar till Livsmedelsverket har dess värden
  * (saknade näringsämnen fylls i från den länkade posten); märkesvaror behåller förpackningens.
+ * Samlingsvärden är Lagoms genomsnitt (se rutan "Samlingsvärde") – den länkade posten fyller bara
+ * i näringsämnen som saknas.
  */
-function provenanceText(source: FoodSource, lmvNumber: number | undefined, brand: string | undefined): string {
+function provenanceText(
+  source: FoodSource,
+  lmvNumber: number | undefined,
+  brand: string | undefined,
+  isAverage?: boolean,
+  averageFromLmv?: boolean,
+): string {
   if (source === 'lagom' && lmvNumber !== undefined) {
-    return brand
-      ? `Näringsvärden från förpackningen, kompletterade med Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}).`
-      : `Värden från Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}), med svenska portioner och mått från Lagom.`
+    if (brand) return `Näringsvärden från förpackningen, kompletterade med Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}).`
+    if (isAverage && averageFromLmv) {
+      return `Samlingsvärde med Livsmedelsverkets värde för produkttypen (nr ${lmvNumber}), med svenska portioner och mått från Lagom.`
+    }
+    if (isAverage) return `Samlingsvärde från Lagom, kompletterat med Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}).`
+    return `Värden från Livsmedelsverkets livsmedelsdatabas (nr ${lmvNumber}), med svenska portioner och mått från Lagom.`
   }
+  if (source === 'lagom' && isAverage) return 'Samlingsvärde från Lagom – genomsnitt av vanliga märken i svenska butiker.'
   return sourceMeta(source).provenance
 }
 
-function Provenance({ source, note, lmvNumber, brand }: { source: FoodSource; note?: string; lmvNumber?: number; brand?: string }) {
+function Provenance({
+  source,
+  note,
+  lmvNumber,
+  brand,
+  isAverage,
+  averageFromLmv,
+}: {
+  source: FoodSource
+  note?: string
+  lmvNumber?: number
+  brand?: string
+  isAverage?: boolean
+  averageFromLmv?: boolean
+}) {
   const meta = sourceMeta(source)
   const Icon = PROVENANCE_ICON[source] ?? ShieldCheck
   const linkedCurated = source === 'lagom' && lmvNumber !== undefined
@@ -438,7 +526,7 @@ function Provenance({ source, note, lmvNumber, brand }: { source: FoodSource; no
     <div className={cx('flex items-start gap-3 rounded-2xl px-4 py-3 text-sm', meta.crowdSourced ? 'bg-hjortron-soft' : 'bg-surface-2')}>
       <Icon className={cx('mt-0.5 size-4 shrink-0', meta.crowdSourced ? 'text-hjortron' : 'text-gran')} aria-hidden />
       <div className="min-w-0 text-ink-2">
-        <p className="text-ink">{provenanceText(source, lmvNumber, brand)}</p>
+        <p className="text-ink">{provenanceText(source, lmvNumber, brand, isAverage, averageFromLmv)}</p>
         {lmvNumber !== undefined && !linkedCurated && <p className="mt-1 text-xs">Livsmedelsnummer {lmvNumber} i Livsmedelsverkets databas.</p>}
         {note && <p className="mt-1 text-xs">{note}</p>}
       </div>

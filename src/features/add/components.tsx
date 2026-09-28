@@ -46,6 +46,15 @@ export function useLeave(): (fallback: string) => void {
 // Källmärke
 // ---------------------------------------------------------------------------
 
+/** Märke för samlingsvärden (genomsnitt av vanliga märken). */
+export function AverageBadge() {
+  return (
+    <Badge tone="neutral" title="Samlingsvärde – genomsnitt av vanliga märken. Skanna streckkoden för ditt märke.">
+      Snitt
+    </Badge>
+  )
+}
+
 export function FoodSourceBadge({ source, short = false, className }: { source: FoodSource; short?: boolean; className?: string }) {
   const meta = sourceMeta(source)
   return (
@@ -236,6 +245,7 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
     <span className="inline-flex items-center gap-1">
       {extraBadge}
       {showSource && <FoodSourceBadge source={food.source} short />}
+      {food.isAverage && <AverageBadge />}
       {inBasket > 0 && (
         <Badge tone="gran" variant="solid" title="I korgen">
           {inBasket > 1 ? `${inBasket} i korgen` : 'I korgen'}
@@ -249,7 +259,7 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
       )}
     </span>
   )
-  const hasBadge = showSource || inBasket > 0 || Boolean(extraBadge) || energyInline
+  const hasBadge = showSource || inBasket > 0 || Boolean(extraBadge) || energyInline || food.isAverage === true
 
   const quick = onQuickAdd ? (
     <motion.button
@@ -295,7 +305,7 @@ export function AddRow({ food, amount, unit, onPick, onQuickAdd, onDetails, show
           if (longPress.consumeFired()) return
           onPick(food)
         }}
-        actionLabel={[food.name, row.amountText, energyText].filter(Boolean).join(', ') + '. Välj mängd.'}
+        actionLabel={[food.name, food.isAverage ? 'samlingsvärde' : undefined, row.amountText, energyText].filter(Boolean).join(', ') + '. Välj mängd.'}
         trailing={quick}
       />
     </div>

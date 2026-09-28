@@ -3,9 +3,16 @@
  *
  * Svenska recept anger ofta torra varor i volym ("2 dl havregryn"). Med livsmedlets
  * densitet (g/ml) kan Lagom räkna om volym till vikt korrekt.
+ *
+ * Kött, fågel, fisk, pasta, ris, gryn och torkade baljväxter anges tillagade. Har livsmedlet
+ * `rawWeight` kan mängden ändå anges i rå/okokt vikt – 'g-ra' ("g rå", "g okokt") och, med
+ * densitet för den okokta varan, 'dl-ra' ("dl okokt") – och Lagom räknar om till tillagad vikt.
  */
-import type { Food, UnitKey, VolumeUnit } from '../types'
+import type { Food, RawUnit, RawWeight, UnitKey, VolumeUnit } from '../types'
 import { formatNumber } from './format'
+
+/** De fält i ett livsmedel som behövs för att räkna om mängder till gram. */
+export type UnitFood = Pick<Food, 'portions' | 'density' | 'liquid' | 'rawWeight'>
 
 export const VOLUME_ML: Record<VolumeUnit, number> = {
   krm: 1,
@@ -27,6 +34,37 @@ export const UNIT_LABELS: Record<Exclude<UnitKey, `portion:${string}`>, { short:
   cl: { short: 'cl', long: 'centiliter' },
   dl: { short: 'dl', long: 'deciliter' },
   l: { short: 'l', long: 'liter' },
+  // Generiska etiketter – `unitLabel` anger rätt ord för livsmedlet ("g okokt", "g torkad", "g fryst").
+  'g-ra': { short: 'g rå', long: 'gram rå vikt' },
+  'dl-ra': { short: 'dl okokt', long: 'deciliter okokt' },
+}
+
+/** Vad den otillagade varan kallas: "rå", "okokt", "torkad", "fryst". */
+export const RAW_KIND_LABELS: Record<RawWeight['kind'], string> = {
+  ra: 'rå',
+  okokt: 'okokt',
+  torkad: 'torkad',
+  fryst: 'fryst',
+}
+
+/** Samma ord i neutrum ("väg rått", "väg torkat") – "okokt" och "fryst" böjs inte. */
+const RAW_KIND_NEUTER: Record<RawWeight['kind'], string> = {
+  ra: 'rått',
+  okokt: 'okokt',
+  torkad: 'torkat',
+  fryst: 'fryst',
+}
+
+/** true för enheter i rå/okokt vikt ('g-ra', 'dl-ra'). */
+export function isRawUnit(unit: UnitKey): unit is RawUnit {
+  return unit === 'g-ra' || unit === 'dl-ra'
+}
+
+/** Ordet för den otillagade varan för ett livsmedel ("rå", "okokt", "torkad", "fryst"). */
+export function rawKindLabel(food: Pick<Food, 'rawWeight'>, unit: RawUnit = 'g-ra'): string {
+  const kind = food.rawWeight?.kind
+  if (kind) return RAW_KIND_LABELS[kind]
+  return unit === 'dl-ra' ? 'okokt' : 'rå'
 }
 
 export function isVolumeUnit(unit: UnitKey): unit is VolumeUnit {
@@ -44,10 +82,29 @@ export function densityOf(food: Pick<Food, 'density' | 'liquid'>): number | unde
   return undefined
 }
 
-/** Vilka enheter som går att använda för ett livsmedel (portioner först). */
-export function availableUnits(food: Pick<Food, 'portions' | 'density' | 'liquid'>): UnitKey[] {
+/** Giltig omräkning från rå/okokt vikt, annars undefined. */
+function rawWeightOf(food: Pick<Food, 'rawWeight'>): RawWeight | undefined {
+  const rw = food.rawWeight
+  return rw && Number.isFinite(rw.factor) && rw.factor > 0 ? rw : undefined
+}
+
+/** Densitet (g/ml) för den okokta varan, om den är känd. */
+function rawDensityOf(food: Pick<Food, 'rawWeight'>): number | undefined {
+  const d = rawWeightOf(food)?.density
+  return d !== undefined && Number.isFinite(d) && d > 0 ? d : undefined
+}
+
+/**
+ * Vilka enheter som går att använda för ett livsmedel (portioner först). Med `rawWeight` kommer
+ * "g rå/okokt" direkt efter gram, och "dl okokt" efter den när den okokta varans densitet är känd.
+ */
+export function availableUnits(food: UnitFood): UnitKey[] {
   const units: UnitKey[] = food.portions.map((p) => `portion:${p.id}` as const)
   units.push('g')
+  if (rawWeightOf(food)) {
+    units.push('g-ra')
+    if (rawDensityOf(food) !== undefined) units.push('dl-ra')
+  }
   if (densityOf(food) !== undefined) {
     if (food.liquid) units.push('dl', 'cl', 'ml', 'msk', 'tsk', 'l')
     else units.push('dl', 'msk', 'tsk', 'krm')
@@ -56,7 +113,7 @@ export function availableUnits(food: Pick<Food, 'portions' | 'density' | 'liquid
 }
 
 /** Förvald enhet: första portionen, annars dl för drycker, annars gram. */
-export function defaultUnit(food: Pick<Food, 'portions' | 'density' | 'liquid'>): UnitKey {
+export function defaultUnit(food: UnitFood): UnitKey {
   if (food.portions.length > 0) return `portion:${food.portions[0].id}`
   if (food.liquid) return 'dl'
   return 'g'
@@ -64,7 +121,7 @@ export function defaultUnit(food: Pick<Food, 'portions' | 'density' | 'liquid'>)
 
 /** Förvald mängd för en enhet. */
 export function defaultAmount(unit: UnitKey): number {
-  if (unit === 'g') return 100
+  if (unit === 'g' || unit === 'g-ra') return 100
   if (unit === 'ml') return 200
   if (unit === 'cl') return 33
   if (unit === 'dl') return 2
@@ -75,10 +132,15 @@ export function defaultAmount(unit: UnitKey): number {
  * Gram för en mängd i en viss enhet. Returnerar NaN om enheten inte kan räknas om
  * (t.ex. volym utan densitet eller okänd portion).
  */
-export function gramsFor(food: Pick<Food, 'portions' | 'density' | 'liquid'>, amount: number, unit: UnitKey): number {
+export function gramsFor(food: UnitFood, amount: number, unit: UnitKey): number {
   if (!Number.isFinite(amount) || amount < 0) return Number.NaN
   if (unit === 'g') return amount
   if (unit === 'kg') return amount * 1000
+  if (isRawUnit(unit)) {
+    const raw = rawGramsFor(food, amount, unit)
+    const rw = rawWeightOf(food)
+    return rw && Number.isFinite(raw) ? raw * rw.factor : Number.NaN
+  }
   if (isVolumeUnit(unit)) {
     const d = densityOf(food)
     return d === undefined ? Number.NaN : amount * VOLUME_ML[unit] * d
@@ -91,13 +153,45 @@ export function gramsFor(food: Pick<Food, 'portions' | 'density' | 'liquid'>, am
   return Number.NaN
 }
 
-/** Kort etikett för en enhet, t.ex. "dl" eller "skiva". */
-export function unitLabel(food: Pick<Food, 'portions'>, unit: UnitKey): string {
+/**
+ * Vikten i gram av den RÅA/OKOKTA varan för en mängd i 'g-ra' eller 'dl-ra' ("1 dl okokt ris" →
+ * 85 g). NaN för andra enheter och när omräkningen saknas.
+ */
+export function rawGramsFor(food: Pick<Food, 'rawWeight'>, amount: number, unit: UnitKey): number {
+  if (!Number.isFinite(amount) || amount < 0 || !rawWeightOf(food)) return Number.NaN
+  if (unit === 'g-ra') return amount
+  if (unit === 'dl-ra') {
+    const d = rawDensityOf(food)
+    return d === undefined ? Number.NaN : amount * VOLUME_ML.dl * d
+  }
+  return Number.NaN
+}
+
+/** Kort etikett för en enhet, t.ex. "dl", "skiva", "g rå" eller "dl okokt". */
+export function unitLabel(food: Pick<Food, 'portions' | 'rawWeight'>, unit: UnitKey): string {
   if (isPortionUnit(unit)) {
     const id = unit.slice('portion:'.length)
     return food.portions.find((p) => p.id === id)?.label ?? 'portion'
   }
+  if (isRawUnit(unit)) return `${unit === 'dl-ra' ? 'dl' : 'g'} ${rawKindLabel(food, unit)}`
   return UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
+}
+
+/**
+ * Hjälptext för rå/okokt vikt: "Väg rått – Lagom räknar om till tillagad vikt (1 g rå ≈ 0,75 g
+ * tillagat)." Tom sträng när livsmedlet saknar omräkning.
+ */
+export function rawWeightHint(food: Pick<Food, 'rawWeight'>, unit: RawUnit = 'g-ra'): string {
+  const rw = rawWeightOf(food)
+  if (!rw) return ''
+  const kind = RAW_KIND_LABELS[rw.kind]
+  const verb = `${unit === 'dl-ra' ? 'Mät' : 'Väg'} ${RAW_KIND_NEUTER[rw.kind]}`
+  const cooked = (g: number) => `${formatNumber(g, g < 10 ? 2 : 0)} g tillagat`
+  if (unit === 'dl-ra') {
+    const perDl = gramsFor({ portions: [], rawWeight: rw }, 1, 'dl-ra')
+    if (Number.isFinite(perDl)) return `${verb} – Lagom räknar om till tillagad vikt (1 dl ${kind} ≈ ${cooked(perDl)}).`
+  }
+  return `${verb} – Lagom räknar om till tillagad vikt (1 g ${kind} ≈ ${cooked(rw.factor)}).`
 }
 
 /** Pluralformer för vanliga portionsord i livsmedelsdatabasen ("skiva" → "skivor"). */
@@ -254,19 +348,20 @@ export function formatPortionAmount(label: string, amount: number, grams?: numbe
 }
 
 /**
- * Läsbar mängd: "2 dl", "1 st (medel)", "150 g", "2 skivor". Med `withGrams` visas vikten inom
- * parentes – "2 dl (76 g)", "1 glas (2 dl, 206 g)" – men aldrig två gånger.
+ * Läsbar mängd: "2 dl", "1 st (medel)", "150 g", "2 skivor", "150 g rå". Med `withGrams` visas
+ * vikten inom parentes – "2 dl (76 g)", "1 glas (2 dl, 206 g)", "150 g rå (113 g tillagat)" – men
+ * aldrig två gånger.
  */
-export function formatAmount(
-  food: Pick<Food, 'portions' | 'density' | 'liquid'>,
-  amount: number,
-  unit: UnitKey,
-  withGrams = false,
-): string {
+export function formatAmount(food: UnitFood, amount: number, unit: UnitKey, withGrams = false): string {
   const amt = formatNumber(amount, amount < 10 ? 2 : 0)
   if (unit === 'g') return `${amt} g`
   const grams = gramsFor(food, amount, unit)
   if (isPortionUnit(unit)) return formatPortionAmount(unitLabel(food, unit), amount, withGrams ? grams : undefined)
+  if (isRawUnit(unit)) {
+    // "150 g rå (113 g tillagat)", "100 g torkad (230 g tillagat)", "1 dl okokt (230 g tillagat)".
+    const head = `${amt} ${unitLabel(food, unit)}`
+    return withGrams && Number.isFinite(grams) ? `${head} (${formatNumber(grams, 0)} g tillagat)` : head
+  }
   const tail = withGrams && Number.isFinite(grams) ? ` (${formatNumber(grams, 0)} g)` : ''
   return `${amt} ${unitLabel(food, unit)}${tail}`
 }

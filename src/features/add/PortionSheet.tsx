@@ -14,7 +14,7 @@ import { Button, IconButton, Sheet, useMediaQuery, type IconLike } from '../../c
 import { PortionPicker, type PortionSelection } from '../../components/domain/PortionPicker'
 import { hasUsableNutrition } from '../../lib/openFoodFacts'
 import { sourceMeta } from './addLogic'
-import { FoodSourceBadge } from './components'
+import { AverageBadge, FoodSourceBadge } from './components'
 
 export interface SheetAction {
   label: string
@@ -86,6 +86,7 @@ export function PortionSheet({
           <span className="flex flex-wrap items-center gap-1.5">
             {current.brand && <span className="text-ink-2">{current.brand}</span>}
             <FoodSourceBadge source={current.source} />
+            {current.isAverage && <AverageBadge />}
           </span>
         ) : undefined
       }

@@ -102,7 +102,9 @@ describe('ThankYouPage', () => {
     window.dispatchEvent(new Event('online'))
     // Nytt anrop + verifiering med WebCrypto – ge lite marginal när hela testsviten körs parallellt.
     expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' }, { timeout: 5000 })).toBeInTheDocument()
-  })
+    // Testets egen tidsgräns måste vara längre än väntan ovan (standard 5 s) – annars kan testet
+    // avbrytas precis innan rubriken hinner visas när sviten körs parallellt.
+  }, 15_000)
 
   it('en nyckel som inte går att verifiera sparas inte men visas så att den kan skickas till supporten', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ licenseKey: 'LAGOM1.trasig.nyckel' }))

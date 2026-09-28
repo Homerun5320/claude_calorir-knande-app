@@ -18,7 +18,7 @@ Lagom är en svensk kalori- och näringsdagbok (PWA): React 19 + TypeScript 6 + 
 - Kommentarer och all text som användaren ser skrivs på **svenska** med korrekt å/ä/ö. Kodidentifierare på engelska.
 - Siffror visas alltid med `src/lib/format.ts` (decimalkomma, `formatNumber`, `formatNutrient`, `formatEnergy`, `formatGrams`). Tolka inmatade tal med `parseSwedishNumber` (klarar "1,5").
 - Datum är lokala `ISODate`-strängar ('YYYY-MM-DD') – använd `src/lib/dates.ts` (`todayISO`, `addDays`, `relativeDayLabel`, `isoWeek` …). Veckan börjar på måndag.
-- Mått: `src/lib/units.ts` (`gramsFor`, `availableUnits`, `formatAmount`) – svenska köksmått dl/msk/tsk/krm/cl och portioner. `formatAmount(…, true)` böjer portionsord och upprepar aldrig gramvikten ("2 smörgåsar (124 g)").
+- Mått: `src/lib/units.ts` (`gramsFor`, `availableUnits`, `formatAmount`) – svenska köksmått dl/msk/tsk/krm/cl och portioner. `formatAmount(…, true)` böjer portionsord och upprepar aldrig gramvikten ("2 smörgåsar (124 g)"). Kött, fågel, fisk, pasta, ris och gryn anges tillagade; med `Food.rawWeight` finns enheterna `'g-ra'` ("g rå"/"g okokt") och `'dl-ra'` ("dl okokt") som räknas om till tillagad vikt.
 - Ett saknat näringsvärde (`undefined`) betyder okänt, inte 0. Visa "–".
 
 ## Zustand – viktigt
@@ -44,6 +44,15 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 - Ikoner: `lucide-react`. Animationer: `motion/react` (sparsamt, fjädrande; respektera reducerad rörelse).
 - Mobil först (375 px), innehåll max `max-w-3xl`. Tryckytor minst 44 px. Sidor har `px-4` och inleds med `PageHeader` (som hanterar safe area – lägg inte till `pt-safe` utöver den).
 - Tillgänglighet: semantiska element, `aria-label` på ikonknappar, etiketter på fält, synlig fokus.
+
+## Livsmedelsdatabasen
+
+- `src/data/foods/<fil>.ts` (9 filer, 855 kurerade livsmedel, id `lagom:<slug>`) skrivs med `defineFood`. En rad per vardagsbegrepp med kort, naturligt svenskt namn ("Kycklingbröst", inte "Kycklingbröstfilé, stekt, utan skinn"); varianter, märken och gamla namn blir sökord (`syn`).
+- Kött, fågel, fisk, pasta, ris, gryn och torkade baljväxter anges **tillagade** med `raw: [faktor, 'ra' | 'okokt' | 'torkad' | 'fryst', densitet?]` (→ `Food.rawWeight`, enheterna `'g-ra'`/`'dl-ra'`, "g rå", "g okokt", "g fryst" …). Inga separata rå/okokta rader. Frukt och grönsaker som äts råa är råa. Undantag som anges torra eftersom de används torra: havregryn, mannagryn, snabbgröt, grötris och mjöl.
+- Produkttyper med många märken (havredryck, granola, läsk, chips, korv …) är **samlingsvärden**: `avg: true` (→ `Food.isAverage`), inget `brand`, och en `note` som börjar "Samlingsvärde: …" och hänvisar till streckkoden för exakta märken.
+- Ta aldrig bort eller byt ett id utan alias: `{ from, to, unit?, scale?, density? }` i `src/data/foods/aliases/<fil>.ts` (`unit: 'g-ra'` när en rå rad ersätts av den tillagade; `scale` när ersättaren har helt annan energi per gram, t.ex. tillagade → torra snabbnudlar; `density` för att räkna om gamla volymer). Kontrollera att gamla mängder ger ungefär samma energi hos ersättaren – annars behövs en egen rad eller `scale`. `legacy-ids.ts` är genererad – ändra inte. I `aliases/legacy-portions.ts` ändras inte befintliga rader; slås en rad ihop läggs dess gamla portioner till där. Slå upp livsmedel via `lib/foodRepo`/`useFood` (följer alias; `resolveFoodAlias`, `canonicalFoodId`, `aliasAmount`). Inbyggda recept (`src/data/recipes.ts`) och exempeldata (`src/lib/demo.ts`) pekar direkt på dagens id:n – det testas.
+- Livsmedelsverkets fullständiga databas (`public/data/livsmedelsverket.json`, 2 606 livsmedel, id `lmv:<nr>`) visas bara i sökningens hopfällda sektion "Fler från Livsmedelsverket" – även poster som sparats i `cachedFoods` (importen i Inställningar). Råa och okokta poster, torkade baljväxter och specialposter (barnmat, inälvor …) döljs där om sökningen inte innehåller ordet. Ett kurerat livsmedel länkas med `lmv` (nummer) bara när det är samma livsmedel med ungefär samma värden: den länkade posten fyller i saknade näringsämnen och döljs i sökningen.
+- Undvik att ett kurerat namn krockar med en inbyggd klassiker (`src/data/recipes.ts`), t.ex. "Färdiga köttbullar" mot receptet "Köttbullar".
 
 ## Ton
 

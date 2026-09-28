@@ -27,6 +27,7 @@ import { makeFoodEntry } from '../../lib/diary'
 import { gramsFor } from '../../lib/units'
 import { mealName } from '../../lib/meals'
 import { getBuiltinCatalog } from '../../lib/foodRepo'
+import { canonicalFoodId } from '../../data/foods/aliases'
 import { uid } from '../../lib/id'
 import { toast } from '../../components/ui/toast'
 import { countLabel } from './addLogic'
@@ -170,13 +171,15 @@ export function useAddFood(): UseAddFoodResult {
     /** Uppdatera statistik och offlinekopia – och notera ändringarna i `fx` för "Ångra". */
     const record = (food: Food, amount: number, unit: UnitKey, meal: MealId, fx: FoodEffects) => {
       const store = useFoodStore.getState()
-      const prev = fx.usage.get(food.id)
-      const before = prev ? prev.before : store.usage[food.id]
+      // Statistiken förs på det id som gäller i dag (`recordUsage` följer alias för gamla id:n).
+      const usageId = canonicalFoodId(food.id)
+      const prev = fx.usage.get(usageId)
+      const before = prev ? prev.before : store.usage[usageId]
       const wasCached = food.id in store.cachedFoods
       store.recordUsage(food.id, amount, unit, meal)
       cacheIfOnline(food)
       const after = useFoodStore.getState()
-      fx.usage.set(food.id, { before, after: after.usage[food.id], times: (prev?.times ?? 0) + 1, meal })
+      fx.usage.set(usageId, { before, after: after.usage[usageId], times: (prev?.times ?? 0) + 1, meal })
       if (!wasCached && food.id in after.cachedFoods) fx.cached.add(food.id)
     }
 

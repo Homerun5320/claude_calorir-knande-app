@@ -130,6 +130,26 @@ export interface FoodExtra {
   labels?: string[]
 }
 
+/**
+ * Omräkning mellan rå (okokt, torkad) och tillagad vikt för ett livsmedel som anges tillagat.
+ * Lagoms kött, fågel, fisk, pasta, ris, gryn och torkade baljväxter är tillagade som standard –
+ * med `rawWeight` kan man ändå väga varan rå ("g rå", "g okokt", "dl okokt") och få rätt värden.
+ */
+export interface RawWeight {
+  /**
+   * Gram tillagad vara per gram rå/okokt/torkad vara, t.ex. 0,75 för kycklingbröst (tappar vatten
+   * vid stekning) och 2,4 för pasta (suger upp vatten vid kokning).
+   */
+  factor: number
+  /**
+   * Hur den otillagade varan kallas: 'ra' ("rå"), 'okokt', 'torkad' eller 'fryst' (fryst vara som
+   * steks direkt, t.ex. vegofärs).
+   */
+  kind: 'ra' | 'okokt' | 'torkad' | 'fryst'
+  /** g/ml för den OTILLAGADE varan (t.ex. okokt ris) – aktiverar enheten "dl okokt". */
+  density?: number
+}
+
 export interface Food {
   /** Unikt id med prefix: 'lagom:', 'lmv:', 'off:', 'custom:', 'recipe:'. */
   id: string
@@ -161,6 +181,13 @@ export interface Food {
   note?: string
   /** Livsmedelsverkets livsmedelsnummer om känt. */
   lmvNumber?: number
+  /** Omräkning från rå/okokt vikt – livsmedlet självt anges tillagat (se `RawWeight`). */
+  rawWeight?: RawWeight
+  /**
+   * Samlingsvärde: genomsnitt av vanliga märken eller varianter i svenska butiker (t.ex. havredryck,
+   * granola). Exakta värden för ett visst märke fås via streckkoden.
+   */
+  isAverage?: boolean
   /** Extra produktinformation (främst från Open Food Facts). */
   extra?: FoodExtra
   createdAt?: number
@@ -170,9 +197,47 @@ export interface Food {
 /**
  * Enhet för en mängd. Volymenheter kräver `density` (eller liquid → 1,0 g/ml).
  * 'portion:<id>' refererar till `Food.portions[].id`.
+ * 'g-ra' (gram rå/okokt/torkad vara) och 'dl-ra' (dl okokt vara) kräver `Food.rawWeight`
+ * ('dl-ra' dessutom `rawWeight.density`) och räknas om till tillagad vikt.
  */
 export type VolumeUnit = 'ml' | 'cl' | 'dl' | 'l' | 'krm' | 'tsk' | 'msk'
-export type UnitKey = 'g' | 'kg' | VolumeUnit | `portion:${string}`
+export type RawUnit = 'g-ra' | 'dl-ra'
+export type UnitKey = 'g' | 'kg' | VolumeUnit | RawUnit | `portion:${string}`
+
+/**
+ * Hänvisning från ett borttaget eller sammanslaget livsmedels-id till dess ersättare, så att
+ * favoriter, Senaste, sparade måltider och inbyggda recept fortsätter att fungera.
+ */
+export interface FoodAlias {
+  /** Det gamla id:t, fullständigt ('lagom:kycklingfile-ra'). */
+  from: string
+  /** Ersättarens id, fullständigt ('lagom:kycklingfile-stekt'). Får inte själv vara ett alias. */
+  to: string
+  /**
+   * 'g-ra' när en rå/okokt rad ersätts av den tillagade raden: gamla mängder i gram är då rå vikt
+   * och anges i enheten 'g-ra', gamla volymer i 'dl-ra' (ersättaren måste ha `rawWeight`, och
+   * `rawWeight.density` om den gamla raden kunde mätas i dl). Se `aliasAmount`.
+   */
+  unit?: 'g-ra'
+  /**
+   * Gram hos ersättaren per gram av det gamla livsmedlet, när samma mängd annars skulle ge helt
+   * fel energi – t.ex. 85/485 för tillagade snabbnudlar (ett paket torra nudlar blir 485 g med
+   * vattnet), vars ersättare anges torr. Gäller gamla mängder i g, kg och (med `density`) volym;
+   * portioner följer `portions` eller behålls. Används inte tillsammans med `unit: 'g-ra'`.
+   */
+  scale?: number
+  /**
+   * Det gamla livsmedlets densitet (g/ml). Gamla volymer räknas då om till gram – rå vikt när
+   * `unit` är 'g-ra' – i stället för att tolkas med ersättarens densitet ("1 dl torr pärlcouscous"
+   * väger 75 g, men "1 dl okokt pasta" bara 40 g).
+   */
+  density?: number
+  /**
+   * Gamla portioner som ersättaren saknar eller som väger annorlunda där: ersättarens portions-id
+   * (sträng) eller den gamla portionens vikt i gram (tal – rå vikt när `unit` är 'g-ra').
+   */
+  portions?: Readonly<Record<string, number | string>>
+}
 
 // ---------------------------------------------------------------------------
 // Dagbok

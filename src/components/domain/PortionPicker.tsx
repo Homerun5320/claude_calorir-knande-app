@@ -3,6 +3,8 @@
  *
  * - Stor siffra i Fraunces (NumberField lg) som tar emot "1,5", "½" och "1 1/2".
  * - Enhetschips från `availableUnits(food)` med gramvikt: "1 st (medel) · 60 g", "dl · 40 g", "g".
+ *   Tillagade livsmedel med `rawWeight` får även "g rå"/"g okokt" (och "dl okokt") med en kort
+ *   hjälptext om omräkningen till tillagad vikt.
  * - Snabbval ½ · 1 · 1½ · 2 (portioner/mått) eller 50–200 g.
  * - Direkt förhandsvisning av energi och makron för den valda mängden, med energifördelning.
  * - Varnar om mängden inte kan räknas om till gram (t.ex. volym utan densitet).
@@ -27,11 +29,24 @@
  * återanvändning och tester.
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type Ref } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Scale } from 'lucide-react'
 import type { Food, Nutrients, UnitKey } from '../../types'
 import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
-import { UNIT_LABELS, availableUnits, defaultAmount, defaultUnit, gramsFor, isPortionUnit, isVolumeUnit, unitLabel } from '../../lib/units'
+import {
+  UNIT_LABELS,
+  availableUnits,
+  defaultAmount,
+  defaultUnit,
+  gramsFor,
+  isPortionUnit,
+  isRawUnit,
+  isVolumeUnit,
+  rawKindLabel,
+  rawWeightHint,
+  unitLabel,
+  type UnitFood,
+} from '../../lib/units'
 import { energyDistribution, nutrientsForGrams } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
 import { Button, cx, type IconLike } from '../ui/Button'
@@ -43,7 +58,7 @@ import { EnergyValue, useEnergyFormatter } from './EnergyValue'
 // Rena hjälpfunktioner
 // ---------------------------------------------------------------------------
 
-type PortionFood = Pick<Food, 'portions' | 'density' | 'liquid'>
+type PortionFood = UnitFood
 
 /** En vald mängd. `grams` är NaN om enheten inte kan räknas om. */
 export interface PortionSelection {
@@ -100,8 +115,12 @@ export function initialSelection(
 
 const round = (v: number, decimals: number) => Number(v.toFixed(decimals))
 
+/** Enheter där mängden anges exakt (inte i jämna portioner): gram, gram rå och ml. */
+const isExactUnit = (unit: UnitKey) => unit === 'g' || unit === 'g-ra' || unit === 'ml'
+
 /**
- * Ny mängd när enheten byts. Gram och ml behåller vikten ("1 st (60 g)" → 60 g). Andra enheter
+ * Ny mängd när enheten byts. Gram (även rå vikt) och ml behåller vikten ("1 st (60 g)" → 60 g,
+ * 113 g tillagat → 151 g rå). Andra enheter
  * behåller vikten om den blir ett jämnt antal (hela, halva eller kvarts), annars enhetens
  * standardmängd – hellre "1 dl" än "1,37 dl".
  */
@@ -110,22 +129,22 @@ export function amountForUnitChange(food: PortionFood, amount: number, from: Uni
   const perUnit = gramsFor(food, 1, to)
   if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(perUnit) || perUnit <= 0) return defaultAmount(to)
   const exact = grams / perUnit
-  if (to === 'g' || to === 'ml') return Math.max(1, round(exact, exact >= 20 ? 0 : 1))
+  if (isExactUnit(to)) return Math.max(1, round(exact, exact >= 20 ? 0 : 1))
   const quarter = Math.round(exact * 4) / 4
   if (quarter > 0 && Math.abs(exact - quarter) / exact <= 0.04) return quarter
   return defaultAmount(to)
 }
 
-/** Basen som snabbvalen multipliceras med: 100 g/ml, 10 cl, annars 1 (portion, dl, msk …). */
+/** Basen som snabbvalen multipliceras med: 100 g/ml (även rå vikt), 10 cl, annars 1 (portion, dl, msk …). */
 export function multiplierBase(unit: UnitKey): number {
-  if (unit === 'g' || unit === 'ml') return 100
+  if (isExactUnit(unit)) return 100
   if (unit === 'cl') return 10
   return 1
 }
 
 /** Steglängd för −/+ och piltangenter. */
 export function unitStep(unit: UnitKey): number {
-  if (unit === 'g') return 10
+  if (unit === 'g' || unit === 'g-ra') return 10
   if (unit === 'ml') return 50
   if (unit === 'cl') return 5
   if (unit === 'l' || unit === 'kg') return 0.25
@@ -151,12 +170,13 @@ export function portionNoun(label: string): string {
     .toLocaleLowerCase('sv-SE')
 }
 
-/** Kort enhet efter den stora siffran: "g", "dl", "st", "skiva" – eller "×" för långa portionsnamn. */
-export function amountSuffix(food: Pick<Food, 'portions'>, unit: UnitKey): string {
+/** Kort enhet efter den stora siffran: "g", "dl", "st", "skiva", "g rå" – eller "×" för långa portionsnamn. */
+export function amountSuffix(food: Pick<Food, 'portions' | 'rawWeight'>, unit: UnitKey): string {
   if (isPortionUnit(unit)) {
     const noun = portionNoun(unitLabel(food, unit))
     return noun && noun.length <= 9 ? noun : '×'
   }
+  if (isRawUnit(unit)) return unitLabel(food, unit)
   return UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
 }
 
@@ -170,18 +190,27 @@ export function unitChipLabel(food: PortionFood, unit: UnitKey): { label: string
     return { label, detail: /\d\s*(g|ml)\b/i.test(label) ? undefined : g }
   }
   if (unit === 'g') return { label: 'g' }
-  const label = UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
-  if (isVolumeUnit(unit) && food.liquid) return { label }
+  // "g rå" behöver ingen vikt (hjälptexten förklarar omräkningen); "dl okokt · 230 g tillagat"
+  // anger den tillagade vikten som 1 dl okokt vara ger.
+  if (unit === 'g-ra') return { label: unitLabel(food, unit) }
+  if (unit === 'dl-ra') return { label: unitLabel(food, unit), detail: g && `${g} tillagat` }
+  const short = UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
+  if (isVolumeUnit(unit) && food.liquid) return { label: short }
+  // Tillagat som standard: "dl tillagat · 70 g" bredvid "dl okokt · 230 g tillagat".
+  const label = isVolumeUnit(unit) && food.rawWeight ? `${short} tillagat` : short
   return { label, detail: g }
 }
 
-/** Snabbvalens mängder och etiketter för en enhet. */
+/**
+ * Snabbvalens mängder och etiketter för en enhet. Rå/okokt vikt visas kort ("50 g", "1 dl") –
+ * enheten syns redan efter siffran; skärmläsare får hela enheten via `rawKindLabel`.
+ */
 export function quickChoices(unit: UnitKey): Array<{ amount: number; label: string }> {
   const base = multiplierBase(unit)
   return QUICK_MULTIPLIERS.map((m) => {
     const amount = m * base
     if (isPortionUnit(unit)) return { amount, label: formatFraction(amount) }
-    const short = UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit
+    const short = unit === 'g-ra' ? 'g' : unit === 'dl-ra' ? 'dl' : (UNIT_LABELS[unit as keyof typeof UNIT_LABELS]?.short ?? unit)
     return { amount, label: `${base === 1 ? formatFraction(amount) : formatNumber(amount)} ${short}` }
   })
 }
@@ -212,6 +241,7 @@ export function amountHint(food: PortionFood, amount: number, unit: UnitKey): st
   const grams = gramsFor(food, amount, unit)
   if (!Number.isFinite(grams)) return ''
   const g = `≈ ${formatNumber(grams, grams < 10 ? 1 : 0)} g`
+  if (isRawUnit(unit)) return `${g} tillagat`
   if (isPortionUnit(unit) && amountSuffix(food as Pick<Food, 'portions'>, unit) === '×') {
     const label = unitLabel(food as Pick<Food, 'portions'>, unit)
     return amount === 1 && /\d\s*(g|ml)\b/i.test(label) ? label : `${label} · ${g}`
@@ -337,6 +367,7 @@ export function PortionPicker({
   const quick = quickChoices(unit)
   const suffix = amountSuffix(food, unit)
   const hint = amount !== undefined ? amountHint(food, amount, unit) : ''
+  const rawHint = isRawUnit(unit) ? rawWeightHint(food, unit) : ''
   const liveSummary = !valid
     ? ''
     : mindful
@@ -356,7 +387,7 @@ export function PortionPicker({
           value={amount}
           onChange={setAmount}
           min={0}
-          max={unit === 'g' || unit === 'ml' ? 10000 : 1000}
+          max={isExactUnit(unit) ? 10000 : 1000}
           step={unitStep(unit)}
           decimals={2}
           suffix={suffix}
@@ -382,7 +413,7 @@ export function PortionPicker({
               size="sm"
               selected={amount !== undefined && Math.abs(amount - q.amount) < 1e-9}
               onClick={() => setAmount(q.amount)}
-              aria-label={isPortionUnit(unit) ? `${q.label} × ${unitLabel(food, unit)}` : q.label}
+              aria-label={isPortionUnit(unit) ? `${q.label} × ${unitLabel(food, unit)}` : isRawUnit(unit) ? `${q.label} ${rawKindLabel(food, unit)}` : q.label}
               className="min-w-12 justify-center"
             >
               {q.label}
@@ -408,6 +439,13 @@ export function PortionPicker({
           })}
         </div>
       </div>
+
+      {rawHint && (
+        <p className="-mt-2 flex items-start gap-2 text-sm text-ink-2">
+          <Scale className="mt-0.5 size-4 shrink-0 text-gran" aria-hidden />
+          <span>{rawHint}</span>
+        </p>
+      )}
 
       {amount !== undefined && !gramsKnown && (
         <div role="alert" className="flex items-start gap-2.5 rounded-2xl bg-hjortron-soft px-4 py-3 text-sm text-ink">

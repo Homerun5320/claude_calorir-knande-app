@@ -62,3 +62,38 @@ export const unknownEnergy: Food = {
   nutrients: {},
   portions: [],
 }
+
+/** Tillagat som standard – kan vägas rått ("g rå"). */
+export const kycklingbrost: Food = {
+  id: 'lagom:kycklingbrost-test',
+  name: 'Kycklingbröst',
+  source: 'lagom',
+  category: 'fagel',
+  nutrients: { kcal: 150, protein: 30, carbs: 0, fat: 3 },
+  portions: [{ id: 'file', label: '1 filé (ca 95 g)', grams: 95 }],
+  rawWeight: { factor: 0.75, kind: 'ra' },
+}
+
+/** Kokt ris som kan mätas okokt i gram och dl. */
+export const risKokt: Food = {
+  id: 'lagom:ris-test',
+  name: 'Ris',
+  source: 'lagom',
+  category: 'pasta_ris',
+  nutrients: { kcal: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+  portions: [],
+  rawWeight: { factor: 2.7, kind: 'okokt', density: 0.85 },
+}
+
+/** Samlingsvärde: genomsnitt av vanliga märken. */
+export const havredryckSnitt: Food = {
+  id: 'lagom:havredryck-test',
+  name: 'Havredryck',
+  source: 'lagom',
+  category: 'vaxtdryck',
+  nutrients: { kcal: 45, protein: 1, carbs: 6.5, fat: 1.5 },
+  portions: [{ id: 'glas', label: '1 glas (2 dl)', grams: 206 }],
+  liquid: true,
+  isAverage: true,
+  note: 'Samlingsvärde: genomsnitt av vanliga märken (t.ex. Oatly, Planti, Garant). Skanna streckkoden för exakta värden för ditt märke.',
+}

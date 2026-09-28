@@ -4,6 +4,10 @@
  * /lagg-till?maltid=frukost&datum=2026-09-26&flik=senaste&q=gröt
  *
  * - Sök direkt bland 1 000+ svenska livsmedel (lokalt, fungerar offline) och vid behov i Open Food Facts.
+ *   Huvudträffarna är Lagoms kurerade livsmedel (grova linjer och samlingsvärden) plus egna; övriga
+ *   poster från Livsmedelsverkets fullständiga databas ligger i en hopfälld sektion under dem
+ *   (utfälld när huvudträffarna är få). Är översta träffen ett samlingsvärde föreslås streckkoden
+ *   för det exakta märket.
  * - Utan sökning: "Brukar du äta till frukost" (ett tryck lägger i korgen), kopiera från igår,
  *   senaste, favoriter, egna livsmedel/recept och sparade måltider.
  * - Tryck på en rad → välj mängd → "Lägg till i Frukost" (eller "Lägg i korgen"). "+" på raden
@@ -14,7 +18,7 @@
  * - Dator: sök → Enter (första träffen) → skriv mängd → Enter.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CalendarDays,
@@ -95,11 +99,17 @@ interface Picked {
   unit?: UnitKey
 }
 
-/** Skärmläsartext för sökresultatet. */
-export function searchAnnouncement(q: string, count: number): string {
-  if (count === 0) return `Inga träffar för ”${q}”. Prova ett annat ord, sök online eller snabbregistrera.`
-  return `${count === 1 ? '1 träff' : `${count} träffar`} för ”${q}”`
+/** Skärmläsartext för sökresultatet. `lmvCount` = träffar i sektionen "Fler från Livsmedelsverket". */
+export function searchAnnouncement(q: string, count: number, lmvCount = 0): string {
+  if (count === 0 && lmvCount === 0) return `Inga träffar för ”${q}”. Prova ett annat ord, sök online eller snabbregistrera.`
+  const hits = (n: number) => (n === 1 ? '1 träff' : `${n} träffar`)
+  if (count === 0) return `${hits(lmvCount)} från Livsmedelsverket för ”${q}”`
+  const main = `${hits(count)} för ”${q}”`
+  return lmvCount > 0 ? `${main} och ${lmvCount} till från Livsmedelsverket` : main
 }
+
+/** Under så här många huvudträffar fälls "Fler från Livsmedelsverket" ut automatiskt. */
+export const LMV_AUTO_OPEN_BELOW = 3
 
 export default function AddFoodPage() {
   const [params, setParams] = useSearchParams()
@@ -149,7 +159,10 @@ export default function AddFoodPage() {
   const [query, setQuery] = useState(() => params.get('q') ?? '')
   const q = query.trim()
   const searchRef = useRef<HTMLInputElement>(null)
-  const { results, loading, pending } = useFoodSearch(q, { meal, limit: 40 })
+  const { results, lmvResults, loading, pending } = useFoodSearch(q, { meal, limit: 40 })
+  // Livsmedelsverkets sektion: utfälld när huvudträffarna är få – användarens eget val gäller för sökningen.
+  const [lmvToggle, setLmvToggle] = useState<{ q: string; open: boolean } | null>(null)
+  const lmvOpen = lmvToggle?.q === q ? lmvToggle.open : results.length < LMV_AUTO_OPEN_BELOW
 
   // Spara söktexten i adressen (fördröjt) så att den finns kvar efter ett besök på detaljsidan.
   const urlQuery = params.get('q') ?? ''
@@ -220,7 +233,7 @@ export default function AddFoodPage() {
 
   // Skärmläsare: berätta hur många träffar det blev när sökningen har landat.
   const settled = q !== '' && !loading && !pending
-  const announcement = settled ? searchAnnouncement(q, results.length) : ''
+  const announcement = settled ? searchAnnouncement(q, results.length, lmvResults.length) : ''
   const [announced, setAnnounced] = useState('')
   useEffect(() => {
     const t = window.setTimeout(() => setAnnounced(announcement), 500)
@@ -269,9 +282,10 @@ export default function AddFoodPage() {
       : [addDirect(`Lägg till i ${mealLabel}`), toBasket]
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && results[0]) {
+    const first = results[0] ?? (lmvOpen ? lmvResults[0] : undefined)
+    if (e.key === 'Enter' && first) {
       e.preventDefault()
-      pick(results[0].food)
+      pick(first.food)
     } else if (e.key === 'Escape' && query) {
       e.preventDefault()
       setQuery('')
@@ -339,11 +353,23 @@ export default function AddFoodPage() {
                   </li>
                 ))}
               </RowList>
+              {results[0]?.food.isAverage && (
+                <Link
+                  to={scanHref({ meal, date })}
+                  state={{ from: 'lagg-till' }}
+                  className="mt-1 flex min-h-11 items-center gap-2 rounded-2xl px-1 text-sm text-ink-2 transition-colors hover:text-ink"
+                >
+                  <ScanBarcode className="size-4 shrink-0 text-gran" aria-hidden />
+                  <span>
+                    Letar du efter ett visst märke? <span className="font-semibold text-gran">Skanna streckkoden</span>
+                  </span>
+                </Link>
+              )}
               <p className="mt-2 px-1 text-xs text-ink-3">
                 Lagom = granskad svensk databas · LMV = Livsmedelsverket · {desktop ? 'Högerklicka på' : 'Håll inne'} en rad för detaljer.
               </p>
             </div>
-          ) : loading || pending ? (
+          ) : (loading || pending) && lmvResults.length === 0 ? (
             <RowList>
               {Array.from({ length: 5 }, (_, i) => (
                 <li key={i} className="py-2">
@@ -351,13 +377,57 @@ export default function AddFoodPage() {
                 </li>
               ))}
             </RowList>
-          ) : (
+          ) : lmvResults.length === 0 ? (
             <EmptyState
               compact
               illustration="search"
               title={`Inga träffar för ”${q}”`}
               text="Prova ett annat ord eller en kortare stavning – eller leta bland märkesvaror online."
             />
+          ) : null}
+
+          {lmvResults.length > 0 && (
+            <section aria-labelledby="lmv-traffar-rubrik" className={cx('transition-opacity', pending && 'opacity-60')}>
+              <h2 id="lmv-traffar-rubrik">
+                <button
+                  type="button"
+                  aria-expanded={lmvOpen}
+                  aria-controls="lmv-traffar"
+                  aria-label={`Fler från Livsmedelsverket, ${lmvResults.length === 1 ? '1 träff' : `${lmvResults.length} träffar`}`}
+                  onClick={() => setLmvToggle({ q, open: !lmvOpen })}
+                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl px-1 text-left"
+                >
+                  <span className="eyebrow">Fler från Livsmedelsverket</span>
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink-2">
+                    <span className="tabular-nums">{lmvResults.length}</span>
+                    <ChevronDown className={cx('size-4 transition-transform duration-200', lmvOpen && 'rotate-180')} aria-hidden />
+                  </span>
+                </button>
+              </h2>
+              <div id="lmv-traffar" hidden={!lmvOpen}>
+                {lmvOpen && (
+                  <>
+                    <p className="mb-2 px-1 text-xs text-ink-3">
+                      Livsmedelsverkets fullständiga databas – mer specifika varianter och råvaror, med officiella näringsvärden.
+                    </p>
+                    <RowList>
+                      {lmvResults.map((r) => (
+                        <li key={r.food.id}>
+                          <AddRow
+                            food={r.food}
+                            onPick={pick}
+                            onQuickAdd={quickAdd}
+                            onDetails={details}
+                            inBasket={basketCount(r.food.id)}
+                            {...lastAmount(usage, r.food)}
+                          />
+                        </li>
+                      ))}
+                    </RowList>
+                  </>
+                )}
+              </div>
+            </section>
           )}
 
           <OnlineSearch query={q} onPick={pick} onQuickAdd={quickAdd} onDetails={details} basketCount={basketCount} />

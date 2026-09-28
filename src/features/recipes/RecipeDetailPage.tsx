@@ -583,7 +583,9 @@ function IngredientsCard({
         <span>
           {weight.cooked
             ? `Färdig vikt ${formatGrams(weight.final * factor)} (rå ${formatGrams(weight.raw * factor)}). `
-            : `Total vikt ${formatGrams(weight.raw * factor)}. `}
+            : weight.rawUnits
+              ? `Total vikt ca ${formatGrams(weight.final * factor)} (rå ${formatGrams(weight.raw * factor)}). `
+              : `Total vikt ${formatGrams(weight.raw * factor)}. `}
           {cookedWeightText(weight)}
         </span>
       </div>

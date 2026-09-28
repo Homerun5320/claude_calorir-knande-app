@@ -23,8 +23,48 @@ const mjolk: Food = {
   liquid: true,
 }
 
+const kyckling: Food = {
+  id: 'lagom:test-kycklingbrost',
+  name: 'Kycklingbröst',
+  source: 'lagom',
+  category: 'fagel',
+  nutrients: { kcal: 150, protein: 30, carbs: 0, fat: 3 },
+  portions: [],
+  rawWeight: { factor: 0.75, kind: 'ra' },
+}
+
+const havredryck: Food = {
+  id: 'lagom:test-havredryck',
+  name: 'Havredryck',
+  source: 'lagom',
+  category: 'vaxtdryck',
+  nutrients: { kcal: 45, protein: 1, carbs: 6.5, fat: 1.5 },
+  portions: [],
+  liquid: true,
+  isAverage: true,
+  note: 'Samlingsvärde: genomsnitt av vanliga märken.',
+}
+
 describe('backup', () => {
   beforeEach(() => wipeAllData())
+
+  it('behåller rå vikt och samlingsvärden genom export och återställning', () => {
+    useDiaryStore.getState().addEntry({ kind: 'food', food: kyckling, amount: 200, unit: 'g-ra', grams: 150, date: '2026-09-20', meal: 'middag' })
+    useDiaryStore.getState().addEntry({ kind: 'food', food: havredryck, amount: 2, unit: 'dl', grams: 200, date: '2026-09-20', meal: 'frukost' })
+    useFoodStore.getState().recordUsage(kyckling.id, 200, 'g-ra', 'middag')
+    const json = JSON.stringify(createBackup())
+    wipeAllData()
+    const parsed = parseBackup(json)
+    expect(parsed.repairs?.repaired ?? 0).toBe(0)
+    restoreBackup(parsed, 'replace')
+    const [middag] = useDiaryStore.getState().entries['2026-09-20'].filter((e) => e.kind === 'food' && e.meal === 'middag')
+    expect(middag).toMatchObject({ amount: 200, unit: 'g-ra', grams: 150, food: { rawWeight: { factor: 0.75, kind: 'ra' } } })
+    const frukost = useDiaryStore.getState().entries['2026-09-20'].find((e) => e.kind === 'food' && e.meal === 'frukost')
+    expect(frukost?.kind === 'food' && frukost.food.isAverage).toBe(true)
+    expect(useFoodStore.getState().usage[kyckling.id]).toMatchObject({ lastAmount: 200, lastUnit: 'g-ra' })
+    // CSV:en skriver enheten i klartext.
+    expect(diaryToCsv(useDiaryStore.getState().entries)).toContain(';200;g rå;150;')
+  })
 
   it('exporterar och återställer (ersätt)', () => {
     useDiaryStore.getState().addEntry({ kind: 'food', food: mjolk, amount: 1, unit: 'portion:glas', grams: 206, date: '2026-09-20', meal: 'frukost' })

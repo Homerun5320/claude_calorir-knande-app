@@ -52,6 +52,20 @@ const problems = (food: Food): string[] => {
     const s = food.plate.veg + food.plate.carb + food.plate.protein
     if (s > 1.001) out.push('plate-andelar summerar > 1')
   }
+  // Tillagat som standard: omräkningen från rå/okokt vikt ska vara rimlig och namnet ska inte säga "rå".
+  const rw = food.rawWeight
+  if (rw) {
+    // Upp till ca 5 för polenta (1 del majsgryn + 4 delar vatten).
+    if (!(rw.factor >= 0.3 && rw.factor <= 6)) out.push(`orimlig rå-faktor ${rw.factor} (gram tillagat per gram rått, 0,3–6)`)
+    if (!['ra', 'okokt', 'torkad', 'fryst'].includes(rw.kind)) out.push(`okänt rå-slag ${rw.kind}`)
+    if (rw.density !== undefined && !(rw.density > 0.1 && rw.density < 1.5)) out.push(`orimlig densitet för okokt vara ${rw.density}`)
+    if (/(^|\s|,)(rå|råa|okokt|okokta)(\s|,|$)/i.test(food.name)) out.push('rawWeight anges på den tillagade raden – namnet ska inte säga rå/okokt')
+  }
+  // Samlingsvärden: genomsnitt av flera märken – inget varumärke, och förklaringen står i note.
+  if (food.isAverage) {
+    if (food.brand) out.push('samlingsvärde (avg) ska inte ha brand')
+    if (!food.note?.includes('Samlingsvärde')) out.push('samlingsvärde (avg) behöver note som börjar med "Samlingsvärde: …"')
+  }
   return out
 }
 

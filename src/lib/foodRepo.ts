@@ -19,6 +19,10 @@
  *    svenska portioner och sökord), men det går fortfarande att slå upp på id ('lmv:150') så att
  *    gamla dagboksposter, favoriter och Senaste fungerar.
  *
+ * Id:n som tagits bort eller slagits ihop i Lagoms databas har alias (`data/foods/aliases`) till
+ * ersättaren. Katalogens `byId` och alla uppslag här följer aliasen, så att gamla favoriter,
+ * Senaste, länkar och recept hittar den nya raden (med ersättarens id).
+ *
  * Den inbyggda katalogen publiceras normalt en gång, komplett. Dröjer Livsmedelsverkets fil
  * publiceras den i två steg: först Lagoms egna livsmedel (så att sökningen fungerar direkt), sedan
  * berikat och sammanslaget med Livsmedelsverkets data. Prenumerera med `subscribeBuiltinCatalog`
@@ -30,6 +34,7 @@ import { useFoodStore } from '../stores/foodStore'
 import { NUTRIENT_KEYS, saltFromSodiumMg, sodiumMgFromSalt, type NutrientKey } from './nutrients'
 import { recipeFoodId, recipeToFood } from './recipes'
 import { fetchProductByBarcode, normalizeBarcode, searchProducts, type SearchProductsOptions } from './openFoodFacts'
+import { FOOD_ALIASES, resolveFoodAlias } from '../data/foods/aliases'
 
 // ---------------------------------------------------------------------------
 // Användarens livsmedel
@@ -167,7 +172,7 @@ export interface BuiltinCatalog {
   foods: Food[]
   /**
    * Alla inbyggda livsmedel per id, även dolda dubbletter – och de inbyggda recepten som
-   * livsmedel ('recipe:klassiker-*').
+   * livsmedel ('recipe:klassiker-*'). Gamla id:n med alias ger ersättaren (med ersättarens id).
    */
   byId: ReadonlyMap<string, Food>
   /**
@@ -409,6 +414,11 @@ function buildCatalog(
   const byId = new Map<string, Food>()
   for (const f of curated) if (!byId.has(f.id)) byId.set(f.id, f)
   for (const f of recipeFoods) if (!byId.has(f.id)) byId.set(f.id, f)
+  // Borttagna och sammanslagna id:n pekar på ersättaren.
+  for (const [from, alias] of FOOD_ALIASES) {
+    const target = byId.has(from) ? undefined : byId.get(alias.to)
+    if (target) byId.set(from, target)
+  }
   if (lmvFoods.length === 0) return { foods: curated, byId, recipes, recipeFoods, complete, lmv }
   // Kurerade Lagom-livsmedel med känt livsmedelsnummer ersätter Livsmedelsverkets post i sökningen.
   const linked = new Set<number>()
@@ -501,12 +511,21 @@ export async function loadBuiltinFoods(): Promise<Food[]> {
 // Uppslag
 // ---------------------------------------------------------------------------
 
+/** Ett inbyggt livsmedel på id – följer alias för borttagna och sammanslagna id:n. */
+export function builtinFood(cat: BuiltinCatalog | null | undefined, id: string): Food | undefined {
+  if (!cat) return undefined
+  const direct = cat.byId.get(id)
+  if (direct) return direct
+  const alias = resolveFoodAlias(id)
+  return alias ? cat.byId.get(alias.to) : undefined
+}
+
 /**
  * Synkront uppslag bland det som redan finns i minnet: användarens livsmedel, den inbyggda
- * katalogen (om den är inläst) och sessionens onlineprodukter.
+ * katalogen (om den är inläst, även via alias) och sessionens onlineprodukter.
  */
 export function resolveFoodSync(id: string): Food | undefined {
-  return findUserFood(useFoodStore.getState(), id) ?? catalog?.byId.get(id) ?? remembered.get(id)
+  return findUserFood(useFoodStore.getState(), id) ?? builtinFood(catalog, id) ?? remembered.get(id)
 }
 
 /**
@@ -518,7 +537,7 @@ export async function getFoodById(id: string, opts: { online?: boolean; signal?:
   const local = resolveFoodSync(id)
   if (local) return local
   const cat = await loadBuiltinCatalog()
-  const builtin = cat.byId.get(id) ?? resolveFoodSync(id)
+  const builtin = builtinFood(cat, id) ?? resolveFoodSync(id)
   if (builtin) return builtin
   if (opts.online && id.startsWith('off:')) {
     const food = await fetchProductByBarcode(id.slice(4), opts.signal)

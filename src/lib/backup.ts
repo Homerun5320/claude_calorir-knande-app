@@ -5,7 +5,7 @@
 import { useBodyStore } from '../stores/bodyStore'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useFastingStore } from '../stores/fastingStore'
-import { useFoodStore } from '../stores/foodStore'
+import { migrateFoodRefs, useFoodStore } from '../stores/foodStore'
 import { useProfileStore, DEFAULT_SETTINGS } from '../stores/profileStore'
 import { useLicenseStore } from '../stores/licenseStore'
 import { COMMERCE_MODE } from '../config/commerce'
@@ -15,6 +15,7 @@ import { entryNutrients } from './diary'
 import { NUTRIENTS, type NutrientKey } from './nutrients'
 import { todayISO } from './dates'
 import { mealName } from './meals'
+import { isRawUnit, unitLabel } from './units'
 import { describeRepairs, sanitizeBackupData, skippedCount, type BackupRepairs } from './backupValidation'
 
 export const BACKUP_FORMAT = 'lagom-backup'
@@ -158,14 +159,17 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   if (mode === 'replace') {
     useProfileStore.setState({ profile: profile.profile ?? null, settings: { ...DEFAULT_SETTINGS, ...(profile.settings ?? {}) } })
     useDiaryStore.setState({ entries: diary.entries ?? {}, water: diary.water ?? {}, exercise: diary.exercise ?? {}, days: diary.days ?? {} })
-    useFoodStore.setState({
-      customFoods: food.customFoods ?? {},
-      recipes: food.recipes ?? {},
-      cachedFoods: food.cachedFoods ?? {},
-      favorites: food.favorites ?? [],
-      usage: food.usage ?? {},
-      templates: food.templates ?? [],
-    })
+    // Gamla livsmedels-id:n i en äldre säkerhetskopia skrivs om till ersättarna (alias).
+    useFoodStore.setState(
+      migrateFoodRefs({
+        customFoods: food.customFoods ?? {},
+        recipes: food.recipes ?? {},
+        cachedFoods: food.cachedFoods ?? {},
+        favorites: food.favorites ?? [],
+        usage: food.usage ?? {},
+        templates: food.templates ?? [],
+      }),
+    )
     useBodyStore.setState({ weights: body.weights ?? [], measurements: body.measurements ?? [] })
     useFastingStore.setState({ active: fasting?.active ?? null, history: fasting?.history ?? [] })
     return
@@ -192,14 +196,16 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   useDiaryStore.setState({ entries, exercise, water, days })
 
   const f = useFoodStore.getState()
-  useFoodStore.setState({
-    customFoods: { ...(food.customFoods ?? {}), ...f.customFoods },
-    recipes: { ...(food.recipes ?? {}), ...f.recipes },
-    cachedFoods: { ...(food.cachedFoods ?? {}), ...f.cachedFoods },
-    favorites: [...new Set([...f.favorites, ...(food.favorites ?? [])])],
-    usage: { ...(food.usage ?? {}), ...f.usage },
-    templates: mergeById(f.templates, food.templates),
-  })
+  useFoodStore.setState(
+    migrateFoodRefs({
+      customFoods: { ...(food.customFoods ?? {}), ...f.customFoods },
+      recipes: { ...(food.recipes ?? {}), ...f.recipes },
+      cachedFoods: { ...(food.cachedFoods ?? {}), ...f.cachedFoods },
+      favorites: [...new Set([...f.favorites, ...(food.favorites ?? [])])],
+      usage: { ...(food.usage ?? {}), ...f.usage },
+      templates: mergeById(f.templates, food.templates),
+    }),
+  )
 
   const bo = useBodyStore.getState()
   const weightDates = new Set(bo.weights.map((w) => w.date))
@@ -300,7 +306,7 @@ export function diaryToCsv(entries: Record<ISODate, DiaryEntry[]>, meals: MealCo
       const meal = mealName(meals, e.meal)
       const base =
         e.kind === 'food'
-          ? [date, meal, e.time ?? '', e.food.name, e.food.brand ?? '', e.amount, e.unit.replace('portion:', ''), e.grams]
+          ? [date, meal, e.time ?? '', e.food.name, e.food.brand ?? '', e.amount, isRawUnit(e.unit) ? unitLabel(e.food, e.unit) : e.unit.replace('portion:', ''), e.grams]
           : [date, meal, e.time ?? '', e.name, '', 1, 'snabbregistrering', undefined]
       rows.push([...base, ...CSV_NUTRIENTS.map((k) => n[k])].map((v) => csvCell(v as string | number | undefined)).join(';'))
     }

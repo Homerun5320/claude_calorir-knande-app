@@ -12,11 +12,14 @@
  * Matchning per sökord
  * - exakt ord, början av ord ("kyck" → "Kyckling"),
  * - svenska sammansättningar: huvudordet sist ("ost" → "Prästost", "filé" → "Kycklingbröstfilé")
- *   och delar inuti ("bröst" → "Kycklingbröstfilé"),
+ *   och delar inuti ("bröst" → "Kycklingbröstfilé") – men inte ord som bara råkar sluta likadant
+ *   ("Ankbröst" och "Råkost" är ingen ost, "Kapris" och "Polkagris" inget ris, se `FALSE_HEADS`),
  * - lätt stamning av böjningsformer ("köttbulle" ↔ "köttbullar", "tomater" ↔ "tomat"),
  * - synonymer (`food.synonyms`) och varumärke,
  * - stavfel med Damerau–Levenshtein: högst 1 fel för ord med minst 4 tecken, 2 från 8 tecken.
  *   Stavfelstolerans används bara när sökordet inte redan ger tydliga träffar (mindre brus).
+ * - valfria ord (`SearchOptions.optionalWords`, t.ex. "rå" i huvudsökningen) behöver inte matcha:
+ *   "nötfärs rå" söker som "nötfärs".
  *
  * Rankning (nivåer ligger ca 200 poäng isär, se `SEARCH_TIERS`)
  *   exakt namn > namnet börjar med sökningen > alla ord finns i namnet > synonym/varumärke > stavfel.
@@ -58,6 +61,13 @@ export interface SearchOptions {
    * poäng isär, så en boost på 0–250 flyttar ett livsmedel inom och ibland mellan närliggande nivåer.
    */
   boost?: (food: Food) => number
+  /** Ta bara med livsmedel där funktionen ger true – filtreras innan listan kapas vid `limit`. */
+  filter?: (food: Food) => boolean
+  /**
+   * Ord i sökningen som inte behöver matcha (normaliserade, med och utan å/ä/ö), t.ex. "rå" när
+   * alla rader anges tillagade. Består sökningen bara av sådana ord söks de ändå.
+   */
+  optionalWords?: ReadonlySet<string>
 }
 
 /** Oföränderligt sökindex. Skapas med `createSearchIndex`. */
@@ -77,7 +87,7 @@ export const SEARCH_TIERS = {
   prefixInWord: 700,
   /** Namnet börjar med sökningen men resten är för kort för att vara ett eget ord ("Ostron" för "ost"). */
   prefixShort: 650,
-  /** Hela sökningen är exakt en av livsmedlets synonymer. */
+  /** Hela sökningen är exakt en av livsmedlets synonymer (och finns inte i namnet). */
   synonymExact: 650,
   token: 600,
   synonym: 400,
@@ -85,6 +95,13 @@ export const SEARCH_TIERS = {
   /** Delvis träff (minst hälften av orden) – visas bara när det finns få fullständiga träffar. */
   partial: 0,
 } as const
+
+/**
+ * Extra poäng när hela sökningen är exakt en av livsmedlets synonymer men namnet också matchar
+ * (t.ex. "kyckling" → Kycklingbröst, "fil" → Filmjölk). Avgör ordningen inom en nivå, så att
+ * vardagsbegreppet kommer före sammansättningar och rätter ("Grillkyckling", "Kycklingwrap").
+ */
+const SYNONYM_EXACT_BONUS = 40
 
 // ---------------------------------------------------------------------------
 // Normalisering
@@ -439,9 +456,14 @@ interface ParsedQuery {
   qLen: number
 }
 
-function parseQuery(query: string): ParsedQuery | null {
-  const norm = normalizeSv(query)
+function parseQuery(query: string, optionalWords?: ReadonlySet<string>): ParsedQuery | null {
+  let norm = normalizeSv(query)
   if (!norm) return null
+  if (optionalWords && optionalWords.size > 0) {
+    // Valfria ord tas bort helt ("lax rå" söker som "lax", även exakt namn och början av namnet).
+    const kept = norm.split(' ').filter((t) => !optionalWords.has(t) && !optionalWords.has(foldNormalized(t)))
+    if (kept.length > 0) norm = kept.join(' ')
+  }
   const all = [...new Set(norm.split(' '))]
   let required = all.filter((t) => !STOPWORDS.has(t))
   if (required.length === 0) required = all
@@ -459,6 +481,23 @@ function parseQuery(query: string): ParsedQuery | null {
     })),
     qLen: required.reduce((s, t) => s + t.length, 0),
   }
+}
+
+/**
+ * Ord som slutar som ett kort livsmedelsord utan att vara en sammansättning med det: "bröst" och
+ * "kost" slutar på "ost", "pålägg", "fläsklägg" och "skägg" på "ägg", "gris", "kapris" och
+ * "sparris" på "ris", "svin" på "vin". Ett sökord räknas inte som huvudord i ett ord som slutar så
+ * – "Ankbröst" och "Råkost" är ingen ost, "Kycklingpålägg" inget ägg och "Polkagris" inget ris
+ * (men "Vaktelägg" är ett ägg och "Fullkornsris" ett ris).
+ */
+const FALSE_HEADS = ['bröst', 'kost', 'frost', 'pålägg', 'fläsklägg', 'lammlägg', 'kalvlägg', 'skägg', 'gris', 'kapris', 'sparris', 'svin']
+const FALSE_HEADS_FOLDED = FALSE_HEADS.map(foldNormalized)
+
+function isFalseHead(word: string, q: string, sv: boolean): boolean {
+  for (const head of sv ? FALSE_HEADS : FALSE_HEADS_FOLDED) {
+    if (head.length > q.length && head.endsWith(q) && word.endsWith(head)) return true
+  }
+  return false
 }
 
 /** Typ av senaste träff i `directScore`: 0 ingen, 1 exakt/stam, 2 början, 3 huvudord, 4 inuti. */
@@ -484,11 +523,12 @@ function directScore(qt: QueryToken, e: VocabEntry): number {
   if (ql >= 3) {
     lastDirectKind = 3
     // Huvudordet i en sammansättning: "ost" i "prästost", "filé" i "kycklingbröstfilé".
-    if (t.endsWith(q) && tl - ql >= (ql === 3 ? 3 : 2)) return 0.72 * fp
+    const falseHead = isFalseHead(t, q, qt.sv)
+    if (!falseHead && t.endsWith(q) && tl - ql >= (ql === 3 ? 3 : 2)) return 0.72 * fp
     if (ql >= 4) {
       const st = qt.sv ? e.st : e.sf
       const qs = qt.stem
-      if (qs.length >= 3 && st.length - qs.length >= 2 && st.endsWith(qs)) return 0.66 * fp
+      if (!falseHead && qs.length >= 3 && st.length - qs.length >= 2 && st.endsWith(qs)) return 0.66 * fp
       lastDirectKind = 4
       // Del inuti en sammansättning: "bröst" i "kycklingbröstfilé".
       if (t.indexOf(q, 2) >= 2) return 0.55 * fp
@@ -575,7 +615,14 @@ function prefixTier(name: string, query: string, last: QueryToken): number {
   return wordEnd - query.length >= 4 ? SEARCH_TIERS.prefixInWord : SEARCH_TIERS.prefixShort
 }
 
-function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit: number): SearchResult[] {
+interface OneSearch {
+  full: SearchResult[]
+  partial: SearchResult[]
+  /** Hela sökningen är exakt namnet eller en synonym för något livsmedel ("red bull"). */
+  whole: boolean
+}
+
+function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit: number): OneSearch {
   ensureBuffers(data)
   const nameBest = data.nameBest!
   const anyBest = data.anyBest!
@@ -628,10 +675,12 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
   const qStr = pq.sv ? pq.norm : pq.fold
   const full: SearchResult[] = []
   const partial: SearchResult[] = []
+  let whole = false
 
   for (const d of touched) {
     const doc = data.docs[d]
     if (catSet && !catSet.has(doc.food.category)) continue
+    if (opts.filter && !opts.filter(doc.food)) continue
     const base = d * MAX_Q
     let nameAll = true
     let anyAll = true
@@ -657,6 +706,7 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
     let tier: number
     let kind: MatchKind
     let quality: number
+    const synExact = (pq.sv ? doc.syn : doc.synF).includes(qStr)
     if (nameAll) {
       const nm = pq.sv ? doc.name : doc.nameF
       quality = qName / nq
@@ -664,6 +714,7 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
         tier = SEARCH_TIERS.exact
         kind = 'exact'
         quality = 1
+        whole = true
       } else if (nm.startsWith(qStr)) {
         tier = prefixTier(nm, qStr, pq.required[nq - 1])
         kind = 'prefix'
@@ -677,8 +728,8 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
         kind = 'token'
       }
     } else if (anyAll) {
-      const syns = pq.sv ? doc.syn : doc.synF
-      tier = syns.includes(qStr) ? SEARCH_TIERS.synonymExact : SEARCH_TIERS.synonym
+      if (synExact) whole = true
+      tier = synExact ? SEARCH_TIERS.synonymExact : SEARCH_TIERS.synonym
       kind = 'synonym'
       quality = qAny / nq
     } else if (matched === nq) {
@@ -694,6 +745,7 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
     const shortness = Math.min(1, pq.qLen / doc.lenCompact)
     let score =
       tier + 70 * quality + 45 * shortness + 25 * (exactWords / nq) + (firstHit[d] !== 0 ? 20 : 0) + doc.sourceBonus
+    if (synExact && tier > SEARCH_TIERS.synonymExact && tier < SEARCH_TIERS.exact) score += SYNONYM_EXACT_BONUS
     if (tier === SEARCH_TIERS.partial) score *= matched / nq
     if (opts.boost) {
       const b = opts.boost(doc.food)
@@ -705,11 +757,18 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
   }
 
   full.sort(compareResults)
-  // Delvisa träffar bara när fullständiga träffar är få.
-  if (full.length < Math.min(limit, 8) && partial.length > 0) {
-    partial.sort(compareResults)
-    full.push(...partial.slice(0, limit - full.length))
-  }
+  partial.sort(compareResults)
+  return { full: full.length > limit ? full.slice(0, limit) : full, partial: partial.length > limit ? partial.slice(0, limit) : partial, whole }
+}
+
+/**
+ * Fullständiga träffar, kompletterade med delvisa (minst hälften av orden) när de fullständiga är
+ * få – men inte när hela sökningen redan är namnet eller en synonym för något ("red bull",
+ * "coca cola"): då är övriga delträffar ("Rödkål", "Kanelbulle") bara brus.
+ */
+function withPartial(one: OneSearch, limit: number): SearchResult[] {
+  const { full, partial } = one
+  if (!one.whole && full.length < Math.min(limit, 8) && partial.length > 0) return [...full, ...partial.slice(0, limit - full.length)]
   return full.length > limit ? full.slice(0, limit) : full
 }
 
@@ -725,6 +784,7 @@ function browse(data: IndexData, opts: SearchOptions, limit: number): SearchResu
   const out: SearchResult[] = []
   for (const doc of data.docs) {
     if (!cats.has(doc.food.category)) continue
+    if (opts.filter && !opts.filter(doc.food)) continue
     let score = doc.sourceBonus
     if (opts.boost) {
       const b = opts.boost(doc.food)
@@ -759,22 +819,34 @@ export function searchFoods(
 ): SearchResult[] {
   const limit = Math.max(1, Math.floor(opts.limit ?? 50))
   const indexes = isIndexList(index) ? index : [index]
-  const pq = parseQuery(query)
-  if (!pq && !(opts.categories && opts.categories.length > 0)) return []
+  const pq = parseQuery(query, opts.optionalWords)
+  if (!pq) {
+    if (!(opts.categories && opts.categories.length > 0)) return []
+    if (indexes.length === 1) return browse(dataOf(indexes[0]), opts, limit)
+    const merged = mergeBest(indexes.map((ix) => browse(dataOf(ix), opts, limit)))
+    return merged.sort((a, b) => b.score - a.score || collator.compare(a.food.name, b.food.name)).slice(0, limit)
+  }
 
-  const runOne = (ix: SearchIndex) => (pq ? searchOne(dataOf(ix), pq, opts, limit) : browse(dataOf(ix), opts, limit))
-  if (indexes.length === 1) return runOne(indexes[0])
+  if (indexes.length === 1) return withPartial(searchOne(dataOf(indexes[0]), pq, opts, limit), limit)
 
+  // Flera index: slå ihop fullständiga och delvisa träffar var för sig.
+  const runs = indexes.map((ix) => searchOne(dataOf(ix), pq, opts, limit))
+  const full = mergeBest(runs.map((r) => r.full))
+  const fullIds = new Set(full.map((r) => r.food.id))
+  const partial = mergeBest(runs.map((r) => r.partial)).filter((r) => !fullIds.has(r.food.id))
+  return withPartial({ full: full.sort(compareResults), partial: partial.sort(compareResults), whole: runs.some((r) => r.whole) }, limit)
+}
+
+/** Slå ihop träfflistor – dubbletter (samma id) behåller bästa poängen. */
+function mergeBest(lists: readonly SearchResult[][]): SearchResult[] {
   const best = new Map<string, SearchResult>()
-  for (const ix of indexes) {
-    for (const r of runOne(ix)) {
+  for (const list of lists) {
+    for (const r of list) {
       const prev = best.get(r.food.id)
       if (!prev || r.score > prev.score) best.set(r.food.id, r)
     }
   }
-  const merged = [...best.values()]
-  merged.sort(pq ? compareResults : (a, b) => b.score - a.score || collator.compare(a.food.name, b.food.name))
-  return merged.slice(0, limit)
+  return [...best.values()]
 }
 
 // ---------------------------------------------------------------------------

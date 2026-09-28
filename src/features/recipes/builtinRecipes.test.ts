@@ -11,6 +11,7 @@ import {
   builtinRecipeInfo,
   isBuiltinRecipeId,
   loadBuiltinRecipes,
+  resolveSeedIngredient,
 } from '../../data/recipes'
 import { recipeFinalWeight, recipePerServing, recipeRawWeight, recipeServingWeight, recipeToFood } from '../../lib/recipes'
 import { gramsFor } from '../../lib/units'
@@ -30,20 +31,28 @@ describe('Svenska klassiker – data', () => {
     for (const id of ids) expect(id).toMatch(/^[a-z0-9-]+$/)
   })
 
-  it('varje ingrediens finns i BUILTIN_FOODS och kan räknas om till gram', () => {
+  it('varje ingrediens finns i BUILTIN_FOODS (direkt eller via alias) och kan räknas om till gram', () => {
     const problems: string[] = []
     for (const seed of BUILTIN_RECIPE_SEEDS) {
-      for (const [foodId, amount, unit] of seed.ingredients) {
-        const food = byId.get(foodId)
-        if (!food) {
+      for (const [foodId, seedAmount, seedUnit] of seed.ingredients) {
+        const resolved = resolveSeedIngredient(byId, foodId, seedAmount, seedUnit)
+        if (!resolved) {
           problems.push(`${seed.id}: ${foodId} saknas`)
           continue
         }
+        const { food, amount, unit } = resolved
         const grams = gramsFor(food, amount, unit)
         if (!Number.isFinite(grams) || grams <= 0) problems.push(`${seed.id}: ${amount} ${unit} ${foodId} ger inga gram`)
       }
     }
     expect(problems).toEqual([])
+  })
+
+  it('pekar direkt på dagens livsmedel – inte på gamla id:n via alias', () => {
+    const viaAlias = BUILTIN_RECIPE_SEEDS.flatMap((seed) =>
+      seed.ingredients.filter(([foodId]) => !byId.has(foodId)).map(([foodId]) => `${seed.id}: ${foodId}`),
+    )
+    expect(viaAlias).toEqual([])
   })
 
   it('har namn, emoji, portioner, tid och instruktioner på svenska', () => {

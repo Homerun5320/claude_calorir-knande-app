@@ -8,6 +8,7 @@ import { loadBuiltinCatalog, resolveFoodSync } from './foodRepo'
 import { toISODate } from './dates'
 import { wipeAllData } from './backup'
 import { getActivity } from '../data/activities'
+import { canonicalFoodId } from '../data/foods/aliases'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useFoodStore } from '../stores/foodStore'
 import { useBodyStore } from '../stores/bodyStore'
@@ -27,6 +28,9 @@ describe('exempeldata', () => {
   it('använder bara livsmedel och favoriter som finns i databasen', () => {
     const missing = demoFoodIds().filter((id) => !resolveFoodSync(id))
     expect(missing).toEqual([])
+    // Exemplet använder dagens id:n direkt – inte gamla, sammanslagna id:n via alias.
+    expect(demoFoodIds().filter((id) => canonicalFoodId(id) !== id)).toEqual([])
+    expect(DEMO_FAVORITES.filter((id) => canonicalFoodId(id) !== id)).toEqual([])
     for (const id of DEMO_FAVORITES) expect(resolveFoodSync(id), id).toBeDefined()
     // En av favoriterna är en svensk klassiker (inbyggt recept).
     expect(resolveFoodSync('recipe:klassiker-kottbullar')?.source).toBe('recipe')

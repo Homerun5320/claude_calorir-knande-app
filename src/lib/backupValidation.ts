@@ -35,6 +35,7 @@ import type {
   Nutrients,
   PlateSplit,
   Portion,
+  RawWeight,
   Profile,
   QuickEntry,
   Recipe,
@@ -400,6 +401,21 @@ function sanitizeKostrad(raw: unknown, r: Rec): KostradContrib | undefined {
   return out
 }
 
+const RAW_KINDS: ReadonlyArray<RawWeight['kind']> = ['ra', 'okokt', 'torkad', 'fryst']
+
+/** Omräkning från rå/okokt vikt: faktor 0,05–20, känt slag och valfri densitet för den okokta varan. */
+function sanitizeRawWeight(raw: unknown, r: Rec): RawWeight | undefined {
+  if (raw === undefined || raw === null) return undefined
+  if (!isObj(raw) || !isNum(raw.factor) || raw.factor < 0.05 || raw.factor > 20 || !oneOf(RAW_KINDS)(raw.kind)) {
+    r.fixed = true
+    return undefined
+  }
+  const out: RawWeight = { factor: raw.factor, kind: raw.kind }
+  const density = optNumber(raw.density, r, 0, 10, true)
+  if (density !== undefined) out.density = density
+  return out
+}
+
 function sanitizeExtra(raw: unknown, r: Rec): FoodExtra | undefined {
   if (raw === undefined || raw === null) return undefined
   if (!isObj(raw)) {
@@ -472,6 +488,10 @@ function sanitizeFood(raw: unknown, r: Rec): Food | null {
   if (note) food.note = note
   const lmvNumber = optional(raw.lmvNumber, r, (v): v is number => isNum(v) && Number.isInteger(v) && v >= 0)
   if (lmvNumber !== undefined) food.lmvNumber = lmvNumber
+  const rawWeight = sanitizeRawWeight(raw.rawWeight, r)
+  if (rawWeight) food.rawWeight = rawWeight
+  const isAverage = optBoolean(raw.isAverage, r)
+  if (isAverage) food.isAverage = true
   const extra = sanitizeExtra(raw.extra, r)
   if (extra) food.extra = extra
   const createdAt = optNumber(raw.createdAt, r, 0, MAX_TIMESTAMP)
@@ -481,10 +501,17 @@ function sanitizeFood(raw: unknown, r: Rec): Food | null {
   return food
 }
 
-/** true för en enhet som finns: g, kg, volymmått eller 'portion:<id>'. */
+/** true för en enhet som finns: g, kg, volymmått, rå/okokt vikt ('g-ra', 'dl-ra') eller 'portion:<id>'. */
 function isUnitKey(v: unknown): v is UnitKey {
   if (typeof v !== 'string') return false
-  return v === 'g' || v === 'kg' || VOLUME_UNITS.includes(v) || (v.startsWith('portion:') && v.length > 'portion:'.length)
+  return (
+    v === 'g' ||
+    v === 'kg' ||
+    v === 'g-ra' ||
+    v === 'dl-ra' ||
+    VOLUME_UNITS.includes(v) ||
+    (v.startsWith('portion:') && v.length > 'portion:'.length)
+  )
 }
 
 /**

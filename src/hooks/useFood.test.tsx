@@ -30,7 +30,7 @@ describe('inbyggda recept i hookarna', () => {
   it('useFoodResolver slår upp klassiker och vanliga livsmedel', () => {
     const { result } = renderHook(() => useFoodResolver())
     expect(result.current(ID)?.name).toBe('Pannkakor')
-    expect(result.current('lagom:kanelbulle-bageri')?.name).toBe('Kanelbulle, bageri')
+    expect(result.current('lagom:kanelbulle-bageri')?.name).toBe('Kanelbulle')
   })
 
   it('visar en loggad klassiker under Senaste och bland favoriterna', () => {

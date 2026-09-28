@@ -4,7 +4,7 @@
  * Alla värden per 100 g ätlig del. För drycker: per 100 g (≈ 100 ml) och `liquid: true`.
  * Ange bara värden du vet – utelämnade näringsämnen visas som okända ("–"), aldrig som 0.
  */
-import type { Food, FoodCategory, FoodTag, KostradContrib, Nutrients, PlateSplit } from '../../types'
+import type { Food, FoodCategory, FoodTag, KostradContrib, Nutrients, PlateSplit, RawWeight } from '../../types'
 import { completeNutrients } from '../../lib/nutrients'
 
 export interface FoodSeed {
@@ -45,6 +45,19 @@ export interface FoodSeed {
    * att fylla i näringsämnen som saknas här och för att inte visa dubbletter i sökningen.
    */
   lmv?: number
+  /**
+   * Livsmedlet anges tillagat men kan vägas rått/okokt: [faktor, slag, densitet?].
+   * - faktor = gram tillagad vara per gram rå/okokt/torkad vara (kycklingbröst ≈ 0,75, pasta ≈ 2,4),
+   * - slag = 'ra' ("g rå"), 'okokt' ("g okokt") eller 'torkad' ("g torkad"),
+   * - densitet (valfri) = g/ml för den okokta varan – aktiverar "dl okokt" (t.ex. ris ≈ 0,85).
+   * Blir `Food.rawWeight`.
+   */
+  raw?: [factor: number, kind: RawWeight['kind'], density?: number]
+  /**
+   * Samlingsvärde: genomsnitt av vanliga märken i svenska butiker (utan `brand`). Ange märkena i
+   * `note`. Blir `Food.isAverage`.
+   */
+  avg?: true
 }
 
 export function defineFood(s: FoodSeed): Food {
@@ -78,6 +91,10 @@ export function defineFood(s: FoodSeed): Food {
     kostrad: s.kostrad,
     note: s.note,
     lmvNumber: s.lmv,
+    ...(s.raw && {
+      rawWeight: { factor: s.raw[0], kind: s.raw[1], ...(s.raw[2] !== undefined && { density: s.raw[2] }) },
+    }),
+    ...(s.avg && { isAverage: true }),
   }
 }
 

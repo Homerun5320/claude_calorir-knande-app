@@ -225,6 +225,26 @@ describe('RecipeEditorPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(`/recept/${saved[0].id}`))
   })
 
+  it('föreslår rå/okokt vikt för ingredienser som anges tillagade', async () => {
+    renderAt('/recept/nytt')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Lägg till ingrediens' }), { target: { value: 'pasta' } })
+    const results = await screen.findByRole('list', { name: 'Sökträffar' }, { timeout: 3000 })
+    const hit = await waitFor(() => {
+      const b = within(results)
+        .getAllByRole('button')
+        .find((x) => x.querySelector('.line-clamp-2')?.textContent === 'Pasta')
+      expect(b).toBeDefined()
+      return b!
+    })
+    // Träffraden visar samma utgångsläge som arket: okokt vikt med den kokta vikten.
+    expect(hit).toHaveTextContent('100 g okokt · 250 g tillagat')
+    fireEvent.click(hit)
+    const sheet = await screen.findByRole('dialog', { name: 'Pasta' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Lägg till i receptet' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Pasta' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Ändra mängd: Pasta, 100 g okokt · 250 g tillagat/ })).toBeInTheDocument()
+  })
+
   it('förifyller ett befintligt recept och sparar ändringar', async () => {
     useFoodStore.setState({ recipes: { [ownRecipe.id]: ownRecipe } })
     renderAt('/recept/r_test1/redigera')

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { Food } from '../types'
 import { useFoodStore } from '../stores/foodStore'
 import {
+  builtinFood,
   findRecipe,
   getBuiltinCatalog,
   getRememberedFood,
@@ -53,7 +54,8 @@ interface OnlineState {
 
 /**
  * Ett livsmedel på id: användarens egna, recept, sparade, inbyggda (även de svenska klassikerna,
- * 'recipe:klassiker-*') eller – för `off:`-id:n som inte finns lokalt – hämtat från Open Food Facts.
+ * 'recipe:klassiker-*', och gamla id:n via alias – då får livsmedlet ersättarens id) eller – för
+ * `off:`-id:n som inte finns lokalt – hämtat från Open Food Facts.
  */
 export function useFood(id: string | null | undefined): UseFoodResult {
   const key = id ?? ''
@@ -65,7 +67,7 @@ export function useFood(id: string | null | undefined): UseFoodResult {
 
   const needBuiltin = key !== '' && !local
   const catalog = useBuiltinCatalog(needBuiltin)
-  const builtin = needBuiltin && catalog ? catalog.byId.get(key) : undefined
+  const builtin = needBuiltin ? builtinFood(catalog, key) : undefined
   const builtinSettled = catalog?.complete === true
   const needOnline = needBuiltin && builtinSettled && !builtin && key.startsWith('off:')
 
@@ -91,7 +93,8 @@ export function useFood(id: string | null | undefined): UseFoodResult {
 
 /**
  * En funktion som slår upp livsmedel på id bland användarens och de inbyggda livsmedlen
- * (inklusive klassikerna). Byts ut när butiken eller katalogen ändras (lämplig som beroende i useMemo).
+ * (inklusive klassikerna och gamla id:n via alias). Byts ut när butiken eller katalogen ändras
+ * (lämplig som beroende i useMemo).
  */
 export function useFoodResolver(): (id: string) => Food | undefined {
   const customFoods = useFoodStore((s) => s.customFoods)
@@ -100,6 +103,6 @@ export function useFoodResolver(): (id: string) => Food | undefined {
   const catalog = useBuiltinCatalog()
   return useMemo(() => {
     const user = userFoodCatalog(customFoods, recipes, cachedFoods).byId
-    return (id: string) => user.get(id) ?? catalog?.byId.get(id) ?? getRememberedFood(id)
+    return (id: string) => user.get(id) ?? builtinFood(catalog, id) ?? getRememberedFood(id)
   }, [customFoods, recipes, cachedFoods, catalog])
 }
