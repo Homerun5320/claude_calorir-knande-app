@@ -13,6 +13,7 @@ import { useFastingStore } from '../../stores/fastingStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { useLicenseStore } from '../../stores/licenseStore'
+import { usePlanStore } from '../../stores/planStore'
 
 /** "20 september 2026" för kopians exportdatum, eller "okänt datum" om det saknas eller är ogiltigt. */
 export function backupDateLabel(exportedAt: unknown): string {
@@ -29,6 +30,7 @@ type Snapshot = [
   ReturnType<typeof useBodyStore.getState>,
   ReturnType<typeof useFastingStore.getState>,
   ReturnType<typeof useLicenseStore.getState>,
+  ReturnType<typeof usePlanStore.getState>,
 ]
 
 function snapshot(): Snapshot {
@@ -39,16 +41,18 @@ function snapshot(): Snapshot {
     useBodyStore.getState(),
     useFastingStore.getState(),
     useLicenseStore.getState(),
+    usePlanStore.getState(),
   ]
 }
 
-function rollback([profile, diary, food, body, fasting, license]: Snapshot): void {
+function rollback([profile, diary, food, body, fasting, license, plan]: Snapshot): void {
   useProfileStore.setState(profile, true)
   useDiaryStore.setState(diary, true)
   useFoodStore.setState(food, true)
   useBodyStore.setState(body, true)
   useFastingStore.setState(fasting, true)
   useLicenseStore.setState(license, true)
+  usePlanStore.setState(plan, true)
 }
 
 /**

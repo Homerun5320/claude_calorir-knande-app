@@ -238,6 +238,8 @@ describe('poster', () => {
     expect(entrySubtitle({ time: '07:10', note: 'god' }, '1 portion (på 1 dl gryn, 240 g)')).toBe('07:10 · 1 portion (på 1 dl gryn, 240 g) · anteckning')
     expect(entrySubtitle({}, '2 dl (206 g)')).toBe('2 dl (206 g)')
     expect(entrySubtitle({ time: '12:30' }, undefined)).toBe('12:30')
+    // Tallrikens rader säger vad de är, som i korgen.
+    expect(entrySubtitle({ note: 'Uppskattat med tallriken' }, '100 g')).toBe('100 g · uppskattat med tallriken')
     expect(entrySubtitle({}, undefined)).toBe('')
   })
 })

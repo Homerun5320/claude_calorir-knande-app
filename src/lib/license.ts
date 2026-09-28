@@ -47,7 +47,7 @@ export const LICENSE_ERRORS: Record<LicenseFailure, string> = {
   utgangen: 'Licensen har gått ut. Du kan förnya den på köpsidan.',
   testlicens: 'Det här är en testlicens och gäller inte i den riktiga appen.',
   'ingen-nyckel': 'Appen saknar nyckel för att kontrollera licenser. Kontakta supporten.',
-  aterkallad: 'Licensen har återkallats (köpet återbetalades). Kontakta support om det är fel.',
+  aterkallad: 'Licensen har återkallats, till exempel för att köpet har återbetalats eller bestridits. Tror du att det är fel? Mejla oss, så reder vi ut det.',
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,17 @@ async function verifyWithAny(keys: string[], kid: string | undefined, message: s
  */
 export async function verifyLicense(
   key: string,
-  opts: { publicKey: string | readonly string[]; mode: 'test' | 'live'; now?: number },
+  opts: {
+    publicKey: string | readonly string[]
+    mode: 'test' | 'live'
+    now?: number
+    /**
+     * Underkänn licenser från köp med Stripes testkort (köp-id cs_test_…) i skarpt läge. Appen
+     * sätter den (utom i förhandsversioner, VITE_ACCEPT_TEST_PURCHASES=1), så att ett testköp i
+     * en förhandsversion som delar nyckel med produktionen aldrig blir en giltig licens där.
+     */
+    rejectTestPurchases?: boolean
+  },
 ): Promise<LicenseCheck> {
   const clean = normalizeLicenseKey(key)
   const payload = decodeLicense(clean)
@@ -193,6 +203,7 @@ export async function verifyLicense(
   if (payload.test) {
     if (mode !== 'test') return { ok: false, reason: 'testlicens' }
   } else {
+    if (mode === 'live' && opts.rejectTestPurchases && payload.id.startsWith('cs_test_')) return { ok: false, reason: 'testlicens' }
     const keys = keyList(opts.publicKey)
     if (keys.length === 0) return { ok: false, reason: 'ingen-nyckel' }
     if (!(await verifyWithAny(keys, payload.kid, `${prefix}.${body}`, sig))) return { ok: false, reason: 'signatur' }
@@ -239,9 +250,15 @@ export async function signLicense(payload: LicensePayload, privateKeyPkcs8Base64
 
 export const REVOCATION_PREFIX = 'LAGOMREV1'
 
-/** Spärrlistan: köp-id (licensens `id`) eller nyckelhashar för licenser som inte längre gäller. */
+/**
+ * Spärrlistan för licenser som inte längre gäller.
+ * - v: 2 (nuvarande): `ids` är hashar – köp-id:ts hash (`purchaseIdHash`) eller nyckelns hash
+ *   (`licenseKeyHash`). Köp-id:t står aldrig i klartext: det är just det som verify-purchase
+ *   kräver för att lämna ut nyckeln, och listan är publik.
+ * - v: 1 (äldre): köp-id (licensens `id`) i klartext eller nyckelhashar. Godtas fortfarande.
+ */
 export interface RevocationList {
-  v: 1
+  v: 1 | 2
   /** När listan utfärdades (serverns tidsstämpel). En äldre lista ersätter aldrig en nyare. */
   issuedAt: number
   ids: string[]
@@ -250,9 +267,9 @@ export interface RevocationList {
 function parseRevocationPayload(body: string): RevocationList | null {
   try {
     const data = JSON.parse(dec.decode(base64UrlDecode(body))) as Partial<RevocationList>
-    if (data.v !== 1 || typeof data.issuedAt !== 'number' || !Number.isFinite(data.issuedAt) || !Array.isArray(data.ids)) return null
+    if ((data.v !== 1 && data.v !== 2) || typeof data.issuedAt !== 'number' || !Number.isFinite(data.issuedAt) || !Array.isArray(data.ids)) return null
     if (!data.ids.every((id) => typeof id === 'string')) return null
-    return { v: 1, issuedAt: data.issuedAt, ids: data.ids }
+    return { v: data.v, issuedAt: data.issuedAt, ids: data.ids }
   } catch {
     return null
   }
@@ -270,7 +287,7 @@ export function decodeRevocationList(token: string): RevocationList | null {
 
 /**
  * Verifiera en spärrlista "LAGOMREV1.<payload>.<signatur>" med licensernas publika nycklar.
- * payload = JSON { v: 1, issuedAt, ids } base64url-kodat. Signaturen (ECDSA P-256/SHA-256)
+ * payload = JSON { v, issuedAt, ids } base64url-kodat (v 1 eller 2, se `RevocationList`). Signaturen (ECDSA P-256/SHA-256)
  * godtas över payload-strängen – eller, som för licenserna, över "LAGOMREV1.<payload>".
  * Returnerar listan, eller null om den är trasig eller inte är signerad av oss.
  */
@@ -295,9 +312,20 @@ export async function signRevocationList(list: RevocationList, privateKeyPkcs8Ba
 
 /**
  * Nyckelns hash (SHA-256 över hela den tvättade nyckelsträngen, base64url). Spärrlistan kan
- * ange antingen licensens köp-id eller den här hashen.
+ * ange antingen köp-id:ts hash (`purchaseIdHash`) eller den här hashen.
  */
 export async function licenseKeyHash(key: string): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(normalizeLicenseKey(key)) as BufferSource))
   return base64UrlEncode(digest)
+}
+
+/** Köp-id:ts hash i spärrlistan (v2): SHA-256 över id:t (licensens `id`), base64url. */
+export async function purchaseIdHash(id: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(id) as BufferSource))
+  return base64UrlEncode(digest)
+}
+
+/** true om texten ser ut som en SHA-256-hash i base64url (43 tecken) – t.ex. en nyckelhash. */
+export function looksLikeHash(value: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(value)
 }

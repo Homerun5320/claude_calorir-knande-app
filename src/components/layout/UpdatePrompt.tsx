@@ -26,6 +26,16 @@ function checkForUpdate(registration: ServiceWorkerRegistration): void {
   })
 }
 
+/**
+ * true när service workern inte går att använda i den här webbläsaren: den saknas helt (t.ex.
+ * blockerad) eller registreringen nekas av säkerhetsskäl. Då är felet väntat och loggas inte.
+ */
+export function serviceWorkerUnavailable(error: unknown): boolean {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || navigator.serviceWorker === undefined) return true
+  const name = error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException) ? error.name : ''
+  return name === 'SecurityError' || name === 'NotSupportedError'
+}
+
 export default function UpdatePrompt() {
   const stopChecks = useRef<(() => void) | null>(null)
   const prompted = useRef(false)
@@ -48,6 +58,9 @@ export default function UpdatePrompt() {
       }
     },
     onRegisterError(error: unknown) {
+      // En blockerad service worker (privat läge, strikta inställningar) är inget fel i Lagom –
+      // appen fungerar ändå, bara inte utan uppkoppling. Sådant hamnar inte i felloggen.
+      if (serviceWorkerUnavailable(error)) return
       logError(error, 'service worker')
     },
   })

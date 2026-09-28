@@ -6,7 +6,7 @@
 
 Lagom är en allmän kost- och livsstilsdagbok för vuxna. Den är inte avsedd för diagnos, behandling, övervakning eller förebyggande av sjukdom och är inte en medicinteknisk produkt.
 
-Lagom riktar sig till vuxna (18 år och äldre). Appen går att använda från 13 år med extra skydd: den som är under 18 år får aldrig ett kaloriunderskott och uppmanas att prata med en vuxen eller skolsköterskan om mat och vikt.
+Lagom riktar sig till vuxna (18 år och äldre) och går bara att använda från 18 år. Appen vet bara födelseåret, så den som fyller 18 i år släpps in – men får inget förslag om viktnedgång (kaloriunderskott) förrän hen säkert har fyllt 18, och får en stödtext med hänvisning till en vuxen, skolsköterskan, elevhälsan, 1177 och Frisk & Fri. Den som är yngre får en vänlig text om att Lagom är gjord för vuxna.
 
 ## Vad Lagom gör
 

@@ -328,7 +328,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
                   <span>Ungefär som att köra {climate.carText} med en genomsnittlig svensk personbil.</span>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-ink-3">
-                  En klimatsmart måltid ligger kring 0,5{'\u00a0'}kg CO₂e (WWF One Planet Plate). Beräknat från ingrediensernas schabloner.
+                  En måltid i nivå med WWF:s One Planet Plate ligger kring 0,5{'\u00a0'}kg CO₂e. Beräknat från ingrediensernas schabloner.
                 </p>
               </Card>
             )}

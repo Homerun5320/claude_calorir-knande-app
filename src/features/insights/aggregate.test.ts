@@ -1,5 +1,6 @@
 import { referenceIntakes } from '../../lib/nnr'
 import {
+  plateMealsText,
   buildDayStats,
   climateDays,
   consistency,
@@ -264,5 +265,14 @@ describe('lowIntakeAverage', () => {
 
   it('säger inget när snittet ligger över golvet', () => {
     expect(lowIntakeAverage(days, (d) => complete.has(d), 900)).toBeUndefined()
+  })
+})
+
+describe('plateMealsText', () => {
+  it('böjer substantiv och particip rätt', () => {
+    expect(plateMealsText(1, 0)).toBe('1 huvudmåltid bedömd – små byten gör tallriken mer lagom.')
+    expect(plateMealsText(3, 0)).toBe('3 huvudmåltider bedömda – små byten gör tallriken mer lagom.')
+    expect(plateMealsText(1, 1)).toBe('1 av 1 huvudmåltid var lagom fördelad – fint!')
+    expect(plateMealsText(5, 2)).toBe('2 av 5 huvudmåltider var lagom fördelade.')
   })
 })

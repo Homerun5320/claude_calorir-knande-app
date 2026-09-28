@@ -1,9 +1,11 @@
 /**
  * Lagom Moln – inloggning och läget för molnkopian på den här enheten.
  *
- * Sparas under nyckeln 'lagom-cloud', som medvetet INTE finns i `STORE_KEYS`: säkerhetskopior,
- * export och "Radera all data" ska aldrig ta med en inloggning. Den upplåsta datanyckeln sparas
- * inte här utan separat (icke-exporterbar CryptoKey, se src/lib/cloud/keyStore.ts).
+ * Sparas under nyckeln 'lagom-cloud', som medvetet INTE finns i `STORE_KEYS`: säkerhetskopior och
+ * export ska aldrig ta med en inloggning. "Radera all data" loggar i stället ut på enheten
+ * (`signOutOfCloud` i features/settings/wipe.ts), som glömmer både inloggningen och den upplåsta
+ * datanyckeln. Datanyckeln sparas inte här utan separat (icke-exporterbar CryptoKey, se
+ * src/lib/cloud/keyStore.ts).
  *
  * Butiken importerar ingen molnkod, så den kan läsas in även när Lagom Moln är avstängt (då är
  * den bara tom).

@@ -134,6 +134,16 @@ export const useToastStore = create<ToastState>((set, get) => ({
   },
 }))
 
+/**
+ * Stäng alla notiser utom fel – när ett ark eller en dialog öppnas. Annars ligger t.ex. "3 livsmedel
+ * tillagda · Ångra" kvar i 8 sekunder ovanpå arkets innehåll. Fel står kvar (de läses upp och kan
+ * behövas).
+ */
+export function dismissNonErrorToasts(): void {
+  const { toasts, dismiss } = useToastStore.getState()
+  for (const t of toasts) if (t.tone !== 'error') dismiss(t.id)
+}
+
 export function toast(message: string, opts: Omit<ToastItem, 'id' | 'message'> = {}): string {
   return useToastStore.getState().push({ message, ...opts })
 }

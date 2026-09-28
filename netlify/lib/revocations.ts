@@ -4,12 +4,15 @@
  * Ingen databas: Stripe är källan. Listan räknas fram ur Stripes återbetalningar och tvister och
  * signeras med licensernas privata nyckel (ECDSA P-256, samma som licenserna):
  *
- *   { "token": "LAGOMREV1.<base64url(JSON { v: 1, issuedAt, ids })>.<base64url(signatur)>", "issuedAt": … }
+ *   { "token": "LAGOMREV1.<base64url(JSON { v: 2, issuedAt, ids })>.<base64url(signatur)>", "issuedAt": … }
  *
- * `ids` är köp-id:n, alltså licensens `id` (Checkout-sessionens id, cs_…). Samma köp ger alltid
- * samma id, även om nyckeln skulle signeras om, så appen känner igen alla nycklar för köpet.
- * Listan innehåller inga namn och inga e-postadresser. Till det kommer id:n (eller nyckelhashar,
- * se `licenseIdOf`) från LICENSE_REVOKED_IDS för licenser som spärras manuellt.
+ * `ids` är hashar av köp-id:n (SHA-256 av licensens `id`, Checkout-sessionens id cs_…, se
+ * `revocationEntries` i licensing.ts). Samma köp ger alltid samma id, även om nyckeln skulle
+ * signeras om, så appen känner igen alla nycklar för köpet. Köp-id:t publiceras aldrig i
+ * klartext – det är just det som verify-purchase kräver för att lämna ut nyckeln, och den som
+ * sparat listan skulle annars kunna hämta nyckeln om spärren hävs. Listan innehåller inga namn och
+ * inga e-postadresser. Till det kommer id:n (eller nyckelhashar, se `licenseIdOf`) från
+ * LICENSE_REVOKED_IDS för licenser som spärras manuellt.
  *
  * Regler (samma som när en licens lämnas ut, se `revocationOf` i fulfillment.ts):
  * - hela beloppet återbetalt → spärrad (en delvis återbetalning, t.ex. prisavdrag, spärrar inte),
@@ -23,7 +26,8 @@
  * äldre än 400 dagar lämnas bort: de har ändå gått ut (365 dagar).
  *
  * Svaret får cachas i en timme (webbläsare och Netlifys CDN). Funktionen minns dessutom listan i
- * tio minuter, så att Stripe inte frågas vid varje anrop.
+ * tio minuter, så att Stripe inte frågas vid varje anrop. En adress med frågeparametrar avvisas
+ * (400), så att ingen kan förbigå cachen med ?x=1, ?x=2 … och låta varje anrop fråga Stripe.
  */
 import { errorText, isFullyRefunded, isLagomIntent, REVOKED_METADATA_KEY, REVOKING_DISPUTES, SESSION_ID_RE, sessionIdFromIntent } from './fulfillment.ts'
 import type { Logger } from './fulfillment.ts'
@@ -186,6 +190,10 @@ export async function handleLicenseRevocations(req: Request, deps: HandlerDeps):
   if (!prep.ok) return prep.response
   const { cfg, origin, now, log } = prep
   const h = origin.headers
+  // Samma adress för alla, så att CDN:en alltid kan svara från cachen.
+  if (new URL(req.url).search !== '') {
+    return errorResponse(400, 'ogiltig-begaran', 'Spärrlistan hämtas utan frågeparametrar.', h)
+  }
 
   const key = memoryKey(cfg)
   let entry = memory && memory.key === key && memory.until > now ? memory : null

@@ -4,7 +4,7 @@
  * (låtsas-Stripe) och signeras så att appen godkänner den.
  */
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { verifyRevocationList } from '../../src/lib/license.ts'
+import { purchaseIdHash, verifyRevocationList } from '../../src/lib/license.ts'
 import { extractRevocationToken } from '../../src/features/premium/revocations.ts'
 import { LICENSE_METADATA_KEY, REVOKED_METADATA_KEY } from '../lib/fulfillment.ts'
 import type { HandlerDeps } from '../lib/handlers.ts'
@@ -141,9 +141,20 @@ describe('spärrlistan', () => {
     const token = extractRevocationToken(text)
     expect(token).toMatch(/^LAGOMREV1\./)
     const list = await verifyRevocationList(token!, { publicKey: keys.pub })
-    expect(list).toEqual({ v: 1, issuedAt: NOW_SEC, ids: [S1, S3, S7, S9, 'lic_manuell01'].sort() })
+    // v2: köp-id:n står bara som hashar – köp-id:t är det som verify-purchase kräver.
+    const hashes = await Promise.all([S1, S3, S7, S9, 'lic_manuell01'].map((id) => purchaseIdHash(id)))
+    expect(list).toEqual({ v: 2, issuedAt: NOW_SEC, ids: hashes.sort() })
+    expect(text).not.toContain('cs_test_')
     // Inga personuppgifter i svaret.
     expect(text).not.toMatch(/@|exempel\.se/)
+  })
+
+  it('en adress med frågeparametrar ger 400 – cachen kan inte förbigås med ?x=1, ?x=2 …', async () => {
+    const { deps, stripe } = await scenario()
+    const before = stripe.calls.length
+    const res = await handleLicenseRevocations(new Request(`${APP}/api/license-revocations?x=1`, { headers: { Origin: APP } }), deps)
+    expect(res.status).toBe(400)
+    expect(stripe.calls.length).toBe(before)
   })
 
   it('listan minns i tio minuter – Stripe frågas inte vid varje anrop', async () => {

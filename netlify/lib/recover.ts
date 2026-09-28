@@ -2,15 +2,17 @@
  * POST /api/recover-license – "Hämta min licensnyckel igen" för webbköp.
  *
  * Kropp: { email, receipt } där `receipt` är kvittonumret från Stripes kvittomejl (t.ex.
- * "1234-5678"), fakturanumret eller köp-id:t (cs_live_…). Svaret är samma licens som köpet redan
- * har gett (sparad på betalningen i Stripe) – eller, om ingen sparats, en nyckel med exakt samma
- * innehåll: { licenseKey, plan, issuedAt, expiresAt }.
+ * "1234-5678") eller köp-id:t (cs_live_…). Fakturanumret godtas inte: Stripes fakturanummer är
+ * löpande (PREFIX-0001, -0002 …) och prefixet står på varje kvitto, så det går att gissa.
+ * Svaret är samma licens som köpet redan har gett (sparad på betalningen i Stripe) – eller, om
+ * ingen sparats, en nyckel med exakt samma innehåll: { licenseKey, plan, issuedAt, expiresAt }.
  *
  * Skydd mot att någon provar sig fram:
  * - fel e-post och fel nummer ger samma svar (404 'hittades-inte') och samma svarstid
  *   (`RECOVER_MIN_MS`), så att det inte går att ta reda på vilka e-postadresser som har köpt,
  * - högst 5 försök per IP-adress och 10 minuter, och högst 10 försök per e-postadress och timme
- *   (per funktionsinstans – se Netlifys anropsbegränsning i docs/BETALNING.md),
+ *   (per funktionsinstans), och dessutom en gräns för hela webbplatsen i Netlify (`config` i
+ *   netlify/functions/recover-license.mts, se docs/BETALNING.md),
  * - återbetalda och bestridda köp ger ingen licens (410 'aterbetald').
  * E-postadressen loggas aldrig.
  */
@@ -41,7 +43,7 @@ export function isEmail(value: string): boolean {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-/** Kvittonummer och fakturanummer jämförs utan mellanslag, bindestreck och skiftläge. */
+/** Kvittonummer jämförs utan mellanslag, bindestreck och skiftläge. */
 export function receiptKey(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
@@ -50,7 +52,7 @@ export function receiptKey(value: string): string {
 function cleanReceipt(value: string): string {
   return value
     .trim()
-    .replace(/^(kvitto(nummer)?|receipt|faktura(nummer)?|invoice|#|:|\s)+/i, '')
+    .replace(/^(kvitto(nummer)?|receipt|#|:|\s)+/i, '')
     .trim()
 }
 
@@ -58,15 +60,14 @@ function sessionEmail(session: StripeCheckoutSession): string {
   return (session.customer_details?.email ?? '').trim().toLowerCase()
 }
 
-/** Numren på köpet som kunden kan ha: kvittonumret, fakturanumret och köp-id:t. */
+/**
+ * Numret på köpet som kunden kan ha: kvittonumret. (Köp-id:t hämtas direkt, se `findPurchase`.)
+ * Fakturanumret räknas inte – det är löpande och går att gissa.
+ */
 function receiptNumbersOf(session: StripeCheckoutSession): string[] {
-  const out: string[] = []
   const intent = typeof session.payment_intent === 'object' && session.payment_intent !== null ? session.payment_intent : null
   const charge = intent && typeof intent.latest_charge === 'object' && intent.latest_charge !== null ? intent.latest_charge : null
-  if (charge?.receipt_number) out.push(charge.receipt_number)
-  const invoice = typeof session.invoice === 'object' && session.invoice !== null ? session.invoice : null
-  if (invoice?.number) out.push(invoice.number)
-  return out
+  return charge?.receipt_number ? [charge.receipt_number] : []
 }
 
 function isLagomSession(session: StripeCheckoutSession): boolean {
@@ -75,7 +76,7 @@ function isLagomSession(session: StripeCheckoutSession): boolean {
 
 /**
  * Leta upp köpet. Med ett köp-id hämtas sessionen direkt; annars söks kundens sessioner fram på
- * e-postadressen (som den skrevs och med små bokstäver) och numret jämförs med kvittot och fakturan.
+ * e-postadressen (som den skrevs och med små bokstäver) och numret jämförs med kvittonumret.
  */
 export async function findPurchase(
   email: string,
@@ -109,7 +110,7 @@ export async function findPurchase(
         customer_details: { email: variant },
         status: 'complete',
         limit: 100,
-        expand: ['data.payment_intent.latest_charge', 'data.invoice'],
+        expand: ['data.payment_intent.latest_charge'],
       },
       secretKey: opts.cfg.stripeSecretKey,
       fetch: opts.fetch,
@@ -148,7 +149,7 @@ export async function handleRecoverLicense(req: Request, deps: HandlerDeps): Pro
   const receipt = typeof body.value.receipt === 'string' ? cleanReceipt(body.value.receipt) : ''
   if (!isEmail(email)) return errorResponse(400, 'ogiltig-epost', 'Skriv e-postadressen du använde vid köpet.', h)
   if (receipt.length < 4 || receipt.length > 255) {
-    return errorResponse(400, 'ogiltigt-kvitto', 'Skriv kvittonumret eller fakturanumret från kvittot, eller köp-id:t (cs_…).', h)
+    return errorResponse(400, 'ogiltigt-kvitto', 'Skriv kvittonumret från kvittot, eller köp-id:t (cs_…).', h)
   }
   if (!(deps.keyRateLimiter ?? emailLimiter).take(email.toLowerCase(), startedAt)) {
     return errorResponse(429, 'for-manga', 'Många försök på kort tid. Vänta en stund och försök igen.', { ...h, 'Retry-After': '600' })

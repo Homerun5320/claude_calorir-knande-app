@@ -9,9 +9,11 @@
  * priset kommer från butiken och inga Stripe-anrop görs.
  */
 import {
+  ACCEPT_TEST_PURCHASES,
   API_BASE,
   COMMERCE_MODE,
   LICENSE_PUBLIC_KEYS,
+  LIFETIME_SHORT,
   PLANS,
   SUPPORT_EMAIL,
   TRIAL_DAYS,
@@ -21,7 +23,7 @@ import {
 } from '../../config/commerce'
 import { DISTRIBUTION, IS_STORE_BUILD, allowsLicenseKeyEntry, isAppleWebKit, isInApp, isTwa, sellsOnWeb } from '../../config/platform'
 import { LICENSE_ERRORS, LICENSE_PREFIX, createTestLicense, normalizeLicenseKey, verifyLicense, type LicensePayload } from '../../lib/license'
-import { getStorePurchases, type StoreProductId, type StorePurchaseResult } from '../../lib/storePurchases'
+import { getStorePurchases, type StoreProduct, type StoreProductId, type StorePurchaseResult } from '../../lib/storePurchases'
 import { MONTHS } from '../../lib/dates'
 import { formatNumber, plural } from '../../lib/format'
 import type { Tone } from '../../components/ui'
@@ -61,14 +63,66 @@ export function priceSummary(plans: readonly Plan[] = PLANS): string {
   return plans.map((p) => `${formatPrice(p.priceKr)}${p.durationDays ? '/år' : ' för alltid'}`).join(' eller ')
 }
 
+// ---------------------------------------------------------------------------
+// Butikens priser (köp i appen)
+// ---------------------------------------------------------------------------
+
+/** Priserna som butiken visar (redan formaterade, t.ex. "349,00 kr") – aldrig hårdkodade i appen. */
+let storePrices: Partial<Record<PlanId, string>> = {}
+let storePriceVersion = 0
+const storePriceListeners = new Set<() => void>()
+let storePriceLoading: Promise<void> | null = null
+
+export function subscribeStorePrices(listener: () => void): () => void {
+  storePriceListeners.add(listener)
+  return () => storePriceListeners.delete(listener)
+}
+
+/** Ändras när butikens priser har hämtats – för useSyncExternalStore. */
+export function storePricesVersion(): number {
+  return storePriceVersion
+}
+
+/** Kom ihåg butikens priser (från `getProducts`), så att texterna före provperioden kan visa dem. */
+export function rememberStorePrices(products: readonly StoreProduct[]): void {
+  const next: Partial<Record<PlanId, string>> = {}
+  for (const p of products) if ((p.id === 'ar' || p.id === 'livstid') && p.displayPrice.trim()) next[p.id] = p.displayPrice.trim()
+  if (next.ar === storePrices.ar && next.livstid === storePrices.livstid) return
+  storePrices = next
+  storePriceVersion++
+  storePriceListeners.forEach((l) => l())
+}
+
+/** Hämta butikens priser i en app med köp i appen (en gång i taget). Kastar aldrig. */
+export function loadStorePrices(): Promise<void> {
+  const store = getStorePurchases()
+  if (!isInApp() || !store.available()) return Promise.resolve()
+  storePriceLoading ??= store
+    .getProducts()
+    .then(rememberStorePrices, () => undefined)
+    .finally(() => {
+      storePriceLoading = null
+    })
+  return storePriceLoading
+}
+
+/** Endast för tester: glöm butikens priser. */
+export function resetStorePricesForTests(): void {
+  storePrices = {}
+  storePriceVersion++
+}
+
 /**
- * Priserna i en mening där de får visas: kronpriserna när Lagom säljs på webben, annars en
- * beskrivning utan belopp – i butiksapparna kommer priset från butiken.
+ * Priserna i en mening där de får visas: kronpriserna när Lagom säljs på webben. I en app visas
+ * butikens priser när de har hämtats (Apple kräver att priserna efter en provperiod syns innan
+ * den startar, riktlinje 3.1.1) – annars att priserna visas i butiken före köpet.
  */
 export function priceSummaryText(): string {
   if (sellsOnWeb()) return priceSummary()
   if (!isInApp()) return 'årslicens eller livstidslicens i appbutikerna'
-  return 'årslicens eller livstidslicens som köp i appen'
+  const { ar, livstid } = storePrices
+  if (ar && livstid) return `årslicens (${ar}) eller livstidslicens (${livstid}) som köp i appen`
+  return `årslicens eller livstidslicens som köp i appen (priserna visas i ${storeName()} innan du köper)`
 }
 
 /** Butiken som säljer Lagom här: App Store eller Google Play. */
@@ -142,7 +196,7 @@ export function statusSummary(status: AccessStatus): StatusSummary {
     case 'licensierad': {
       const name = status.plan?.name ?? 'Licens'
       if (status.expiresAt === undefined) {
-        return { label: name, title: 'Lagom är ditt – för alltid', text: 'Gäller utan tidsgräns, och felrättningar ingår. Tack för att du stödjer Lagom!', tone: 'mossa' }
+        return { label: name, title: 'Lagom är ditt – för alltid', text: `${LIFETIME_SHORT}. Tack för att du stödjer Lagom!`, tone: 'mossa' }
       }
       return {
         label: name,
@@ -207,7 +261,7 @@ export async function activateLicense(input: string, now: number = Date.now()): 
   const key = normalizeLicenseKey(input)
   if (!key) return { ok: false, message: 'Klistra in din licensnyckel först.' }
   const [result] = await Promise.all([
-    verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEYS, mode: COMMERCE_MODE, now }),
+    verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEYS, mode: COMMERCE_MODE, now, rejectTestPurchases: !ACCEPT_TEST_PURCHASES }),
     withTimeout(refreshRevocations({ force: true }), REVOCATION_WAIT_MS),
   ])
   if (!result.ok) return { ok: false, message: LICENSE_ERRORS[result.reason] }

@@ -164,7 +164,7 @@ describe('WaterGlasses', () => {
 
 describe('BarChart – mållinjens etikett', () => {
   it('använder målets egen precision', () => {
-    // Axel 0, 1, 2, 3 (heltal) – "Klimatsmart" 1,6 kg ska inte bli "2".
+    // Axel 0, 1, 2, 3 (heltal) – referensnivån 1,6 kg ska inte bli "2".
     expect(targetLabelFor(1.6, [0, 1, 2, 3])).toBe('1,6')
     expect(targetLabelFor(2000, [0, 1000, 2000])).toBe('2 000')
     expect(targetLabelFor(0.25, [0, 0.5, 1])).toBe('0,25')

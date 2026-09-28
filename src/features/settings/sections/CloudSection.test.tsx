@@ -223,7 +223,9 @@ describe('samtycke och lösenfras', () => {
     const [table, row] = m.insert.mock.calls[0] as [string, Record<string, unknown>]
     expect(table).toBe('vaults')
     expect(row).toMatchObject({ format: 1, consent_version: CLOUD_CONSENT_VERSION })
-    expect(typeof row.consent_at).toBe('string')
+    // Samtyckets tidpunkt sätts av databasen – appen kan inte bakdatera den.
+    expect(row).not.toHaveProperty('consent_at')
+    expect(row).not.toHaveProperty('updated_at')
     expect(row).not.toHaveProperty('user_id')
     // Lösenfrasen och nyckeln skickas aldrig.
     expect(JSON.stringify(row)).not.toContain('lingon')

@@ -34,11 +34,38 @@ onLateRead((name) => {
   void BY_KEY[name]?.persist.rehydrate()
 })
 
+/**
+ * En dold flik läser in en ändrad butik högst så här ofta. Annars skulle varje dold flik läsa och
+ * tolka hela dagboken vid varje loggning i den aktiva fliken. När fliken blir synlig läses allt
+ * som har ändrats in direkt (se visibilitychange nedan).
+ */
+export const HIDDEN_REHYDRATE_DELAY_MS = 30_000
+
+const hiddenTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+const isHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden'
+
+function rehydrateIfChanged(name: string): void {
+  if (canRehydrate(name)) void BY_KEY[name]?.persist.rehydrate()
+}
+
 // En annan flik har sparat en butik: läs in den på nytt, så att den här fliken inte skriver över
 // den nyare datan med sin gamla. `canRehydrate` är false för butiker som läses just nu, har data
-// från en nyare version eller inte har ändrats sedan fliken läste dem.
+// från en nyare version eller inte har ändrats sedan fliken läste dem. En dold flik väntar en
+// stund, så att flera sparningar i rad blir en enda inläsning.
 onRemoteWrite((name) => {
-  if (canRehydrate(name)) void BY_KEY[name]?.persist.rehydrate()
+  if (!isHidden()) {
+    rehydrateIfChanged(name)
+    return
+  }
+  if (hiddenTimers.has(name)) return
+  hiddenTimers.set(
+    name,
+    setTimeout(() => {
+      hiddenTimers.delete(name)
+      rehydrateIfChanged(name)
+    }, HIDDEN_REHYDRATE_DELAY_MS),
+  )
 })
 
 // Fliken blir synlig igen (t.ex. efter att Lagom varit öppen i en annan flik): läs in de butiker
@@ -46,9 +73,9 @@ onRemoteWrite((name) => {
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return
-    for (const [name, store] of Object.entries(BY_KEY)) {
-      if (canRehydrate(name)) void store.persist.rehydrate()
-    }
+    for (const timer of hiddenTimers.values()) clearTimeout(timer)
+    hiddenTimers.clear()
+    for (const name of Object.keys(BY_KEY)) rehydrateIfChanged(name)
   })
 }
 

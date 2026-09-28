@@ -1,6 +1,12 @@
 /**
  * Köp i appen (App Store och Google Play) – ett litet gränssnitt som resten av appen använder.
  *
+ * Val av tillägg: helst ett som talar direkt med StoreKit 2 och Play Billing utan egen server
+ * (t.ex. cordova-plugin-purchase). Ett tillägg med egen server, som RevenueCat, gör leverantören
+ * till personuppgiftsbiträde (köphistorik och användar-id) – då måste integritetspolicyn,
+ * registerförteckningen, App Privacy och Data safety ändras före inskickningen
+ * (docs/APP-STORE.md §7, docs/GOOGLE-PLAY.md §8).
+ *
  * I dag finns bara webbversionen: den säger att köp i appen inte är tillgängliga och returnerar
  * tomma listor, så att appen beter sig precis som förut. När Capacitor installeras ersätts
  * `webStore` av en implementation med ett IAP-tillägg (StoreKit 2 på iPhone, Play Billing på
@@ -9,6 +15,16 @@
  * Produkterna i butikerna ska ha samma id som här: 'livstid' (engångsköp), 'ar' (ett år, förnyas
  * inte automatiskt) och 'prov14' (gratis provperiod i butiken, om den används).
  */
+
+/**
+ * true när en riktig implementation av köp i appen (StoreKit 2 på iPhone, Play Billing på
+ * Android) är inkopplad i `getStorePurchases` nedan. Byggkontrollen (scripts/commerce-guard.ts)
+ * stoppar App Store- och Google Play-byggen så länge den är false – annars kan en app där det inte
+ * går att köpa skickas in av misstag. Sätt den till true först när köp, "Återställ köp" och
+ * butikens priser fungerar på en riktig telefon (TestFlight eller Play-testning).
+ * Filen får inte importera något: byggkontrollen läser den.
+ */
+export const NATIVE_PURCHASES_READY: boolean = false
 
 export type StoreProductId = 'livstid' | 'ar' | 'prov14'
 

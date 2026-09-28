@@ -10,7 +10,7 @@ import { formatEnergy } from '../../lib/format'
 import { percentText } from './fmt'
 import { mealName } from '../../lib/meals'
 import { PLATE_GOOD_SCORE, PLATE_VARIANT_LABELS } from '../../lib/plate'
-import { mainMealPlate, mealDistribution } from './aggregate'
+import { mainMealPlate, mealDistribution, plateMealsText } from './aggregate'
 import { Callout, InfoNote, ShareBar, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
 
@@ -20,7 +20,6 @@ export function PlateTab({ data }: { data: InsightsData }) {
   const dist = useMemo(() => mealDistribution(entries, summary.loggedDays), [entries, summary.loggedDays])
   const largest = dist.length ? dist.reduce((a, b) => (b.share > a.share ? b : a)) : undefined
   const variant = PLATE_VARIANT_LABELS[plateVariant]
-  const lagomShare = plate.meals > 0 ? plate.lagomMeals / plate.meals : 0
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -42,9 +41,7 @@ export function PlateTab({ data }: { data: InsightsData }) {
               {plate.plate.advice}
             </Callout>
             <p className="mt-3 text-sm text-ink-2">
-              {plate.lagomMeals === 0
-                ? `${plate.meals} ${plate.meals === 1 ? 'huvudmåltid' : 'huvudmåltider'} bedömda – små byten gör tallriken mer lagom.`
-                : `${plate.lagomMeals} av ${plate.meals} huvudmåltider var lagom fördelade${lagomShare >= 0.5 ? ' – fint!' : '.'}`}
+              {plateMealsText(plate.meals, plate.lagomMeals)}
             </p>
           </>
         )}

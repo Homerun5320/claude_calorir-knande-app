@@ -34,6 +34,19 @@ describe('licensnycklar', () => {
     expect(base64UrlDecode(base64UrlEncode(bytes))).toEqual(bytes)
   })
 
+  it('ett köp med Stripes testkort (cs_test_…) godtas inte i skarpt läge när appen ber om det', async () => {
+    const { priv, pub } = await keyPair()
+    const iat = Math.floor(NOW / 1000)
+    const testKey = await signLicense({ v: 1, id: 'cs_test_kort4242', plan: 'livstid', iat }, priv)
+    const liveKey = await signLicense({ v: 1, id: 'cs_live_riktigt', plan: 'livstid', iat }, priv)
+    const strict = { publicKey: pub, mode: 'live' as const, now: NOW, rejectTestPurchases: true }
+    expect(await verifyLicense(testKey, strict)).toEqual({ ok: false, reason: 'testlicens' })
+    expect((await verifyLicense(liveKey, strict)).ok).toBe(true)
+    // Förhandsversioner (VITE_ACCEPT_TEST_PURCHASES=1) och testläget godtar testköpet.
+    expect((await verifyLicense(testKey, { ...strict, rejectTestPurchases: false })).ok).toBe(true)
+    expect((await verifyLicense(testKey, { ...strict, mode: 'test' })).ok).toBe(true)
+  })
+
   it('signerad livstidslicens verifieras i skarpt läge', async () => {
     const { priv, pub } = await keyPair()
     const payload: LicensePayload = { v: 1, id: 'cs_test_123', plan: 'livstid', iat: Math.floor(NOW / 1000) }

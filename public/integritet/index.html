@@ -52,7 +52,8 @@
       .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem; margin-top: 1rem; }
       .omfang { color: var(--ink-3); font-size: 0.8125rem; font-weight: 600; margin: 0 0 0.25rem; }
       nav ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
-      nav li { margin: 0.25rem 0; }
+      nav li { margin: 0; }
+      nav li a { display: inline-flex; align-items: center; min-height: 2.75rem; }
       ul, ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
       li { margin: 0.375rem 0; }
       .fyll { background: var(--fyll); border-radius: 0.25rem; padding: 0 0.2em; }
@@ -100,8 +101,8 @@
       <section class="kort" id="ansvarig" aria-labelledby="ansvarig-rubrik">
         <h2 id="ansvarig-rubrik">Vem ansvarar för dina uppgifter</h2>
         <p>Lagom är en svensk kalori- och näringsdagbok. Den här policyn gäller Lagom på webben och i App Store och Google Play. Den förklarar vilka uppgifter som behandlas, varför, och vad du själv kan göra.</p>
-        <p>Personuppgiftsansvarig är <span class="fyll">[Företagsnamn]</span>, enskild firma med organisationsnummer <span class="fyll">[Org.nr]</span>, <span class="fyll">[Adress]</span>. Du når oss på <span class="fyll">[E-post]</span>.</p>
-        <p>Kort sagt: din dagbok stannar på din enhet. Vi behandlar bara de uppgifter som behövs när du köper en licens, när du kontaktar oss och när appen hämtas från vår server.</p>
+        <p>Personuppgiftsansvarig är <span class="fyll">[Företagsnamn]</span> (enskild firma, organisationsnummer <span class="fyll">[Org.nr]</span>), <span class="fyll">[Adress]</span>. Du når oss på <span class="fyll">[E-post]</span>.</p>
+        <p>Kort sagt: din dagbok stannar på din enhet. Vi behandlar bara de uppgifter som behövs när du köper en licens, när du kontaktar oss och när appen hämtas från vår server eller anropar våra serverfunktioner, till exempel vid receptimport.</p>
       </section>
       <section class="kort" id="dagbok" aria-labelledby="dagbok-rubrik">
         <h2 id="dagbok-rubrik">Din dagbok finns bara på din enhet</h2>
@@ -117,7 +118,7 @@
           <tbody>
             <tr><td data-label="Vad">Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering och inställningar</td><td data-label="Var">IndexedDB</td><td data-label="Varför">Det är själva dagboken – appen fungerar inte utan den</td><td data-label="Hur länge">Tills du raderar den</td><td data-label="Så rensar du">Inställningar → Data → Radera all data</td></tr>
             <tr><td data-label="Vad">Licens och när provperioden startade</td><td data-label="Var">IndexedDB</td><td data-label="Varför">För att veta om Lagom är upplåst</td><td data-label="Hur länge">Tills du tar bort den. Provperiodens startdatum finns kvar när du raderar din data, så att provperioden inte börjar om</td><td data-label="Så rensar du">Licensen: Inställningar → Data → Radera all data med valet Ta även bort licensen. Provperiodens startdatum: rensa webbplatsens data eller avinstallera appen</td></tr>
-            <tr><td data-label="Vad">Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet återbetalades</td><td data-label="Var">localStorage (lagom-sparrlista)</td><td data-label="Varför">Så att en återkallad licens slutar gälla även utan uppkoppling</td><td data-label="Hur länge">Tills en nyare lista hämtas</td><td data-label="Så rensar du">Rensa webbplatsens data eller avinstallera appen</td></tr>
+            <tr><td data-label="Vad">Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet har återbetalats eller bestridits</td><td data-label="Var">localStorage (lagom-sparrlista)</td><td data-label="Varför">Så att en återkallad licens slutar gälla även utan uppkoppling</td><td data-label="Hur länge">Tills en nyare lista hämtas</td><td data-label="Så rensar du">Rensa webbplatsens data eller avinstallera appen</td></tr>
             <tr><td data-label="Vad">Tema (ljust eller mörkt)</td><td data-label="Var">localStorage (lagom-theme)</td><td data-label="Varför">Så att appen startar i rätt färger utan att blinka</td><td data-label="Hur länge">Tills du byter tema</td><td data-label="Så rensar du">Inställningar → Utseende och visning, eller rensa webbplatsens data</td></tr>
             <tr><td data-label="Vad">Små visningsval, till exempel dolda tips och pausad animation</td><td data-label="Var">localStorage</td><td data-label="Varför">Så att appen minns dina val</td><td data-label="Hur länge">Tills du ändrar dem</td><td data-label="Så rensar du">Rensa webbplatsens data</td></tr>
             <tr><td data-label="Vad">När varje del av dagboken senast sparades – bara en slumpad tidsstämpel, ingen data</td><td data-label="Var">localStorage (lagom-sparad:…)</td><td data-label="Varför">Så att flera öppna flikar med Lagom inte skriver över varandras ändringar</td><td data-label="Hur länge">Tills du rensar webbplatsens data</td><td data-label="Så rensar du">Rensa webbplatsens data eller avinstallera appen</td></tr>
@@ -134,13 +135,13 @@
         <h2 id="tjanster-rubrik">Tjänster som appen kontaktar</h2>
         <p>För att appen ska fungera kontaktar den några tjänster på internet. Varje gång det sker ser mottagaren din IP-adress – så fungerar internet. Din dagbok, ditt namn och din e-post skickas aldrig med.</p>
         <ul>
-          <li>Netlify, vårt webbhotell: när du öppnar Lagom på webben eller i Google Play-appen hämtas appen därifrån, och där körs också våra serverfunktioner – för köp, för spärrlistan över återkallade licenser och för receptimport. Netlify sparar IP-adressen en kort tid i sina loggar, och våra funktioner använder den en kort stund för att begränsa missbruk.</li>
-          <li>Open Food Facts: när du söker efter livsmedel online, skannar en streckkod eller visar en produktbild skickas sökordet eller streckkoden dit, och bilden hämtas från deras server. Open Food Facts är en ideell förening i Frankrike och ansvarar själv för sin behandling – läs deras <a href="https://world.openfoodfacts.org/privacy" rel="noopener noreferrer">integritetspolicy</a>.</li>
+          <li>Netlify, vårt webbhotell: när du öppnar Lagom på webben eller i Google Play-appen hämtas appen därifrån, och där körs också våra serverfunktioner – för köp, för spärrlistan över återkallade licenser och för receptimport. Netlify sparar IP-adressen en kort tid i sina loggar, och Netlify och våra funktioner använder den en kort stund för att begränsa missbruk.</li>
+          <li>Open Food Facts: när du söker efter livsmedel online, skannar en streckkod, öppnar en produkt från Open Food Facts som inte är sparad på enheten eller visar en produktbild skickas sökordet eller streckkoden dit, och bilden hämtas från deras server. Open Food Facts är en ideell förening i Frankrike och ansvarar själv för sin behandling – läs deras <a href="https://world.openfoodfacts.org/privacy" rel="noopener noreferrer">integritetspolicy</a>.</li>
           <li>Livsmedelsverket: bara om du själv väljer att hämta hela databasen under Inställningar → Livsmedelsdatabas. Då anropas Livsmedelsverkets öppna API direkt från din enhet.</li>
           <li>Receptimport: om du hämtar ett recept från en webbadress skickas adressen till vår serverfunktion, som hämtar receptet åt dig. Adressen sparas inte – går hämtningen inte att göra loggas bara webbplatsens namn, för felsökning.</li>
           <li>App Store och Google Play: när du köper i appen eller trycker på Återställ köp kontaktar appen butiken via din telefon.</li>
           <li>Stripe: när du köper en licens på webben (se ”När du köper”).</li>
-          <li>Spärrlistan: har du aktiverat en licensnyckel hämtar appen ungefär en gång per dygn en lista över licenser som har återkallats, till exempel för att köpet återbetalades. Inget om dig skickas med – kontrollen görs på enheten.</li>
+          <li>Spärrlistan: har du aktiverat en licensnyckel hämtar appen ungefär en gång per dygn en lista över licenser som har återkallats, till exempel för att köpet har återbetalats eller bestridits. Inget om dig skickas med – kontrollen görs på enheten.</li>
         </ul>
       </section>
       <section class="kort" id="kameran" aria-labelledby="kameran-rubrik">
@@ -150,9 +151,9 @@
       <section class="kort" id="kop" aria-labelledby="kop-rubrik">
         <h2 id="kop-rubrik">När du köper</h2>
         <p>I App Store och Google Play sköter Apple respektive Google betalningen. Appen får bara en bekräftelse på köpet – vilken licens och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Apple och Google ansvarar själva för sin behandling.</p>
-        <p>På webben sköter Stripe betalningen. Stripe behandlar din e-postadress, ditt namn, land, betalkortsuppgifter (eller uppgifter för det betalsätt du väljer) och köp-id. Vi ser köpet i Stripe – e-post, namn, land, belopp, licens och köp-id – men aldrig dina kortuppgifter. Vid köpet sparas köp-id, licenstyp och när du samtyckte till omedelbar leverans på köpet hos Stripe – vi har ingen egen databas – så att vi kan utfärda licensen, hjälpa dig om du tappar nyckeln, spärra licensen om köpet återbetalas och sköta bokföringen.</p>
+        <p>På webben sköter Stripe betalningen. Stripe behandlar din e-postadress, ditt namn, land, betalkortsuppgifter (eller uppgifter för det betalsätt du väljer) och köp-id. Väljer du Klarna, Swish, Apple Pay eller Google Pay behandlar de också dina uppgifter enligt sina villkor. Vi ser köpet i Stripe – e-post, namn, land, belopp, licens och köp-id – men aldrig dina kortuppgifter. Vid köpet sparas köp-id, licenstyp och när du samtyckte till omedelbar leverans på köpet hos Stripe – vi har ingen egen databas – så att vi kan utfärda licensen, hjälpa dig om du tappar nyckeln, spärra licensen om köpet återbetalas och sköta bokföringen.</p>
         <p>Licensnyckeln innehåller inte ditt namn eller din e-post – bara licenstyp, datum och ett köp-id som vi kan koppla till betalningen om du behöver hjälp.</p>
-        <p>Tappar du nyckeln kan du be om den igen med din e-post och ditt kvittonummer. Uppgifterna skickas via vår serverfunktion till Stripe för att hitta köpet och sparas inte hos oss.</p>
+        <p>Tappar du nyckeln kan du be om den igen med din e-post och ditt kvittonummer (eller köp-id). Uppgifterna skickas via vår serverfunktion till Stripe för att hitta köpet och sparas inte hos oss.</p>
       </section>
       <section class="kort" id="rattslig-grund" aria-labelledby="rattslig-grund-rubrik">
         <h2 id="rattslig-grund-rubrik">Varför vi får behandla uppgifterna</h2>
@@ -169,7 +170,7 @@
           <li>Bokföringsunderlag, till exempel kvitton och utbetalningsrapporter: så länge bokföringslagen kräver (7 kap. 2 §) – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.</li>
           <li>Supportmejl: i 24 månader efter vår senaste kontakt, om de inte behövs längre för en pågående reklamation eller för bokföringen.</li>
           <li>Serverloggar hos Netlify: enligt Netlifys lagringstid för loggar.</li>
-          <li>Anropsbegränsning: IP-adressen finns bara i serverns minne i några minuter.</li>
+          <li>Anropsbegränsning: Netlify och våra funktioner använder IP-adressen bara en kort stund – några minuter – för att begränsa missbruk.</li>
           <li>Din dagbok: tills du själv raderar den – vi har ingen kopia.</li>
           <li>Köp på webben: uppgifterna om köpet finns kvar hos Stripe lika länge som bokföringsunderlaget. Stripe sparar också uppgifter enligt sina egna regler.</li>
         </ul>
@@ -188,8 +189,8 @@
       </section>
       <section class="kort" id="barn" aria-labelledby="barn-rubrik">
         <h2 id="barn-rubrik">Barn och unga</h2>
-        <p>Lagom är avsett för vuxna. Är du under 18 år – prata med en vuxen eller skolsköterskan om mat och vikt; Lagom ger aldrig underskott för dig som är under 18.</p>
-        <p>Du som är under 13 år kan inte använda Lagom. Din dagbok stannar på enheten oavsett ålder – vi får inga uppgifter om dig när du använder appen. För att köpa en licens som omyndig behövs normalt vårdnadshavarens godkännande.</p>
+        <p>Lagom är gjord för vuxna, 18 år och äldre, och går inte att använda om du är yngre. Funderar du på mat och vikt – prata gärna med en vuxen, skolsköterskan eller <a href="https://www.1177.se" rel="noopener noreferrer">1177</a>.</p>
+        <p>Vi samlar inte in uppgifter om barn. Din dagbok stannar på enheten oavsett ålder – vi får inga uppgifter om dig när du använder appen.</p>
       </section>
       <section class="kort" id="ingen-sparning" aria-labelledby="ingen-sparning-rubrik">
         <h2 id="ingen-sparning-rubrik">Ingen reklam, ingen spårning</h2>

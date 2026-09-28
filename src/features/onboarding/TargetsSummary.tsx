@@ -88,7 +88,9 @@ function MacroTile({ label, ariaLabel, value, unit, tone, sub }: { label: ReactN
       </div>
       <div className="mt-0.5 text-ink">
         <span className="font-display text-[1.25rem] font-semibold tabular-nums tracking-tight">{value}</span>
-        <span className="ml-1 text-[0.8125rem] font-medium text-ink-3">{unit}</span>
+        {/* Ett riktigt (fast) mellanslag: skärmläsare och kopiering får "115 g" i stället för "115g". */}
+        {'\u00a0'}
+        <span className="text-[0.8125rem] font-medium text-ink-3">{unit}</span>
       </div>
       {sub && <div className="text-[0.6875rem] text-ink-3">{sub}</div>}
     </div>

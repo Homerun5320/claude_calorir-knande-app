@@ -219,7 +219,7 @@ export const TIPS: readonly Tip[] = [
     id: 'vatten',
     category: 'kostrad',
     title: 'Vatten som törstsläckare',
-    text: 'Vatten är den bästa drycken för törsten. Svenskt kranvatten håller hög kvalitet och är både billigt och klimatsmart.',
+    text: 'Vatten är den bästa drycken för törsten. Svenskt kranvatten håller hög kvalitet och är både billigt och har mycket lågt klimatavtryck.',
     source: 'Livsmedelsverket',
   },
   {

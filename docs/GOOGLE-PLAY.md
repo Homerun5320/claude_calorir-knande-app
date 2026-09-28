@@ -111,8 +111,9 @@ för spåret för sluten test).
 
 *Play Console → Väx → Butiksnärvaro → Huvudbutiksinformation*
 
-Reglerna (Googles policy för metadata): inga rankingord ("bäst", "nr 1", "gratis"), inga
-emoji eller versaler för att sticka ut, inga omdömen från användare, inga myndighetslogotyper och
+Reglerna (Googles policy för metadata): inga rankingord ("bäst", "nr 1", "gratis") i appnamn,
+ikon och kort beskrivning – i den fullständiga beskrivningen står provperioden som "14 dagar utan
+kostnad" – inga emoji eller versaler för att sticka ut, inga omdömen från användare, inga myndighetslogotyper och
 ingen antydan om att Lagom är kopplad till Livsmedelsverket. Nämn inte webbköp eller andra butiker.
 
 ### Appnamn (högst 30 tecken)
@@ -137,7 +138,7 @@ Svensk kostdagbok med Livsmedelsverkets värden, svenska mått och streckkoder
 Lagom är en svensk kost- och näringsdagbok för dig som vill ha koll på vad du äter – utan pekpinnar. Allt är på svenska, med svensk mat, svenska mått och Livsmedelsverkets näringsvärden.
 
 LOGGA MAT SNABBT
-• Sök bland svenska vardagslivsmedel med näringsvärden från Livsmedelsverkets livsmedelsdatabas
+• Sök bland svenska vardagslivsmedel – de flesta med näringsvärden från Livsmedelsverkets livsmedelsdatabas
 • Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
 • Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
 • Skanna streckkoden på förpackningen för att hitta produkten
@@ -149,8 +150,10 @@ NÄRING OCH MÅL
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Vatten, träning och vikt på samma ställe
 
-RECEPT OCH INSIKTER
+RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
+• Hämta recept från en webbadress
+• Planera veckans måltider och få en inköpslista
 • Insikter för veckan, 30 och 90 dagar – bara dagar du har loggat räknas
 • Vikt och mått med en lugn trendlinje i stället för dagliga svängningar
 
@@ -161,19 +164,21 @@ DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
 • Exportera allt när du vill, eller radera allt med ett par tryck
-• Sökord och streckkoder skickas till Open Food Facts för att hitta produkter, utan uppgifter om dig
+• Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
-14 dagar gratis, sedan årslicens eller livstidslicens som köp i appen via Google Play, utan automatisk förnyelse. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
+14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen via Google Play, utan automatisk förnyelse. Priserna visas i Google Play innan du köper. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
 
 KÄLLOR
-Lagom är en fristående app och är inte kopplad till Livsmedelsverket; näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0). Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
+Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de flesta näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0), övriga är samlingsvärden för vanliga märken och värden från förpackningar. Källa: https://soknaringsinnehall.livsmedelsverket.se. Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
 
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(2 563 tecken.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp – lägg till
-*Veckoplanering med inköpslista* först när den finns i appen.
+(Ungefär 2 750 tecken.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
+veckoplaneringen och receptimporten finns i version 1.0, men kontrollera ändå. Googles policy för
+appar med information från myndigheter kräver att källan anges (gärna med adress) – det gör raden
+"Källa:" ovan.
 
 ### Kategori och kontaktuppgifter
 
@@ -285,9 +290,9 @@ skickas. Inget konto, ingen reklam och ingen koppling till någon person.
 | Krypteras all data under överföring? | **Ja** (HTTPS) |
 | Kan användare begära att data raderas? | **Ja** – Inställningar → Data och säkerhetskopia → Radera all data raderar allt i telefonen. Lagom har inga konton och sparar ingen data på servrar. |
 | Hälsa och träning, kost, vikt | **Inte insamlat** – dagboken lämnar aldrig telefonen. |
-| Köphistorik | **Inte insamlat** av appen – köpet hanteras av Google Play. *Om* köp senare kontrolleras mot en egen server (Netlify-funktion): ange *Köphistorik – insamlad, inte delad, appens funktioner*. |
+| Köphistorik | **Inte insamlat** av appen – köpet hanteras av Google Play. *Om* köp senare kontrolleras mot en egen server (Netlify-funktion): ange *Köphistorik – insamlad, inte delad, appens funktioner*. Väljs **RevenueCat** som köp-i-appen-tillägg får RevenueCat köphistorik och ett användar-id: ange då *Köphistorik* och *Enhets- eller andra id:n* (insamlade, delade med tjänsteleverantör), och lägg till RevenueCat i integritetspolicyn och registerförteckningen – före inskickningen. Rekommendationen är ett tillägg som talar direkt med Play Billing utan egen server. |
 | Kraschloggar och diagnostik | **Inte insamlat** – felloggen stannar i telefonen och skickas bara om användaren själv mejlar den till supporten. |
-| Receptimport från en webbadress (om funktionen finns i bygget) | Adressen skickas till Lagoms server, som hämtar receptet direkt och inte sparar något. Vill du vara försiktig: ange *Appaktivitet → Annat användargenererat innehåll – insamlad, behandlas bara tillfälligt, inte delad, appens funktioner*. |
+| Receptimport från en webbadress | Adressen skickas till Lagoms server, som hämtar receptet direkt och inte sparar något. Vill du vara försiktig: ange *Appaktivitet → Annat användargenererat innehåll – insamlad, behandlas bara tillfälligt, inte delad, appens funktioner*. |
 | Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen för streckkoder och sparas eller skickas inte. |
 | Säkerhetsgranskning (MASA) | Nej (valfri) |
 
@@ -321,7 +326,9 @@ spel, inte sociala nätverk). E-post: supportadressen.
 ### Målgrupp och innehåll
 
 *Appinnehåll → Målgrupp och innehåll*: välj **bara 18 år och äldre**. Svara **Nej** på att appen
-kan locka barn. (Ägarens beslut 2026-09-28: målgruppen är vuxna.)
+kan locka barn. (Ägarens beslut 2026-09-28: målgruppen är vuxna.) Appen stämmer med det: den går
+bara att använda från 18 år (räknat på födelseåret), och den som fyller 18 i år får inget förslag
+om viktnedgång förrän hen säkert har fyllt 18.
 
 ### Övriga deklarationer
 
@@ -387,7 +394,7 @@ Android SDK åt dig, så det går bra på Windows, Mac och Linux.
    | Application name / Short name | `Lagom – kaloriräknaren` / `Lagom` |
    | Application ID (paketnamn) | T.ex. `se.<dittnamn>.lagom` – **kan inte ändras efter första uppladdningen** |
    | Display mode | `standalone` |
-   | Orientation | `portrait` (samma som i webbappens manifest) |
+   | Orientation | `portrait` eller `default` – webbappens manifest anger ingen orientering, så välj det som ser bäst ut i skärmdumparna |
    | Status bar color / Splash | `#1F5A43` / `#F6F3EC` |
    | Icon URL | `https://<domän>/icon-512.png`, maskable `https://<domän>/icon-512-maskable.png` |
    | Include support for Play Billing? | **Ja** (lägger till Digital Goods API) |

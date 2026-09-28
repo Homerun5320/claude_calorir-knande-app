@@ -18,6 +18,7 @@ import { X } from 'lucide-react'
 import { cx } from './Button'
 import { IconButton } from './IconButton'
 import { hasModalEntries, registerModalEntry } from './modalHistory'
+import { dismissNonErrorToasts } from './toast'
 
 // ---------------------------------------------------------------------------
 // Modal-grunder
@@ -134,6 +135,8 @@ export function useModal(ref: RefObject<HTMLElement | null>, { active, onDismiss
 
   useEffect(() => {
     if (!active) return
+    // Notiser (utom fel) skulle annars ligga ovanpå arkets eller dialogens innehåll.
+    dismissNonErrorToasts()
     const token = Symbol('modal')
     modalStack.push(token)
     const isTop = () => modalStack[modalStack.length - 1] === token

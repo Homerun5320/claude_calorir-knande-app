@@ -39,12 +39,14 @@ describe('public/radera-konto/index.html', () => {
     expect(html).toMatch(/prefers-color-scheme: dark/)
   })
 
-  it('har appnamn, utvecklare, stegen i appen och en väg utan appen', async () => {
+  it('har appnamn, utvecklare, stegen i appen och en kontaktväg – och säger att 1.0 saknar konton', async () => {
     const html = await readRepoFile('public/radera-konto/index.html')
-    expect(html).toContain('<title>Radera konto – Lagom</title>')
-    expect(html).toContain('Inställningar → Lagom Moln')
-    expect(html).toContain('Radera konto och molndata')
-    expect(html).toContain('>Har du inte längre appen?</h2>')
+    expect(html).toContain('<title>Radera din data – Lagom</title>')
+    // Lagom Moln är avstängt i 1.0: inga konton, inga molnsteg (sidan får inte motsäga integritetspolicyn).
+    expect(html).toContain('Lagom har inga konton i den här versionen.')
+    expect(html).toContain('Inställningar → Data och säkerhetskopia → Radera all data')
+    expect(html).not.toMatch(/<(p|li|h1|h2)[^>]*>[^<]*Lagom Moln/)
+    expect(html).toContain('>Frågor?</h2>')
     expect(html).not.toMatch(/lorem|ipsum|TODO|FIXME/i)
     // Utvecklare och supportadress fylls i när sidan byggs.
     expect(missingSellerPlaceholders(html)).toEqual(['[Företagsnamn]', '[E-post]'])

@@ -46,6 +46,7 @@ import { useAccess } from '../../hooks/useAccess'
 import { premiumStatusLine } from '../premium/TrialBanner'
 import { overrideCount } from './settingsLogic'
 import { CLOUD_ENABLED } from '../../config/cloud'
+import { allowsLicenseKeyEntry } from '../../config/platform'
 import { useCloudStore } from '../../stores/cloudStore'
 
 /** Lagom Moln laddas bara när funktionen finns i bygget (VITE_SUPABASE_URL) – se docs/BACKEND.md. */
@@ -69,7 +70,14 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   traning: { title: 'Träning och vatten', description: 'Träningskalorier och glasstorlek.', icon: Dumbbell, tone: 'fjall', component: TrainingSection },
   data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger på din enhet.', icon: HardDrive, tone: 'gran', component: DataSection },
   databas: { title: 'Livsmedelsdatabas', description: 'Vad som finns inbyggt, källor och import.', icon: Database, tone: 'mossa', component: DatabaseSection },
-  licens: { title: 'Licens', description: 'Provperiod, licensnyckel och köp.', icon: KeyRound, tone: 'sol', component: LicenseSection },
+  licens: {
+    title: 'Licens',
+    // I iPhone-appen finns inga licensnycklar (alternativ A) – bara köp i appen och Återställ köp.
+    description: allowsLicenseKeyEntry() ? 'Provperiod, licensnyckel och köp.' : 'Provperiod, köp och Återställ köp.',
+    icon: KeyRound,
+    tone: 'sol',
+    component: LicenseSection,
+  },
   moln: { title: 'Lagom Moln', description: 'Krypterad kopia av din dagbok i molnet.', icon: Cloud, tone: 'fjall', component: CloudSection },
 }
 

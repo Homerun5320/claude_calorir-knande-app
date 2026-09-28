@@ -218,6 +218,23 @@ describe('ingredientAmount', () => {
     expect(ingredientAmount(kikartor, { amount: 400, unit: 'g', raw: '400 g kokta kikärtor' })).toEqual({ amount: 400, unit: 'g', grams: 400 })
   })
 
+  it('dl av ett tillagat livsmedel utan rå densitet räknas inte som tillagad volym – raden ska kontrolleras', () => {
+    const nudlar: Food = {
+      id: 'lagom:nudlar',
+      name: 'Nudlar',
+      source: 'lagom',
+      category: 'pasta_ris',
+      nutrients: { kcal: 140 },
+      portions: [],
+      density: 0.6,
+      rawWeight: { factor: 2.4, kind: 'okokt' },
+    }
+    expect(ingredientAmount(nudlar, { amount: 2, unit: 'dl' })).toBeUndefined()
+    // Gram går fortfarande att räkna om (rå vikt), och en kokt vara i dl är tillagad volym.
+    expect(ingredientAmount(nudlar, { amount: 200, unit: 'g' })).toEqual({ amount: 200, unit: 'g-ra', grams: 480 })
+    expect(ingredientAmount(nudlar, { amount: 2, unit: 'dl', raw: '2 dl kokta nudlar' })).toEqual({ amount: 2, unit: 'dl', grams: 120 })
+  })
+
   it('använder portioner när måttet saknas och låter förpackningsord matcha varandra', () => {
     const sirap: Food = { id: 'lagom:sirap', name: 'Sirap', source: 'lagom', category: 'sotsaker', nutrients: { kcal: 300 }, portions: [{ id: 'msk', label: '1 msk', grams: 20 }] }
     expect(ingredientAmount(sirap, { amount: 2, unit: 'msk' })).toEqual({ amount: 2, unit: 'portion:msk', grams: 40 })

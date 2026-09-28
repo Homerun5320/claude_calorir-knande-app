@@ -76,11 +76,17 @@ describe('POST /api/recover-license', () => {
   it.each([
     ['kvittonummer med # och mellanslag', '#1234 5678'],
     ['"Kvitto #…" inklistrat', 'Kvitto #1234-5678'],
-    ['fakturanummer i gemener', 'abcd1234-0001'],
     ['köp-id:t från tacksidan', 'cs_test_a1B2c3D4e5F6g7H8i9J0'],
   ])('%s godtas', async (_label, receipt) => {
     const { deps } = setup()
     expect((await handleRecoverLicense(post({ email: CUSTOMER_EMAIL, receipt }), deps)).status).toBe(200)
+  })
+
+  it('fakturanumret godtas inte – det är löpande och går att gissa', async () => {
+    const { deps } = setup()
+    const res = await handleRecoverLicense(post({ email: CUSTOMER_EMAIL, receipt: 'ABCD1234-0001' }), deps)
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ code: 'hittades-inte', error: RECOVER_NOT_FOUND })
   })
 
   it('e-postadressen jämförs utan hänsyn till stora och små bokstäver', async () => {

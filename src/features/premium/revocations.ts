@@ -14,16 +14,19 @@
  * radera – bara ny loggning kräver en licens, precis som efter provperioden. I testläge hoppas
  * kontrollen över.
  *
- * Licensen känns igen på köp-id (`payload.id`) eller på nyckelns hash (`licenseKeyHash`).
+ * Licensen känns igen på köp-id:ts hash (`purchaseIdHash`, listans format v2), på köp-id:t i
+ * klartext (äldre listor, v1) eller på nyckelns hash (`licenseKeyHash`).
  */
 import { API_BASE, COMMERCE_MODE, LICENSE_PUBLIC_KEYS } from '../../config/commerce'
 import { IS_STORE_BUILD } from '../../config/platform'
 import {
   REVOCATION_PREFIX,
   base64UrlEncode,
+  decodeLicense,
   decodeRevocationList,
   licenseKeyHash,
   normalizeLicenseKey,
+  purchaseIdHash,
   verifyRevocationList,
   type LicensePayload,
 } from '../../lib/license'
@@ -77,8 +80,11 @@ let version = 0
 let lastAttempt = 0
 let inFlight: Promise<boolean> | null = null
 const listeners = new Set<() => void>()
-/** Nyckelns hash per nyckel (räknas ut i förväg, så att statusen kan avgöras synkront). */
-const keyHashes = new Map<string, string>()
+/**
+ * Nyckelns hash och köp-id:ts hash per nyckel (räknas ut i förväg, så att statusen kan avgöras
+ * synkront).
+ */
+const keyHashes = new Map<string, string[]>()
 
 function notify(): void {
   version++
@@ -130,15 +136,16 @@ export function revocationIssuedAt(): number | null {
   return cache?.issuedAt ?? null
 }
 
-/** Räkna ut nyckelns hash i förväg, så att `isLicenseRevoked` kan svara direkt. */
+/** Räkna ut nyckelns och köp-id:ts hashar i förväg, så att `isLicenseRevoked` kan svara direkt. */
 export async function prepareRevocationCheck(key: string): Promise<void> {
   const clean = normalizeLicenseKey(key)
   if (keyHashes.has(clean)) return
   try {
-    keyHashes.set(clean, await licenseKeyHash(clean))
+    const id = decodeLicense(clean)?.id
+    keyHashes.set(clean, [await licenseKeyHash(clean), ...(id ? [await purchaseIdHash(id)] : [])])
     if (revoked.size > 0) notify()
   } catch {
-    /* utan WebCrypto kontrolleras bara köp-id */
+    /* utan WebCrypto kontrolleras bara köp-id i klartext (äldre listor) */
   }
 }
 
@@ -146,8 +153,8 @@ export async function prepareRevocationCheck(key: string): Promise<void> {
 export function isLicenseRevoked(key: string, payload: LicensePayload, opts: { enabled?: boolean } = {}): boolean {
   if (!(opts.enabled ?? revocationChecksEnabled()) || payload.test || revoked.size === 0) return false
   if (revoked.has(payload.id)) return true
-  const hash = keyHashes.get(normalizeLicenseKey(key))
-  return hash !== undefined && revoked.has(hash)
+  const hashes = keyHashes.get(normalizeLicenseKey(key)) ?? []
+  return hashes.some((h) => revoked.has(h))
 }
 
 export type ApplyResult = 'uppdaterad' | 'aldre' | 'ogiltig'
@@ -195,7 +202,7 @@ export function extractRevocationToken(body: string): string | null {
   if (typeof o.sig === 'string') {
     if (typeof o.payload === 'string') return `${REVOCATION_PREFIX}.${o.payload}.${o.sig}`
     // { v, issuedAt, ids, sig }: payload = JSON { v, issuedAt, ids } base64url-kodat.
-    if (o.v === 1 && typeof o.issuedAt === 'number' && Array.isArray(o.ids)) {
+    if ((o.v === 1 || o.v === 2) && typeof o.issuedAt === 'number' && Array.isArray(o.ids)) {
       const body64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ v: o.v, issuedAt: o.issuedAt, ids: o.ids })))
       return `${REVOCATION_PREFIX}.${body64}.${o.sig}`
     }

@@ -17,7 +17,7 @@
  *   när appen återfår fokus.
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
+import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
 import { allowsLicenseKeyEntry } from '../config/platform'
 import { isDemoData } from '../lib/demoFlag'
 import { verifyLicense, type LicenseCheck, type LicensePayload } from '../lib/license'
@@ -52,7 +52,7 @@ export type AccessStatus =
   | { kind: 'prov'; daysLeft: number; endsAt: number }
   /**
    * Ny loggning kräver licens. `licenseExpired`: en årslicens har gått ut. `revoked`: licensen har
-   * återkallats (köpet återbetalades). Datan finns alltid kvar.
+   * återkallats (t.ex. återbetalat eller bestritt köp). Datan finns alltid kvar.
    */
   | { kind: 'utgangen'; endedAt: number; licenseExpired: boolean; revoked?: boolean }
   /** Ingen profil ännu (välkomstflödet eller exempeldata) – provperioden har inte startat. */
@@ -235,7 +235,7 @@ export function verifyLicenseCached(key: string): Promise<LicenseCheck> {
   const running = pending.get(key)
   if (running) return running
   const p = Promise.all([
-    verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEYS, mode: COMMERCE_MODE }).catch((): LicenseCheck => ({ ok: false, reason: 'signatur' })),
+    verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEYS, mode: COMMERCE_MODE, rejectTestPurchases: !ACCEPT_TEST_PURCHASES }).catch((): LicenseCheck => ({ ok: false, reason: 'signatur' })),
     prepareRevocationCheck(key),
   ]).then(([result]) => {
     checks.set(key, result)

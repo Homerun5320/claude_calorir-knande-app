@@ -3,6 +3,7 @@ import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../../stores/profileStore'
+import { usePlanStore } from '../../stores/planStore'
 import { backupDateLabel, restoreBackupSafely } from './backupImport'
 
 describe('backupDateLabel', () => {
@@ -43,5 +44,27 @@ describe('restoreBackupSafely', () => {
     expect(() => restoreBackupSafely(broken, 'merge')).toThrow()
     expect(useDiaryStore.getState().entries).toBe(diaryBefore)
     expect(useBodyStore.getState().weights).toBe(weightsBefore)
+  })
+
+  it('veckoplaneringen ingår i återställningen – den rullas också tillbaka', () => {
+    const planBefore = usePlanStore.getState().items
+    const broken = {
+      ...createBackup(),
+      data: { ...createBackup().data, body: { weights: 'trasig' } },
+    } as unknown as BackupFile
+    // Planen ändras av en del av importen som körs innan felet (här simulerat direkt).
+    const original = useBodyStore.setState
+    const spy = vi.spyOn(useBodyStore, 'setState').mockImplementation((...args) => {
+      usePlanStore.setState({ items: { '2026-09-28': [] } })
+      return (original as (...a: unknown[]) => void)(...args)
+    })
+    try {
+      restoreBackupSafely(broken, 'merge')
+    } catch {
+      /* väntat */
+    }
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+    expect(usePlanStore.getState().items).toBe(planBefore)
   })
 })

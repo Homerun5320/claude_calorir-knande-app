@@ -104,6 +104,22 @@ describe('MorePage', () => {
     expect(screen.queryByText(/säkerhetskopia/)).not.toBeInTheDocument()
   })
 
+  it('ber inte om en säkerhetskopia av exempeldata', () => {
+    localStorage.setItem('lagom-demo', '1')
+    inRouter(<MorePage />)
+    expect(screen.queryByText(/säkerhetskopia/)).not.toBeInTheDocument()
+    localStorage.removeItem('lagom-demo')
+  })
+
+  it('en planerad måltid: "1 måltid planerad i veckan"', async () => {
+    const { usePlanStore } = await import('../../stores/planStore')
+    const { weekStartOf } = await import('../../lib/planning')
+    usePlanStore.setState({ items: { [weekStartOf(todayISO())]: [{ id: 'p1' }] } as never })
+    inRouter(<MorePage />)
+    expect(screen.getByText('1 måltid planerad i veckan')).toBeInTheDocument()
+    usePlanStore.setState({ items: {} })
+  })
+
   it('går jämnt ut i två och tre kolumner: Stöd & hjälp blir ett brett kort', () => {
     inRouter(<MorePage />)
     const nav = screen.getByRole('navigation', { name: 'Mer i Lagom' })
@@ -193,6 +209,21 @@ describe('AboutPage', () => {
     }
   })
 
+  it('i den inbyggda appen visas licenstexten i ett ark (en ny flik går ut ur webbvyn)', async () => {
+    vi.stubGlobal('Capacitor', { isNativePlatform: () => true, getPlatform: () => 'ios' })
+    vi.resetModules()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('MIT License\n\nCopyright …'))
+    const { default: FreshAbout } = await import('./AboutPage')
+    inRouter(<FreshAbout />)
+    expect(screen.queryByRole('link', { name: 'Alla paket' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Alla paket' }))
+    expect(await screen.findByText(/MIT License/)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('./licenses.txt')
+    fetchMock.mockRestore()
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
   it('berättar rättvisande vad som lämnar enheten och länkar till policyn och villkoren', () => {
     inRouter(<AboutPage />)
     const card = screen.getByRole('region', { name: 'Din data är din' })
@@ -278,7 +309,7 @@ describe('AboutPage', () => {
     expect(container).not.toHaveTextContent(/\d\s?kr\b/)
     expect(container).not.toHaveTextContent(/Stripe/)
     expect(container).not.toHaveTextContent(/Licensnyckeln/)
-    expect(container).toHaveTextContent('Prova gratis i 14 dagar – sedan årslicens eller livstidslicens som köp i appen.')
+    expect(container).toHaveTextContent('Prova gratis i 14 dagar – sedan årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper).')
     expect(container).toHaveTextContent('allt sparas i appen på den här enheten')
     expect(screen.getByRole('link', { name: 'Lagom Premium' })).toHaveAttribute('href', '/premium')
   })

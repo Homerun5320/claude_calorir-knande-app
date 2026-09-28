@@ -26,9 +26,9 @@ import {
 } from './config.ts'
 import {
   APP_MARKER,
-  REVOKED_METADATA_KEY,
   REVOKING_DISPUTES,
   SESSION_ID_RE,
+  STATUS_METADATA_KEY,
   errorText,
   fulfillSession,
   isFullyRefunded,
@@ -56,6 +56,8 @@ import {
 export interface NetlifyContext {
   ip?: string
   site?: { url?: string }
+  /** Driftmiljön: 'production', 'deploy-preview', 'branch-deploy' eller 'dev'. */
+  deploy?: { context?: string }
 }
 
 export interface HandlerDeps {
@@ -117,19 +119,24 @@ export interface PrepareOptions {
   method?: 'GET' | 'POST'
   /** Meddelandet (403) när anropet kommer från en annan webbplats. */
   forbidden?: string
+  /**
+   * Kräv Origin-headern (appens eller den inbyggda appens ursprung). Anrop utan Origin (curl,
+   * skript) avvisas då – för funktioner som bara appen ska använda.
+   */
+  requireOrigin?: boolean
 }
 
 const FORBIDDEN_PAYMENT = 'Den här webbplatsen får inte använda Lagoms betalning.'
 
 /** Metod, ursprung, anropsgräns och konfiguration – samma för alla anrop från appen. */
 export function prepareRequest(req: Request, deps: HandlerDeps, opts: PrepareOptions): Prepared {
-  const cfg = readConfig(deps.env, deps.context?.site?.url)
+  const cfg = readConfig(deps.env, deps.context?.site?.url, deps.context?.deploy?.context)
   const log = deps.log ?? consoleLogger
   const now = (deps.now ?? Date.now)()
   const method = opts.method ?? 'POST'
   const origin = checkOrigin(req, [cfg.appUrl, ...cfg.allowedOrigins].filter(Boolean), cfg.nativeOrigins, `${method}, OPTIONS`)
 
-  if (!origin.allowed) {
+  if (!origin.allowed || (opts.requireOrigin && req.headers.get('origin') === null)) {
     return { ok: false, response: errorResponse(403, 'fel-ursprung', opts.forbidden ?? FORBIDDEN_PAYMENT, origin.headers) }
   }
   if (req.method === 'OPTIONS') return { ok: false, response: new Response(null, { status: 204, headers: origin.headers }) }
@@ -214,7 +221,7 @@ export function invoiceFooter(seller: SellerInfo, plan: ServerPlan): string {
   const s = sellerForDisplay(seller)
   const sellerLine = [
     `Säljare: ${oneLine(s.name)}`,
-    `Org.nr ${oneLine(s.orgnr, 40)}`,
+    s.orgnr ? `Org.nr ${oneLine(s.orgnr, 40)}` : '',
     oneLine(s.address, 200),
     `Tel. ${oneLine(s.phone, 40)}`,
     oneLine(s.email, 120),
@@ -473,26 +480,29 @@ export async function handleVerifyPurchase(req: Request, deps: HandlerDeps): Pro
 const FULFILL_EVENTS = new Set(['checkout.session.completed', 'checkout.session.async_payment_succeeded'])
 
 /**
- * Händelser som spärrar eller släpper licensen för ett köp (metadata `lagom_revoked` på
- * betalningen). Spärren gäller också utan webhook – verify-purchase och spärrlistan läser
- * återbetalningar och tvister direkt från Stripe – men markeringen syns i Stripes dashboard.
+ * Händelser om återbetalningar och tvister. Webhooken skriver bara vad som hänt i metadata
+ * `lagom_status` på betalningen, som information i Stripes dashboard. Själva spärren räknas alltid
+ * fram ur Stripes återbetalningar och tvister (verify-purchase, "Tappat nyckeln?" och spärrlistan
+ * läser dem direkt) – så en händelse som kommer i fel ordning kan inte spärra en vunnen tvist, och
+ * webhooken rör aldrig supportens manuella beslut i `lagom_revoked`.
  */
 const REVOCATION_EVENTS = new Set(['charge.refunded', 'charge.dispute.created', 'charge.dispute.funds_withdrawn', 'charge.dispute.closed'])
 
-/** '1' = spärra, '' = ta bort spärren, null = ingen ändring. */
-function revocationMarkerFor(type: string, obj: Record<string, unknown>): '1' | '' | null {
+/** Status att skriva i `lagom_status`, eller null = ingen ändring. */
+export function purchaseStatusFor(type: string, obj: Record<string, unknown>): string | null {
   if (type === 'charge.refunded') {
     // Bara full återbetalning – en delvis återbetalning (prisavdrag) behåller licensen.
-    return obj.object === 'charge' && isFullyRefunded(obj as unknown as StripeCharge) ? '1' : null
+    return obj.object === 'charge' && isFullyRefunded(obj as unknown as StripeCharge) ? 'aterbetald' : null
   }
   if (obj.object !== 'dispute') return null
   const status = (obj as unknown as StripeDispute).status
   if (type === 'charge.dispute.closed') {
-    if (status === 'won' || status === 'warning_closed') return ''
-    return status === 'lost' ? '1' : null
+    if (status === 'won') return 'tvist-vunnen'
+    if (status === 'warning_closed') return 'forfragan-stangd'
+    return status === 'lost' ? 'tvist-forlorad' : null
   }
   // Förfrågningar (warning_*) spärrar inte – bara tvister där pengarna har dragits tillbaka.
-  return REVOKING_DISPUTES.has(status) ? '1' : null
+  return REVOKING_DISPUTES.has(status) ? 'bestriden' : null
 }
 
 function idOf(value: unknown): string | null {
@@ -503,9 +513,9 @@ function idOf(value: unknown): string | null {
 
 async function handleRevocationEvent(event: StripeEvent, cfg: ServerConfig, deps: HandlerDeps, log: Logger): Promise<Response> {
   const obj = event.data.object
-  const marker = revocationMarkerFor(event.type, obj)
+  const status = purchaseStatusFor(event.type, obj)
   const intentId = idOf(obj.payment_intent)
-  if (marker === null || !intentId || !/^pi_[A-Za-z0-9_]+$/.test(intentId)) return json(200, { received: true, ignored: true })
+  if (status === null || !intentId || !/^pi_[A-Za-z0-9_]+$/.test(intentId)) return json(200, { received: true, ignored: true })
 
   const needs = missingConfig(cfg, ['stripe'])
   if (needs.length > 0) {
@@ -520,21 +530,15 @@ async function handleRevocationEvent(event: StripeEvent, cfg: ServerConfig, deps
       fetch: deps.fetch,
     })
     if (!isLagomIntent(intent)) return json(200, { received: true, ignored: true })
-    const current = intent.metadata?.[REVOKED_METADATA_KEY] ?? ''
-    // '0' är supportens undantag och ändras aldrig automatiskt.
-    if (current === '0' || current === marker) return json(200, { received: true })
+    if (intent.metadata?.[STATUS_METADATA_KEY] === status) return json(200, { received: true })
     await stripeRequest<StripePaymentIntent>({
       method: 'POST',
       path: `/payment_intents/${encodeURIComponent(intentId)}`,
-      params: { metadata: { [REVOKED_METADATA_KEY]: marker } },
+      params: { metadata: { [STATUS_METADATA_KEY]: status } },
       secretKey: cfg.stripeSecretKey,
       fetch: deps.fetch,
     })
-    log.info(marker === '1' ? 'Licensen spärrad (återbetalning eller tvist)' : 'Spärren hävd (tvisten avgjord till vår fördel)', {
-      event: event.id,
-      type: event.type,
-      betalning: intentId,
-    })
+    log.info('Köpets status noterad (återbetalning eller tvist)', { event: event.id, type: event.type, betalning: intentId, status })
     return json(200, { received: true })
   } catch (e) {
     if (e instanceof StripeError && e.status === 404) return json(200, { received: true, ignored: true })
@@ -547,10 +551,11 @@ async function handleRevocationEvent(event: StripeEvent, cfg: ServerConfig, deps
 /**
  * Tar emot händelser från Stripe. Signaturen kontrolleras alltid. För betalda Lagom-köp utfärdas
  * licensen direkt och sparas på betalningen – även om kunden stängde fliken innan tacksidan
- * hann laddas. Återbetalningar och tvister markeras på betalningen. Inga personuppgifter loggas.
+ * hann laddas. Återbetalningar och tvister noteras på betalningen (`lagom_status`, bara information).
+ * Inga personuppgifter loggas.
  */
 export async function handleStripeWebhook(req: Request, deps: HandlerDeps): Promise<Response> {
-  const cfg = readConfig(deps.env, deps.context?.site?.url)
+  const cfg = readConfig(deps.env, deps.context?.site?.url, deps.context?.deploy?.context)
   const log = deps.log ?? consoleLogger
   const now = (deps.now ?? Date.now)()
   if (req.method !== 'POST') return errorResponse(405, 'fel-metod', 'Använd POST.', { Allow: 'POST' })

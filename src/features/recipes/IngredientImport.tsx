@@ -359,11 +359,12 @@ export function PasteIngredientsSheet({
             <p className="text-center text-xs leading-relaxed text-ink-3" aria-live="polite">
               {reviewSummary(result)}
             </p>
-            <div className="flex gap-2">
+            {/* Staplade på smala skärmar (huvudknappen överst) – annars får "Lägg till 12 ingredienser" inte plats. */}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button variant="secondary" iconLeft={ArrowLeft} onClick={() => setLines(null)}>
                 Ändra text
               </Button>
-              <Button className="flex-1" size="lg" iconLeft={Check} onClick={add} disabled={n === 0}>
+              <Button className="min-w-0 sm:flex-1" size="lg" iconLeft={Check} onClick={add} disabled={n === 0}>
                 {n === 1 ? 'Lägg till 1 ingrediens' : `Lägg till ${n} ingredienser`}
               </Button>
             </div>

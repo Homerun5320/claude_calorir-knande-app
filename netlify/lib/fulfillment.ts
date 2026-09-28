@@ -8,10 +8,10 @@
  *
  * Återbetalda och bestridda köp ger ingen licens (koden 'aterbetald'). Se `revocationOf`.
  */
-import { decodeLicense, type LicensePayload } from '../../src/lib/license.ts'
-import type { ServerConfig } from './config.ts'
+import { decodeLicense, licenseKeyHash, type LicensePayload } from '../../src/lib/license.ts'
+import { purchaseModeProblem, type ServerConfig } from './config.ts'
 import { isIssuedLicenseValid, issueLicense, licenseKid, licensePayloadFor, publicKeyFromPrivate } from './licensing.ts'
-import { CURRENCY, SERVER_PLANS, isPlanId, priceInOre, type PlanId } from './plans.ts'
+import { CURRENCY, SERVER_PLANS, acceptedAmountsInOre, isPlanId, type PlanId } from './plans.ts'
 import {
   StripeError,
   stripeRequest,
@@ -29,11 +29,18 @@ export const APP_MARKER = 'lagom'
 /** Metadata-nyckeln på betalningen (PaymentIntent) där licensnyckeln sparas. */
 export const LICENSE_METADATA_KEY = 'lagom_license'
 /**
- * Metadata-nyckeln på betalningen som spärrar eller släpper licensen: '1' = spärrad (sätts av
- * webhooken vid full återbetalning eller tvist, eller av supporten), '0' = gäller ändå (supportens
- * undantag, t.ex. en återbetalning av goodwill där kunden får behålla licensen).
+ * Metadata-nyckeln på betalningen för supportens manuella beslut: '1' = spärrad (t.ex. en nyckel
+ * som delats öppet), '0' = gäller ändå (supportens undantag, t.ex. en återbetalning av goodwill där
+ * kunden får behålla licensen). Sätts bara för hand – webhooken rör den aldrig, så att en händelse
+ * i fel ordning inte kan spärra en vunnen tvist eller häva en manuell spärr.
  */
 export const REVOKED_METADATA_KEY = 'lagom_revoked'
+/**
+ * Metadata-nyckeln där webhooken skriver vad som senast hänt med betalningen ('aterbetald',
+ * 'bestriden', 'tvist-vunnen' …). Bara information i Stripes dashboard – spärren räknas alltid fram
+ * ur Stripes återbetalningar och tvister (se `revocationOf`).
+ */
+export const STATUS_METADATA_KEY = 'lagom_status'
 
 /** Stripes Checkout-id: cs_test_… eller cs_live_… */
 export const SESSION_ID_RE = /^cs_(test|live)_[A-Za-z0-9]{8,250}$/
@@ -73,9 +80,10 @@ export function validatePaidSession(session: StripeCheckoutSession, cfg: Pick<Se
     return { ok: false, code: 'okant-kop', detail: `${items.length} rader` }
   }
   const price = items[0].price
-  // Det betalade priset ska vara ett av planens pris-id:n eller exakt planens belopp i kronor.
+  // Det betalade priset ska vara ett av planens pris-id:n eller exakt planens belopp i kronor –
+  // dagens eller ett tidigare pris (köp före en prisändring ska fortfarande gå att hämta igen).
   const knownPrice = cfg.priceIds[plan.id].includes(price.id)
-  const sameAmount = price.currency === CURRENCY && price.unit_amount === priceInOre(plan)
+  const sameAmount = price.currency === CURRENCY && price.unit_amount !== null && acceptedAmountsInOre(plan).includes(price.unit_amount)
   if (!knownPrice && !sameAmount) {
     return { ok: false, code: 'okant-kop', detail: `pris ${price.id} (${price.unit_amount} ${price.currency}) passar inte ${plan.id}` }
   }
@@ -192,6 +200,19 @@ export async function fulfillSession(sessionId: string, ctx: FulfillContext): Pr
     return { ok: false, code: check.code }
   }
 
+  // Ett testköp ger aldrig en licens i produktionen (och ett skarpt köp aldrig i en förhandsversion).
+  const modeProblem = purchaseModeProblem(session.livemode, cfg)
+  if (modeProblem) {
+    log.error(modeProblem, { session: session.id, livemode: session.livemode })
+    return { ok: false, code: 'ej-konfigurerad' }
+  }
+
+  // Manuellt spärrad (LICENSE_REVOKED_IDS): lämnas inte ut igen.
+  if (cfg.revokedIds.includes(session.id)) {
+    log.warn('Licensen är spärrad (LICENSE_REVOKED_IDS) – ingen licens lämnas ut', { session: session.id })
+    return { ok: false, code: 'aterbetald' }
+  }
+
   const intent = typeof session.payment_intent === 'object' && session.payment_intent !== null ? session.payment_intent : null
   const intentId = typeof session.payment_intent === 'string' ? session.payment_intent : intent?.id
 
@@ -225,6 +246,10 @@ export async function fulfillSession(sessionId: string, ctx: FulfillContext): Pr
   const payload = licensePayloadFor(session.id, check.plan, session.created, kid)
 
   const stored = intent?.metadata?.[LICENSE_METADATA_KEY]
+  if (stored && cfg.revokedIds.length > 0 && cfg.revokedIds.includes(await licenseKeyHash(stored))) {
+    log.warn('Licensen är spärrad (nyckelhash i LICENSE_REVOKED_IDS) – ingen licens lämnas ut', { session: session.id })
+    return { ok: false, code: 'aterbetald' }
+  }
   if (stored && (await isIssuedLicenseValid(stored, payload, publicKey))) {
     return { ok: true, licenseKey: stored, payload: decodeLicense(stored) ?? payload, reused: true, livemode: session.livemode }
   }

@@ -24,7 +24,7 @@ vi.mock('../../config/commerce', async (importOriginal) => {
 })
 
 import { currentAccess, resetLicenseChecks, useAccess } from '../../hooks/useAccess'
-import { createTestLicense, licenseKeyHash, signLicense, signRevocationList, type LicensePayload } from '../../lib/license'
+import { createTestLicense, licenseKeyHash, purchaseIdHash, signLicense, signRevocationList, type LicensePayload } from '../../lib/license'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../../stores/profileStore'
 import { activateLicense, statusSummary } from './premiumLogic'
@@ -99,6 +99,18 @@ describe('signatur och sparad lista', () => {
     await applyRevocationToken(token)
     await prepareRevocationCheck(key)
     expect(isLicenseRevoked(key, { ...PAYLOAD, id: 'cs_live_hash' })).toBe(true)
+  })
+
+  it('listans format v2: köp-id:t står bara som hash – och spärrar ändå licensen', async () => {
+    const key = await signLicense({ ...PAYLOAD, id: 'cs_live_v2hash' }, keys.priv)
+    const token = await signRevocationList({ v: 2, issuedAt: 2, ids: [await purchaseIdHash('cs_live_v2hash')] }, keys.priv)
+    expect(await applyRevocationToken(token)).toBe('uppdaterad')
+    await prepareRevocationCheck(key)
+    expect(isLicenseRevoked(key, { ...PAYLOAD, id: 'cs_live_v2hash' })).toBe(true)
+    // En annan licens påverkas inte.
+    const other = await signLicense({ ...PAYLOAD, id: 'cs_live_annan' }, keys.priv)
+    await prepareRevocationCheck(other)
+    expect(isLicenseRevoked(other, { ...PAYLOAD, id: 'cs_live_annan' })).toBe(false)
   })
 
   it('testlicenser och testläge hoppar över spärrlistan', async () => {
@@ -214,7 +226,7 @@ describe('status och aktivering', () => {
     const token = await signRevocationList({ v: 1, issuedAt: 700, ids: [PAYLOAD.id] }, keys.priv)
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(textResponse(token))
     const res = await activateLicense(key)
-    expect(res).toEqual({ ok: false, message: 'Licensen har återkallats (köpet återbetalades). Kontakta support om det är fel.' })
+    expect(res).toEqual({ ok: false, message: 'Licensen har återkallats, till exempel för att köpet har återbetalats eller bestridits. Tror du att det är fel? Mejla oss, så reder vi ut det.' })
     expect(fetchMock).toHaveBeenCalledWith('https://lagom.example/api/license-revocations', expect.anything())
     expect(useLicenseStore.getState().licenseKey).toBeNull()
   })
@@ -236,7 +248,7 @@ describe('status och aktivering', () => {
     await applyRevocationToken(await signRevocationList({ v: 1, issuedAt: 800, ids: [PAYLOAD.id] }, keys.priv))
     await waitFor(() => expect(result.current.status).toMatchObject({ kind: 'utgangen', revoked: true }))
     expect(result.current.canLog).toBe(false)
-    expect(statusSummary(result.current.status).text).toContain('Kontakta support om det är fel')
+    expect(statusSummary(result.current.status).text).toContain('Mejla oss, så reder vi ut det')
     // Licensnyckeln finns kvar på enheten (inget tas bort) – bara loggningen spärras.
     expect(useLicenseStore.getState().licenseKey).toBe(key)
   })

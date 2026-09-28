@@ -31,6 +31,7 @@ import {
   requestPersistentStorage,
   saveBackup,
   saveFile,
+  sharedFileToast,
   storageEstimate,
   summarizeBackup,
   type BackupFile,
@@ -49,15 +50,16 @@ import { useHasNewerData, useMemoryOnlyStorage } from '../../../hooks/useStorage
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { SUPPORT_EMAIL } from '../../../config/commerce'
+import { isExampleEmail } from '../../../lib/placeholderEmail'
 import { CLOUD_ENABLED } from '../../../config/cloud'
-import { DISTRIBUTION, allowsLicenseKeyEntry, isInApp, isNativeApp, isTwa, sellsOnWeb, storagePlace } from '../../../config/platform'
+import { DISTRIBUTION, isInApp, isNativeApp, isTwa, sellsOnWeb, storagePlace } from '../../../config/platform'
+import { StartOwnProfileButton } from '../../premium/AccessGate'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
 import { markBackupNow, useLastBackup } from '../backupStatus'
 import { wipeAndReset } from '../wipe'
 import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
-const SHARED_TOAST = 'Delad – välj Spara i Filer för att behålla den'
 
 /**
  * Spara en säkerhetskopia. "Senaste säkerhetskopian" uppdateras bara när filen faktiskt har sparats
@@ -69,7 +71,7 @@ async function exportBackup(): Promise<SaveOutcome> {
     // Med data från en nyare version innehåller kopian bara det som gjorts nu – den sparade datan
     // är inte med, så påminnelsen om säkerhetskopia ska inte tystna.
     if (!hasNewerData()) markBackupNow()
-    toast(outcome === 'saved' ? 'Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.' : SHARED_TOAST, { tone: 'success' })
+    toast(outcome === 'saved' ? 'Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.' : sharedFileToast(), { tone: 'success' })
   } else if (outcome === 'failed') {
     toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
   }
@@ -96,7 +98,8 @@ function joinSv(parts: string[]): string {
   return parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} och ${parts.at(-1)}`
 }
 
-const hasSupportEmail = () => !/\.invalid$/i.test(SUPPORT_EMAIL)
+/** En riktig supportadress (inte en platshållare som support@example.invalid) – samma regel som byggkontrollen. */
+const hasSupportEmail = () => !isExampleEmail(SUPPORT_EMAIL)
 
 interface OtherAppImport {
   fileName: string
@@ -198,7 +201,7 @@ export function DataSection() {
     }
     const outcome = await saveFile(`lagom-dagbok-${todayISO()}.csv`, csv, 'text/csv')
     if (outcome === 'saved') toast('Dagboken är exporterad som CSV', { tone: 'success' })
-    else if (outcome === 'shared') toast(SHARED_TOAST, { tone: 'success' })
+    else if (outcome === 'shared') toast(sharedFileToast(), { tone: 'success' })
     else if (outcome === 'failed') toast('Dagboken kunde inte exporteras. Försök igen.', { tone: 'error' })
   }
 
@@ -220,7 +223,8 @@ export function DataSection() {
         toast('Hittade inget att importera i filen.', { tone: 'error' })
         return
       }
-      setOther({ fileName: file.name, data, summary: otherAppSummary(data), blockedDays, demo: access.demo })
+      // Med exempeldata importeras inget (den är skrivskyddad) – sammanfattningen visar då vad filen innehåller.
+      setOther({ fileName: file.name, data, summary: otherAppSummary(access.demo ? all : data), blockedDays, demo: access.demo })
     } catch (err) {
       toast(err instanceof ImportCsvError || err instanceof UnzipError ? err.message : 'Filen kunde inte läsas.', { tone: 'error' })
     } finally {
@@ -257,7 +261,7 @@ export function DataSection() {
       tone: 'danger',
     })
     if (!ok) return
-    wipeAndReset()
+    void wipeAndReset()
     navigate('/valkommen', { replace: true })
   }
 
@@ -279,7 +283,7 @@ export function DataSection() {
 
   const confirmDelete = () => {
     if (!isDeleteConfirmed(typed)) return
-    wipeAndReset({ removeLicense })
+    void wipeAndReset({ removeLicense })
     setDeleteOpen(false)
     toast('All data är raderad från enheten')
     navigate('/valkommen', { replace: true })
@@ -324,18 +328,19 @@ export function DataSection() {
               Din data finns {storagePlace()} och flyttar inte med automatiskt. Spara en säkerhetskopia här, öppna Lagom på den nya enheten eller i
               appen och välj Återställ från säkerhetskopia.
             </p>
-            {/* I iPhone-appen – och på webben för den som har en licens och funderar på att flytta dit. */}
-            {(!allowsLicenseKeyEntry() || (hasLicense && !isInApp())) && (
+            {/* Bara på webben, för den som har en licensnyckel. I apparna nämns aldrig webbköp (Apples
+                riktlinjer 3.1.1 och 3.1.3) – webbköpare som byter till iPhone hjälps via supporten. */}
+            {hasLicense && !isInApp() && (
               <p className="mt-2">
-                En licens som köpts på webben följer inte med till iPhone-appen –{' '}
+                Har du en licensnyckel och vill använda Lagom i iPhone-appen?{' '}
                 {hasSupportEmail() ? (
-                  <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Licens från webben')}`} className="font-semibold text-gran underline underline-offset-2">
-                    kontakta oss
+                  <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Licensnyckel och iPhone-appen')}`} className="font-semibold text-gran underline underline-offset-2">
+                    Mejla oss
                   </a>
                 ) : (
-                  'kontakta oss'
+                  'Mejla oss'
                 )}{' '}
-                så hjälper vi dig.
+                innan du byter, så hjälper vi dig.
               </p>
             )}
           </div>
@@ -409,7 +414,10 @@ export function DataSection() {
         <h2 id="radera-rubrik" className="font-display text-[1.1875rem] font-semibold tracking-tight text-ink">
           Radera all data
         </h2>
-        <p className="mb-4 mt-1 text-[0.9375rem] leading-relaxed text-ink-2">Tar bort allt från den här enheten. Exportera gärna en säkerhetskopia först.</p>
+        <p className="mb-4 mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
+          Tar bort allt från den här enheten. Exportera gärna en säkerhetskopia först.
+          {CLOUD_ENABLED && ' Du loggas också ut från Lagom Moln på den här enheten. Kopian i molnet raderas inte – det gör du under Lagom Moln.'}
+        </p>
         <Button variant="danger" iconLeft={Trash} onClick={startDelete}>
           Radera all data
         </Button>
@@ -466,7 +474,10 @@ export function DataSection() {
             <ImportSummaryList summary={other.summary} kind="annan-app" />
             <div className="mt-4 flex flex-col gap-2 text-[0.875rem] leading-relaxed text-ink-3">
               {other.demo ? (
-                <p className="text-ink-2">Exempeldatan är skrivskyddad. Skapa din egen profil först – sedan kan du importera.</p>
+                <>
+                  <p className="text-ink-2">Så här mycket finns i filen. Exempeldatan är skrivskyddad – skapa din egen profil först, sedan kan du importera.</p>
+                  <StartOwnProfileButton confirm onNavigate={() => setOther(null)} />
+                </>
               ) : (
                 other.blockedDays > 0 && (
                   <p className="text-ink-2">

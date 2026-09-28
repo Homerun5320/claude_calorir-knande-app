@@ -6,6 +6,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
+import { LIFETIME_PROMISE } from '../../config/commerce'
 import PrivacyPage from './PrivacyPage'
 import TermsPage from './TermsPage'
 import {
@@ -22,9 +23,10 @@ import {
   privacySections,
   termsSections,
   visibleSections,
+  type LegalContext,
 } from './legalContent'
 import { htmlToText, sectionTexts } from './legalExport'
-import { LEGAL_FILES, privacyHtml, privacyMarkdown, termsHtml, termsMarkdown, userTermsMarkdown } from './legalDocs'
+import { LEGAL_FILES, privacyHtml, privacyMarkdown, termsDoc, termsHtml, termsMarkdown, userTermsMarkdown } from './legalDocs'
 import { fillSellerPlaceholders, missingSellerPlaceholders } from './staticSeller'
 import { BodyStats } from '../body/BodyStats'
 import { bodyOverview } from '../body/bodyLogic'
@@ -107,7 +109,7 @@ describe('legalContent', () => {
 
   it('beskriver dataflödena, rättslig grund och rättigheter', () => {
     const all = PRIVACY_SECTIONS.flatMap(sectionTexts).join(' ')
-    for (const needle of ['Open Food Facts', 'Netlify', 'Livsmedelsverkets öppna API', 'Stripe', 'Apple respektive Google', '6.1 b', '6.1 c', '6.1 f', '7 kap. 2 §', '24 månader', 'Data Privacy Framework', 'standardavtalsklausuler', 'imy.se', 'Lagom är avsett för vuxna']) {
+    for (const needle of ['Open Food Facts', 'Netlify', 'Livsmedelsverkets öppna API', 'Stripe', 'Apple respektive Google', '6.1 b', '6.1 c', '6.1 f', '7 kap. 2 §', '24 månader', 'Data Privacy Framework', 'standardavtalsklausuler', 'imy.se', 'Lagom är gjord för vuxna, 18 år och äldre', 'Klarna, Swish, Apple Pay eller Google Pay', 'receptimport']) {
       expect(all).toContain(needle)
     }
     expect(all).toContain('Licensnyckeln innehåller inte ditt namn eller din e-post')
@@ -119,17 +121,23 @@ describe('legalContent', () => {
     expect(all).toContain('inklusive 25 % moms')
     expect(all).toContain('2 kap. 11 §')
     expect(all).toContain('konsumentköplagen (2022:260)')
-    expect(all).toContain('Felrättningar ingår')
-    expect(all).toContain('vi lovar inte nya funktioner')
+    expect(all).toContain('Felrättningar ingår så länge vi ger ut Lagom')
+    expect(all).toContain('nya funktioner kan komma men utlovas inte')
     expect(all).toContain('Allmänna reklamationsnämnden (ARN)')
     expect(all).toContain('Svensk lag gäller')
     expect(all).not.toMatch(/alla framtida uppdateringar/i)
-    expect(TERMS_SECTIONS.find((s) => s.id === 'livstid')?.ownerNote).toMatch(/Ägaren ska bekräfta/)
+    // Livstidslicensen beskrivs med samma löfte som i köparket och på kvittot.
+    expect(TERMS_SECTIONS.find((s) => s.id === 'livstid')?.paragraphs[0]).toBe(LIFETIME_PROMISE)
+    // Anteckningarna till ägaren finns bara i docs/ – de byggs inte in i appen.
+    expect([...TERMS_SECTIONS, ...PRIVACY_SECTIONS].some((s) => s.ownerNote)).toBe(false)
+    expect(termsDoc().sections.find((s) => s.id === 'livstid')?.ownerNote).toMatch(/Ägaren ska bekräfta/)
   })
 
   it('visar platshållare när säljarens uppgifter saknas', () => {
     const seller = TERMS_SECTIONS[0].paragraphs.join(' ')
-    expect(seller).toContain(`Lagom säljs av ${OWNER_PLACEHOLDER}, enskild firma med organisationsnummer ${OWNER_PLACEHOLDER}.`)
+    // Organisationsnumret är frivilligt (för enskild firma personnumret) – saknas det utelämnas det.
+    expect(seller).toContain(`Lagom säljs av ${OWNER_PLACEHOLDER} (enskild firma).`)
+    expect(PRIVACY_SECTIONS[0].paragraphs.join(' ')).toContain(`Personuppgiftsansvarig är ${OWNER_PLACEHOLDER} (enskild firma), ${OWNER_PLACEHOLDER}.`)
     expect(PRIVACY_SECTIONS[0].paragraphs.join(' ')).toContain(`Du når oss på ${OWNER_PLACEHOLDER}.`)
     // Momsregistreringsnumret är frivilligt (momsbefriad firma) – meningen utelämnas i stället.
     expect(TERMS_SECTIONS[0].paragraphs[1]).toBe(`Adress: ${OWNER_PLACEHOLDER}. Telefon: ${OWNER_PLACEHOLDER}. E-post: ${OWNER_PLACEHOLDER}.`)
@@ -140,11 +148,11 @@ describe('legalContent', () => {
     vi.stubEnv('VITE_SELLER_ORGNR', '900101-1234')
     vi.stubEnv('VITE_SELLER_ADDRESS', 'Storgatan 1, 123 45 Småstad')
     vi.stubEnv('VITE_SELLER_PHONE', '070-123 45 67')
-    vi.stubEnv('VITE_SUPPORT_EMAIL', 'hej@lagom.example')
+    vi.stubEnv('VITE_SUPPORT_EMAIL', 'hej@lagom-appen.se')
     vi.resetModules()
     const fresh = await import('./legalContent')
-    expect(fresh.TERMS_SECTIONS[0].paragraphs[0]).toBe('Lagom säljs av Anna Andersson, enskild firma med organisationsnummer 900101-1234.')
-    expect(fresh.TERMS_SECTIONS[0].paragraphs[1]).toContain('Adress: Storgatan 1, 123 45 Småstad. Telefon: 070-123 45 67. E-post: hej@lagom.example.')
+    expect(fresh.TERMS_SECTIONS[0].paragraphs[0]).toBe('Lagom säljs av Anna Andersson (enskild firma, organisationsnummer 900101-1234).')
+    expect(fresh.TERMS_SECTIONS[0].paragraphs[1]).toContain('Adress: Storgatan 1, 123 45 Småstad. Telefon: 070-123 45 67. E-post: hej@lagom-appen.se.')
     // Utan momsregistreringsnummer utelämnas meningen.
     expect(fresh.TERMS_SECTIONS[0].paragraphs[1]).not.toContain('Momsregistreringsnummer')
 
@@ -152,7 +160,7 @@ describe('legalContent', () => {
     vi.resetModules()
     const withVat = await import('./legalContent')
     expect(withVat.TERMS_SECTIONS[0].paragraphs[1]).toBe(
-      'Adress: Storgatan 1, 123 45 Småstad. Telefon: 070-123 45 67. E-post: hej@lagom.example. Momsregistreringsnummer: SE900101123401.',
+      'Adress: Storgatan 1, 123 45 Småstad. Telefon: 070-123 45 67. E-post: hej@lagom-appen.se. Momsregistreringsnummer: SE900101123401.',
     )
   })
 
@@ -168,15 +176,43 @@ describe('legalContent', () => {
     expect(formatLegalDate('2026-10-01')).toBe('1 oktober 2026')
   })
 
+  const WEB: LegalContext = { platform: 'web', webSales: true, licenseKeys: true }
+  const PLAY: LegalContext = { platform: 'play', webSales: false, licenseKeys: true }
+  const APPSTORE: LegalContext = { platform: 'appstore', webSales: false, licenseKeys: false }
+  const textFor = (ctx: LegalContext) => [...visibleSections(TERMS_SECTIONS, ctx), ...visibleSections(PRIVACY_SECTIONS, ctx)].flatMap(sectionTexts).join(' ')
+
   it('tar bort webbköpen i butiksapparna', () => {
-    const store = visibleSections(TERMS_SECTIONS, false)
-    expect(store.map((s) => s.id)).not.toContain('pris')
-    expect(store.map((s) => s.id)).not.toContain('kopet')
-    expect(store.map((s) => s.id)).not.toContain('angerratt')
-    const text = [...store, ...visibleSections(PRIVACY_SECTIONS, false)].flatMap(sectionTexts).join(' ')
-    expect(text).not.toMatch(/Stripe/)
-    expect(text).not.toMatch(/\d\s?kr\b/)
-    expect(visibleSections(TERMS_SECTIONS, true)).toHaveLength(TERMS_SECTIONS.length)
+    for (const ctx of [PLAY, APPSTORE]) {
+      const store = visibleSections(TERMS_SECTIONS, ctx)
+      expect(store.map((s) => s.id)).not.toContain('pris')
+      expect(store.map((s) => s.id)).not.toContain('kopet')
+      expect(store.map((s) => s.id)).not.toContain('angerratt')
+      const text = textFor(ctx)
+      expect(text).not.toMatch(/Stripe/)
+      expect(text).not.toMatch(/\d\s?kr\b/)
+    }
+    expect(visibleSections(TERMS_SECTIONS, WEB)).toHaveLength(TERMS_SECTIONS.length)
+    // Webben med webbförsäljningen avstängd: inga Stripe-avsnitt, men licensnycklarna gäller.
+    expect(visibleSections(TERMS_SECTIONS, { ...WEB, webSales: false }).map((s) => s.id)).not.toContain('pris')
+  })
+
+  it('iPhone-appen nämner bara iPhone och App Store – inte Google Play, webbläsare eller licensnycklar', () => {
+    const text = textFor(APPSTORE)
+    for (const word of [/Google Play/, /Google-konto/, /Android/, /webbläsar/i, /service worker/i, /licensnyckel/i, /licensnycklar/i, /lagom-twa/, /sparrlista/, /webbplatsens data/, /Safari|Chrome|Firefox|Edge/]) {
+      expect(text).not.toMatch(word)
+    }
+    expect(text).toContain('Den här policyn gäller Lagom för iPhone')
+    expect(text).toContain('I App Store sköter Apple betalningen')
+    expect(text).toContain('Köp i App Store följer ditt Apple-konto')
+    expect(visibleSections(TERMS_SECTIONS, APPSTORE).find((s) => s.id === 'butikerna')?.heading).toBe('Köp i App Store')
+    // Varianten gäller bara iPhone-appen – på webben och i Play-appen står den vanliga texten.
+    expect(textFor(PLAY)).toContain('Den här policyn gäller Lagom på webben och i App Store och Google Play')
+  })
+
+  it('spärrlistan nämns där licensnycklar kan aktiveras (webben och Play-appen), inte i iPhone-appen', () => {
+    expect(textFor(PLAY)).toContain('Spärrlistan: har du aktiverat en licensnyckel')
+    expect(textFor({ ...WEB, webSales: false })).toContain('Spärrlistan: har du aktiverat en licensnyckel')
+    expect(textFor(APPSTORE)).not.toContain('Spärrlistan')
   })
 })
 
@@ -207,7 +243,8 @@ describe('PrivacyPage', () => {
     const { container } = inRouter(<Page />)
     expect(screen.getByRole('heading', { level: 2, name: 'När du köper' })).toBeInTheDocument()
     expect(container).not.toHaveTextContent(/Stripe/)
-    expect(container).toHaveTextContent('I App Store och Google Play sköter Apple respektive Google betalningen')
+    expect(container).toHaveTextContent('I App Store sköter Apple betalningen')
+    expect(container).not.toHaveTextContent(/Google Play/)
   })
 })
 
@@ -232,8 +269,9 @@ describe('TermsPage', () => {
     expect(container).not.toHaveTextContent(/Stripe/)
     expect(container).not.toHaveTextContent(/\d\s?kr\b/)
     expect(screen.queryByRole('heading', { name: 'Så går köpet till' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Köp i App Store och Google Play' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Köp i App Store' })).toBeInTheDocument()
     expect(container).toHaveTextContent('Återställ köp')
+    expect(container).not.toHaveTextContent(/Google Play|licensnyckel/i)
   })
 })
 
@@ -327,6 +365,20 @@ describe('staticSeller', () => {
     expect(missingSellerPlaceholders(without)).toEqual([])
     const withVat = fillSellerPlaceholders(html, { ...env, VITE_SELLER_VAT: 'SE900101123401' })
     expect(withVat).toContain('Momsregistreringsnummer: SE900101123401.')
+  })
+
+  it('tar bort organisationsnumret när det saknas (frivilligt för enskild firma)', async () => {
+    const html = await readRepoFile(LEGAL_FILES.termsHtml)
+    expect(html).toContain('(enskild firma, organisationsnummer <span class="fyll">[Org.nr]</span>)')
+    const env = { VITE_SELLER_NAME: 'Anna Andersson', VITE_SELLER_ADDRESS: 'Storgatan 1', VITE_SELLER_PHONE: '070-1', VITE_SUPPORT_EMAIL: 'hej@lagom.se' }
+    const without = fillSellerPlaceholders(html, env)
+    expect(without).not.toContain('organisationsnummer')
+    expect(without).not.toContain('[Org.nr]')
+    expect(without).toContain('Lagom säljs av Anna Andersson (enskild firma).')
+    expect(missingSellerPlaceholders(without)).toEqual([])
+    expect(fillSellerPlaceholders(html, { ...env, VITE_SELLER_ORGNR: '900101-1234' })).toContain('(enskild firma, organisationsnummer 900101-1234)')
+    // Exempeladresser känns igen med samma regel som byggkontrollen.
+    expect(fillSellerPlaceholders('[E-post]', { VITE_SUPPORT_EMAIL: 'hej@lagom.example' })).toBe('[E-post]')
   })
 })
 

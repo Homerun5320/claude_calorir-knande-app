@@ -7,7 +7,7 @@ import { useCloudStore } from '../../stores/cloudStore'
 import { CLOUD_CONSENT_VERSION } from './consent'
 import { CloudError } from './http'
 import { clearUnlockedVault, loadUnlockedVault } from './keyStore'
-import { passphraseProblem, setUpVault } from './cloudSetup'
+import { passphraseHint, passphraseProblem, passphraseStrength, setUpVault } from './cloudSetup'
 import type { VaultRow } from './vault'
 
 const USER = '11111111-1111-4111-8111-111111111111'
@@ -48,6 +48,22 @@ describe('passphraseProblem', () => {
     expect(passphraseProblem('            ', '            ')).toMatch(/mellanslag/)
     expect(passphraseProblem('lingon och blåbär', 'lingon och blåbar')).toMatch(/inte likadana/)
     expect(passphraseProblem('lingon och blåbär', 'lingon och blåbär')).toBeNull()
+  })
+
+  it('avvisar lösenfraser som är lätta att gissa offline', () => {
+    for (const weak of ['aaaaaaaaaaaa', 'lösenord1234', 'Password2024!', '123456789012', 'abcdefghijkl', 'qwertyuiop12', 'ababababababab', 'LagomLagom2026']) {
+      expect(passphraseProblem(weak, weak), weak).toMatch(/gissa|siffror|olika tecken/)
+    }
+    expect(passphraseProblem('fjäll kanelbulle regnjacka', 'fjäll kanelbulle regnjacka')).toBeNull()
+  })
+
+  it('styrkemätaren: fyra ord är stark, ett långt ord okej, vanliga lösenord svaga', () => {
+    expect(passphraseStrength('lösenord1234')).toBe('svag')
+    expect(passphraseStrength('kort')).toBe('svag')
+    expect(passphraseStrength('lingon och blåbär')).toBe('okej')
+    expect(passphraseStrength('fjäll kanelbulle regn jacka')).toBe('stark')
+    expect(passphraseHint('')).toBe('Minst 12 tecken – helst fyra ord eller fler.')
+    expect(passphraseHint('lingon och blåbär')).toBe('Minst 12 tecken – helst fyra ord eller fler. Styrka: okej.')
   })
 })
 

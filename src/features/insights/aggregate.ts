@@ -514,6 +514,17 @@ export interface PlateSummary {
   lagomMeals: number
 }
 
+/**
+ * Tallrikens sammanfattning i en mening med rätt böjning: "1 huvudmåltid bedömd – …",
+ * "0 av 1 huvudmåltid var lagom fördelad", "2 av 5 huvudmåltider var lagom fördelade – fint!".
+ */
+export function plateMealsText(meals: number, lagomMeals: number): string {
+  const noun = meals === 1 ? 'huvudmåltid' : 'huvudmåltider'
+  if (lagomMeals === 0) return `${meals} ${noun} ${meals === 1 ? 'bedömd' : 'bedömda'} – små byten gör tallriken mer lagom.`
+  const fordelad = meals === 1 ? 'fördelad' : 'fördelade'
+  return `${lagomMeals} av ${meals} ${noun} var lagom ${fordelad}${lagomMeals / meals >= 0.5 ? ' – fint!' : '.'}`
+}
+
 /** Den genomsnittliga tallriken för periodens huvudmåltider (lunch, middag, kvällsmat). */
 export function mainMealPlate(entriesByDate: EntriesByDate, dates: readonly ISODate[], variant: PlateVariant): PlateSummary {
   const all: DiaryEntry[] = []

@@ -18,7 +18,13 @@ import { formatNumber } from '../../lib/format'
 // Gränser
 // ---------------------------------------------------------------------------
 
-export const MIN_AGE = 13
+/**
+ * Lagom är gjord för vuxna (ägarens beslut 2026-09-28: målgruppen är 18 år och äldre, samma som i
+ * App Store och Google Play). Vi vet bara födelseåret, så den som fyller 18 i år släpps in – men
+ * säkerhetsreglerna räknar försiktigt (se `minimumAge`) och föreslår ingen viktnedgång förrän
+ * personen säkert har fyllt 18.
+ */
+export const MIN_AGE = 18
 export const MAX_AGE = 110
 export const HEIGHT_RANGE = { min: 120, max: 230 } as const
 export const WEIGHT_RANGE = { min: 30, max: 300 } as const
@@ -164,9 +170,9 @@ function currentYear(today: ISODate): number {
 
 /**
  * Lägsta möjliga ålder för ett födelseår. Vi vet bara året, så den som är född i december kan
- * fortfarande vara ett år yngre än årsskillnaden. Används för säkerhetsreglerna (minsta ålder och
- * ingen viktnedgång under 18 år) så att ingen släpps igenom för tidigt. Den 31 december har alla
- * som är födda det året hunnit fylla år.
+ * fortfarande vara ett år yngre än årsskillnaden. Används för säkerhetsreglerna (ingen viktnedgång
+ * under 18 år) så att ingen får ett underskott för tidigt. Den 31 december har alla som är födda
+ * det året hunnit fylla år.
  */
 export function minimumAge(birthYear: number, today: ISODate = todayISO()): number {
   // Samma regel som dagsmålen i lib/energy.
@@ -175,9 +181,13 @@ export function minimumAge(birthYear: number, today: ISODate = todayISO()): numb
 
 /**
  * Felmeddelandet för födelseåret – ett som faktiskt säger vad som är fel: fel format, ett år i
- * framtiden eller ett orimligt gammalt år. Lagom riktar sig till vuxna men kan användas från
- * MIN_AGE år (med extra skydd under 18); texten för de yngsta är vänlig, inte dömande.
+ * framtiden eller ett orimligt gammalt år. Lagom är gjord för vuxna: den som fyller MIN_AGE (18)
+ * i år eller tidigare kan använda Lagom. Texten för de yngre är vänlig, inte dömande.
  */
+/** Visas för den som är för ung för Lagom. */
+export const UNDER_AGE_TEXT =
+  'Lagom är gjord för vuxna, 18 år och äldre. Funderar du på mat och hälsa – prata gärna med en vuxen, skolsköterskan eller 1177.'
+
 export function validateBirthYear(birthYear: number | undefined, today: ISODate = todayISO()): string | undefined {
   const year = currentYear(today)
   if (birthYear === undefined) return 'Fyll i ditt födelseår.'
@@ -185,9 +195,7 @@ export function validateBirthYear(birthYear: number | undefined, today: ISODate 
   if (!Number.isInteger(birthYear) || birthYear < 1000 || birthYear > 9999) return `Skriv födelseåret med fyra siffror, t.ex. ${year - 35}.`
   if (birthYear > year) return 'Födelseåret kan inte ligga i framtiden.'
   if (birthYear < year - MAX_AGE) return `Ange ett födelseår mellan ${year - MAX_AGE} och ${year}.`
-  if (minimumAge(birthYear, today) < MIN_AGE) {
-    return `Lagom är gjord för vuxna och kan användas från ${MIN_AGE} år. Funderar du på mat och hälsa – prata gärna med en vuxen eller skolsköterskan.`
-  }
+  if (year - birthYear < MIN_AGE) return UNDER_AGE_TEXT
   return undefined
 }
 
@@ -228,10 +236,13 @@ export function draftAge(draft: Pick<ProfileDraft, 'birthYear'>, today: ISODate 
   return draft.birthYear === undefined ? undefined : minimumAge(draft.birthYear, today)
 }
 
-/** true om personen kan vara under 18 år (räknat försiktigt, se `minimumAge`). */
+/**
+ * true om personen får använda Lagom men kan vara under 18 år (räknat försiktigt, se
+ * `minimumAge`) – den som fyller 18 i år men kanske inte har fyllt än.
+ */
 export function isMinor(draft: Pick<ProfileDraft, 'birthYear'>, today: ISODate = todayISO()): boolean {
   const age = draftAge(draft, today)
-  return age !== undefined && age >= MIN_AGE && age < 18
+  return age !== undefined && age < 18 && validateBirthYear(draft.birthYear, today) === undefined
 }
 
 export function bmiOf(weightKg: number, heightCm: number): number {
@@ -259,6 +270,10 @@ export function minHealthyWeight(heightCm: number, age?: number): number {
 /**
  * Varför viktnedgång inte erbjuds, eller null om den är ok. Texten är vänlig och förklarande.
  */
+/** Skälet till att viktnedgång inte föreslås för den som kan vara under 18 år. */
+export const MINOR_LOSS_REASON =
+  'Du som är under 18 år växer fortfarande, och då rekommenderas inte kaloriunderskott. Lagom hjälper dig att äta varierat och lagom i stället.'
+
 export function lossBlockReason(draft: ProfileDraft, today: ISODate = todayISO()): string | null {
   if (draft.sex === 'kvinna' && draft.lifeStage === 'gravid') {
     return 'Under graviditeten behöver du och barnet energi och näring, så viktnedgång rekommenderas inte. Lagom hjälper dig att äta lagom och näringsrikt i stället.'
@@ -267,9 +282,7 @@ export function lossBlockReason(draft: ProfileDraft, today: ISODate = todayISO()
     return 'När du ammar behöver kroppen extra energi, så Lagom sätter inget mål om viktnedgång. Fokus ligger på näring och att äta så att du orkar.'
   }
   const age = draftAge(draft, today)
-  if (age !== undefined && age < 18) {
-    return 'Du som är under 18 år växer fortfarande, och då rekommenderas inte kaloriunderskott. Lagom hjälper dig att äta varierat och lagom i stället.'
-  }
+  if (age !== undefined && age < 18) return MINOR_LOSS_REASON
   const older = bmiAge(draft, today)
   if (draft.weightKg !== undefined && draft.heightCm !== undefined && bmiOf(draft.weightKg, draft.heightCm) < minHealthyBmi(older)) {
     return older !== undefined && older >= OLDER_ADULT_AGE

@@ -660,11 +660,33 @@ export function isUsable(r: Pick<KostradResult, 'coverage'>): boolean {
 }
 
 /**
+ * Veckoråd (fisk, rött kött, alkohol och rörelse) bedöms först när minst så här många dagar är
+ * loggade. Annars räknas en enda middag om till en hel vecka – "674 g rött kött per vecka" efter en
+ * köttbullsmiddag säger ingenting och känns dömande.
+ */
+export const KOSTRAD_MIN_WEEKLY_DAYS = 3
+
+/** true om rådet är ett veckoråd som bygger på för få loggade dagar för att bedömas. */
+export function tooFewDays(r: Pick<KostradResult, 'id' | 'weeklyTarget' | 'periodDays'>): boolean {
+  const weekly = r.weeklyTarget !== undefined || r.id === 'alkohol' || r.id === 'rorelse'
+  return weekly && r.periodDays < KOSTRAD_MIN_WEEKLY_DAYS
+}
+
+/**
+ * true om rådet får en status i Insikter och rapporten: värdet är känt (`isUsable`) och ett veckoråd
+ * bygger på tillräckligt många dagar (`tooFewDays`).
+ */
+export function isAssessable(r: Pick<KostradResult, 'id' | 'weeklyTarget' | 'periodDays' | 'coverage'>): boolean {
+  return isUsable(r) && !tooFewDays(r)
+}
+
+/**
  * Sammanfattande poäng 0–100 (medelvärdet av de bedömda rådens poäng). Råd med låg täckningsgrad
- * (< 50 %) räknas inte, eftersom resultatet då är osäkert (se `isUsable`).
+ * (< 50 %) och veckoråd med för få dagar räknas inte, eftersom resultatet då är osäkert (se
+ * `isAssessable`).
  */
 export function kostradScore(results: readonly KostradResult[]): number {
-  const usable = results.filter(isUsable)
+  const usable = results.filter(isAssessable)
   if (usable.length === 0) return 0
   return Math.round((usable.reduce((s, r) => s + r.score, 0) / usable.length) * 100)
 }

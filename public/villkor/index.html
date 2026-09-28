@@ -52,7 +52,8 @@
       .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem; margin-top: 1rem; }
       .omfang { color: var(--ink-3); font-size: 0.8125rem; font-weight: 600; margin: 0 0 0.25rem; }
       nav ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
-      nav li { margin: 0.25rem 0; }
+      nav li { margin: 0; }
+      nav li a { display: inline-flex; align-items: center; min-height: 2.75rem; }
       ul, ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
       li { margin: 0.375rem 0; }
       .fyll { background: var(--fyll); border-radius: 0.25rem; padding: 0 0.2em; }
@@ -100,7 +101,7 @@
       </nav>
       <section class="kort" id="saljare" aria-labelledby="saljare-rubrik">
         <h2 id="saljare-rubrik">Säljare</h2>
-        <p>Lagom säljs av <span class="fyll">[Företagsnamn]</span>, enskild firma med organisationsnummer <span class="fyll">[Org.nr]</span>.</p>
+        <p>Lagom säljs av <span class="fyll">[Företagsnamn]</span> (enskild firma, organisationsnummer <span class="fyll">[Org.nr]</span>).</p>
         <p>Adress: <span class="fyll">[Adress]</span>. Telefon: <span class="fyll">[Telefon]</span>. E-post: <span class="fyll">[E-post]</span>. Momsregistreringsnummer: <span class="fyll">[Momsreg.nr]</span>.</p>
         <p>Villkoren gäller när du köper en licens och när du använder Lagom. Hur vi hanterar personuppgifter står i <a href="../integritet/">integritetspolicyn</a>.</p>
       </section>
@@ -126,8 +127,8 @@
         <p>Så här köper du en licens på webben:</p>
         <ol>
           <li>Välj licens under Lagom Premium.</li>
-          <li>Läs sammanfattningen, godkänn villkoren och kryssa i att du vill ha licensen levererad direkt.</li>
-          <li>Betala hos Stripe. Innan du betalar kan du se och rätta dina uppgifter, till exempel e-post och kortnummer – eller gå tillbaka och välja en annan licens.</li>
+          <li>Läs sammanfattningen och köpvillkoren och kryssa i att du vill ha licensen levererad direkt (och att ångerrätten då upphör).</li>
+          <li>Betala hos Stripe, där du också godkänner köpvillkoren. Innan du betalar kan du se och rätta dina uppgifter, till exempel e-post och kortnummer – eller gå tillbaka och välja en annan licens.</li>
           <li>När betalningen är klar visas licensnyckeln, och den aktiveras på enheten.</li>
         </ol>
         <p>Avtalet ingås på svenska. Köpet sparas hos Stripe och i vår bokföring. En bekräftelse med kvitto, de viktigaste villkoren och villkorens version skickas till den e-post du anger hos Stripe, och hela villkoren finns alltid på den här sidan med versionsdatum.</p>
@@ -154,13 +155,13 @@
       </section>
       <section class="kort" id="uppdateringar" aria-labelledby="uppdateringar-rubrik">
         <h2 id="uppdateringar-rubrik">Uppdateringar och support</h2>
-        <p>Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.</p>
+        <p>Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna medan licensen gäller – för livstidslicensen så länge vi ger ut Lagom. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.</p>
         <p>Support ges på svenska via e-post: <span class="fyll">[E-post]</span>. Vi svarar så snart vi kan, normalt inom några arbetsdagar.</p>
       </section>
       <section class="kort" id="livstid" aria-labelledby="livstid-rubrik">
         <h2 id="livstid-rubrik">Livstidslicensen</h2>
-        <p>Livstidslicensen har ingen tidsgräns och ingen årsavgift – du köper den en gång och den upphör aldrig att gälla. Felrättningar ingår efter felanmälan så länge vi tillhandahåller Lagom, men vi lovar inte nya funktioner.</p>
-        <p>Lägger vi någon gång ned Lagom fortsätter den version du har att fungera på din enhet så länge enheten stöder den, och du kan alltid exportera din data.</p>
+        <p>Livstidslicensen gäller för alltid – ingen tidsgräns och ingen årsavgift. Felrättningar ingår så länge vi ger ut Lagom; nya funktioner kan komma men utlovas inte. Om Lagom läggs ned fortsätter din version att fungera på din enhet så länge enheten stöder den.</p>
+        <p>Du betalar en gång, och du kan alltid exportera din data.</p>
       </section>
       <section class="kort" id="provperiod" aria-labelledby="provperiod-rubrik">
         <h2 id="provperiod-rubrik">Provperioden</h2>
@@ -187,8 +188,8 @@
       </section>
       <section class="kort" id="minderariga" aria-labelledby="minderariga-rubrik">
         <h2 id="minderariga-rubrik">Minderåriga</h2>
-        <p>Lagom är avsett för vuxna. Är du under 18 år – prata med en vuxen eller skolsköterskan om mat och vikt; Lagom ger aldrig underskott för dig som är under 18.</p>
-        <p>Du som är under 13 år kan inte använda Lagom. Är du under 18 år behöver du normalt din vårdnadshavares godkännande för att köpa en licens, om du inte betalar med pengar du själv har tjänat.</p>
+        <p>Lagom är gjord för vuxna, 18 år och äldre, och går inte att använda om du är yngre. Funderar du på mat och vikt – prata gärna med en vuxen, skolsköterskan eller <a href="https://www.1177.se" rel="noopener noreferrer">1177</a>.</p>
+        <p>Lagom föreslår aldrig viktnedgång (kaloriunderskott) för den som kan vara under 18 år.</p>
       </section>
       <section class="kort" id="tvister" aria-labelledby="tvister-rubrik">
         <h2 id="tvister-rubrik">Tvister</h2>

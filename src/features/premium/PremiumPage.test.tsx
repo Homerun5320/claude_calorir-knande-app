@@ -9,6 +9,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DialogHost } from '../../components/ui'
+import { LIFETIME_PROMISE } from '../../config/commerce'
 import { resetLicenseChecks } from '../../hooks/useAccess'
 import { createTestLicense } from '../../lib/license'
 import { setDemoFlag, clearDemoFlag } from '../../lib/demoFlag'
@@ -85,8 +86,8 @@ describe('PremiumPage', () => {
     expect(villkor).toHaveTextContent('Årslicensen förnyas inte')
     expect(villkor).toHaveTextContent('2 kap. 11 § lagen om distansavtal')
     expect(villkor).toHaveTextContent('Stripe')
-    expect(villkor).toHaveTextContent('Livstidslicensen gäller utan tidsgräns')
-    expect(villkor).toHaveTextContent('Nya funktioner kan tillkomma men utlovas inte')
+    expect(villkor).toHaveTextContent(LIFETIME_PROMISE)
+    expect(villkor).toHaveTextContent('nya funktioner kan komma men utlovas inte')
     expect(villkor).toHaveTextContent('Funktion och kompatibilitet')
     expect(villkor).toHaveTextContent('Allmänna reklamationsnämnden (ARN), www.arn.se. Svensk lag gäller.')
     expect(villkor).toHaveTextContent(
@@ -301,8 +302,10 @@ describe('PremiumPage i App Store-bygget', () => {
     const panel = screen.getByRole('region', { name: 'Lås upp Lagom' })
     expect(panel).toHaveTextContent('Köpet görs i App Store')
     expect(panel).toHaveTextContent('Priset visas av butiken.')
-    // IAP-tillägget finns inte ännu: köpknappen är avstängd och säger varför.
-    expect(within(panel).getByRole('button', { name: 'Köp i appen kommer i nästa version' })).toBeDisabled()
+    // Köp i appen går inte att nå: köpknappen är avstängd och lovar inget om framtiden.
+    expect(within(panel).getByRole('button', { name: 'Köp är inte tillgängliga just nu' })).toBeDisabled()
+    expect(panel).toHaveTextContent('Försök igen om en stund.')
+    expect(panel).not.toHaveTextContent(/nästa version/)
 
     const text = document.body.textContent ?? ''
     // " kr" som valuta (inte "krm" i måtten) och "kronor".
@@ -325,7 +328,7 @@ describe('PremiumPage i App Store-bygget', () => {
     expect(villkor).toHaveTextContent('samma Apple-konto')
     expect(villkor).not.toHaveTextContent('Google')
     expect(villkor).toHaveTextContent('tryck på Återställ köp på en ny enhet')
-    expect(villkor).toHaveTextContent('Livstidslicensen gäller utan tidsgräns')
+    expect(villkor).toHaveTextContent(LIFETIME_PROMISE)
     expect(within(villkor).getByRole('link', { name: 'Integritetspolicy' })).toHaveAttribute('href', '/integritet')
 
     fireEvent.click(screen.getByRole('button', { name: 'Återställ köp' }))

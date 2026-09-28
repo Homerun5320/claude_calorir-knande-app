@@ -5,7 +5,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
-import OnboardingPage from './OnboardingPage'
+import OnboardingPage, { stepText } from './OnboardingPage'
 import { TargetsSummary } from './TargetsSummary'
 import { trialNote } from './OnboardingSteps'
 import { DialogHost } from '../../components/ui'
@@ -96,7 +96,8 @@ describe('OnboardingPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
     await screen.findByRole('heading', { name: 'Vad vill du med Lagom?' })
-    expect(screen.getByRole('progressbar', { name: 'Förlopp' })).toHaveAttribute('aria-valuetext', 'Steg 1 av 6')
+    // Totalantalet visas först när målet och uppgifterna om dig är kända (det kan bli ett steg färre).
+    expect(screen.getByRole('progressbar', { name: 'Förlopp' })).toHaveAttribute('aria-valuetext', 'Steg 1')
 
     // Utan val går det inte vidare
     next()
@@ -182,7 +183,7 @@ describe('OnboardingPage', () => {
     fireEvent.change(screen.getByRole('spinbutton', { name: /Födelseår/ }), { target: { value: '1850' } })
     expect(await screen.findByText(/^Ange ett födelseår mellan \d{4} och \d{4}\.$/)).toBeInTheDocument()
     fireEvent.change(screen.getByRole('spinbutton', { name: /Födelseår/ }), { target: { value: '2020' } })
-    expect(await screen.findByText(/Lagom är gjord för vuxna och kan användas från 13 år/)).toBeInTheDocument()
+    expect(await screen.findByText(/Lagom är gjord för vuxna, 18 år och äldre/)).toBeInTheDocument()
   })
 
   it('medvetet läge: inga siffror i fokus och mindfulMode sparas', async () => {
@@ -364,24 +365,36 @@ describe('trialNote', () => {
 })
 
 describe('OnboardingPage i App Store-bygget', () => {
-  it('visar inga kronor och ingen Stripe – och förklarar flytten från webben', async () => {
+  it('visar inga kronor och ingen Stripe – och förklarar flytten från en annan enhet utan att nämna webben', async () => {
     vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
     vi.resetModules()
     const { default: FreshPage } = await import('./OnboardingPage')
     const router = createMemoryRouter([{ path: '/valkommen', element: <FreshPage /> }], { initialEntries: ['/valkommen'] })
     const { container } = render(<RouterProvider router={router} />)
-    expect(await screen.findByRole('heading', { name: 'Har du använt Lagom på webben?' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Har du använt Lagom på en annan enhet?' })).toBeInTheDocument()
     expect(container).not.toHaveTextContent(/\d\s?kr\b/)
     expect(container).not.toHaveTextContent(/Stripe/)
     expect(screen.getByText(/årslicens eller livstidslicens som köp i appen/)).toBeInTheDocument()
     const steps = screen.getAllByRole('listitem').filter((li) => li.closest('section[aria-labelledby="flytta-fran-webben"]'))
     expect(steps.map((li) => li.textContent)).toEqual([
-      'Öppna Lagom i webbläsaren och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
+      'Öppna Lagom på den andra enheten och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
       'Spara filen i Filer eller skicka den till dig själv.',
       'Välj Återställ från säkerhetskopia här.',
     ])
     expect(screen.getByRole('button', { name: /Återställ från säkerhetskopia/ })).toBeInTheDocument()
     // Bara ett sätt att återställa – den lilla knappen längst ned visas inte i appen.
     expect(screen.queryByRole('button', { name: /^Återställ säkerhetskopia$/ })).not.toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/webben|webbläsar/i)
+  })
+})
+
+describe('stegräknaren', () => {
+  it('visar totalantalet först när det är känt (från aktivitetssteget)', () => {
+    const steps = ['valkommen', 'mal', 'om-dig', 'aktivitet', 'takt', 'kost', 'sammanfattning'] as const
+    expect(stepText(steps, 1)).toBe('Steg 1')
+    expect(stepText(steps, 2)).toBe('Steg 2')
+    expect(stepText(steps, 3)).toBe('Steg 3 av 6')
+    // Utan taktsteg (t.ex. graviditet): fem steg.
+    expect(stepText(['valkommen', 'mal', 'om-dig', 'aktivitet', 'kost', 'sammanfattning'], 4)).toBe('Steg 4 av 5')
   })
 })

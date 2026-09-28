@@ -11,9 +11,16 @@
  * - Ett skarpt bygge eller butiksbygge utan säljarens uppgifter (distansavtalslagen) eller med
  *   en supportadress som bara är ett exempel.
  * - En felstavad `VITE_DISTRIBUTION`, eller ett butiksbygge som inte når serverfunktionerna.
+ * - Ett butiksbygge utan riktiga köp i appen (`NATIVE_PURCHASES_READY` i src/lib/storePurchases.ts)
+ *   – Apple och Google avvisar en app där det inte går att köpa. Bara testbyggen får göras med
+ *   LAGOM_ALLOW_STORE_WITHOUT_IAP=1.
+ * - Testköp som godtas i ett produktionsbygge eller butiksbygge (`VITE_ACCEPT_TEST_PURCHASES`).
  * Se docs/BETALNING.md.
  */
-import { createPublicKey } from 'node:crypto'
+import { createPrivateKey, createPublicKey } from 'node:crypto'
+import { isExampleEmail } from '../src/lib/placeholderEmail.ts'
+
+export { isExampleEmail }
 
 export type BuildEnv = Record<string, string | undefined>
 
@@ -30,6 +37,13 @@ export interface CommerceBuildContext {
   netlifyContext?: string
   /** `LAGOM_ALLOW_TEST_COMMERCE`: '1' = ett produktionsbygge i testläge är avsiktligt. */
   allowTest?: string
+  /** `NATIVE_PURCHASES_READY` i src/lib/storePurchases.ts: köp i appen är inkopplade. */
+  nativePurchasesReady?: boolean
+  /**
+   * `LAGOM_ALLOW_STORE_WITHOUT_IAP`: '1' = ett butiksbygge utan köp i appen är avsiktligt – bara
+   * för testbyggen (simulator, skärmdumpar), aldrig för inskickning.
+   */
+  allowStoreWithoutIap?: string
 }
 
 /** Början av en privat ECDSA P-256-nyckel (PKCS#8, base64) – som från generate-license-keys.mjs. */
@@ -55,15 +69,38 @@ function looksSecret(name: string, value: string): boolean {
   return value.split(',').some((part) => looksLikeSecretValue(part))
 }
 
+/** true om texten (base64, DER) går att läsa som en privat nyckel i PKCS#8- eller SEC1-format. */
+function isDerPrivateKey(value: string): boolean {
+  const clean = value.replace(/\s+/g, '')
+  if (clean.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) return false
+  const der = Buffer.from(clean, 'base64')
+  for (const type of ['pkcs8', 'sec1'] as const) {
+    try {
+      createPrivateKey({ key: der, format: 'der', type })
+      return true
+    } catch {
+      /* inte det formatet */
+    }
+  }
+  return false
+}
+
 function looksLikeSecretValue(value: string): boolean {
   const v = value.trim()
   return (
     /^(sk|rk)_(live|test)_/.test(v) ||
+    // Andra tjänsters hemliga nycklar som börjar med sk_ (t.ex. RevenueCat).
+    /^sk_[A-Za-z0-9]{16,}$/.test(v) ||
     v.startsWith('whsec_') ||
     // Supabases hemliga nyckel (ny form) och service_role-nyckeln (JWT) ger full åtkomst till databasen.
     v.startsWith('sb_secret_') ||
     jwtPayload(v)?.role === 'service_role' ||
-    v.replace(/\s+/g, '').startsWith(PKCS8_P256_PREFIX)
+    v.replace(/\s+/g, '').startsWith(PKCS8_P256_PREFIX) ||
+    // Privata nycklar i andra format: PEM, JSON-servicekonton (Google) och JWK med "d".
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(v) ||
+    /"private_key"\s*:/.test(v) ||
+    /"d"\s*:\s*"/.test(v) ||
+    isDerPrivateKey(v)
   )
 }
 
@@ -99,20 +136,15 @@ function publicKeysFrom(env: BuildEnv): { name: string; keys: string[] } {
 const SELLER_FIELDS: ReadonlyArray<{ name: string; what: string }> = [
   { name: 'VITE_SELLER_NAME', what: 'säljarens namn (för enskild firma ditt namn eller firmanamnet)' },
   { name: 'VITE_SUPPORT_EMAIL', what: 'e-post för frågor om köp' },
-  { name: 'VITE_SELLER_ORGNR', what: 'organisationsnummer (för enskild firma ditt personnummer)' },
   { name: 'VITE_SELLER_ADDRESS', what: 'postadress' },
   { name: 'VITE_SELLER_PHONE', what: 'telefonnummer' },
 ]
 
 /**
- * true om e-postadressen bara är ett exempel: domänen example.* (t.ex. example.se, example.com)
- * eller en domän som aldrig kan ta emot post (.invalid, .test, .example, .localhost).
+ * Frivilliga uppgifter: kontrolleras bara om de är satta. Organisationsnumret är för en enskild
+ * firma personnumret – om det måste visas är inte kontrollerat (se docs/BETALNING.md).
  */
-export function isExampleEmail(email: string): boolean {
-  const domain = email.trim().toLowerCase().split('@').pop() ?? ''
-  const labels = domain.split('.')
-  return labels.includes('example') || ['invalid', 'test', 'localhost'].includes(labels[labels.length - 1] ?? '')
-}
+const OPTIONAL_SELLER_FIELDS = ['VITE_SELLER_ORGNR', 'VITE_SELLER_VAT'] as const
 
 /** true om värdet är en platshållare från en mall, t.ex. "[Företagsnamn]" eller "hej@<din domän>". */
 function isTemplatePlaceholder(value: string): boolean {
@@ -205,18 +237,45 @@ export function checkCommerceBuild(env: BuildEnv, ctx: CommerceBuildContext = {}
     warnings.push('VITE_LICENSE_PUBLIC_KEY används inte när VITE_LICENSE_PUBLIC_KEYS är satt – lägg den i listan om gamla licenser ska fortsätta gälla.')
   }
 
+  // --- Testköp (Stripes testkort) ---
+  if ((env.VITE_ACCEPT_TEST_PURCHASES ?? '').trim() === '1' && (ctx.netlifyContext === 'production' || store)) {
+    errors.push(
+      'VITE_ACCEPT_TEST_PURCHASES=1 i ett produktionsbygge eller butiksbygge – då blir köp med Stripes testkort giltiga licenser. ' +
+        'Variabeln hör bara hemma i förhandsversioner och grenbyggen (netlify.toml).',
+    )
+  }
+
   // --- Butiksbyggen ---
   if (store) {
     const apiBase = env.VITE_API_BASE?.trim() ?? ''
     if (!apiBase.startsWith('https://')) {
       errors.push('Butiksappen når inte serverfunktionerna – sätt VITE_API_BASE till webbplatsens https-adress.')
     }
-    if (keys.length === 0) {
+    // Licensnycklar används bara i Google Play-appen – i App Store-bygget finns inga (alternativ A).
+    if (distribution === 'play' && keys.length === 0) {
       warnings.push(
-        `${distribution === 'appstore' ? 'App Store' : 'Google Play'}-bygget saknar publik licensnyckel (VITE_LICENSE_PUBLIC_KEY) – ` +
-          'licensnycklar kan inte aktiveras i appen och spärrlistan för återbetalda licenser kan inte kontrolleras.',
+        'Google Play-bygget saknar publik licensnyckel (VITE_LICENSE_PUBLIC_KEY) – licensnycklar från webbköp kan inte aktiveras i appen ' +
+          'och spärrlistan för återbetalda licenser kan inte kontrolleras.',
       )
     }
+    if (!ctx.nativePurchasesReady) {
+      const message =
+        'Köp i appen är inte inkopplade (NATIVE_PURCHASES_READY i src/lib/storePurchases.ts) – i appen går det då inte att köpa Lagom, ' +
+        'och Apple och Google avvisar appen. Koppla in IAP-tillägget först (docs/APP-STORE.md).'
+      if (ctx.allowStoreWithoutIap === '1') {
+        warnings.push(`${message} LAGOM_ALLOW_STORE_WITHOUT_IAP=1: bygget får bara användas för test, aldrig skickas in.`)
+      } else {
+        errors.push(`${message} Ett testbygge (simulator, skärmdumpar) kan göras med LAGOM_ALLOW_STORE_WITHOUT_IAP=1.`)
+      }
+    }
+  }
+
+  // --- Köpvillkoren i Stripe (skarpt läge på webben) ---
+  if (live && !store && webSales !== 'off' && !env.VITE_TERMS_URL?.trim()) {
+    warnings.push(
+      'VITE_TERMS_URL saknas – sätt den (och TERMS_URL i serverfunktionerna) till köpvillkorens adress, t.ex. https://<din domän>/villkor/, ' +
+        'så att köparen godkänner villkoren i Stripe.',
+    )
   }
 
   // --- Säljarens uppgifter (skarpt läge och butiksbyggen) ---
@@ -229,11 +288,18 @@ export function checkCommerceBuild(env: BuildEnv, ctx: CommerceBuildContext = {}
         )
       }
     }
-    for (const field of SELLER_FIELDS) {
-      const value = env[field.name]?.trim()
+    for (const name of [...SELLER_FIELDS.map((f) => f.name), ...OPTIONAL_SELLER_FIELDS]) {
+      const value = env[name]?.trim()
       if (value && isTemplatePlaceholder(value)) {
-        errors.push(`${field.name} (${value}) ser ut som en platshållare från en mall – skriv in den riktiga uppgiften (distansavtalslagen).`)
+        errors.push(`${name} (${value}) ser ut som en platshållare från en mall – skriv in den riktiga uppgiften (distansavtalslagen).`)
       }
+    }
+    if (!env.VITE_SELLER_ORGNR?.trim()) {
+      warnings.push(
+        'VITE_SELLER_ORGNR saknas – organisationsnumret visas då inte i appen, i villkoren eller på kvittot. För en enskild firma är det ' +
+          'ditt personnummer. Distansavtalslagen kräver namn, adress, telefon och e-post; registreringsnumret krävs (e-handelslagen 8 §) ' +
+          'om firman finns i handelsregistret. Kontrollera med Verksamt eller en jurist (docs/BETALNING.md).',
+      )
     }
     const email = env.VITE_SUPPORT_EMAIL?.trim().toLowerCase() ?? ''
     if (email && !isTemplatePlaceholder(email) && isExampleEmail(email)) {

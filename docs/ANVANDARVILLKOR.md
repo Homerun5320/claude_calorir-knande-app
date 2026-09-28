@@ -26,9 +26,17 @@ Villkoren gäller all användning av Lagom, även under provperioden och utan k�
 - Din data: du ansvarar själv för din dagbok och för att spara säkerhetskopior. Vi har ingen kopia och kan inte återställa data som försvunnit från din enhet.
 - Ansvarsbegränsning: i den utsträckning lagen tillåter ansvarar vi inte för indirekta skador, till exempel förlorad data eller beslut du fattar utifrån appens uppskattningar. Begränsningen inskränker aldrig dina rättigheter enligt tvingande konsumentlagstiftning.
 
+> **I iPhone-appen (App Store) står i stället:**
+>
+> - Rätt att använda appen: du får använda Lagom för ditt eget, privata bruk. Du får inte kopiera, sälja eller sprida appen, kringgå licenskontrollen eller använda appen på ett sätt som skadar den eller andra.
+> - Inte medicinsk rådgivning: Lagom ger allmän information om mat och näring och är inte en medicinteknisk produkt. Mål och beräkningar är uppskattningar och ersätter inte råd från vården. Rådgör med vården om du har en sjukdom, är gravid eller ammar, eller funderar på att ändra din vikt – kontakta [1177](https://www.1177.se) vid frågor om hälsa. Tänker du mycket på mat och vikt finns stöd hos [Frisk & Fri](https://www.friskfri.se).
+> - Innehåll från andra: näringsvärden kommer från Livsmedelsverket, Open Food Facts och andra källor och kan innehålla fel. Jämför gärna med förpackningen.
+> - Din data: du ansvarar själv för din dagbok och för att spara säkerhetskopior. Vi har ingen kopia och kan inte återställa data som försvunnit från din enhet.
+> - Ansvarsbegränsning: i den utsträckning lagen tillåter ansvarar vi inte för indirekta skador, till exempel förlorad data eller beslut du fattar utifrån appens uppskattningar. Begränsningen inskränker aldrig dina rättigheter enligt tvingande konsumentlagstiftning.
+
 ## Uppdateringar och support
 
-Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.
+Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna medan licensen gäller – för livstidslicensen så länge vi ger ut Lagom. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.
 
 Support ges på svenska via e-post: [E-post]. Vi svarar så snart vi kan, normalt inom några arbetsdagar.
 
@@ -36,9 +44,9 @@ Support ges på svenska via e-post: [E-post]. Vi svarar så snart vi kan, normal
 
 ## Minderåriga
 
-Lagom är avsett för vuxna. Är du under 18 år – prata med en vuxen eller skolsköterskan om mat och vikt; Lagom ger aldrig underskott för dig som är under 18.
+Lagom är gjord för vuxna, 18 år och äldre, och går inte att använda om du är yngre. Funderar du på mat och vikt – prata gärna med en vuxen, skolsköterskan eller [1177](https://www.1177.se).
 
-Du som är under 13 år kan inte använda Lagom. Är du under 18 år behöver du normalt din vårdnadshavares godkännande för att köpa en licens, om du inte betalar med pengar du själv har tjänat.
+Lagom föreslår aldrig viktnedgång (kaloriunderskott) för den som kan vara under 18 år.
 
 ## Ändringar i villkoren
 

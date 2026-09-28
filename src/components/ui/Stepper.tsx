@@ -114,8 +114,8 @@ export interface StepButtonProps {
 }
 
 const STEP_SIZES = {
-  sm: { box: 'size-8 after:absolute after:-inset-1.5 after:rounded-full', icon: 'size-4' },
-  md: { box: 'size-10 after:absolute after:-inset-0.5 after:rounded-full', icon: 'size-[1.125rem]' },
+  sm: { box: 'z-[1] size-8 after:absolute after:-inset-1.5 after:rounded-full', icon: 'size-4' },
+  md: { box: 'z-[1] size-10 after:absolute after:-inset-0.5 after:rounded-full', icon: 'size-[1.125rem]' },
   lg: { box: 'size-14', icon: 'size-6' },
 } as const
 

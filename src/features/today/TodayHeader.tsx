@@ -56,7 +56,8 @@ export const TodayHeader = memo(function TodayHeader({ today }: { today: ISODate
   return (
     <header className="lg:px-4 lg:pt-4">
       <SeasonalHeader date={today} height={212} className="lg:rounded-[1.75rem]">
-        <p className="text-[0.9375rem] font-medium text-ink-2">{dateText}</p>
+        {/* text-ink (inte ink-2): datumet ligger på himlen, som kan vara färgstark på kvällen. */}
+        <p className="text-[0.9375rem] font-medium text-ink">{dateText}</p>
         <h1 className="mt-0.5 font-display text-[2rem] leading-[1.1] font-semibold tracking-tight text-balance text-ink sm:text-[2.375rem]">
           {hello}
         </h1>

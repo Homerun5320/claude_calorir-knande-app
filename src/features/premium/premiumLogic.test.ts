@@ -72,7 +72,7 @@ describe('statustexter', () => {
     expect(s).toMatchObject({ kind: 'utgangen', revoked: true, licenseExpired: false })
     const summary = statusSummary(s)
     expect(summary.title).toBe('Licensen har återkallats – din data finns kvar')
-    expect(summary.text).toContain('Licensen har återkallats (köpet återbetalades). Kontakta support om det är fel.')
+    expect(summary.text).toContain('Licensen har återkallats, till exempel för att köpet har återbetalats eller bestridits. Tror du att det är fel? Mejla oss, så reder vi ut det.')
     expect(summary.text).toContain('se, exportera och radera')
     // Under en pågående provperiod gäller provperioden som vanligt.
     expect(accessStatus({ trialStartedAt: NOW - DAY, license: { ok: false, reason: 'aterkallad' }, now: NOW }).kind).toBe('prov')
@@ -112,8 +112,16 @@ describe('statustexter', () => {
     vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
     vi.resetModules()
     const logic = await import('./premiumLogic')
-    expect(logic.priceSummaryText()).toBe('årslicens eller livstidslicens som köp i appen')
+    // Innan butikens priser har hämtats: priserna visas i butiken före köpet.
+    expect(logic.priceSummaryText()).toBe('årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper)')
     expect(logic.priceSummaryText()).not.toMatch(/kr\b/)
+    // Med butikens priser (riktlinje 3.1.1: priserna efter provperioden ska synas innan den startar).
+    logic.rememberStorePrices([
+      { id: 'ar', title: 'Årslicens', displayPrice: '349,00 kr' },
+      { id: 'livstid', title: 'Livstidslicens', displayPrice: '699,00 kr' },
+    ])
+    expect(logic.priceSummaryText()).toBe('årslicens (349,00 kr) eller livstidslicens (699,00 kr) som köp i appen')
+    logic.resetStorePricesForTests()
     expect(logic.storeName()).toBe('App Store')
     // priceSummary finns kvar (webbpriserna), men används bara när Lagom säljs på webben.
     expect(logic.priceSummary()).toBe('349 kr/år eller 699 kr för alltid')

@@ -87,7 +87,7 @@ Bara iPhone ställs in i Xcode-projektet (*Targeted Device Family* = iPhone, `TA
 
 Reglerna som texterna följer (App Review Guidelines 2.3):
 
-- Inga priser i namn eller undertitel, inga rankingord ("bäst", "nr 1", "gratis"), inga emoji.
+- Inga priser och inga rankingord ("bäst", "nr 1", "gratis") i **namn, undertitel, ikon och nyckelord**, och inga emoji. I beskrivningen står provperioden som "14 dagar utan kostnad" – ordet "gratis" används inte ens där.
 - Inga andra plattformar (2.3.10) – nämn inte Android, Google Play eller webbversionen.
 - Ingen hänvisning till köp utanför appen (3.1.1).
 - Inga myndighetslogotyper och ingen antydan om att Lagom är kopplad till Livsmedelsverket.
@@ -125,7 +125,7 @@ Logga svensk mat med Livsmedelsverkets näringsvärden och svenska mått. Inget 
 Lagom är en svensk kost- och näringsdagbok för dig som vill ha koll på vad du äter – utan pekpinnar. Allt är på svenska, med svensk mat, svenska mått och Livsmedelsverkets näringsvärden.
 
 LOGGA MAT SNABBT
-• Sök bland svenska vardagslivsmedel med näringsvärden från Livsmedelsverkets livsmedelsdatabas
+• Sök bland svenska vardagslivsmedel – de flesta med näringsvärden från Livsmedelsverkets livsmedelsdatabas
 • Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
 • Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
 • Skanna streckkoden på förpackningen för att hitta produkten
@@ -137,8 +137,10 @@ NÄRING OCH MÅL
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Vatten, träning och vikt på samma ställe
 
-RECEPT OCH INSIKTER
+RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
+• Hämta recept från en webbadress
+• Planera veckans måltider och få en inköpslista
 • Insikter för veckan, 30 och 90 dagar – bara dagar du har loggat räknas
 • Vikt och mått med en lugn trendlinje i stället för dagliga svängningar
 
@@ -149,23 +151,20 @@ DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
 • Exportera allt när du vill, eller radera allt med ett par tryck
-• Sökord och streckkoder skickas till Open Food Facts för att hitta produkter, utan uppgifter om dig
+• Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
-14 dagar gratis, sedan årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
+14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse. Priserna visas i App Store innan du köper. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
 
 KÄLLOR
-Lagom är en fristående app och är inte kopplad till Livsmedelsverket; näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0). Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
+Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de flesta näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0), övriga är samlingsvärden för vanliga märken och värden från förpackningar. Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
 
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(2 547 tecken.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
-rankingord vid granskningen.
-
-> **Veckoplanering med inköpslista** byggs just nu. Lägg till en rad under *Recept och insikter*
-> först när funktionen finns i det bygge du skickar in – beskriv aldrig något som inte finns i
-> appen (2.3.1).
+(Ungefär 2 700 tecken.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
+rankingord vid granskningen. Veckoplaneringen och receptimporten finns i version 1.0 – kontrollera
+ändå i det bygge du skickar in att allt i texten finns i appen (2.3.1).
 
 ### Nyckelord (högst 100 tecken, kommaseparerade utan mellanslag)
 
@@ -263,7 +262,7 @@ Produkt-id:na måste vara exakt desamma som i `src/lib/storePurchases.ts`:
 För varje produkt:
 
 1. Visningsnamn (svenska): `Livstidslicens` respektive `Årslicens`.
-2. Beskrivning: `Allt i Lagom för alltid – felrättningar ingår.` respektive
+2. Beskrivning: `Allt i Lagom. För alltid – felrättningar ingår.` respektive
    `Allt i Lagom i ett år. Förnyas inte automatiskt.`
 3. Pris: välj Sverige som bas och den prisnivå som ligger närmast 349 kr/699 kr (priserna i App
    Store anges inklusive moms). Tillgänglighet: bara Sverige.
@@ -273,7 +272,16 @@ För varje produkt:
 
 Så beter sig appen (bra att veta vid granskningen):
 
-- Priserna i appen hämtas från App Store – inga kronbelopp är inskrivna i appbygget.
+- Priserna i appen hämtas från App Store – inga kronbelopp är inskrivna i appbygget. Butikens
+  priser visas i välkomststeget och i sammanfattningen innan provperioden startar (riktlinje
+  3.1.1: det som kostar efter provperioden ska synas innan den börjar). Går priserna inte att
+  hämta står det "priserna visas i App Store innan du köper".
+- **Byggkontrollen stoppar App Store-bygget** tills köp i appen är inkopplade
+  (`NATIVE_PURCHASES_READY = true` i `src/lib/storePurchases.ts`, som sätts när IAP-tillägget
+  fungerar). Då kan en app där det inte går att köpa aldrig skickas in av misstag. Ett testbygge
+  för simulatorn eller skärmdumpar görs med `LAGOM_ALLOW_STORE_WITHOUT_IAP=1` – skicka aldrig in ett
+  sådant bygge. Går butiken inte att nå visar köpknappen "Köp är inte tillgängliga just nu" –
+  aldrig ett löfte om en kommande version.
 - Årslicensen döljs när en livstidslicens redan är köpt.
 - **Återställ köp** finns på sidan Lagom Premium och under Inställningar → Licens.
 - Årslicensen gäller 365 dagar från köpet och förnyas inte. Apple kräver att sådana köp kan
@@ -335,14 +343,19 @@ inte för spårning.
 Det här samlas **inte** in (och ska inte kryssas i):
 
 - Hälsa och träning, kost och vikt – dagboken sparas bara på telefonen och lämnar den aldrig.
-- Köp – köpet hanteras av Apple; appen skickar inga köpuppgifter till någon server.
+- Köp – köpet hanteras av Apple; appen skickar inga köpuppgifter till någon server. **Gäller bara om
+  köp-i-appen-tillägget talar direkt med StoreKit** (rekommenderat: `cordova-plugin-purchase` med
+  StoreKit 2, utan egen server). Väljs i stället **RevenueCat** får RevenueCat köphistorik och ett
+  användar-id – då måste *Purchases* och *Identifiers* anges här, RevenueCat läggas till som
+  personuppgiftsbiträde i integritetspolicyn och i registerförteckningen, och Data safety i Google
+  Play ändras på samma sätt – **före** inskickningen.
 - Identifierare, plats, kontakter, foton – streckkodsläsaren tolkar kamerabilden i telefonen och
   sparar eller skickar inga bilder.
 - Diagnostik – felloggen sparas bara i telefonen och skickas bara om användaren själv mejlar
   felrapporten till supporten. Det är frivilligt och sker sällan, vilket enligt Apples regler
   inte behöver redovisas. (Vill du vara extra försiktig kan du ange *Other Diagnostic Data –
   App Functionality – Not linked – No tracking*.)
-- Receptimport från en webbadress (om funktionen finns i bygget) – adressen skickas till Lagoms
+- Receptimport från en webbadress – adressen skickas till Lagoms
   server, som hämtar receptet direkt och inte sparar något. Apple räknar inte sådant som
   insamling, eftersom uppgiften bara används just då för att svara på förfrågan.
 
@@ -368,10 +381,11 @@ kan skilja något):
 | Advertising | Nej | Ingen reklam. |
 | Parental Controls / Age Assurance | Nej | – |
 
-Målgruppen är vuxna (18+). Beräknas en lägre åldersgräns och App Store Connect erbjuder att välja
-en högre (*Age Rating Override* eller liknande), välj **18+**. Finns inget sådant val gäller den
-beräknade gränsen – det är okej; texterna i appen riktar sig ändå till vuxna, och viktnedgång
-föreslås aldrig under 18 år.
+Målgruppen är vuxna (18+), och appen går bara att använda från 18 år (räknat på födelseåret –
+den som fyller 18 i år släpps in, men får inget förslag om viktnedgång förrän hen säkert har
+fyllt 18). Beräknas en lägre åldersgräns och App Store Connect erbjuder att välja en högre
+(*Age Rating Override* eller liknande), välj **18+**. Finns inget sådant val gäller den beräknade
+gränsen – det är okej, eftersom appen själv släpper in bara vuxna.
 
 ## 9. Övriga frågor i App Store Connect
 
@@ -427,9 +441,16 @@ Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och s
    | --- | --- |
    | `VITE_DISTRIBUTION` | `appstore` |
    | `VITE_API_BASE` | Webbplatsens adress med `https://` (serverfunktionerna) |
-   | `VITE_SELLER_NAME`, `VITE_SELLER_ORGNR`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` | Dina uppgifter som säljare (enskild firma: ditt namn och personnummer) – visas i köpvillkoren. Personnumret blir då offentligt; läs rutan om det i docs/BETALNING.md |
+   | `VITE_SELLER_NAME`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` | Dina uppgifter som säljare (enskild firma: ditt namn) – visas i köpvillkoren |
+   | `VITE_SELLER_ORGNR` | Frivilligt (bara en varning utan): för enskild firma ditt personnummer, som då blir offentligt. Läs rutan om det i docs/BETALNING.md |
    | `VITE_SUPPORT_EMAIL` | Supportadressen (inte en exempeladress) |
-   | `VITE_LICENSE_PUBLIC_KEY` | Rekommenderas (varning utan): behövs för spärrlistan över återbetalda licenser |
+   | `VITE_LICENSE_PUBLIC_KEY` | Behövs inte i App Store-bygget – licensnycklar används inte där |
+
+   Bygget stoppas också tills köp i appen är inkopplade (`NATIVE_PURCHASES_READY`, se avsnitt 6).
+   Ett testbygge för simulatorn eller skärmdumpar: lägg till `LAGOM_ALLOW_STORE_WITHOUT_IAP=1`
+   framför kommandot – och skicka aldrig in det bygget. De fristående sidorna (integritetspolicy,
+   villkor, support, radering) tas bort ur `dist-native/`: i appen finns policyn och villkoren som
+   egna sidor med iPhone-text, och de fristående sidorna finns bara på webbplatsen.
 2. **Xcode-projektet** (en gång, i molnbygget eller på en lånad Mac): Bundle ID, ditt team,
    bara iPhone, ikon från `store-assets/app-store-icon-1024.png`, `ITSAppUsesNonExemptEncryption`
    = NO, `NSCameraUsageDescription` och privacy manifest.
@@ -451,7 +472,8 @@ Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och s
 - [ ] Namn, undertitel, beskrivning, nyckelord, kategori och URL:er inlagda.
 - [ ] Ikon och 3–10 skärmdumpar (1 320 × 2 868 px) från den version som skickas in.
 - [ ] Köp i appen `livstid` och `ar` skapade, prissatta, bara Sverige, med granskningsbild – och `prov14` (0 kr) om provperioden görs i App Store (avsnitt 6).
-- [ ] Välkomstflödet säger före provperioden hur lång den är, vad som kräver köp efteråt och vad licenserna kostar.
+- [ ] Välkomstflödet säger före provperioden hur lång den är, vad som kräver köp efteråt och vad licenserna kostar (butikens priser – kontrollera i TestFlight att de syns).
+- [ ] Bygget är gjort **utan** `LAGOM_ALLOW_STORE_WITHOUT_IAP` och med `NATIVE_PURCHASES_READY = true`.
 - [ ] App Privacy, åldersklassning, MDR = Nej, export compliance, Content Rights besvarade.
 - [ ] Tillgänglighet: bara Sverige. Enheter: bara iPhone.
 - [ ] Granskningsanteckningarna ovan inklistrade.

@@ -216,7 +216,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     description:
       'Trettondedagen firas till minne av de vise männen som enligt berättelsen kom med gåvor till Jesusbarnet. För många är det också sista chansen att ta vara på julens rester innan vardagen tar vid.',
     foods: ['julskinka', 'pepparkaka', 'rödkål'],
-    tip: 'Julskinka i en pytt eller omelett är en god och klimatsmart vardagsrätt – mat som äts upp är aldrig svinn.',
+    tip: 'Julskinka i en pytt eller omelett är en god vardagsrätt med lågt klimatavtryck – mat som äts upp är aldrig svinn.',
   },
   {
     key: 'tjugondag-knut',
@@ -498,7 +498,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     description:
       'Äpplets dag har firats i Sverige sedan 2016 på initiativ av Riksförbundet Svensk Trädgård, inspirerad av engelska Apple Day. I svenska trädgårdar växer hundratals äppelsorter – från Aroma till Ingrid Marie.',
     foods: ['äpple', 'äppelmos', 'äppelkaka'],
-    tip: 'Ta vara på fallfrukten: äppelmos, äppelkaka och must är goda och klimatsmarta sätt att minska svinnet.',
+    tip: 'Ta vara på fallfrukten: äppelmos, äppelkaka och must är goda sätt att minska svinnet.',
   },
   {
     key: 'prinsesstartans-vecka',
@@ -587,7 +587,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     description:
       'Potatisen kom till Sverige under 1600-talet men blev vanlig först på 1700-talet – Jonas Alströmer i Alingsås brukar lyftas fram som pionjär. Dagen firas när skörden är bärgad och utbudet som bäst.',
     foods: ['potatis', 'potatismos', 'potatissallad'],
-    tip: 'Potatis är mättande och klimatsmart. Kokt potatis som fått kallna innehåller mer resistent stärkelse, som fungerar ungefär som fibrer.',
+    tip: 'Potatis är mättande och har lågt klimatavtryck. Kokt potatis som fått kallna innehåller mer resistent stärkelse, som fungerar ungefär som fibrer.',
   },
   // --- November–december -----------------------------------------------------
   {

@@ -678,7 +678,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     prepMinutes: 40,
     tags: ['klassiker', 'svensk'],
     group: 'fisk',
-    intro: 'Strömmingsflundror i rågmjöl – billig, klimatsmart och full av omega-3.',
+    intro: 'Strömmingsflundror i rågmjöl – billig, med lågt klimatavtryck och full av omega-3.',
     ingredients: [
       ['lagom:stromming', 600, 'g-ra'],
       ['lagom:dill-farsk', 10, 'g'],
@@ -734,7 +734,7 @@ export const BUILTIN_RECIPE_SEEDS: readonly BuiltinRecipeSeed[] = [
     prepMinutes: 35,
     tags: ['vegan', 'vegetarisk', 'laktosfri'],
     group: 'vego',
-    intro: 'Röda linser, tomat och kokos – värmande, proteinrik och klimatsmart.',
+    intro: 'Röda linser, tomat och kokos – värmande, proteinrik och med lågt klimatavtryck.',
     ingredients: [
       ['lagom:linser-grona-kokta', 2, 'dl-ra'],
       ['lagom:lok-gul', 1, st],

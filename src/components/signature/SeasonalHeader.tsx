@@ -1249,8 +1249,9 @@ export function SeasonalHeader({ date, now: nowProp, season: seasonProp, phase: 
           className={contentClassName ?? 'relative z-10 flex h-full flex-col px-4 text-ink'}
           style={{
             ...(night ? NIGHT_INK : null),
-            // En mjuk skugga håller texten skarp mot norrsken och stjärnor.
-            textShadow: night ? '0 1px 14px var(--lg-shadow-c)' : undefined,
+            // En mjuk skugga håller texten skarp mot norrsken och stjärnor. Övriga tider en gloria i
+            // sidans bakgrundsfärg, så att texten läses även mot en färgstark kvällshimmel (4,5:1).
+            textShadow: night ? '0 1px 14px var(--lg-shadow-c)' : `0 0 10px ${tok('bg')}, 0 0 3px ${tok('bg')}, 0 0 1px ${tok('bg')}`,
             paddingTop: contentClassName ? undefined : 'calc(var(--sa-top) + 1rem)',
           }}
         >

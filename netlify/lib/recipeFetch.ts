@@ -203,13 +203,31 @@ function decode(bytes: Uint8Array, contentType: string): string {
  * <script type="application/ld+json">…</script>, eller '' om det inte finns något recept.
  */
 export function extractRecipeJsonLd(html: string): string {
+  // En linjär skanner i stället för ett enda reguljärt uttryck: ett uttryck med [^>]* före
+  // type-attributet backar kvadratiskt på sidor med många "<script" utan ">" (ReDoS) – och
+  // tidsgränsen stoppar inte synkron kod. Varje tecken läses här högst ett par gånger.
   // Blocket slutar där webbläsaren avslutar det: vid första "</script" följt av mellanslag, "/" eller
   // ">" (även "</script foo>"). Då kan innehållet aldrig avsluta skriptet i förtid i appen.
-  const re = /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json[^>]*>([\s\S]*?)<\/script[\s/>]/gi
+  const open = /<script\b/gi
+  const close = /<\/script[\s/>]/gi
   const blocks: string[] = []
   let total = 0
-  for (const m of html.matchAll(re)) {
-    const content = m[1].trim()
+  let pos = 0
+  for (;;) {
+    open.lastIndex = pos
+    const start = open.exec(html)?.index
+    if (start === undefined) break
+    const end = html.indexOf('>', start)
+    if (end < 0) break
+    pos = end + 1
+    // Orimligt långa taggar hoppas över – då blir uttrycket nedan alltid billigt.
+    if (end - start > MAX_SCRIPT_TAG_CHARS) continue
+    if (!LD_JSON_TYPE.test(html.slice(start, end))) continue
+    close.lastIndex = end + 1
+    const stop = close.exec(html)?.index
+    if (stop === undefined) break
+    pos = stop + '</script'.length
+    const content = html.slice(end + 1, stop).trim()
     if (!content || !/recipe/i.test(content)) continue
     if (total + content.length > RECIPE_MAX_JSONLD_CHARS) break
     total += content.length
@@ -217,6 +235,10 @@ export function extractRecipeJsonLd(html: string): string {
   }
   return blocks.join('\n')
 }
+
+/** Högsta längd på en <script …>-tagg som undersöks (attributen, inte innehållet). */
+const MAX_SCRIPT_TAG_CHARS = 1024
+const LD_JSON_TYPE = /\btype\s*=\s*["']?application\/ld\+json/i
 
 /** Ett löfte som avvisas när signalen avbryts (tidsgränsen). */
 function whenAborted(signal: AbortSignal): Promise<never> {
@@ -325,6 +347,9 @@ export async function handleRecipeFetch(req: Request, deps: RecipeFetchDeps): Pr
     needs: [],
     notConfigured: RECIPE_ERRORS.hamtning.message,
     forbidden: 'Den här webbplatsen får inte använda Lagoms receptimport.',
+    // Bara appen (webben eller den inbyggda appen) får använda funktionen – aldrig som öppen
+    // hämtare för skript och curl utan Origin.
+    requireOrigin: true,
   })
   if (!prep.ok) return prep.response
   const { origin, log } = prep

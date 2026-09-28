@@ -69,7 +69,7 @@ export const SUPPLEMENT_TEMPLATES: readonly SupplementTemplate[] = [
     nutrients: [{ key: 'folate', amount: 400 }],
     presets: [400],
     portionLabel: '1 tablett',
-    note: 'Livsmedelsverket rekommenderar 400 µg folsyra om dagen till den som kan bli gravid, från minst en månad före graviditeten.',
+    note: 'Livsmedelsverket rekommenderar 400 µg folsyra om dagen till den som kan bli gravid – från minst en månad före graviditeten och under de tre första månaderna av graviditeten.',
   },
   {
     id: 'jarn',

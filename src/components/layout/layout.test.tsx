@@ -273,12 +273,25 @@ describe('uppdateringsfrågan (UpdatePrompt)', () => {
     expect(update).toHaveBeenCalledTimes(2)
   })
 
-  it('sparar ett registreringsfel i felloggen', () => {
+  it('sparar ett oväntat registreringsfel i felloggen', () => {
+    clearErrorLog()
+    Object.defineProperty(navigator, 'serviceWorker', { value: {}, configurable: true })
+    render(<UpdatePrompt />)
+    act(() => pwa.options?.onRegisterError?.(new Error('nätverket')))
+    expect(readErrorLog().map((e) => e.message)).toEqual(['service worker: Error: nätverket'])
+    clearErrorLog()
+    Reflect.deleteProperty(navigator, 'serviceWorker')
+  })
+
+  it('en blockerad service worker (privat läge, strikta inställningar) loggas inte', () => {
     clearErrorLog()
     render(<UpdatePrompt />)
-    act(() => pwa.options?.onRegisterError?.(new Error('SecurityError')))
-    expect(readErrorLog().map((e) => e.message)).toEqual(['service worker: Error: SecurityError'])
-    clearErrorLog()
+    // Utan navigator.serviceWorker (jsdom, eller blockerad i webbläsaren).
+    act(() => pwa.options?.onRegisterError?.(new TypeError("Cannot read properties of undefined (reading 'register')")))
+    Object.defineProperty(navigator, 'serviceWorker', { value: {}, configurable: true })
+    act(() => pwa.options?.onRegisterError?.(new DOMException('The operation is insecure.', 'SecurityError')))
+    expect(readErrorLog()).toEqual([])
+    Reflect.deleteProperty(navigator, 'serviceWorker')
   })
 })
 

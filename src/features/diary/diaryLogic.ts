@@ -13,6 +13,7 @@ import { mealForTime, MEAL_EMOJI } from '../../lib/meals'
 import { KJ_PER_KCAL } from '../../lib/nutrients'
 import { describeAmount } from '../../components/domain/FoodRow'
 import { summarizeRing, mindfulLabel, type RingStatus } from '../../components/signature/CalorieRing'
+import { PLATE_NOTE } from '../add/plateLog'
 
 // ---------------------------------------------------------------------------
 // Datum och adresser
@@ -228,7 +229,9 @@ export function entryAmountText(entry: DiaryEntry): string {
  * som försvinner, aldrig tiden.
  */
 export function entrySubtitle(entry: Pick<DiaryEntry, 'time' | 'note'>, amount: string | undefined): string {
-  return [entry.time, amount, entry.note ? 'anteckning' : undefined].filter(Boolean).join(' · ')
+  // Tallrikens rader säger vad de är, som i korgen – inte bara "anteckning".
+  const note = entry.note === PLATE_NOTE ? 'uppskattat med tallriken' : entry.note ? 'anteckning' : undefined
+  return [entry.time, amount, note].filter(Boolean).join(' · ')
 }
 
 /** Energi för en post, `undefined` om okänd. */

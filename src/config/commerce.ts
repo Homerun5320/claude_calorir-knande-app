@@ -27,6 +27,18 @@ export interface Plan {
 /** Antal dagar med full tillgång innan köp krävs. */
 export const TRIAL_DAYS = 14
 
+/**
+ * Livstidslicensens löfte – samma formulering i köparket, villkoren och på Stripe-kvittot
+ * (servern har en kopia i netlify/lib/plans.ts, och testerna kontrollerar att de är lika). Ägarens
+ * beslut 2026-09-28: för alltid, felrättningar ingår, inga löften om nya funktioner. Lova aldrig
+ * mer än så i andra texter.
+ */
+export const LIFETIME_PROMISE =
+  'Livstidslicensen gäller för alltid – ingen tidsgräns och ingen årsavgift. Felrättningar ingår så länge vi ger ut Lagom; nya funktioner kan komma men utlovas inte. Om Lagom läggs ned fortsätter din version att fungera på din enhet så länge enheten stöder den.'
+
+/** Kort form av löftet (planer, status och butikernas produktbeskrivning). */
+export const LIFETIME_SHORT = 'För alltid – felrättningar ingår'
+
 export const PLANS: Plan[] = [
   {
     id: 'ar',
@@ -37,9 +49,8 @@ export const PLANS: Plan[] = [
     perks: ['Allt i Lagom i 12 månader', 'Ingen prenumeration att komma ihåg att säga upp', 'Motsvarar 29 kr i månaden'],
   },
   {
-    // Livstid = för alltid (ägarens beslut 2026-09-28). Löftet är försiktigt: Lagom fortsätter att
-    // fungera och felrättningar ingår – nya funktioner utlovas inte. Den slutliga definitionen
-    // beslutas av ägaren och skrivs i docs/KOPVILLKOR.md.
+    // Livstid = för alltid (ägarens beslut 2026-09-28) – se LIFETIME_PROMISE. Perkarna är den
+    // korta formen: för alltid och felrättningar, inga löften om nya funktioner.
     id: 'livstid',
     name: 'Livstidslicens',
     priceKr: 699,
@@ -77,6 +88,13 @@ export const LICENSE_PUBLIC_KEYS: string[] = (envText('VITE_LICENSE_PUBLIC_KEYS'
 export const LICENSE_PUBLIC_KEY = LICENSE_PUBLIC_KEYS[0] ?? ''
 
 export const COMMERCE_MODE: CommerceMode = env.VITE_COMMERCE_MODE === 'live' && LICENSE_PUBLIC_KEYS.length > 0 ? 'live' : 'test'
+
+/**
+ * `VITE_ACCEPT_TEST_PURCHASES=1`: licenser från köp med Stripes testkort (köp-id cs_test_…) godtas
+ * även i skarpt läge. Bara för förhandsversioner och grenbyggen (netlify.toml) – byggkontrollen
+ * stoppar ett produktionsbygge eller butiksbygge med den.
+ */
+export const ACCEPT_TEST_PURCHASES = envText('VITE_ACCEPT_TEST_PURCHASES') === '1'
 
 /** Stripe-köp på webben är möjliga här (inte i butiksapparna eller när webbförsäljningen är av). */
 export const WEB_CHECKOUT_ENABLED = sellsOnWeb()

@@ -13,7 +13,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(40);
+select plan(45);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-00000000000a', 'a@example.com'),
@@ -73,9 +73,14 @@ select throws_ok(
 set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000000a","role":"authenticated"}';
 
 select lives_ok(
-  $$insert into public.vaults (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version, consent_at)
-    values (1, '{"alg":"PBKDF2-SHA256","iter":600000,"salt":"c2FsdHNhbHRzYWx0c2FsdA"}', 'v1.aaa.bbb', 'v1.ccc.ddd', '2026-10-01', now())$$,
+  $$insert into public.vaults (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version)
+    values (1, '{"alg":"PBKDF2-SHA256","iter":600000,"salt":"c2FsdHNhbHRzYWx0c2FsdA"}', 'v1.aaa.bbb', 'v1.ccc.ddd', '2026-10-01')$$,
   'A skapar sitt valv'
+);
+select ok((select consent_at is not null from public.vaults), 'Samtyckets tidpunkt sätts av databasen');
+select throws_ok(
+  $$update public.vaults set consent_at = '2020-01-01'$$,
+  '42501', null, 'A kan inte bakdatera samtycket'
 );
 select is((select user_id from public.vaults), '00000000-0000-4000-8000-00000000000a'::uuid, 'user_id sätts till den inloggade användaren');
 select throws_ok(
@@ -107,7 +112,14 @@ select results_eq(
   $$values (true, true, 0)$$,
   'Gravstenen saknar innehåll'
 );
-select results_eq($$select seq, bytes_used from public.vaults$$, $$values (2::bigint, 0::bigint)$$, 'Valvets seq och bytes_used följer med');
+select results_eq($$select seq, bytes_used from public.vaults$$, $$values (2::bigint, 512::bigint)$$, 'Valvets seq och bytes_used följer med (minst 512 byte per post)');
+
+select is(
+  public.sync_push('[{"id":"GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG","baseRev":0,"payload":null}]'::jsonb),
+  '{"applied":[],"conflicts":[{"id":"GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG","rev":0}]}'::jsonb,
+  'En gravsten för en post som inte finns ger konflikt'
+);
+select is((select count(*)::int from public.sync_items where item_id = 'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG'), 0, 'Ingen gravsten skapades');
 
 select throws_ok(
   $$select public.sync_push('[{"id":"för-kort","baseRev":0,"payload":"v1.a.b"}]'::jsonb)$$,
@@ -150,12 +162,24 @@ select is((select count(*)::int from public.sync_items where item_id = 'EEEEEEEE
 -- Radering av egna poster frigör utrymme.
 select lives_ok($$delete from public.sync_items where item_id = 'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'$$, 'A kan radera sina egna poster');
 
+-- Högst 16 poster per konto: A har 1 (gravstenen) – fyll på till 16 och prova en till.
+reset role;
+insert into public.sync_items (user_id, item_id, rev, seq, payload, deleted, size)
+  select '00000000-0000-4000-8000-00000000000a', lpad(i::text, 32, 'H'), 1, 10 + i, 'v1.x', false, 4
+  from generate_series(1, 15) as i;
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000000a","role":"authenticated"}';
+select throws_ok(
+  $$select public.sync_push('[{"id":"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII","baseRev":0,"payload":"v1.a.b"}]'::jsonb)$$,
+  '53400', null, 'Högst 16 poster per konto'
+);
+
 -- -----------------------------------------------------------------------------
 -- B:s valv och poster
 -- -----------------------------------------------------------------------------
 set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000000b","role":"authenticated"}';
 -- B ger sitt samtycke (valvet skapades utan samtycke längre upp).
-update public.vaults set consent_version = '2026-10-01', consent_at = now();
+update public.vaults set consent_version = '2026-10-01';
 
 select is(
   public.sync_push('[{"id":"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF","baseRev":0,"payload":"v1.b.b"}]'::jsonb),

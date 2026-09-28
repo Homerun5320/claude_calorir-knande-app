@@ -3,15 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Radera konto – Lagom</title>
-    <meta name="description" content="Så raderar du ditt konto i Lagom Moln och all krypterad data i molnet – i appen, i webbappen eller via e-post." />
+    <title>Radera din data – Lagom</title>
+    <meta name="description" content="Lagom har inga konton i den här versionen – din dagbok finns bara på din enhet. Så raderar du allt." />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <!--
-      Fristående sida (ingen JavaScript) om att radera kontot. Adressen anges i Google Play Console
-      (Datasäkerhet → "Delete account URL") och kan länkas från App Store Connect och supportsidan.
-      [Företagsnamn] och [E-post] ersätts med VITE_SELLER_NAME och VITE_SUPPORT_EMAIL när sidan
-      byggs (samma mekanism som integritetspolicyn, se src/features/legal/staticSeller.ts).
-      Konton finns bara när den frivilliga tjänsten Lagom Moln är påslagen (docs/BACKEND.md).
+      Fristående sida (ingen JavaScript) om att radera sin data. Kan länkas från supportsidan och anges
+      i Google Play Console om Play frågar efter en adress för radering. [Företagsnamn] och [E-post]
+      ersätts med VITE_SELLER_NAME och VITE_SUPPORT_EMAIL när sidan byggs (samma mekanism som
+      integritetspolicyn, se src/features/legal/staticSeller.ts). Sidan finns bara på webbplatsen –
+      den tas bort ur butiksappens paket (vite.config.ts).
+      Version 1.0 har inga konton: Lagom Moln är avstängt. När Lagom Moln slås på (docs/BACKEND.md)
+      ska sidan beskriva hur kontot och molndatan raderas – i appen (Inställningar → Lagom Moln →
+      Radera konto och molndata) och via e-post – innan tjänsten öppnas för användare.
     -->
     <style>
       :root {
@@ -75,66 +78,35 @@
     <main>
       <header>
         <p class="eyebrow">Lagom</p>
-        <h1>Radera ditt konto</h1>
+        <h1>Radera din data</h1>
         <p class="ingress">
-          Lagom är en svensk kalori- och näringsdagbok. De flesta som använder Lagom har inget konto alls – dagboken sparas bara på den egna
-          enheten. Ett konto finns bara om du har slagit på den frivilliga tjänsten <strong>Lagom Moln</strong>, en krypterad kopia av dagboken.
+          Lagom är en svensk kalori- och näringsdagbok. Lagom har inga konton i den här versionen. Din dagbok finns bara på din enhet – det finns
+          inget hos oss att radera.
         </p>
         <p class="meta">Appens namn: Lagom. Utvecklare: <span class="fyll">[Företagsnamn]</span> (enskild firma).</p>
       </header>
 
-      <section class="kort" aria-labelledby="i-appen">
-        <h2 id="i-appen">Radera kontot i appen eller webbappen</h2>
+      <section class="kort" aria-labelledby="radera-allt">
+        <h2 id="radera-allt">Så raderar du allt</h2>
         <ol>
-          <li>Öppna Lagom – appen i telefonen eller webbappen i webbläsaren.</li>
-          <li>Gå till <span class="vag">Inställningar → Lagom Moln</span>. Logga in med din e-postadress om du inte redan är inloggad (du får en kod via e-post).</li>
-          <li>Tryck på <span class="vag">Radera konto och molndata</span> och bekräfta med <span class="vag">Radera konto</span>.</li>
-          <li>
-            Vill du också tömma enheten: kryssa i <span class="vag">Radera också allt på den här enheten</span> innan du bekräftar. Annars finns din
-            data kvar på enheten.
-          </li>
+          <li>Öppna Lagom och välj <span class="vag">Inställningar → Data och säkerhetskopia → Radera all data</span>.</li>
+          <li>Eller avinstallera appen. Använder du Lagom i webbläsaren kan du i stället rensa webbplatsens data i webbläsarens inställningar.</li>
         </ol>
-        <p>Kontot raderas direkt. Det går inte att ångra.</p>
-      </section>
-
-      <section class="kort" aria-labelledby="vad-raderas">
-        <h2 id="vad-raderas">Det här raderas</h2>
-        <ul>
-          <li>Ditt konto i Lagom Moln och e-postadressen som hör till det.</li>
-          <li>All krypterad data i molnet: kopian av dagboken, vikt, kroppsmått, recept, egna livsmedel och inställningar.</li>
-          <li>Valvets inslagna (krypterade) nycklar och ditt samtycke.</li>
-          <li>Kopplingar mellan kontot och eventuella köp.</li>
-        </ul>
-        <p>
-          Molnleverantörens automatiska säkerhetskopior av databasen skrivs över inom 7 dagar. Innehållet i dem är krypterat på din enhet och kan
-          inte läsas av oss.
-        </p>
+        <p>Raderingen går inte att ångra. Spara gärna en säkerhetskopia först om du vill kunna ta tillbaka din data.</p>
       </section>
 
       <section class="kort" aria-labelledby="finns-kvar">
         <h2 id="finns-kvar">Det här finns kvar</h2>
         <ul>
-          <li>Din data på enheten, om du inte väljer att radera den också. Du kan när som helst radera den under <span class="vag">Inställningar → Data → Radera all data</span> eller genom att avinstallera appen.</li>
-          <li>Köp i App Store eller Google Play finns kvar hos Apple respektive Google och kan återställas med <span class="vag">Återställ köp</span>.</li>
+          <li>Ett köp i App Store eller Google Play finns kvar hos Apple respektive Google och kan återställas med <span class="vag">Återställ köp</span>.</li>
           <li>Uppgifter om köp på webben som vi enligt bokföringslagen måste spara (kvitton och betalningsuppgifter hos betalningsleverantören Stripe och i vår bokföring) sparas så länge lagen kräver – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.</li>
         </ul>
       </section>
 
-      <section class="kort kontakt" aria-labelledby="utan-appen">
-        <h2 id="utan-appen">Har du inte längre appen?</h2>
+      <section class="kort kontakt" aria-labelledby="fragor">
+        <h2 id="fragor">Frågor?</h2>
         <p>
-          Mejla <a href="mailto:[E-post]?subject=Radera%20mitt%20konto%20i%20Lagom%20Moln"><span class="fyll">[E-post]</span></a> från den e-postadress som
-          du använde för Lagom Moln och skriv att du vill att kontot raderas. Vi raderar kontot och all data i Lagom Moln och bekräftar via e-post
-          – utan onödigt dröjsmål och senast inom en månad.
-        </p>
-        <p>Skriv aldrig din lösenfras eller återställningsnyckel i mejlet – vi behöver dem inte och frågar aldrig efter dem.</p>
-      </section>
-
-      <section class="kort" aria-labelledby="utan-konto">
-        <h2 id="utan-konto">Använder du Lagom utan Lagom Moln?</h2>
-        <p>
-          Då finns inget konto och ingen data hos oss att radera. Allt ligger på din enhet: radera det under
-          <span class="vag">Inställningar → Data → Radera all data</span> eller avinstallera appen.
+          Mejla <a href="mailto:[E-post]?subject=Radera%20min%20data%20i%20Lagom"><span class="fyll">[E-post]</span></a>, så hjälper vi dig.
         </p>
       </section>
 

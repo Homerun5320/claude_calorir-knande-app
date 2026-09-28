@@ -37,6 +37,7 @@ import { LogoMark } from '../../components/layout/Logo'
 import {
   APPSTORE_URL,
   COMMERCE_MODE,
+  LIFETIME_PROMISE,
   PLAY_URL,
   SELLER_ADDRESS,
   SELLER_NAME,
@@ -65,6 +66,7 @@ import {
   looksLikeEmail,
   perMonthText,
   recoverLicense,
+  rememberStorePrices,
   statusSummary,
   storeAccountName,
   storeName,
@@ -144,13 +146,13 @@ export function StatusHero({ status, actions }: { status: AccessStatus; actions?
 
 const FEATURES: ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
   { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Livsmedelsverkets värden, dl, msk och krm.' },
-  { icon: ScanBarcode, tone: 'gran', title: 'Streckkodsläsare', text: 'Skanna förpackningar – ingår alltid.' },
+  { icon: ScanBarcode, tone: 'gran', title: 'Streckkodsläsare', text: 'Skanna förpackningar – ingår i licensen, inget tillägg.' },
   { icon: Leaf, tone: 'mossa', title: 'Alla näringsämnen', text: 'Vitaminer, mineraler, fibrer och NNR 2023.' },
   { icon: ChefHat, tone: 'lingon', title: 'Recept och klassiker', text: 'Egna recept räknade på tillagad vikt.' },
   { icon: ChartNoAxesColumn, tone: 'blabar', title: 'Insikter och adaptiva mål', text: 'Kostråd, Tallriksmodellen och klimat.' },
   { icon: Download, tone: 'fjall', title: 'Export och säkerhetskopia', text: 'JSON och Excel (CSV) – din data är din.' },
   { icon: MegaphoneOff, tone: 'vinbar', title: 'Ingen reklam', text: 'Inga konton, ingen spårning, inga dolda avgifter.' },
-  { icon: ShieldCheck, tone: 'gran', title: 'Data på din enhet', text: 'Dagboken lämnar aldrig telefonen.' },
+  { icon: ShieldCheck, tone: 'gran', title: 'Data på din enhet', text: 'Dagboken sparas bara på din enhet.' },
 ]
 
 export function FeatureList() {
@@ -241,10 +243,11 @@ interface TermItem {
   text: string
 }
 
-/** Vad livstidslicensen innebär – samma formulering på webben och i butiksapparna. */
-const LIFETIME_TERMS =
-  'Livstidslicensen gäller utan tidsgräns. Lagom fortsätter att fungera lokalt på dina enheter och du kan alltid exportera din data. ' +
-  'Felrättningar tillhandahålls efter felanmälan i rimlig omfattning. Nya funktioner kan tillkomma men utlovas inte.'
+/**
+ * Vad livstidslicensen innebär – samma löfte som i de fullständiga villkoren och på kvittot
+ * (LIFETIME_PROMISE), på webben och i butiksapparna.
+ */
+const LIFETIME_TERMS = `${LIFETIME_PROMISE} Du kan alltid exportera din data.`
 
 const PRIVACY_BASE = 'Din dagbok stannar på din enhet och skickas aldrig till oss.'
 
@@ -742,7 +745,11 @@ export function StorePurchasePanel({ headingId, planIds }: { headingId?: string;
     let alive = true
     store
       .getProducts()
-      .then((list) => alive && setProducts(list.filter(isPlanProduct)))
+      .then((list) => {
+        // Samma priser i texterna före provperioden (priceSummaryText).
+        rememberStorePrices(list)
+        if (alive) setProducts(list.filter(isPlanProduct))
+      })
       .catch(() => alive && setProducts([]))
     return () => {
       alive = false
@@ -814,11 +821,12 @@ export function StorePurchasePanel({ headingId, planIds }: { headingId?: string;
                 Hämtar priser från butiken …
               </Button>
             ) : (
+              // Butiken svarar inte (eller köp i appen går inte att nå här) – lova aldrig något framtida.
               <Button fullWidth disabled>
-                {available ? 'Köp' : 'Köp i appen kommer i nästa version'}
+                Köp är inte tillgängliga just nu
               </Button>
             )}
-            {available && products !== null && <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">Butiken svarar inte just nu. Försök igen om en stund.</p>}
+            {!(available && products === null) && <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">Försök igen om en stund.</p>}
           </div>
         </>
       )}

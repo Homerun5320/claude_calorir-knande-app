@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto'
-import { decodeLicense, licenseKeyHash, verifyLicense, verifyRevocationList } from '../../src/lib/license.ts'
+import { decodeLicense, licenseKeyHash, purchaseIdHash, verifyLicense, verifyRevocationList } from '../../src/lib/license.ts'
 import {
   isIssuedLicenseValid,
   issueLicense,
@@ -104,7 +104,13 @@ describe('spärrlistan och licens-id', () => {
   it('signRevocations ger en lista som appen godkänner – och bara med rätt nyckel', async () => {
     const token = await signRevocations(['cs_live_a', 'cs_live_b'], 1_790_000_000, keys.priv)
     expect(token).toMatch(/^LAGOMREV1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/)
-    expect(await verifyRevocationList(token, { publicKey: keys.pub })).toEqual({ v: 1, issuedAt: 1_790_000_000, ids: ['cs_live_a', 'cs_live_b'] })
+    // v2: köp-id:n publiceras bara som hashar – aldrig i klartext.
+    const hashes = [await purchaseIdHash('cs_live_a'), await purchaseIdHash('cs_live_b')].sort()
+    expect(await verifyRevocationList(token, { publicKey: keys.pub })).toEqual({ v: 2, issuedAt: 1_790_000_000, ids: hashes })
+    expect(token).not.toContain(btoa('cs_live_a').slice(0, 8))
+    // En nyckelhash (från LICENSE_REVOKED_IDS) behålls som den är.
+    const keyHash = await licenseKeyHash('LAGOM1.x.y')
+    expect((await verifyRevocationList(await signRevocations([keyHash], 1, keys.priv), { publicKey: keys.pub }))?.ids).toContain(keyHash)
     expect(await verifyRevocationList(token, { publicKey: other.pub })).toBeNull()
     await expect(signRevocations([], 1, 'inte-en-nyckel')).rejects.toBeTruthy()
   })

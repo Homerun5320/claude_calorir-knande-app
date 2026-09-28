@@ -848,7 +848,7 @@ alltid. Bara NY loggning kräver en licens.
 
 ### `src/features/premium/premiumLogic.ts`
 - `statusSummary(status)`, `trialBannerLevel(status)` (`'none' | 'chip' | 'soon' | 'expired'`), `plansToOffer(status, plans)`
-- `formatPrice(kr)` ("599 kr"), `formatKronor(kr)` ("119,80 kr"), `priceSummary()` ("299 kr/år eller 599 kr för alltid"), `formatLongDate(ms)`, `daysText(n)`
+- `formatPrice(kr)` ("699 kr"), `formatKronor(kr)` ("139,80 kr"), `priceSummary()` ("349 kr/år eller 699 kr för alltid"), `priceSummaryText()` (kronor på webben, butikens priser i apparna), `formatLongDate(ms)`, `daysText(n)`
 - `activateLicense(input)` – verifierar och sparar en inklistrad nyckel; `buyInTestMode(plan)`
 - `createCheckout(plan)` → Stripe-adress (POST /api/create-checkout { plan, consent: true }), `verifyPurchase(sessionId)` → `{ kind: 'ok', licenseKey } | { kind: 'pending' }`; fel som `PurchaseError` (`offline | server | not-found | invalid`) med svensk text (serverns eget meddelande när det finns)
 - `redirectTo(url)`, `sessionIdFrom(params)`, `licenseMailto(key)`, `copyText(text)`

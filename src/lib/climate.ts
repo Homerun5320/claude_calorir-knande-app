@@ -197,7 +197,7 @@ export const CLIMATE_REFERENCE = {
   averageSwedeKgPerDay: 4.7,
   averageSwedeKgPerYear: 1700,
   /**
-   * Klimatsmart nivå: WWF One Planet Plate – ca 11 kg CO2e per person och vecka för mat, i linje med
+   * Referensnivå: WWF One Planet Plate – ca 11 kg CO2e per person och vecka för mat, i linje med
    * 1,5-gradersmålet, ≈ 1,6 kg per dag (0,4 kg frukost + 2 × 0,5 kg lunch/middag + 0,2 kg mellanmål).
    */
   klimatsmartKgPerDay: 1.6,
@@ -222,7 +222,7 @@ export interface Co2eEquivalents {
   onePlanetMeals: number
 }
 
-/** Gör kg CO2e begripligt: bilkilometer, andel av en genomsnittlig dag och klimatsmarta måltider. */
+/** Gör kg CO2e begripligt: bilkilometer, andel av en genomsnittlig dag och måltider i nivå med referensen. */
 export function co2eEquivalents(kg: number): Co2eEquivalents {
   const v = Number.isFinite(kg) && kg > 0 ? kg : 0
   return {
@@ -257,7 +257,7 @@ export function climateRating(kgPerDay: number): ClimateRating {
     return {
       level: 'lag',
       label: 'Låg klimatpåverkan',
-      description: 'I nivå med ett klimatsmart matintag – snyggt!',
+      description: 'I nivå med WWF:s referensnivå – snyggt!',
       tone: 'mossa',
     }
   }

@@ -3,8 +3,32 @@
  * ägaren. legal.test.tsx jämför dem med filerna i repot (`toMatchFileSnapshot`) – ändra texten i
  * legalContent.ts eller här och kör `npx vitest run src/features/legal -u`.
  */
-import { PRIVACY_VERSION, STATIC_SELLER, TERMS_VERSION, USER_TERMS_SECTION_IDS, privacySections, termsSections } from './legalContent'
+import { PRIVACY_VERSION, STATIC_SELLER, TERMS_VERSION, USER_TERMS_SECTION_IDS, privacySections, termsSections, type LegalSection } from './legalContent'
 import { renderLegalHtml, renderLegalMarkdown, type LegalDocSpec } from './legalExport'
+
+/**
+ * Anteckningar till ägaren per avsnitt (id). De visas bara i docs/ – därför ligger de här och inte
+ * i legalContent.ts, som byggs in i appen.
+ */
+const PRIVACY_OWNER_NOTES: Readonly<Record<string, string>> = {
+  lagringstid: 'Kontrollera hur länge loggar sparas i din Netlify-plan och skriv gärna in tiden här.',
+  mottagare:
+    'Kontrollera att e-posttjänsten du använder för support har ett personuppgiftsbiträdesavtal (ett privat gratiskonto har det oftast inte) och skriv gärna in dess namn. Netlifys och Stripes avtal (DPA) ingår i deras villkor – spara en kopia. Väljer du RevenueCat för köpen i appen blir RevenueCat också ett biträde – lägg då till det här, i registerförteckningen och i App Privacy/Data safety före inskickningen.',
+}
+
+const TERMS_OWNER_NOTES: Readonly<Record<string, string>> = {
+  pris: 'Hela köpflödet (den här texten, köpsidan och kvittot) räknar med att firman är momsregistrerad och tar ut 25 % moms. En enskild firma med liten omsättning kan i stället vara momsbefriad (omsättningsgränsen var 120 000 kr per år när reglerna ändrades 2025 – kontrollera hos Skatteverket). Är firman momsbefriad får du inte ta ut moms, och texterna om moms här, på köpsidan och på kvittot måste ändras före lansering. Vid köp i App Store och Google Play sköter butiken momsen.',
+  funktion: 'Skriv gärna in lägsta iOS- och Android-version när apparna är byggda (i iPhone-appen står i dag ”en aktuell version av iOS”).',
+  uppdateringar: 'Bekräfta svarstiden för supporten.',
+  livstid:
+    'Ägaren ska bekräfta definitionen av livstid före lansering (beslut 2026-09-28: för alltid, felrättningar ingår, inga löften om nya funktioner). Texten är avsiktligt försiktig och är samma som i köparket och på kvittot (LIFETIME_PROMISE i src/config/commerce.ts) – lova inte mer i butikstexter eller i Stripe.',
+  tvister:
+    'Du måste informera om ARN (lagen om alternativ tvistlösning i konsumentförhållanden). Att följa ARN:s rekommendationer är frivilligt men förtroendeingivande – bekräfta att du medverkar.',
+}
+
+function withOwnerNotes(sections: LegalSection[], notes: Readonly<Record<string, string>>): LegalSection[] {
+  return sections.map((s) => (notes[s.id] ? { ...s, ownerNote: notes[s.id] } : s))
+}
 
 /** Sökvägar relativt repots rot. */
 export const LEGAL_FILES = {
@@ -20,7 +44,7 @@ export function privacyDoc(title = 'Integritetspolicy'): LegalDocSpec {
     title,
     version: PRIVACY_VERSION,
     description: 'Så hanterar Lagom dina uppgifter: dagboken stannar på din enhet, ingen reklam och ingen spårning.',
-    sections: privacySections(STATIC_SELLER),
+    sections: withOwnerNotes(privacySections(STATIC_SELLER), PRIVACY_OWNER_NOTES),
   }
 }
 
@@ -29,7 +53,7 @@ export function termsDoc(title = 'Köp- och användarvillkor'): LegalDocSpec {
     title,
     version: TERMS_VERSION,
     description: 'Villkor för köp och användning av Lagom – licenser, pris, ångerrätt, reklamation och användarvillkor.',
-    sections: termsSections(STATIC_SELLER),
+    sections: withOwnerNotes(termsSections(STATIC_SELLER), TERMS_OWNER_NOTES),
   }
 }
 
@@ -46,13 +70,13 @@ export function termsHtml(): string {
 // ---------------------------------------------------------------------------
 
 const SELLER_CHECKLIST = `- [ ] **Företagsnamn** – för enskild firma ditt namn eller det registrerade firmanamnet → \`VITE_SELLER_NAME\`
-- [ ] **Organisationsnummer** – för enskild firma samma som ditt personnummer → \`VITE_SELLER_ORGNR\`
+- [ ] **Organisationsnummer** (frivilligt) – för enskild firma samma som ditt personnummer → \`VITE_SELLER_ORGNR\`. Sätter du det visas det i appen, i villkoren och på varje kvitto. Lämnar du det tomt utelämnas det överallt, och bygget ger bara en varning. Distansavtalslagen (2 kap. 2 §) kräver namn, adress, telefon och e-post; e-handelslagen (8 §) kräver registreringsnummer om firman finns i handelsregistret. Fråga Verksamt eller en jurist vad som gäller för just din firma (se ”Låt en jurist granska”).
 - [ ] **Postadress** → \`VITE_SELLER_ADDRESS\`
 - [ ] **Telefon** → \`VITE_SELLER_PHONE\`
 - [ ] **Momsregistreringsnummer** (om firman är momsregistrerad) → \`VITE_SELLER_VAT\`
 - [ ] **E-post för support** – en riktig adress som du läser → \`VITE_SUPPORT_EMAIL\`
 
-Variablerna sätts i Netlify (Site configuration → Environment variables). Appen visar dem automatiskt, och när sajten byggs fylls platshållarna i de fristående sidorna i ([Företagsnamn], [Org.nr], [Adress], [Telefon], [Momsreg.nr], [E-post]). Här i docs står platshållarna kvar. Saknas en uppgift visar appen ”[fylls i av ägaren]”, och bygget för butikerna och för skarpa webbköp stoppas.`
+Variablerna sätts i Netlify (Site configuration → Environment variables). Appen visar dem automatiskt, och när sajten byggs fylls platshållarna i de fristående sidorna i ([Företagsnamn], [Org.nr], [Adress], [Telefon], [Momsreg.nr], [E-post]). Här i docs står platshållarna kvar. Saknas en obligatorisk uppgift visar appen ”[fylls i av ägaren]”, och bygget för butikerna och för skarpa webbköp stoppas. Organisationsnumret och momsregistreringsnumret är frivilliga – saknas de tas de bort ur texten.`
 
 const PRIVACY_PREFACE = `> **Utkast – ska ses över av ägaren.** Texten är skriven för att stämma med hur Lagom fungerar i version 1.0: dagboken finns bara på enheten, det finns inga konton, ingen reklam och ingen analys. Den är inte granskad av en jurist.
 
@@ -72,8 +96,9 @@ Policyn är ett juridiskt dokument. Be gärna om en engångsgranskning – till 
 
 - rättslig grund och lagringstider (bokföring, support och loggar),
 - Stripes roll – både personuppgiftsbiträde och självständigt ansvarig – och överföringarna till USA (EU–US Data Privacy Framework har överklagats; standardavtalsklausulerna är reserven),
-- texten om barn och unga: Lagom riktar sig till vuxna men går att använda från 13 år med extra skydd,
-- om ditt organisationsnummer (= personnumret för enskild firma) måste visas.
+- texten om barn och unga: Lagom är gjord för vuxna och går bara att använda från 18 år (räknat på födelseåret),
+- om ditt organisationsnummer (= personnumret för enskild firma) måste visas – distansavtalslagen (2 kap. 2 §) och e-handelslagen (8 §) kräver identitet och kontaktuppgifter, men om personnumret måste stå med för en enskild firma som inte finns i handelsregistret är inte kontrollerat,
+- att provperiodens startdatum finns kvar på enheten när användaren raderar sin data (så att provperioden inte börjar om) – är det nödvändig lagring enligt LEK 9 kap. 28 §?
 
 ### Ingen samtyckesbanner behövs – så länge det förblir så
 
@@ -82,13 +107,14 @@ All lagring på enheten (tabellen under ”Lagring på din enhet”) är nödvä
 ### Appen och den publicerade sidan
 
 - I appen finns policyn på sidan Integritetspolicy (\`#/integritet\`). I apparna från App Store och Google Play visas inte det som bara gäller köp på webben (Stripe) – Apple tillåter inga hänvisningar till andra köpsätt i appen. Den publicerade sidan innehåller allt.
-- Det som bara gäller webben är märkt _(bara webben)_ nedan.`
+- I iPhone-appen nämns bara iPhone och App Store (Apples riktlinje 2.3.10). Där ett avsnitt har en egen iPhone-text står den nedan under _I iPhone-appen (App Store) står i stället_.
+- Det som bara gäller webben är märkt _(bara webben)_ nedan, och det som bara gäller licensnycklar _(inte i iPhone-appen)_.`
 
 const TERMS_PREFACE = `> **Utkast – ska ses över av ägaren.** Villkoren är skrivna för att stämma med hur köpet och appen fungerar i version 1.0. De är inte granskade av en jurist.
 
 ### Beslut som texten bygger på (2026-09-28)
 
-- Säljaren är en enskild firma. Lansering bara i Sverige; Lagom riktar sig till vuxna.
+- Säljaren är en enskild firma. Lansering bara i Sverige; Lagom är gjord för vuxna (18 år och äldre).
 - Priser på webben: Årslicens 349 kr och Livstidslicens 699 kr inklusive 25 % moms (\`src/config/commerce.ts\`). I butikerna sätts priset i App Store Connect och Play Console.
 - Livstid betyder för alltid. Felrättningar ingår – nya funktioner utlovas inte.
 - I apparna från App Store och Google Play görs köpet bara som köp i appen, och köp återställs med Återställ köp. I App Store-appen kan inga licensnycklar aktiveras.
@@ -114,7 +140,7 @@ ${SELLER_CHECKLIST}
 
 ### Appen och den publicerade sidan
 
-I appen finns villkoren på sidan Köp- och användarvillkor (\`#/villkor\`). I apparna från App Store och Google Play visas inte avsnitten som bara gäller köp på webben (pris i kronor, Stripe, ångerrätt vid webbköp) – där sköter butiken köpet. Den publicerade sidan innehåller allt.`
+I appen finns villkoren på sidan Köp- och användarvillkor (\`#/villkor\`). I apparna från App Store och Google Play visas inte avsnitten som bara gäller köp på webben (pris i kronor, Stripe, ångerrätt vid webbköp) – där sköter butiken köpet. I iPhone-appen nämns bara iPhone och App Store; de texterna står nedan under _I iPhone-appen (App Store) står i stället_. Den publicerade sidan innehåller allt.`
 
 const USER_TERMS_PREFACE = `> **Utkast – ska ses över av ägaren.** Användarvillkoren är samma text som avsnitten om användning i [köp- och användarvillkoren](KOPVILLKOR.md) och gäller alla som använder Lagom – även under provperioden och utan köp.
 

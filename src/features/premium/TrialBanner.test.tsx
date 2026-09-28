@@ -85,12 +85,14 @@ describe('TrialBanner på Idag', () => {
     license.useLicenseStore.setState({ trialStartedAt: Date.now() - 12 * DAY, licenseKey: null })
     const { unmount } = inRouter(<FreshBanner />)
     expect(screen.getByText(/All din data finns kvar efter provperioden/)).toHaveTextContent(
-      'Vill du fortsätta logga: årslicens eller livstidslicens som köp i appen.',
+      'Vill du fortsätta logga: årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper).',
     )
     unmount()
     license.useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * DAY })
     const { container } = inRouter(<FreshBanner />)
-    expect(container).toHaveTextContent('För att logga nytt behöver du en licens: årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse.')
+    expect(container).toHaveTextContent(
+      'För att logga nytt behöver du en licens: årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper), utan automatisk förnyelse.',
+    )
     expect(container.textContent).not.toMatch(/\skr(?![a-zåäö])|Stripe/)
   })
 

@@ -7,7 +7,7 @@
  * De fristående sidorna fungerar utan JavaScript (inga skript – CSP:n tillåter bara appens egna) och
  * har ljust och mörkt tema via prefers-color-scheme.
  */
-import { formatLegalDate, parseInline, plainText, type LegalSection } from './legalContent'
+import { formatLegalDate, parseInline, plainText, type LegalSection, type LegalTable, type LegalVariant } from './legalContent'
 import type { ISODate } from '../../types'
 
 export interface LegalDocSpec {
@@ -94,7 +94,8 @@ const CSS = `
       .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem; margin-top: 1rem; }
       .omfang { color: var(--ink-3); font-size: 0.8125rem; font-weight: 600; margin: 0 0 0.25rem; }
       nav ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
-      nav li { margin: 0.25rem 0; }
+      nav li { margin: 0; }
+      nav li a { display: inline-flex; align-items: center; min-height: 2.75rem; }
       ul, ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
       li { margin: 0.375rem 0; }
       .fyll { background: var(--fyll); border-radius: 0.25rem; padding: 0 0.2em; }
@@ -123,7 +124,7 @@ function sectionHtml(s: LegalSection): string {
     for (const t of s.steps) out.push(`          <li>${inlineHtml(t)}</li>`)
     out.push('        </ol>')
   }
-  const items = [...(s.items ?? []), ...(s.webItems ?? [])]
+  const items = [...(s.items ?? []), ...(s.webItems ?? []), ...(s.keyItems ?? [])]
   if (items.length) {
     out.push('        <ul>')
     for (const t of items) out.push(`          <li>${inlineHtml(t)}</li>`)
@@ -229,16 +230,34 @@ function sectionMd(s: LegalSection): string {
   }
   for (const t of s.items ?? []) out.push(`- ${inlineMd(t)}`)
   for (const t of s.webItems ?? []) out.push(`- ${inlineMd(t)} _(bara webben)_`)
-  if (s.items?.length || s.webItems?.length) out.push('')
-  if (s.table) {
-    out.push(`| ${s.table.columns.map(cellMd).join(' | ')} |`)
-    out.push(`| ${s.table.columns.map(() => '---').join(' | ')} |`)
-    for (const row of s.table.rows) out.push(`| ${row.map(cellMd).join(' | ')} |`)
-    out.push('')
-  }
+  for (const t of s.keyItems ?? []) out.push(`- ${inlineMd(t)} _(inte i iPhone-appen)_`)
+  if (s.items?.length || s.webItems?.length || s.keyItems?.length) out.push('')
+  if (s.table) out.push(...tableMd(s.table), '')
   for (const p of s.closing ?? []) out.push(inlineMd(p), '')
+  if (s.appStore) out.push(...appStoreMd(s.appStore), '')
   if (s.ownerNote) out.push(`> **Till ägaren:** ${s.ownerNote}`, '')
   return out.join('\n')
+}
+
+function tableMd(table: LegalTable): string[] {
+  return [
+    `| ${table.columns.map(cellMd).join(' | ')} |`,
+    `| ${table.columns.map(() => '---').join(' | ')} |`,
+    ...table.rows.map((row) => `| ${row.map(cellMd).join(' | ')} |`),
+  ]
+}
+
+/** iPhone-appens egen text, som ett citat under avsnittet (bara i docs/). */
+function appStoreMd(v: LegalVariant): string[] {
+  const lines: string[] = ['**I iPhone-appen (App Store) står i stället:**', '']
+  if (v.heading) lines.push(`Rubrik: ${inlineMd(v.heading)}`, '')
+  for (const p of v.paragraphs ?? []) lines.push(inlineMd(p), '')
+  for (const t of v.items ?? []) lines.push(`- ${inlineMd(t)}`)
+  if (v.items?.length) lines.push('')
+  if (v.table) lines.push(...tableMd(v.table), '')
+  for (const p of v.closing ?? []) lines.push(inlineMd(p), '')
+  while (lines[lines.length - 1] === '') lines.pop()
+  return lines.map((l) => (l ? `> ${l}` : '>'))
 }
 
 /**
@@ -272,6 +291,7 @@ export function sectionTexts(s: LegalSection): string[] {
     ...(s.steps ?? []),
     ...(s.items ?? []),
     ...(s.webItems ?? []),
+    ...(s.keyItems ?? []),
     ...(s.table ? [...s.table.columns, ...s.table.rows.flat()] : []),
     ...(s.closing ?? []),
   ].map(plainText)

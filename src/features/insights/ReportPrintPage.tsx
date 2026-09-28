@@ -19,7 +19,7 @@ import { Badge, Button, PageHeader, SegmentedControl, Skeleton } from '../../com
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { useToday } from '../../hooks/useToday'
 import { formatEnergy, formatKg, formatNumber } from '../../lib/format'
-import { isUsable, kostradScore } from '../../lib/kostrad'
+import { KOSTRAD_MIN_WEEKLY_DAYS, isAssessable, isUsable, kostradScore, tooFewDays } from '../../lib/kostrad'
 import { PLATE_PART_LABELS, PLATE_VARIANT_LABELS } from '../../lib/plate'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useHydrated } from '../../stores/hydration'
@@ -189,7 +189,7 @@ function KostradSection({ data }: { data: InsightsData }) {
   const results = usePeriodKostrad(data)
   const { mindful } = data
   if (results.length === 0) return null
-  const usable = results.filter(isUsable)
+  const usable = results.filter(isAssessable)
   const met = usable.filter((r) => r.status === 'bra').length
   const score = kostradScore(results)
   const label = kostradScoreLabel(score)
@@ -198,7 +198,8 @@ function KostradSection({ data }: { data: InsightsData }) {
       <p className="mb-3 text-sm text-ink-2">{kostradMetText(met, usable.length, results.length - usable.length)}.</p>
       <ul className="divide-y divide-line" aria-label="Kostråden">
         {results.map((r) => {
-          const uncertain = !isUsable(r)
+          const fewDays = tooFewDays(r)
+          const uncertain = !isUsable(r) || fewDays
           const status = KOSTRAD_STATUS[r.status]
           return (
             <li key={r.id} className="flex items-start justify-between gap-3 py-2 break-inside-avoid">
@@ -207,10 +208,10 @@ function KostradSection({ data }: { data: InsightsData }) {
                   <span aria-hidden="true">{r.emoji} </span>
                   {r.title}
                 </p>
-                {!mindful && <p className="text-xs text-ink-3 tabular-nums">{kostradProgressText(r)}</p>}
+                {!mindful && !fewDays && <p className="text-xs text-ink-3 tabular-nums">{kostradProgressText(r)}</p>}
               </div>
               <Badge tone={uncertain ? 'neutral' : status.tone} dot className="mt-0.5 shrink-0">
-                {uncertain ? 'Osäkert' : status.label}
+                {fewDays ? 'För få dagar för att bedöma' : uncertain ? 'Osäkert' : status.label}
               </Badge>
             </li>
           )
@@ -218,7 +219,7 @@ function KostradSection({ data }: { data: InsightsData }) {
       </ul>
       <p className="mt-3 text-xs leading-relaxed text-ink-3">
         Källa: Livsmedelsverkets kostråd för vuxna (2025) och Folkhälsomyndighetens riktlinjer för fysisk aktivitet. Veckoråd räknas om till
-        antalet loggade dagar.
+        antalet loggade dagar och bedöms först när minst {KOSTRAD_MIN_WEEKLY_DAYS} dagar är loggade.
       </p>
     </Section>
   )
@@ -251,7 +252,7 @@ function PlateSection({ data }: { data: InsightsData }) {
               ))}
             </ul>
             <p className="mt-2 text-xs text-ink-3">
-              {plate.lagomMeals} av {plate.meals} huvudmåltider var lagom fördelade. {variant.label}: {variant.description.charAt(0).toLowerCase() + variant.description.slice(1)}
+              {`${plate.lagomMeals} av ${plate.meals} ${plate.meals === 1 ? 'huvudmåltid var lagom fördelad' : 'huvudmåltider var lagom fördelade'}.`} {variant.label}: {variant.description.charAt(0).toLowerCase() + variant.description.slice(1)}
             </p>
           </div>
         </div>

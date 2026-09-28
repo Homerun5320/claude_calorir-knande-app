@@ -22,7 +22,7 @@ export function DemoBanner({ className }: { className?: string }) {
       icon: UserRound,
     })
     if (!ok) return
-    wipeAndReset()
+    void wipeAndReset()
     navigate('/valkommen', { replace: true })
   }
 

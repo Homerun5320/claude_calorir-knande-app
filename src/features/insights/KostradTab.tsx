@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Badge, Card, ExternalLink, ProgressBar, ProgressRing } from '../../components/ui'
-import { evaluateKostrad, isUsable, kostradScore, type KostradResult } from '../../lib/kostrad'
+import { evaluateKostrad, isAssessable, isUsable, kostradScore, tooFewDays, type KostradResult } from '../../lib/kostrad'
 import { KOSTRAD_STATUS, kostradProgressText, kostradScoreLabel } from './advice'
 import { InfoNote, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
@@ -33,7 +33,7 @@ export function KostradTab({ data }: { data: InsightsData }) {
   const { mindful } = data
   const label = kostradScoreLabel(score)
   // Bara bedömda råd räknas: ett osäkert råd (för få kända värden) är varken uppfyllt eller inte.
-  const usable = results.filter(isUsable)
+  const usable = results.filter(isAssessable)
   const met = usable.filter((r) => r.status === 'bra').length
   const uncertainCount = results.length - usable.length
   const days = results[0]?.periodDays ?? 0
@@ -117,7 +117,9 @@ export function kostradMetText(met: number, assessed: number, uncertain: number)
 
 function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: boolean }) {
   const status = KOSTRAD_STATUS[r.status]
-  const uncertain = !isUsable(r)
+  const fewDays = tooFewDays(r)
+  const uncertain = !isUsable(r) || fewDays
+  const neutralLabel = fewDays ? 'För få dagar' : 'Osäkert'
   return (
     <article className="card h-full p-4" aria-label={r.title}>
       <div className="flex items-start gap-3">
@@ -129,7 +131,7 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
           <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
             <Badge tone={uncertain ? 'neutral' : status.tone} dot className="shrink-0">
-              {uncertain ? 'Osäkert' : status.label}
+              {uncertain ? neutralLabel : status.label}
             </Badge>
           </div>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-3">{r.advice}</p>
@@ -141,12 +143,18 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
         max={1}
         size="sm"
         tone={uncertain ? 'neutral' : status.tone}
-        aria-label={`${r.title}: ${status.label}`}
-        valueText={mindful ? status.label : `${status.label}, ${kostradProgressText(r)}`}
+        aria-label={`${r.title}: ${uncertain ? neutralLabel : status.label}`}
+        valueText={fewDays || mindful ? (uncertain ? neutralLabel : status.label) : `${uncertain ? neutralLabel : status.label}, ${kostradProgressText(r)}`}
       />
-      {!mindful && <p className="mt-1.5 text-xs font-medium text-ink-2 tabular-nums">{kostradProgressText(r)}</p>}
-      <p className="mt-2 text-sm leading-relaxed text-ink-2">{r.tip}</p>
-      {uncertain && (
+      {!mindful && !fewDays && <p className="mt-1.5 text-xs font-medium text-ink-2 tabular-nums">{kostradProgressText(r)}</p>}
+      {fewDays ? (
+        <p className="mt-2 text-sm leading-relaxed text-ink-2">
+          Ett veckoråd behöver några loggade dagar innan det går att bedöma – logga gärna några dagar till. Rådet räknas inte in i poängen än.
+        </p>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed text-ink-2">{r.tip}</p>
+      )}
+      {uncertain && !fewDays && (
         <p className="mt-2 text-xs leading-relaxed text-ink-3">
           Värden saknas för en stor del av maten, så rådet räknas inte in i poängen.
         </p>

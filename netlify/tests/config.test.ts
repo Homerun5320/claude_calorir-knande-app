@@ -98,7 +98,8 @@ describe('säljarens uppgifter och villkorsversion', () => {
   it('en exempeladress räknas som saknad och saknade uppgifter blir platshållare', () => {
     const cfg = readConfig({ VITE_SUPPORT_EMAIL: 'support@example.invalid' })
     expect(cfg.seller.email).toBe('')
-    expect(sellerForDisplay(cfg.seller)).toMatchObject({ name: '[Företagsnamn]', orgnr: '[Org.nr]', email: '[E-post]', vat: '' })
+    // Organisationsnumret är frivilligt – saknas det står det inte med (ingen platshållare).
+    expect(sellerForDisplay(cfg.seller)).toMatchObject({ name: '[Företagsnamn]', orgnr: '', email: '[E-post]', vat: '' })
   })
 
   it('platshållare från mallar räknas som saknade – samma regel som byggkontrollen', () => {
@@ -131,7 +132,6 @@ describe('säljarens uppgifter och villkorsversion', () => {
     expect(missingConfig(readConfig({ STRIPE_SECRET_KEY: 'sk_test_abc' }), ['stripe', 'seller'])).toEqual([])
     expect(missingConfig(readConfig({ STRIPE_SECRET_KEY: 'rk_live_abc' }), ['stripe', 'seller'])).toEqual([
       'VITE_SELLER_NAME',
-      'VITE_SELLER_ORGNR',
       'VITE_SELLER_ADDRESS',
       'VITE_SELLER_PHONE',
       'VITE_SUPPORT_EMAIL',

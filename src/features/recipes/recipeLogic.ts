@@ -489,8 +489,8 @@ export interface ServingClimate {
 }
 
 /**
- * Klimatavtryck för en portion, jämfört med en klimatsmart måltid (WWF One Planet Plate ≈ 0,5 kg).
- * Låg upp till en klimatsmart måltid, medel upp till tre gånger så mycket, annars hög.
+ * Klimatavtryck för en portion, jämfört med en måltid i nivå med WWF:s One Planet Plate (≈ 0,5 kg).
+ * Låg upp till referensmåltiden, medel upp till tre gånger så mycket, annars hög.
  */
 export function servingClimate(recipe: Pick<Recipe, 'ingredients' | 'cookedWeightG' | 'servings'>): ServingClimate | undefined {
   const perKg = recipeCo2e(recipe)

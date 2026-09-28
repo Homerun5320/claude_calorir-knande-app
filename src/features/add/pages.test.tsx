@@ -70,6 +70,20 @@ describe('AddFoodPage', () => {
     expect(screen.getByText('Här hamnar det du äter')).toBeInTheDocument()
   })
 
+  it('dagen byts med en knapp – datumfältet ligger utanför tabbordningen', () => {
+    const { router } = renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    const button = screen.getByRole('button', { name: /^Dag: .*\. Byt dag$/ })
+    const input = document.querySelector('input[type="date"]') as HTMLInputElement
+    expect(input).toHaveAttribute('tabindex', '-1')
+    expect(input).toHaveAttribute('aria-hidden', 'true')
+    // Knappen öppnar väljaren (showPicker eller klick på fältet).
+    const click = vi.spyOn(input, 'click')
+    fireEvent.click(button)
+    expect(click).toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: '2026-09-25' } })
+    expect(router.state.location.search).toContain('datum=2026-09-25')
+  })
+
   it('söker lokalt, lägger i korgen och lägger till allt', async () => {
     const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-01-15')
     fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kanelbulle' } })

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest'
 import { keyId, verifyLicense } from '../../src/lib/license.ts'
-import { LICENSE_METADATA_KEY, REVOKED_METADATA_KEY, validatePaidSession } from '../lib/fulfillment.ts'
+import { LICENSE_METADATA_KEY, REVOKED_METADATA_KEY, STATUS_METADATA_KEY, validatePaidSession } from '../lib/fulfillment.ts'
 import {
   INVOICE_FIELD_NAME_MAX,
   INVOICE_FIELD_VALUE_MAX,
@@ -223,8 +223,9 @@ describe('POST /api/create-checkout', () => {
     expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid', consent: true }), deps)).status).toBe(200)
     const footer = lastCreate(stripe).get('invoice_creation[invoice_data][footer]') ?? ''
     expect(footer).toContain('[Företagsnamn]')
-    expect(footer).toContain('[Org.nr]')
     expect(footer).toContain('[E-post]')
+    // Frivilliga uppgifter (organisationsnummer och momsregistreringsnummer) utelämnas när de saknas.
+    expect(footer).not.toContain('Org.nr')
     expect(footer).not.toContain('Momsreg.nr')
     expect(lastCreate(stripe).get('metadata[villkor_version]')).toBe('2026-10-01')
   })
@@ -234,8 +235,10 @@ describe('POST /api/create-checkout', () => {
     const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
     expect(res.status).toBe(503)
     expect(await read(res)).toMatchObject({ code: 'ej-konfigurerad' })
-    for (const name of ['VITE_SELLER_ORGNR', 'VITE_SELLER_ADDRESS', 'VITE_SELLER_PHONE', 'VITE_SUPPORT_EMAIL']) expect(log.text()).toContain(name)
+    for (const name of ['VITE_SELLER_ADDRESS', 'VITE_SELLER_PHONE', 'VITE_SUPPORT_EMAIL']) expect(log.text()).toContain(name)
+    // Namnet finns, och organisationsnumret är frivilligt.
     expect(log.text()).not.toContain('VITE_SELLER_NAME')
+    expect(log.text()).not.toContain('VITE_SELLER_ORGNR')
     expect(stripe.calls).toHaveLength(0)
   })
 
@@ -600,6 +603,46 @@ describe('POST /api/verify-purchase', () => {
     delete s.line_items
     expect(validatePaidSession(s, { priceIds: { ar: [], livstid: [] } })).toMatchObject({ ok: false, code: 'okant-kop' })
   })
+
+  it('köp till det tidigare priset (599 kr) godtas också utan pris-id – men inte ett annat belopp', () => {
+    const at = (amount: number) =>
+      paidSession({ amount_total: amount, line_items: { data: [{ quantity: 1, price: { id: 'price_gammalt', unit_amount: amount, currency: 'sek' } }] } })
+    const cfg = { priceIds: { ar: [], livstid: [] } }
+    expect(validatePaidSession(at(59_900), cfg)).toEqual({ ok: true, plan: 'livstid' })
+    expect(validatePaidSession(at(69_900), cfg)).toEqual({ ok: true, plan: 'livstid' })
+    expect(validatePaidSession(at(100), cfg)).toMatchObject({ ok: false, code: 'okant-kop' })
+    // Årslicensens gamla pris gäller inte för livstid.
+    expect(validatePaidSession(at(29_900), cfg)).toMatchObject({ ok: false, code: 'okant-kop' })
+  })
+
+  it('ett testköp ger ingen licens i produktionen – och ett skarpt köp ingen i en förhandsversion', async () => {
+    const { stripe, deps, log } = setup()
+    const s = paidSession()
+    stripe.sessions.set(s.id, s)
+    const prod = { ...deps, context: { deploy: { context: 'production' } } }
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), prod)
+    expect(res.status).toBe(503)
+    expect(stripe.intents.get('pi_1')?.metadata[LICENSE_METADATA_KEY]).toBeUndefined()
+    expect(log.entries.some((e) => e.message.includes('Testköp'))).toBe(true)
+    // Före lanseringen (LAGOM_ALLOW_TEST_COMMERCE=1) går det, och i en förhandsversion alltid.
+    const allowed = { ...prod, env: { ...deps.env, LAGOM_ALLOW_TEST_COMMERCE: '1' } }
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), allowed)).status).toBe(200)
+    const preview = { ...deps, context: { deploy: { context: 'deploy-preview' } } }
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), preview)).status).toBe(200)
+    const live = paidSession({ id: 'cs_live_Skarpt0000000001', livemode: true })
+    stripe.sessions.set(live.id, live)
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: live.id }), preview)).status).toBe(503)
+  })
+
+  it('ett köp i LICENSE_REVOKED_IDS lämnas inte ut igen', async () => {
+    const { stripe } = setup()
+    const s = paidSession()
+    stripe.sessions.set(s.id, s)
+    const deps = { ...setup().deps, fetch: stripe.fetch, env: env({ LICENSE_REVOKED_IDS: s.id }) }
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps)
+    expect(res.status).toBe(410)
+    expect((await read(res)).code).toBe('aterbetald')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -777,19 +820,23 @@ describe('POST /api/stripe-webhook', () => {
     expect((await webhook(completed(), { deps })).status).toBe(503)
   })
 
-  describe('återbetalningar och tvister markeras på betalningen', () => {
+  describe('återbetalningar och tvister noteras på betalningen (lagom_status, bara information)', () => {
     const event = (type: string, object: Record<string, unknown>, id = 'evt_r1') => ({ id, object: 'event', type, livemode: false, data: { object } })
     const refunded = (overrides: Parameters<typeof charge>[1] = {}) => event('charge.refunded', { ...charge('ch_1', overrides) })
     const dispute = (type: string, status: string) => event(type, { id: 'dp_1', object: 'dispute', status, charge: 'ch_1', payment_intent: 'pi_1' })
+    const status = (stripe: FakeStripe) => stripe.intents.get('pi_1')?.metadata[STATUS_METADATA_KEY]
     const marker = (stripe: FakeStripe) => stripe.intents.get('pi_1')?.metadata[REVOKED_METADATA_KEY]
 
-    it('full återbetalning → lagom_revoked = 1, och verify-purchase nekar sedan', async () => {
+    it('full återbetalning → lagom_status = aterbetald; verify-purchase nekar utifrån Stripes återbetalning', async () => {
       const { deps, stripe, log } = setup()
+      stripe.charges.set('ch_1', charge('ch_1', { refunded: true, amount_refunded: 69900 }))
       const res = await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })
       expect(res.status).toBe(200)
       expect(await read(res)).toEqual({ received: true })
-      expect(marker(stripe)).toBe('1')
-      expect(log.entries.find((e) => e.message.includes('spärrad'))?.data).toEqual({ event: 'evt_r1', type: 'charge.refunded', betalning: 'pi_1' })
+      expect(status(stripe)).toBe('aterbetald')
+      // Webhooken rör aldrig supportens manuella spärr.
+      expect(marker(stripe)).toBeUndefined()
+      expect(log.entries.find((e) => e.message.includes('status'))?.data).toEqual({ event: 'evt_r1', type: 'charge.refunded', betalning: 'pi_1', status: 'aterbetald' })
       const s = paidSession()
       stripe.sessions.set(s.id, s)
       expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps)).status).toBe(410)
@@ -798,31 +845,41 @@ describe('POST /api/stripe-webhook', () => {
     it('delvis återbetalning ändrar ingenting', async () => {
       const { deps, stripe } = setup()
       expect(await read(await webhook(refunded({ amount_refunded: 10000 }), { deps }))).toEqual({ received: true, ignored: true })
-      expect(marker(stripe)).toBeUndefined()
+      expect(status(stripe)).toBeUndefined()
       expect(stripe.calls).toHaveLength(0)
     })
 
-    it('tvist: skapad → spärrad, vunnen → spärren tas bort; förfrågningar spärrar inte', async () => {
+    it('tvist: skapad → bestriden, vunnen → tvist-vunnen; förfrågningar noteras inte', async () => {
       const { deps, stripe } = setup()
       await webhook(dispute('charge.dispute.created', 'warning_needs_response'), { deps })
-      expect(marker(stripe)).toBeUndefined()
+      expect(status(stripe)).toBeUndefined()
       expect((await webhook(dispute('charge.dispute.created', 'needs_response'), { deps })).status).toBe(200)
-      expect(marker(stripe)).toBe('1')
+      expect(status(stripe)).toBe('bestriden')
       expect((await webhook(dispute('charge.dispute.closed', 'won'), { deps })).status).toBe(200)
-      expect(marker(stripe)).toBeUndefined()
+      expect(status(stripe)).toBe('tvist-vunnen')
       await webhook(dispute('charge.dispute.closed', 'lost'), { deps })
-      expect(marker(stripe)).toBe('1')
+      expect(status(stripe)).toBe('tvist-forlorad')
+      expect(marker(stripe)).toBeUndefined()
     })
 
-    it('supportens undantag (0) och andra produkter lämnas orörda', async () => {
+    it('händelser i fel ordning kan inte spärra en vunnen tvist eller häva en manuell spärr', async () => {
       const { deps, stripe } = setup()
+      // Supporten har spärrat köpet för hand (t.ex. en nyckel som delats öppet).
+      stripe.intents.get('pi_1')!.metadata[REVOKED_METADATA_KEY] = '1'
+      await webhook(dispute('charge.dispute.closed', 'won'), { deps })
+      expect(marker(stripe)).toBe('1')
+      // En gammal "skapad"-händelse efter en vunnen tvist: bara informationen ändras.
       stripe.intents.get('pi_1')!.metadata[REVOKED_METADATA_KEY] = '0'
-      await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })
+      await webhook(dispute('charge.dispute.created', 'needs_response'), { deps })
       expect(marker(stripe)).toBe('0')
+    })
+
+    it('andra produkter lämnas orörda', async () => {
+      const { deps, stripe } = setup()
       stripe.intents.set('pi_2', intent('pi_2', { metadata: { produkt: 'annat' } }))
       const other = await webhook(event('charge.refunded', { ...charge('ch_2', { refunded: true, amount_refunded: 69900, payment_intent: 'pi_2' }) }), { deps })
       expect(await read(other)).toEqual({ received: true, ignored: true })
-      expect(stripe.intents.get('pi_2')?.metadata[REVOKED_METADATA_KEY]).toBeUndefined()
+      expect(stripe.intents.get('pi_2')?.metadata[STATUS_METADATA_KEY]).toBeUndefined()
     })
 
     it('Stripe nere → 500 så att Stripe skickar händelsen igen', async () => {
@@ -830,7 +887,7 @@ describe('POST /api/stripe-webhook', () => {
       stripe.failNext.push('network')
       expect((await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })).status).toBe(500)
       expect((await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })).status).toBe(200)
-      expect(marker(stripe)).toBe('1')
+      expect(status(stripe)).toBe('aterbetald')
     })
   })
 })

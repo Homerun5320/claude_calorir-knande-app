@@ -1,5 +1,5 @@
 /**
- * Klimat – matens ungefärliga klimatavtryck per dag (kg CO2e) mot en klimatsmart nivå,
+ * Klimat – matens ungefärliga klimatavtryck per dag (kg CO2e) mot en referensnivå (WWF One Planet Plate),
  * snitt, betyg, bilkilometer, största källorna och konkreta byten. Neutral ton – aldrig skuld.
  */
 import { useCallback, useMemo } from 'react'
@@ -95,7 +95,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
               {long ? (
                 <LineChart
                   series={lineSeries}
-                  goal={{ value: CLIMATE_REFERENCE.klimatsmartKgPerDay, label: 'Klimatsmart' }}
+                  goal={{ value: CLIMATE_REFERENCE.klimatsmartKgPerDay, label: 'Referensnivå' }}
                   xDomain={[period.start, period.end]}
                   includeZero
                   height={200}
@@ -109,7 +109,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
                 <BarChart
                   data={barData}
                   target={CLIMATE_REFERENCE.klimatsmartKgPerDay}
-                  targetLabel="Klimatsmart nivå"
+                  targetLabel="Referensnivå (WWF One Planet Plate)"
                   highlight={period.dates.includes(today) ? today : undefined}
                   onSelect={openDay}
                   color="var(--lg-mossa)"
@@ -122,7 +122,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-sm">
               <div>
-                <p className="eyebrow">Klimatsmart nivå</p>
+                <p className="eyebrow">Referensnivå (WWF One Planet Plate)</p>
                 <p className="mt-1 text-ink-2">{kg(CLIMATE_REFERENCE.klimatsmartKgPerDay)} per dag</p>
               </div>
               <div>
@@ -169,9 +169,9 @@ export function ClimateTab({ data }: { data: InsightsData }) {
         )}
       </Card>
 
-      <Card title="Smarta byten" eyebrow="Samma näring, mindre klimat">
+      <Card title="Smarta byten" eyebrow="Liknande mat, mindre klimatavtryck">
         {swaps.length === 0 ? (
-          <Callout emoji="🌱">Inga större byten att föreslå – din mat är redan klimatsmart där det räknas mest.</Callout>
+          <Callout emoji="🌱">Inga större byten att föreslå – din mat har redan ett lågt klimatavtryck där det räknas mest.</Callout>
         ) : (
           <ul className="space-y-2.5">
             {swaps.map((s) => (
@@ -198,7 +198,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
         <InfoNote>
           Så räknar vi: varje livsmedel får ett ungefärligt värde i kg CO₂e per kg, från {RISE_SOURCE} eller en schablon för
           kategorin. Värdena gäller från jord till industrins grind och kan skilja sig mycket mellan
-          producenter – se dem som en fingervisning. Klimatsmart nivå: WWF One Planet Plate. Genomsnittlig svensk:
+          producenter – se dem som en fingervisning. Referensnivå: WWF One Planet Plate. Genomsnittlig svensk:
           Naturvårdsverket. Bil: {formatNumber(CAR_KG_CO2E_PER_KM * 1000)}{'\u00a0'}g CO₂ per km (Trafikverket).
           {summary.unknownEntries > 0 &&
             ` ${summary.unknownEntries} ${summary.unknownEntries === 1 ? 'snabbpost' : 'snabbposter'} utan vikt kunde inte räknas med.`}

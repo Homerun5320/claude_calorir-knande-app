@@ -67,6 +67,28 @@ describe('ThankYouPage', () => {
     expect(screen.getByRole('note')).toHaveTextContent('Har du Lagom på hemskärmen?')
   })
 
+  it('en befintlig livstidslicens byts inte ut utan att fråga (t.ex. av en länk med någon annans köp)', async () => {
+    const current = createTestLicense('livstid', undefined)
+    useLicenseStore.setState({ licenseKey: current })
+    const annual = createTestLicense('ar', 365, Date.now() + 1000)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ licenseKey: annual }))
+    renderAt('/tack?session_id=cs_test_annan')
+    expect(await screen.findByRole('heading', { name: 'Du har redan en licens' })).toBeInTheDocument()
+    expect(useLicenseStore.getState().licenseKey).toBe(current)
+    fireEvent.click(screen.getByRole('button', { name: 'Behåll min nuvarande licens' }))
+    expect(await screen.findByRole('heading', { name: 'Din nuvarande licens gäller som förut' })).toBeInTheDocument()
+    expect(useLicenseStore.getState().licenseKey).toBe(current)
+  })
+
+  it('en uppgradering (årslicens → livstid) aktiveras direkt', async () => {
+    useLicenseStore.setState({ licenseKey: createTestLicense('ar', 365) })
+    const lifetime = createTestLicense('livstid', undefined, Date.now() + 1000)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ licenseKey: lifetime }))
+    renderAt('/tack?session_id=cs_test_upp')
+    expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' })).toBeInTheDocument()
+    expect(useLicenseStore.getState().licenseKey).toBe(lifetime)
+  })
+
   it('före profilen leder vidare till välkomstflödet', async () => {
     useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: false } })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ licenseKey: createTestLicense('ar', 365) }))

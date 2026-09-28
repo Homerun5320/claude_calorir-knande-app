@@ -7,3 +7,12 @@ import { handleStripeWebhook, withErrorBoundary, type NetlifyContext } from '../
 
 export default (req: Request, context?: NetlifyContext): Promise<Response> =>
   withErrorBoundary('stripe-webhook', () => handleStripeWebhook(req, { env: process.env, context }))
+
+/**
+ * Adressen: bara /api/stripe-webhook (inte /.netlify/functions/stripe-webhook). Ingen
+ * anropsbegränsning – Stripe skickar händelser i klump, och varje anrop kontrolleras med
+ * signaturen.
+ */
+export const config = {
+  path: '/api/stripe-webhook',
+}

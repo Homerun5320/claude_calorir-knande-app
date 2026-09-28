@@ -27,6 +27,7 @@ const m = vi.hoisted(() => ({
     distribution: 'web' as 'web' | 'appstore' | 'play',
     canLog: true,
     demo: false,
+    ios: false,
   },
 }))
 
@@ -46,6 +47,7 @@ vi.mock('../../../config/platform', async (importOriginal) => {
     isInApp: () => m.flags.inApp,
     isNativeApp: () => m.flags.native,
     isTwa: () => false,
+    isIosDevice: () => m.flags.ios,
     sellsOnWeb: () => m.flags.sellsOnWeb,
     allowsLicenseKeyEntry: () => m.flags.allowsKey,
     storagePlace: () => (m.flags.inApp ? 'i appen på den här enheten' : 'i den här webbläsaren'),
@@ -80,7 +82,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  Object.assign(m.flags, { inApp: false, sellsOnWeb: true, allowsKey: true, native: false, distribution: 'web', canLog: true, demo: false })
+  Object.assign(m.flags, { inApp: false, sellsOnWeb: true, allowsKey: true, native: false, distribution: 'web', canLog: true, demo: false, ios: false })
   m.saveBackup.mockReset()
   m.saveFile.mockReset()
   localStorage.clear()
@@ -102,12 +104,20 @@ describe('export', () => {
     expect(lastToast()).toBeUndefined()
   })
 
-  it('delad kopia räknas som sparad och påminner om Spara i Filer', async () => {
+  it('delad kopia räknas som sparad och påminner om Spara i Filer på iPhone', async () => {
+    m.flags.ios = true
     m.saveBackup.mockResolvedValue('shared')
     renderSection()
     clickSave()
     await waitFor(() => expect(lastToast()?.message).toBe('Delad – välj Spara i Filer för att behålla den'))
     expect(readLastBackup()).not.toBeNull()
+  })
+
+  it('på Android nämns inte "Spara i Filer" (det heter så bara på iPhone)', async () => {
+    m.saveBackup.mockResolvedValue('shared')
+    renderSection()
+    clickSave()
+    await waitFor(() => expect(lastToast()?.message).toBe('Delad – spara filen där du hittar den igen, t.ex. i Filer eller Google Drive'))
   })
 
   it('nedladdad kopia', async () => {
@@ -183,23 +193,24 @@ describe('byta telefon eller flytta till appen', () => {
     expect(card).toHaveTextContent(
       'Din data finns i den här webbläsaren och flyttar inte med automatiskt. Spara en säkerhetskopia här, öppna Lagom på den nya enheten eller i appen och välj Återställ från säkerhetskopia.',
     )
-    expect(card).not.toHaveTextContent(/följer inte med till iPhone-appen/)
+    expect(card).not.toHaveTextContent(/licensnyckel/i)
     expect(within(card).getByRole('button', { name: 'Spara säkerhetskopia' })).toBeInTheDocument()
   })
 
-  it('på webben med en licens: berättar i förväg att den inte följer med till iPhone-appen', () => {
+  it('på webben med en licensnyckel: ber om ett mejl innan man byter till iPhone-appen', () => {
     useLicenseStore.setState({ licenseKey: 'webbnyckel' })
     renderSection()
     const card = screen.getByRole('heading', { name: 'Byta telefon eller flytta till appen' }).closest('section') as HTMLElement
-    expect(card).toHaveTextContent('En licens som köpts på webben följer inte med till iPhone-appen – kontakta oss så hjälper vi dig.')
+    expect(card).toHaveTextContent('Har du en licensnyckel och vill använda Lagom i iPhone-appen? Mejla oss innan du byter, så hjälper vi dig.')
   })
 
-  it('i App Store-bygget: webblicensen följer inte med', () => {
+  it('i App Store-bygget nämns aldrig webbköp (Apples riktlinjer 3.1.1 och 3.1.3)', () => {
     Object.assign(m.flags, { inApp: true, sellsOnWeb: false, allowsKey: false, native: true, distribution: 'appstore' })
+    useLicenseStore.setState({ licenseKey: 'webbnyckel' })
     renderSection()
     const card = screen.getByRole('heading', { name: 'Byta telefon eller flytta till appen' }).closest('section') as HTMLElement
     expect(card).toHaveTextContent('Din data finns i appen på den här enheten')
-    expect(card).toHaveTextContent('En licens som köpts på webben följer inte med till iPhone-appen – kontakta oss så hjälper vi dig.')
+    expect(card).not.toHaveTextContent(/webben|licensnyckel|licens/i)
   })
 })
 
@@ -330,6 +341,9 @@ describe('byt från annan app', () => {
     const sheet = await screen.findByRole('dialog', { name: 'Importera från MyFitnessPal' })
     expect(within(sheet).getByText(/Exempeldatan är skrivskyddad/)).toBeInTheDocument()
     expect(within(sheet).getByRole('button', { name: 'Importera' })).toBeDisabled()
+    // Sammanfattningen visar vad filen innehåller – inte "0 dagar · 0 måltider".
+    expect(sheet).not.toHaveTextContent('0 dagar')
+    expect(within(sheet).getByRole('button', { name: 'Skapa min egen profil' })).toBeInTheDocument()
   })
 
   it('ger ett begripligt fel för filer som inte går att använda', async () => {

@@ -11,10 +11,80 @@ import { createVault, rewrapWithRecovery, unlockWithPassphrase, unlockWithRecove
 /** Minsta längd på lösenfrasen. */
 export const MIN_PASSPHRASE_LENGTH = 12
 
+/**
+ * Vanliga lösenord och ord som ofta används i dem (utan å/ä/ö och siffror). Den som kommer åt
+ * databasen har den inslagna nyckeln och kan gissa offline – de här provas alltid först.
+ */
+const COMMON_WORDS = [
+  'losenord',
+  'password',
+  'passord',
+  'hemlig',
+  'hemligt',
+  'qwertyuiop',
+  'qwerty',
+  'asdfghjkl',
+  'asdf',
+  'zxcvbnm',
+  'lagom',
+  'sommar',
+  'vinter',
+  'hejhej',
+  'admin',
+  'welcome',
+  'valkommen',
+  'letmein',
+  'iloveyou',
+  'test',
+  'abc',
+]
+
+/** Tangentbordsrader och följder som ofta används ("abcdefgh…", "qwerty…", "1234…"). */
+const SEQUENCES = ['abcdefghijklmnopqrstuvwxyz', 'qwertyuiopasdfghjklzxcvbnm', '01234567890', '09876543210']
+
+/** Gemener utan diakritiska tecken (å → a), för jämförelserna nedan. */
+function plain(text: string): string {
+  return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+/** Varför lösenfrasen är lätt att gissa, eller null. Längden kontrolleras i `passphraseProblem`. */
+export function passphraseWeakness(passphrase: string): string | null {
+  const text = plain(passphrase)
+  const compact = text.replace(/\s+/g, '')
+  const advice = 'Välj hellre några ord som bara du kopplar ihop, till exempel fyra ord.'
+  if (/^\d+$/.test(compact)) return `Lösenfrasen kan inte bara vara siffror. ${advice}`
+  if (new Set(compact).size < 5) return `Lösenfrasen har för få olika tecken. ${advice}`
+  if (SEQUENCES.some((seq) => seq.repeat(3).includes(compact))) return `Lösenfrasen är en följd av tecken som är lätt att gissa. ${advice}`
+  const letters = text.replace(/[^a-z]/g, '')
+  const stripped = COMMON_WORDS.reduce((rest, word) => rest.replaceAll(word, ''), letters)
+  if (letters.length > 0 && stripped.length < 3) return `Lösenfrasen är för vanlig och lätt att gissa. ${advice}`
+  return null
+}
+
+export type PassphraseStrength = 'svag' | 'okej' | 'stark'
+
+/** En enkel styrkemätare: fyra ord eller fler (eller minst 20 tecken) är stark. */
+export function passphraseStrength(passphrase: string): PassphraseStrength {
+  if ([...passphrase.normalize('NFKC')].length < MIN_PASSPHRASE_LENGTH || passphraseWeakness(passphrase)) return 'svag'
+  const words = passphrase
+    .trim()
+    .split(/[\s\-_.,]+/)
+    .filter((w) => [...w].length >= 2).length
+  return words >= 4 || [...passphrase.normalize('NFKC')].length >= 20 ? 'stark' : 'okej'
+}
+
+/** Tipset under fältet: längden, rådet om ord och styrkan när något är ifyllt. */
+export function passphraseHint(passphrase: string): string {
+  const base = `Minst ${MIN_PASSPHRASE_LENGTH} tecken – helst fyra ord eller fler.`
+  return passphrase ? `${base} Styrka: ${passphraseStrength(passphrase)}.` : base
+}
+
 /** Svensk text om lösenfrasen inte duger, annars null. */
 export function passphraseProblem(passphrase: string, repeat: string): string | null {
   if ([...passphrase.normalize('NFKC')].length < MIN_PASSPHRASE_LENGTH) return `Lösenfrasen behöver vara minst ${MIN_PASSPHRASE_LENGTH} tecken.`
   if (passphrase.trim().length === 0) return 'Lösenfrasen kan inte bara vara mellanslag.'
+  const weak = passphraseWeakness(passphrase)
+  if (weak) return weak
   if (passphrase !== repeat) return 'Lösenfraserna är inte likadana.'
   return null
 }

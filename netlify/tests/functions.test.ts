@@ -59,8 +59,12 @@ describe('Netlify-funktionerna', () => {
   })
 
   it('receptimporten behöver inga nycklar och avvisar http-adresser utan att hämta något', async () => {
-    const res = await recipeFetch(req('recipe-fetch', { method: 'POST', body: JSON.stringify({ url: 'http://example.com/recept' }) }))
+    const headers = { Origin: 'https://lagom.example' }
+    const res = await recipeFetch(req('recipe-fetch', { method: 'POST', headers, body: JSON.stringify({ url: 'http://example.com/recept' }) }))
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ code: 'ogiltig' })
+    // Utan Origin (curl, skript) nekas anropet – funktionen är ingen öppen hämtare.
+    const bare = await recipeFetch(req('recipe-fetch', { method: 'POST', body: JSON.stringify({ url: 'https://example.com/recept' }) }))
+    expect(bare.status).toBe(403)
   })
 })

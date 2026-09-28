@@ -7,6 +7,8 @@ import {
   decodeLicense,
   keyId,
   licenseKeyHash,
+  looksLikeHash,
+  purchaseIdHash,
   signLicense,
   signRevocationList,
   verifyLicense,
@@ -127,11 +129,26 @@ export async function issueLicense(payload: LicensePayload, privateKeyPkcs8Base6
 }
 
 /**
- * Signera spärrlistan "LAGOMREV1.<payload>.<signatur>" med licensernas privata nyckel. Listan
- * kontrolleras mot den publika nyckeln innan den lämnas ut.
+ * Posterna i den publicerade spärrlistan (v2): köp-id:n som hashar (`purchaseIdHash`) – aldrig i
+ * klartext, eftersom köp-id:t är det som verify-purchase kräver för att lämna ut nyckeln. En post
+ * som redan är en hash (en nyckelhash från LICENSE_REVOKED_IDS) behålls, och dess egen hash läggs
+ * till för säkerhets skull. Sorterade och utan dubbletter.
+ */
+export async function revocationEntries(ids: readonly string[]): Promise<string[]> {
+  const out = new Set<string>()
+  for (const id of ids) {
+    if (looksLikeHash(id)) out.add(id)
+    out.add(await purchaseIdHash(id))
+  }
+  return [...out].sort()
+}
+
+/**
+ * Signera spärrlistan "LAGOMREV1.<payload>.<signatur>" (v2, se `revocationEntries`) med
+ * licensernas privata nyckel. Listan kontrolleras mot den publika nyckeln innan den lämnas ut.
  */
 export async function signRevocations(ids: readonly string[], issuedAtSec: number, privateKeyPkcs8Base64: string): Promise<string> {
-  const list = { v: 1 as const, issuedAt: issuedAtSec, ids: [...ids] }
+  const list = { v: 2 as const, issuedAt: issuedAtSec, ids: await revocationEntries(ids) }
   const token = await signRevocationList(list, privateKeyPkcs8Base64)
   const publicKey = await publicKeyFromPrivate(privateKeyPkcs8Base64)
   if (!(await verifyRevocationList(token, { publicKey }))) throw new Error('Spärrlistan kunde inte signeras.')

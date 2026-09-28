@@ -87,7 +87,9 @@ export const PLATE_CHOICES: Record<PlatePartKey, readonly PlateChoice[]> = {
   veg: [
     { id: 'sallad', label: 'Sallad', foodId: 'lagom:sallad-blandad', factor: 0.4 },
     { id: 'rotfrukter', label: 'Rotfrukter', foodId: 'lagom:rotfrukter-ugnsrostade', factor: 1.3 },
-    { id: 'kokta', label: 'Kokta grönsaker', foodId: 'lagom:gronsaker-frysta', factor: 1 },
+    // Raden i korgen och dagboken heter "Frysta grönsaker" (Livsmedelsverkets värde för en kokt
+    // grönsaksblandning) – valet heter därför också så, så att ingen tror att något blev fel.
+    { id: 'kokta', label: 'Kokta eller frysta', foodId: 'lagom:gronsaker-frysta', factor: 1 },
   ],
 }
 

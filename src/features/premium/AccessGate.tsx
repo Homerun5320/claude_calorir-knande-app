@@ -116,7 +116,7 @@ export function StartOwnProfileButton({
     setBusy(true)
     // Laddas först när den behövs – raderingen drar in säkerhetskopians kod.
     const { wipeAndReset } = await import('../settings/wipe')
-    wipeAndReset()
+    void wipeAndReset()
     onNavigate?.()
     navigate('/valkommen', { replace: true })
   }

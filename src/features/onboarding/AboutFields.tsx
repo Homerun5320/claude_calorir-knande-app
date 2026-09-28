@@ -8,6 +8,7 @@ import { ExternalLink, NumberField, SegmentedControl, TextField, cx } from '../.
 import type { ISODate, LifeStage, Sex } from '../../types'
 import {
   LIFE_STAGE_OPTIONS,
+  MINOR_LOSS_REASON,
   SEX_OPTIONS,
   goalFromChoice,
   isMinor,
@@ -159,15 +160,21 @@ export function AboutFields({ draft, onChange, errors, visibleErrors, onBlurFiel
         </div>
       )}
 
-      {blocked && <Note>{blocked} Du kan ändra målet när som helst i Inställningar.</Note>}
-      {minor && !blocked && (
+      {/* Den som kan vara under 18 får stödtexten nedan i stället för det korta skälet. */}
+      {blocked && !(minor && blocked === MINOR_LOSS_REASON) && <Note>{blocked} Du kan ändra målet när som helst i Inställningar.</Note>}
+      {minor && (
         <Note tone="mossa" icon={LifeBuoy}>
-          Lagom är i första hand gjord för vuxna. Du som är under 18 år växer fortfarande och behöver mycket energi och näring – därför ger Lagom
-          aldrig något underskott för dig. Om du funderar på mat eller vikt – prata gärna med en vuxen, skolsköterskan, elevhälsan eller{' '}
+          Lagom är gjord för vuxna. Fyller du 18 i år räknar Lagom försiktigt tills du säkert har fyllt: du växer fortfarande och behöver mycket
+          energi och näring, så Lagom föreslår ingen viktnedgång (kaloriunderskott). Om du funderar på mat eller vikt – prata gärna med en vuxen,
+          skolsköterskan, elevhälsan eller{' '}
           <ExternalLink href="https://www.1177.se" className="font-semibold text-gran underline underline-offset-2">
             1177 Vårdguiden
-          </ExternalLink>{' '}
-          först.
+          </ExternalLink>
+          . Tänker du mycket på mat och vikt finns stöd hos{' '}
+          <ExternalLink href="https://www.friskfri.se" className="font-semibold text-gran underline underline-offset-2">
+            Frisk &amp; Fri
+          </ExternalLink>
+          .
         </Note>
       )}
     </div>

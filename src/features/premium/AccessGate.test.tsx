@@ -374,7 +374,7 @@ describe('App Store-bygget', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Provperioden är slut' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Jag har redan en licensnyckel' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Återställ köp' })).toBeInTheDocument()
-    expect(screen.getByText('Årslicens eller livstidslicens som köp i appen · ingen automatisk förnyelse')).toBeInTheDocument()
+    expect(screen.getByText('Årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper) · ingen automatisk förnyelse')).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/\skr(?![a-zåäö])|moms|Stripe/)
   })
 })

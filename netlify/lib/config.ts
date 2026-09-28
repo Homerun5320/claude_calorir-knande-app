@@ -2,6 +2,7 @@
  * Serverns inställningar från miljövariabler (Netlify → Site configuration → Environment variables).
  * Se docs/BETALNING.md och .env.example. Inga hemligheter loggas – bara namnen på det som saknas.
  */
+import { isExampleEmail } from '../../src/lib/placeholderEmail.ts'
 import { SERVER_PLANS, type PlanId } from './plans.ts'
 
 export type Env = Record<string, string | undefined>
@@ -13,7 +14,10 @@ export type Env = Record<string, string | undefined>
 export interface SellerInfo {
   /** VITE_SELLER_NAME – firmanamnet eller, för enskild firma, ditt namn. */
   name: string
-  /** VITE_SELLER_ORGNR – organisationsnummer (för enskild firma personnumret). */
+  /**
+   * VITE_SELLER_ORGNR – organisationsnummer (för enskild firma personnumret). Frivilligt: saknas det
+   * står det inte på fakturan (se docs/BETALNING.md om när det måste visas).
+   */
   orgnr: string
   /** VITE_SELLER_ADDRESS – postadress. */
   address: string
@@ -25,19 +29,20 @@ export interface SellerInfo {
   vat: string
 }
 
+/** Uppgifter som krävs (organisationsnummer och momsregistreringsnummer är frivilliga). */
+type RequiredSellerField = Exclude<keyof SellerInfo, 'vat' | 'orgnr'>
+
 /** Platshållare när en uppgift saknas – samma som i de fristående villkorssidorna. */
-export const SELLER_PLACEHOLDERS: Readonly<Record<Exclude<keyof SellerInfo, 'vat'>, string>> = {
+export const SELLER_PLACEHOLDERS: Readonly<Record<RequiredSellerField, string>> = {
   name: '[Företagsnamn]',
-  orgnr: '[Org.nr]',
   address: '[Adress]',
   phone: '[Telefon]',
   email: '[E-post]',
 }
 
 /** Miljövariabeln bakom varje obligatorisk uppgift. */
-const SELLER_ENV: ReadonlyArray<{ field: Exclude<keyof SellerInfo, 'vat'>; env: string }> = [
+const SELLER_ENV: ReadonlyArray<{ field: RequiredSellerField; env: string }> = [
   { field: 'name', env: 'VITE_SELLER_NAME' },
-  { field: 'orgnr', env: 'VITE_SELLER_ORGNR' },
   { field: 'address', env: 'VITE_SELLER_ADDRESS' },
   { field: 'phone', env: 'VITE_SELLER_PHONE' },
   { field: 'email', env: 'VITE_SUPPORT_EMAIL' },
@@ -89,6 +94,13 @@ export interface ServerConfig {
    * nyckelhashar. Läggs till i spärrlistan.
    */
   revokedIds: string[]
+  /**
+   * Netlifys driftmiljö ('production', 'deploy-preview', 'branch-deploy', 'dev') – från
+   * funktionens context (`context.deploy.context`) eller CONTEXT. '' = okänd (t.ex. i testerna).
+   */
+  deployContext: string
+  /** LAGOM_ALLOW_TEST_COMMERCE: testköp (Stripes testkort) får ge licenser i produktion – bara före lanseringen. */
+  allowTestCommerce: boolean
 }
 
 function clean(value: string | undefined): string {
@@ -145,10 +157,7 @@ function readTermsVersion(value: string | undefined): string {
  * (`isExampleEmail` i scripts/commerce-guard.ts).
  */
 export function isPlaceholderEmail(email: string): boolean {
-  const e = email.trim().toLowerCase()
-  if (!e) return true
-  const labels = (e.split('@').pop() ?? '').split('.')
-  return labels.includes('example') || ['invalid', 'test', 'localhost'].includes(labels[labels.length - 1] ?? '')
+  return isExampleEmail(email)
 }
 
 /**
@@ -178,9 +187,10 @@ function readSeller(env: Env): SellerInfo {
 }
 
 /**
- * Läs inställningarna. `siteUrl` är Netlifys egen adress för webbplatsen (används om APP_URL saknas).
+ * Läs inställningarna. `siteUrl` är Netlifys egen adress för webbplatsen (används om APP_URL saknas)
+ * och `deployContext` driftmiljön från funktionens context (annars CONTEXT).
  */
-export function readConfig(env: Env, siteUrl?: string): ServerConfig {
+export function readConfig(env: Env, siteUrl?: string, deployContext?: string): ServerConfig {
   return {
     stripeSecretKey: clean(env.STRIPE_SECRET_KEY),
     priceIds: {
@@ -197,7 +207,28 @@ export function readConfig(env: Env, siteUrl?: string): ServerConfig {
     automaticTax: isOn(env.STRIPE_AUTOMATIC_TAX),
     seller: readSeller(env),
     revokedIds: [...new Set(list(env.LICENSE_REVOKED_IDS).filter((id) => /^[A-Za-z0-9_-]{4,200}$/.test(id)))],
+    deployContext: clean(deployContext) || clean(env.CONTEXT),
+    allowTestCommerce: clean(env.LAGOM_ALLOW_TEST_COMMERCE) === '1',
   }
+}
+
+/**
+ * Varför ett köp inte får ge en licens i den här driftmiljön, eller null:
+ * - ett testköp (Stripes testkort, livemode false) i produktion – annars blir ett köp med kortet
+ *   4242 … en giltig licens i den skarpa appen om en förhandsversion delar LICENSE_PRIVATE_KEY med
+ *   produktionen. Tillåtet med LAGOM_ALLOW_TEST_COMMERCE=1 (före lanseringen).
+ * - ett skarpt köp utanför produktion (förhandsversion, grenbygge, lokalt) – en skarp Stripe-nyckel
+ *   hör bara hemma i produktionen.
+ * Okänd driftmiljö (t.ex. i testerna) kontrolleras inte.
+ */
+export function purchaseModeProblem(livemode: boolean, cfg: Pick<ServerConfig, 'deployContext' | 'allowTestCommerce'>): string | null {
+  if (!cfg.deployContext) return null
+  if (cfg.deployContext === 'production') {
+    return !livemode && !cfg.allowTestCommerce
+      ? 'Testköp (Stripes testläge) ger inga licenser i produktion – använd skarpa nycklar, eller LAGOM_ALLOW_TEST_COMMERCE=1 före lanseringen'
+      : null
+  }
+  return livemode ? `Skarpt köp i driftmiljön ${cfg.deployContext} – skarpa Stripe-nycklar ska bara finnas i produktionen` : null
 }
 
 function normalizeTermsUrl(value: string | undefined): string {
@@ -224,7 +255,8 @@ export function isLiveStripeKey(cfg: Pick<ServerConfig, 'stripeSecretKey'>): boo
 export function sellerForDisplay(seller: SellerInfo): SellerInfo {
   return {
     name: seller.name || SELLER_PLACEHOLDERS.name,
-    orgnr: seller.orgnr || SELLER_PLACEHOLDERS.orgnr,
+    // Frivilligt – saknas det står det inte med (ingen platshållare).
+    orgnr: seller.orgnr,
     address: seller.address || SELLER_PLACEHOLDERS.address,
     phone: seller.phone || SELLER_PLACEHOLDERS.phone,
     email: seller.email || SELLER_PLACEHOLDERS.email,

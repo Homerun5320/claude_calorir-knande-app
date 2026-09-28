@@ -5,9 +5,10 @@
  * legalContent.ts). Vid bygget ersätts platshållarna med VITE_SELLER_*-variablerna – se
  * `fillSellerPlaceholders`, som anropas från vite.config.ts.
  *
- * Filen får inte importera något: den laddas även av vite.config.ts i Node, där appens moduler
- * (och import.meta.env) inte finns.
+ * Filen får bara importera moduler utan egna importer (som lib/placeholderEmail.ts): den laddas
+ * även av vite.config.ts i Node, där appens moduler (och import.meta.env) inte finns.
  */
+import { isExampleEmail } from '../../lib/placeholderEmail.ts'
 
 export const STATIC_PLACEHOLDERS = {
   name: '[Företagsnamn]',
@@ -33,6 +34,9 @@ export const SELLER_ENV_KEYS: Readonly<Record<Field, string>> = {
 /** Meningen med momsregistreringsnumret på de fristående sidorna (platshållaren kan vara markerad). */
 const VAT_SENTENCE_HTML = / Momsregistreringsnummer: (?:<span class="fyll">)?\[Momsreg\.nr\](?:<\/span>)?\./g
 
+/** Organisationsnumret inuti en mening (", organisationsnummer [Org.nr]"). */
+const ORGNR_PHRASE_HTML = /, organisationsnummer (?:<span class="fyll">)?\[Org\.nr\](?:<\/span>)?/g
+
 function escapeHtml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }
@@ -47,10 +51,12 @@ export function fillSellerPlaceholders(html: string, env: Readonly<Record<string
   // Momsregistreringsnumret är frivilligt (en momsbefriad firma har inget) – saknas det tas hela
   // meningen bort i stället för att platshållaren står kvar.
   if (!(env[SELLER_ENV_KEYS.vat] ?? '').trim()) out = out.replace(VAT_SENTENCE_HTML, '')
+  // Organisationsnumret är också frivilligt (för enskild firma personnumret) – samma sak.
+  if (!(env[SELLER_ENV_KEYS.orgNr] ?? '').trim()) out = out.replace(ORGNR_PHRASE_HTML, '')
   for (const field of Object.keys(STATIC_PLACEHOLDERS) as Field[]) {
     const value = (env[SELLER_ENV_KEYS[field]] ?? '').trim()
     // Samma regel som i appen (legalContent.ts): .invalid- och example-adresser är platshållare.
-    if (!value || (field === 'email' && (/\.invalid$/i.test(value) || /@example\./i.test(value)))) continue
+    if (!value || (field === 'email' && isExampleEmail(value))) continue
     // Ifyllda uppgifter ska inte längre vara markerade som platshållare.
     out = out
       .replaceAll(`<span class="fyll">${STATIC_PLACEHOLDERS[field]}</span>`, escapeHtml(value))
@@ -61,8 +67,9 @@ export function fillSellerPlaceholders(html: string, env: Readonly<Record<string
 
 /**
  * Platshållare som finns kvar i en sida – används för att varna när ett skarpt bygge saknar
- * uppgifter. Momsregistreringsnumret räknas inte (det är frivilligt och tas bort när det saknas).
+ * uppgifter. Momsregistreringsnumret och organisationsnumret räknas inte (de är frivilliga och tas
+ * bort när de saknas).
  */
 export function missingSellerPlaceholders(html: string): string[] {
-  return Object.values(STATIC_PLACEHOLDERS).filter((p) => p !== STATIC_PLACEHOLDERS.vat && html.includes(p))
+  return Object.values(STATIC_PLACEHOLDERS).filter((p) => p !== STATIC_PLACEHOLDERS.vat && p !== STATIC_PLACEHOLDERS.orgNr && html.includes(p))
 }

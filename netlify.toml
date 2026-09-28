@@ -15,63 +15,23 @@
 # Testläget (gratis testlicenser) är tillåtet i förhandsvisningar och grenbyggen. Ett
 # produktionsbygge i testläge stoppas av byggkontrollen (scripts/commerce-guard.ts) – sätt
 # LAGOM_ALLOW_TEST_COMMERCE=1 för Production i Netlify om det är avsiktligt före lanseringen.
+# VITE_ACCEPT_TEST_PURCHASES=1: i förhandsvisningar godtar appen licenser från köp med Stripes
+# testkort även i skarpt läge. I produktionen underkänns de alltid (byggkontrollen stoppar
+# flaggan där), och servern ger inga licenser för testköp i produktionen.
 [context.deploy-preview.environment]
   LAGOM_ALLOW_TEST_COMMERCE = "1"
+  VITE_ACCEPT_TEST_PURCHASES = "1"
 
 [context.branch-deploy.environment]
   LAGOM_ALLOW_TEST_COMMERCE = "1"
+  VITE_ACCEPT_TEST_PURCHASES = "1"
 
 # Appen anropar /api/create-checkout, /api/verify-purchase, /api/recover-license, /api/license-revocations och /api/recipe-fetch; Stripe anropar /api/stripe-webhook.
-
-# Anropsbegränsning (Netlify rate limiting) för de publika funktionerna. Reglerna måste stå före
-# den allmänna /api/*-regeln – Netlify använder den första regeln som matchar. Över gränsen svarar
-# Netlify 429. Fönstret (window_size) får vara 1–180 sekunder. Se docs/BETALNING.md.
-[[redirects]]
-  from = "/api/create-checkout"
-  to = "/.netlify/functions/create-checkout"
-  status = 200
-  force = true
-  [redirects.rate_limit]
-    window_limit = 10
-    window_size = 60
-    aggregate_by = ["ip", "domain"]
-
-[[redirects]]
-  from = "/api/verify-purchase"
-  to = "/.netlify/functions/verify-purchase"
-  status = 200
-  force = true
-  [redirects.rate_limit]
-    window_limit = 30
-    window_size = 60
-    aggregate_by = ["ip", "domain"]
-
-[[redirects]]
-  from = "/api/recover-license"
-  to = "/.netlify/functions/recover-license"
-  status = 200
-  force = true
-  [redirects.rate_limit]
-    window_limit = 5
-    window_size = 180
-    aggregate_by = ["ip", "domain"]
-
-[[redirects]]
-  from = "/api/recipe-fetch"
-  to = "/.netlify/functions/recipe-fetch"
-  status = 200
-  force = true
-  [redirects.rate_limit]
-    window_limit = 10
-    window_size = 60
-    aggregate_by = ["ip", "domain"]
-
-# Övriga funktioner (/api/license-revocations, /api/stripe-webhook) utan särskild gräns.
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-  force = true
+#
+# Adresserna och anropsbegränsningen (Netlify rate limiting) står i varje funktion
+# (`export const config = { path, rateLimit }` i netlify/functions/*.mts) – inte här. En funktion med
+# egen `path` nås bara på den adressen och inte via /.netlify/functions/<namn>, så gränserna går
+# inte att kringgå. Lägg därför inga [[redirects]] för /api/ här. Se docs/BETALNING.md.
 
 # Säkerhetsheaders för hela webbplatsen.
 # CSP: bara egna filer + Open Food Facts (streckkoder och produktbilder) och Livsmedelsverkets API.

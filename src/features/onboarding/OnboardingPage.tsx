@@ -101,13 +101,24 @@ export default function OnboardingPage() {
   return <OnboardingFlow onLeaving={() => setLeaving(true)} />
 }
 
+/**
+ * "Steg 2" eller "Steg 4 av 6". Antalet steg avgörs först av målet och uppgifterna om dig (t.ex.
+ * blir det inget taktsteg vid graviditet eller under 18 år) – innan dess visas inget totalantal,
+ * så att räknaren inte ser ut att hoppa från "1 av 6" till "2 av 5".
+ */
+export function stepText(steps: readonly OnboardingStep[], current: number): string {
+  // Välkomststeget räknas inte.
+  const known = current >= steps.indexOf('aktivitet')
+  return known ? `Steg ${current} av ${steps.length - 1}` : `Steg ${current}`
+}
+
 function ProgressDots({ steps, current }: { steps: readonly OnboardingStep[]; current: number }) {
   const reduce = useReducedMotion()
   // Välkomststeget räknas inte.
   const total = steps.length - 1
   const index = current - 1
   return (
-    <div className="flex items-center gap-1.5" role="progressbar" aria-label="Förlopp" aria-valuemin={1} aria-valuemax={total} aria-valuenow={index + 1} aria-valuetext={`Steg ${index + 1} av ${total}`}>
+    <div className="flex items-center gap-1.5" role="progressbar" aria-label="Förlopp" aria-valuemin={1} aria-valuemax={total} aria-valuenow={index + 1} aria-valuetext={stepText(steps, current)}>
       {Array.from({ length: total }, (_, i) => (
         <motion.span
           key={i}
@@ -122,22 +133,26 @@ function ProgressDots({ steps, current }: { steps: readonly OnboardingStep[]; cu
   )
 }
 
-/** Stegen för att flytta från webben till appen (visas i apparna). */
+/**
+ * Stegen för att flytta sin data från en annan enhet (visas i apparna). Neutralt formulerat – i
+ * iPhone-appen nämns inte webbversionen (docs/APP-STORE.md §4), och i Play-appen (TWA) kan
+ * lagringen delas med Chrome på samma telefon, så påståenden om webbläsaren undviks.
+ */
 export const WEB_MOVE_STEPS = [
   // Samma namn som i appen: avsnittet "Data och säkerhetskopia" och knappen "Spara säkerhetskopia".
-  'Öppna Lagom i webbläsaren och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
+  'Öppna Lagom på den andra enheten och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
   'Spara filen i Filer eller skicka den till dig själv.',
   'Välj Återställ från säkerhetskopia här.',
 ] as const
 
-/** I apparna: så flyttar man sin data från webbversionen. */
+/** I apparna: så flyttar man sin data från en annan enhet. */
 function WebMoveCard({ onRestore }: { onRestore: () => void }) {
   return (
     <section aria-labelledby="flytta-fran-webben" className="card mx-auto mt-5 w-[calc(100%-2rem)] max-w-[30rem] p-4">
       <h2 id="flytta-fran-webben" className="font-display text-[1.125rem] font-semibold tracking-tight text-ink">
-        Har du använt Lagom på webben?
+        Har du använt Lagom på en annan enhet?
       </h2>
-      <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">Datan i webbläsaren följer inte med till appen av sig själv. Så flyttar du den:</p>
+      <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">Din data följer inte med av sig själv. Så flyttar du den:</p>
       <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-[0.875rem] leading-relaxed text-ink-2 marker:font-semibold marker:text-gran">
         {WEB_MOVE_STEPS.map((step) => (
           <li key={step}>{step}</li>
@@ -340,7 +355,7 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
     }
   }
 
-  const eyebrow = index > 0 ? `Steg ${index} av ${steps.length - 1}` : undefined
+  const eyebrow = index > 0 ? stepText(steps, index) : undefined
   const focus = moved
   const blockedContinue = !canContinue(current, draft, today)
 
@@ -351,7 +366,7 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
   }
 
   const common = { draft, onChange, today, focusOnMount: focus, eyebrow }
-  // I apparna visas flytten från webben som ett eget kort med steg (se WebMoveCard).
+  // I apparna visas flytten från en annan enhet som ett eget kort med steg (se WebMoveCard).
   const inApp = isInApp()
   let body: ReactNode
   switch (current) {

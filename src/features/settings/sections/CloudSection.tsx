@@ -43,7 +43,7 @@ import {
   uploadBackup,
   type CloudCopy,
 } from '../../../lib/cloud/cloudBackup'
-import { MIN_PASSPHRASE_LENGTH, acceptNewConsent, loadVaultState, passphraseProblem, recoverHere, setUpVault, unlockHere, type VaultState } from '../../../lib/cloud/cloudSetup'
+import { acceptNewConsent, loadVaultState, passphraseHint, passphraseProblem, recoverHere, setUpVault, unlockHere, type VaultState } from '../../../lib/cloud/cloudSetup'
 import { CLOUD_CONSENT_TEXT } from '../../../lib/cloud/consent'
 import { isValidEmail, normalizeCode, requestCode, signOut, verifyCode } from '../../../lib/cloud/supabaseAuth'
 import { VaultError } from '../../../lib/cloud/vaultCrypto'
@@ -483,7 +483,7 @@ function PassphraseCard({
           label="Lösenfras"
           type="password"
           autoComplete="new-password"
-          hint={`Minst ${MIN_PASSPHRASE_LENGTH} tecken`}
+          hint={passphraseHint(pass)}
           value={pass}
           onChange={(e) => setPass(e.target.value)}
         />
@@ -600,7 +600,7 @@ function UnlockCard({ userId, state, onUnlocked }: { userId: string; state: Extr
               label="Ny lösenfras"
               type="password"
               autoComplete="new-password"
-              hint={`Minst ${MIN_PASSPHRASE_LENGTH} tecken`}
+              hint={passphraseHint(newPass)}
               value={newPass}
               onChange={(e) => setNewPass(e.target.value)}
             />
@@ -888,7 +888,7 @@ function AccountCard({ email, canTurnOff, onDeleted }: { email: string; canTurnO
     setDeleteOpen(false)
     onDeleted()
     if (wipeDevice) {
-      wipeAndReset()
+      void wipeAndReset()
       toast('Ditt konto är raderat, och all data på enheten är borttagen')
       navigate('/valkommen', { replace: true })
     } else {

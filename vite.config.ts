@@ -3,10 +3,11 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from 'vite'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { checkCommerceBuild } from './scripts/commerce-guard.ts'
+import { NATIVE_PURCHASES_READY } from './src/lib/storePurchases.ts'
 import { fillSellerPlaceholders, missingSellerPlaceholders } from './src/features/legal/staticSeller.ts'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
@@ -31,6 +32,8 @@ function commerceGuard(): Plugin {
       const { errors, warnings } = checkCommerceBuild(config.env as Record<string, string | undefined>, {
         netlifyContext: process.env.CONTEXT,
         allowTest: process.env.LAGOM_ALLOW_TEST_COMMERCE,
+        nativePurchasesReady: NATIVE_PURCHASES_READY,
+        allowStoreWithoutIap: process.env.LAGOM_ALLOW_STORE_WITHOUT_IAP,
       })
       for (const w of warnings) config.logger.warn(`Lagom: ${w}`)
       if (errors.length > 0) throw new Error(`Lagom kan inte byggas:\n- ${errors.join('\n- ')}`)
@@ -76,6 +79,29 @@ function staticSellerPages(): Plugin {
       } else {
         config.logger.info(`Lagom: säljarens uppgifter saknas på ${incomplete.length} fristående sidor (platshållare står kvar tills VITE_SELLER_* och VITE_SUPPORT_EMAIL sätts).`)
       }
+    },
+  }
+}
+
+/**
+ * Filer som bara hör hemma på webbplatsen: de fristående sidorna (integritetspolicy, villkor,
+ * support och radering) med webbköp, Stripe och Google Play, och service workerns övergångsskript.
+ * I butiksappen finns policyn och villkoren som sidor i appen (med rätt plattformstext) – de
+ * fristående sidorna ska inte ligga i appens paket (Apples riktlinje 2.3.10).
+ */
+const WEB_ONLY_FILES = ['integritet', 'villkor', 'support', 'radera-konto', 'sw-overgang.js']
+
+function removeWebOnlyFiles(): Plugin {
+  let config: ResolvedConfig
+  return {
+    name: 'lagom-remove-web-only-files',
+    apply: 'build',
+    configResolved(resolved) {
+      config = resolved
+    },
+    writeBundle() {
+      const outDir = resolve(config.root, config.build.outDir)
+      for (const name of WEB_ONLY_FILES) rmSync(join(outDir, name), { recursive: true, force: true })
     },
   }
 }
@@ -146,13 +172,15 @@ export default defineConfig(({ mode }) => {
         : {
             __APP_VERSION__: JSON.stringify(APP_VERSION),
             __BUILD_ID__: JSON.stringify(BUILD_ID),
+            // Distributionen som konstant (se src/config/platform.ts) – ogiltiga värden stoppas av byggkontrollen.
+            __LAGOM_DISTRIBUTION__: JSON.stringify(env.VITE_DISTRIBUTION || 'web'),
           },
     plugins: [
       commerceGuard(),
       react(),
       tailwindcss(),
       staticSellerPages(),
-      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE)] : []),
+      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE), removeWebOnlyFiles()] : []),
       VitePWA({
         // Service workern registreras av UpdatePrompt (AppShell), som frågar innan en ny version tas i bruk.
         registerType: 'prompt',
@@ -184,6 +212,8 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
+          // Övergången från autoUpdate (före 1.0) till uppdateringsfrågan – se public/sw-overgang.js.
+          importScripts: ['sw-overgang.js'],
           globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,txt}'],
           // Typsnittens teckenuppsättningar för andra skriftsystem behövs inte offline.
           globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],

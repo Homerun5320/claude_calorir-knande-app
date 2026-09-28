@@ -21,7 +21,6 @@ describe('netlify.toml', () => {
     expect(toml).toMatch(/command = "npm run build"/)
     expect(toml).toMatch(/publish = "dist"/)
     expect(toml).toMatch(/directory = "netlify\/functions"/)
-    expect(toml).toMatch(/from = "\/api\/\*"\s+to = "\/\.netlify\/functions\/:splat"\s+status = 200/)
   })
 
   it('varje fil i netlify/functions är en funktion (inga tester eller hjälpfiler där)', () => {
@@ -36,25 +35,38 @@ describe('netlify.toml', () => {
     ])
   })
 
-  it('anropsbegränsning (Netlify rate limiting) för de publika funktionerna, före den allmänna /api/*-regeln', () => {
-    const blocks = toml.split(/^\[\[/m).filter((b) => b.startsWith('redirects]]'))
-    const catchAll = blocks.findIndex((b) => /from = "\/api\/\*"/.test(b))
-    expect(catchAll).toBeGreaterThanOrEqual(0)
-    for (const name of ['create-checkout', 'verify-purchase', 'recover-license', 'recipe-fetch']) {
-      const i = blocks.findIndex((b) => b.includes(`from = "/api/${name}"`))
-      expect(i, `[[redirects]] för /api/${name} saknas i netlify.toml`).toBeGreaterThanOrEqual(0)
-      expect(i, `/api/${name} måste stå före /api/*`).toBeLessThan(catchAll)
-      const block = blocks[i]
-      expect(block).toContain(`to = "/.netlify/functions/${name}"`)
-      expect(block).toMatch(/status = 200/)
-      expect(block).toMatch(/\[redirects\.rate_limit\]/)
-      expect(block).toMatch(/window_limit = \d+/)
-      // Netlify godtar fönster på 1–180 sekunder.
-      const size = Number(/window_size = (\d+)/.exec(block)?.[1])
-      expect(size).toBeGreaterThanOrEqual(1)
-      expect(size).toBeLessThanOrEqual(180)
-      expect(block).toMatch(/aggregate_by = \[[^\]]*"ip"/)
+  it('varje funktion har en egen adress under /api/ – och de publika en anropsbegränsning som inte går att kringgå', () => {
+    // Med `path` i funktionens config nås den inte via /.netlify/functions/<namn>, där en
+    // [[redirects]]-regel med rate_limit inte gäller.
+    const limited: Record<string, { windowLimit: number; aggregateBy: string[] }> = {
+      'create-checkout': { windowLimit: 10, aggregateBy: ['ip', 'domain'] },
+      'verify-purchase': { windowLimit: 30, aggregateBy: ['ip', 'domain'] },
+      'recover-license': { windowLimit: 20, aggregateBy: ['domain'] },
+      'recipe-fetch': { windowLimit: 10, aggregateBy: ['ip', 'domain'] },
+      'license-revocations': { windowLimit: 60, aggregateBy: ['ip', 'domain'] },
     }
+    for (const file of readdirSync(`${root}netlify/functions`)) {
+      const name = file.replace(/\.mts$/, '')
+      const source = readFileSync(`${root}netlify/functions/${file}`, 'utf8')
+      const config = /export const config = (\{[\s\S]*?\n\})/.exec(source)?.[1]
+      expect(config, `${file} saknar export const config`).toBeDefined()
+      expect(config).toContain(`path: '/api/${name}'`)
+      const want = limited[name]
+      if (!want) {
+        expect(name).toBe('stripe-webhook')
+        expect(config).not.toContain('rateLimit')
+        continue
+      }
+      const rate = /rateLimit: \{ windowLimit: (\d+), windowSize: (\d+), aggregateBy: \[([^\]]*)\] \}/.exec(config ?? '')
+      expect(rate, `${file}: rateLimit saknas eller är skriven på ett annat sätt`).not.toBeNull()
+      expect(Number(rate?.[1])).toBe(want.windowLimit)
+      // Netlify godtar fönster på 1–180 sekunder.
+      expect(Number(rate?.[2])).toBeGreaterThanOrEqual(1)
+      expect(Number(rate?.[2])).toBeLessThanOrEqual(180)
+      expect(rate?.[3].split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(want.aggregateBy)
+    }
+    // Inga omskrivningar till /.netlify/functions – de skulle peka på adresser som inte finns.
+    expect(toml).not.toMatch(/^\s*to = "\/\.netlify\/functions/m)
   })
 
   it('Play Billing i TWA-appen kräver Payment Request: payment=(self)', () => {

@@ -5,7 +5,7 @@
  * Priser och betaltjänsten nämns bara där de får visas: kronpriser och Stripe bara när Lagom säljs
  * på webben (`sellsOnWeb()`) – i butiksapparna kommer priset från App Store eller Google Play.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   BadgeCheck,
@@ -25,7 +25,7 @@ import {
   WifiOff,
   type LucideIcon,
 } from 'lucide-react'
-import { Button, Card, ExternalLink as TextLink, ListGroup, ListRow, PageHeader, cx, toast, toneVars, type Tone } from '../../components/ui'
+import { Button, Card, ExternalLink as TextLink, ListGroup, ListRow, PageHeader, Sheet, Spinner, cx, toast, toneVars, type Tone } from '../../components/ui'
 import { LogoMark, Wordmark } from '../../components/layout/Logo'
 import { useProfileStore } from '../../stores/profileStore'
 import { SupportSheet } from './SupportSheet'
@@ -63,7 +63,8 @@ export const CHOICES: readonly Choice[] = [
   {
     icon: CircleSlash,
     tone: 'lingon',
-    title: 'Prova först – ingen prenumeration',
+    // Årslicensen är i butikerna en förbetald prenumeration som inte förnyas – "ingen prenumeration" vore fel där.
+    title: 'Prova först – ingen automatisk förnyelse',
     text: `${TRIAL_DAYS} dagar gratis, sedan ${priceSummaryText()} – utan automatisk förnyelse. Ingen reklam och inga dolda avgifter; streckkodsläsaren och alla näringsämnen ingår.`,
   },
   {
@@ -207,7 +208,46 @@ function SourceRow({ source }: { source: Source }) {
   )
 }
 
+const LICENSE_LINK = 'inline-flex min-h-11 items-center text-[0.8125rem] font-semibold text-gran underline-offset-2 hover:underline'
+
+/**
+ * Licenstexten i ett ark inne i appen. I den inbyggda appen går en länk med ny flik ut ur webbvyn
+ * (till Safari), där appens egna filer inte finns – därför läses filen och visas här i stället.
+ */
+function LicenseTextSheet({ license, onClose }: { license: { label: string; href: string } | null; onClose: () => void }) {
+  const [text, setText] = useState<{ href: string; body: string | null } | null>(null)
+  useEffect(() => {
+    if (!license) return
+    let alive = true
+    fetch(license.href)
+      .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((body) => alive && setText({ href: license.href, body }))
+      .catch(() => alive && setText({ href: license.href, body: null }))
+    return () => {
+      alive = false
+    }
+  }, [license])
+  const current = license && text?.href === license.href ? text : null
+  return (
+    <Sheet open={license !== null} onClose={onClose} title={license ? `Licens: ${license.label}` : 'Licens'}>
+      {!current ? (
+        <p role="status" className="flex items-center gap-2 text-[0.9375rem] text-ink-2">
+          <Spinner className="size-4" /> Hämtar licenstexten …
+        </p>
+      ) : current.body === null ? (
+        <p role="alert" className="text-[0.9375rem] text-ink-2">
+          Licenstexten kunde inte visas. Kontakta oss om du behöver den.
+        </p>
+      ) : (
+        <pre className="whitespace-pre-wrap break-words font-sans text-[0.8125rem] leading-relaxed text-ink-2">{current.body}</pre>
+      )}
+    </Sheet>
+  )
+}
+
 function OpenSourceRow() {
+  const [open, setOpen] = useState<{ label: string; href: string } | null>(null)
+  const native = isNativeApp()
   return (
     <div className="px-3 py-1.5">
       <h3 className="flex min-h-11 items-center text-[0.9375rem] font-medium leading-snug text-ink">Licenser för öppen källkod</h3>
@@ -215,12 +255,19 @@ function OpenSourceRow() {
       <ul className="mt-1 flex flex-wrap gap-x-4">
         {OPEN_SOURCE_LICENSES.map((l) => (
           <li key={l.href}>
-            <TextLink href={l.href} showIcon={false} className="inline-flex min-h-11 items-center text-[0.8125rem] font-semibold text-gran underline-offset-2 hover:underline">
-              {l.label}
-            </TextLink>
+            {native ? (
+              <button type="button" className={LICENSE_LINK} onClick={() => setOpen(l)}>
+                {l.label}
+              </button>
+            ) : (
+              <TextLink href={l.href} showIcon={false} className={LICENSE_LINK}>
+                {l.label}
+              </TextLink>
+            )}
           </li>
         ))}
       </ul>
+      {native && <LicenseTextSheet license={open} onClose={() => setOpen(null)} />}
     </div>
   )
 }

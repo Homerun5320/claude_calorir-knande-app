@@ -6,7 +6,9 @@ import {
   RAW_TO_COOKED_MEAT,
   evaluateKostrad,
   foodKostrad,
+  isAssessable,
   isUsable,
+  tooFewDays,
   kostradScore,
   type KostradId,
   type KostradInput,
@@ -402,5 +404,18 @@ describe('kostradScore', () => {
 describe('foodKostrad utan schablon', () => {
   it('ger ett tomt bidrag för kategorier utan kostråd', () => {
     expect(foodKostrad(food('Kaffe', 'dryck'))).toEqual({})
+  })
+})
+
+describe('veckoråd med för få loggade dagar', () => {
+  it('bedöms inte förrän minst tre dagar är loggade – en middag säger inget om en vecka', () => {
+    const base = { coverage: undefined, weeklyTarget: 350 }
+    expect(tooFewDays({ id: 'rott_kott', periodDays: 1, ...base })).toBe(true)
+    expect(isAssessable({ id: 'rott_kott', periodDays: 1, ...base })).toBe(false)
+    expect(isAssessable({ id: 'rott_kott', periodDays: 3, ...base })).toBe(true)
+    // Alkohol och rörelse är också veckoråd.
+    expect(tooFewDays({ id: 'alkohol', periodDays: 2, weeklyTarget: undefined })).toBe(true)
+    // Dagliga råd bedöms från första dagen.
+    expect(tooFewDays({ id: 'frukt_gront', periodDays: 1, weeklyTarget: undefined })).toBe(false)
   })
 })

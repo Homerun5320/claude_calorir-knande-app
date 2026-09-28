@@ -56,7 +56,7 @@ Den här guiden beskriver hur betalningen på **webben** sätts upp med **Stripe
  verifieras offline och sparas i appen
 
  (valfritt) Stripe-webhook ──► /api/stripe-webhook: samma utfärdande direkt när betalningen är klar,
-                               och markering av återbetalda/bestridda köp ("lagom_revoked").
+                               och notering av återbetalda/bestridda köp ("lagom_status").
  Appen, en gång per dygn ────► GET /api/license-revocations: signerad spärrlista över återbetalda köp.
  "Tappat nyckeln?" ──────────► POST /api/recover-license { email, receipt }: samma nyckel igen.
 ```
@@ -128,6 +128,8 @@ Servern kontrollerar vid varje nytt köp (resultatet cachas i tio minuter) att p
 
 **Byta pris:** ändra `src/config/commerce.ts` och `netlify/lib/plans.ts` (testerna misslyckas tills de stämmer), skapa ett nytt pris i Stripe och sätt t.ex. `STRIPE_PRICE_AR=price_nytt,price_gammalt`. Det första id:t används för nya köp; äldre köp går fortfarande att verifiera. Arkivera det gamla priset i Stripe först när inga fler köp startas med det.
 
+**Äldre köp efter en prisändring.** Lägg det gamla priset i `legacyPriceKr` i `netlify/lib/plans.ts` (i dag 299 kr för Årslicens och 599 kr för Livstidslicens). Då går köp till det gamla priset alltid att verifiera och hämta igen med "Tappat nyckeln?" – även utan pris-id (`price_data`), där det inte finns något id att behålla. Nya köp görs alltid till dagens pris.
+
 **Utan pris-id** skickas priset från koden (`price_data`). Det fungerar för ett snabbt test, men Stripes rapporter blir tydligare med riktiga produkter.
 
 ### 3. Betalsätt och försäljning bara i Sverige
@@ -187,20 +189,22 @@ LICENSE_PRIVATE_KEY=… VITE_LICENSE_PUBLIC_KEY=… node scripts/issue-license.m
 | `VITE_LICENSE_PUBLIC_KEYS` | _(tom)_ | Bara vid nyckelbyte: flera publika nycklar, den nuvarande först |
 | `VITE_SUPPORT_EMAIL` | `hej@<din domän>` | Visas vid köp, i felmeddelanden och på fakturan. `…@example.invalid` är bara en platshållare. |
 | `VITE_SELLER_NAME` | `Anna Andersson` | Säljarens namn (för enskild firma ditt namn eller firmanamnet) |
-| `VITE_SELLER_ORGNR` | `900101-1234` | Organisationsnummer – för enskild firma ditt personnummer |
+| `VITE_SELLER_ORGNR` | _(tom)_ | Organisationsnummer – för enskild firma ditt personnummer. **Frivilligt**: saknas det utelämnas det i appen, i villkoren och på fakturan, och bygget ger bara en varning (se rutan nedan). |
 | `VITE_SELLER_ADDRESS` | `Storgatan 1, 123 45 Småstad` | Postadress |
 | `VITE_SELLER_PHONE` | `070-123 45 67` | Telefonnummer |
 | `VITE_SELLER_VAT` | _(tom)_ | Momsregistreringsnummer, bara om du är momsregistrerad |
-| `VITE_TERMS_URL` | `https://<din domän>/villkor/` | Köpvillkoren (valfri) |
+| `VITE_TERMS_URL` | `https://<din domän>/villkor/` | Köpvillkoren. Bygget varnar när den saknas i skarpt läge – sätt samma adress i `TERMS_URL` för funktionerna, så att köparen godkänner villkoren i Stripe. |
 | `VITE_WEB_SALES` | _(tom)_ | `off` = inga köp på webben (Lagom säljs då bara i appbutikerna). Tomt = på. |
 | `VITE_APPSTORE_URL`, `VITE_PLAY_URL` | _(tomma)_ | Länkar till Lagom i App Store och Google Play. Visas på köpsidan när webbförsäljningen är av. |
 | `VITE_API_BASE` | _(tom)_ | Bara om funktionerna ligger på en annan adress än appen (alltid i butiksbyggena). Lägg då också till adressen i `connect-src` i `netlify.toml`, annars stoppar CSP:n anropen. |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | _(tomma)_ | Lämna tomma – Lagom Moln är avstängt i version 1.0 och ingen egen databas används |
-| `LAGOM_ALLOW_TEST_COMMERCE` | _(tom)_ | `1` = ett produktionsbygge i testläge är avsiktligt (t.ex. före lanseringen). Sätt den för _Production_ tills skarpt läge är klart – annars stoppas produktionsbygget. Förhandsvisningar och grenbyggen har den redan (`netlify.toml`). Ta bort den när du börjar sälja. |
+| `LAGOM_ALLOW_TEST_COMMERCE` | _(tom)_ | `1` = ett produktionsbygge i testläge är avsiktligt (t.ex. före lanseringen). Sätt den för _Production_ tills skarpt läge är klart – annars stoppas produktionsbygget. Förhandsvisningar och grenbyggen har den redan (`netlify.toml`). Ta bort den när du börjar sälja. Ge den scope **Builds** och **Functions**: funktionerna använder den också (se "Testköp i produktionen" nedan). |
+| `VITE_ACCEPT_TEST_PURCHASES` | _(tom)_ | **Sätt aldrig själv för Production.** `1` = appen godtar licenser från köp med Stripes testkort (`cs_test_…`) även i skarpt läge. Förhandsvisningar och grenbyggen har den redan (`netlify.toml`); byggkontrollen stoppar ett produktionsbygge eller butiksbygge med den. |
+| `LAGOM_ALLOW_STORE_WITHOUT_IAP` | _(tom)_ | Bara för butiksbyggen på din egen dator: `1` = bygg App Store-/Play-appen fast köp i appen inte är inkopplade (för simulator och skärmdumpar). Ett sådant bygge får **aldrig** skickas in. |
 
 > **Säljarens uppgifter behövs på två ställen.** `VITE_SELLER_*` och `VITE_SUPPORT_EMAIL` byggs in i appen **och** läses av serverfunktionerna, som skriver dem på fakturan. Ge dem därför scope **Builds** och **Functions** (eller _All scopes_) i Netlify. Saknas de för funktionerna startas inga skarpa köp, och loggen säger vilka som fattas.
 >
-> **Personnummer på fakturan.** För en enskild firma är organisationsnumret ditt personnummer (och ett momsregistreringsnummer är `SE` + personnumret + `01`). Det står då på varje faktura och i appen. Det är så det fungerar för enskild firma, men var medveten om det.
+> **Personnummer på fakturan – frivilligt tills vidare.** För en enskild firma är organisationsnumret ditt personnummer. Sätter du `VITE_SELLER_ORGNR` står det i appen, i villkoren och på varje faktura. Distansavtalslagen (2 kap. 2 §) kräver säljarens namn, adress, telefon och e-post; e-handelslagen (8 §) kräver ett registreringsnummer om firman finns i handelsregistret (hos Bolagsverket). Såvitt vi vet behöver en enskild firma som **inte** är registrerad där inte visa personnumret – men det är **inte kontrollerat av en jurist**. Fråga Verksamt eller en jurist, och lämna variabeln tom om du får klartecken. Observera: är firman momsregistrerad innehåller momsregistreringsnumret (`VITE_SELLER_VAT`, `SE` + personnumret + `01`) ändå personnumret, och det måste stå på fakturan.
 
 **Serverfunktionerna** (hemliga, markera som hemliga om din plan har det):
 
@@ -225,40 +229,34 @@ LICENSE_PRIVATE_KEY=… VITE_LICENSE_PUBLIC_KEY=… node scripts/issue-license.m
 | --- | --- | --- |
 | Checkout Sessions | Write | Starta köp, läsa köp och söka köp för "Hämta min licensnyckel igen" |
 | Prices | Read | Kontrollera priset |
-| Payment Intents | Write | Spara licensnyckeln och spärrmarkeringen på betalningen |
+| Payment Intents | Write | Spara licensnyckeln och köpets status (`lagom_status`) på betalningen |
 | Charges | Read | Se om köpet är återbetalt eller bestritt |
 | Refunds | Read | Spärrlistan |
 | Disputes | Read | Spärrlistan och kontroll av tvister |
-| Invoices | Read | Fakturanumret i "Hämta min licensnyckel igen" |
 
 3. Driftsätt. `VITE_*`-variabler byggs in i appen, så efter en ändring behövs ett nytt bygge (**Deploys → Trigger deploy**).
 
 #### Anropsbegränsning
 
-Funktionerna har en enkel begränsning per IP-adress i minnet, men Netlify kan köra flera kopior samtidigt. Det hårdare skyddet är Netlifys **rate limiting**, som står i `netlify.toml` som egna `[[redirects]]`-regler före den allmänna `/api/*`-regeln (Netlify använder den första regel som matchar och svarar `429` över gränsen):
+Funktionerna har en enkel begränsning per IP-adress i minnet, men Netlify kan köra flera kopior samtidigt. Det hårdare skyddet är Netlifys **rate limiting**, som står i varje funktion (`export const config = { path, rateLimit }` i `netlify/functions/*.mts`). En funktion med egen `path` nås **bara** på `/api/<namn>` – inte via `/.netlify/functions/<namn>` – så gränserna går inte att kringgå. Över gränsen svarar Netlify `429`.
 
-| Adress | Gräns per IP-adress | Varför |
+| Adress | Gräns | Varför |
 | --- | --- | --- |
-| `/api/create-checkout` | 10 per minut | Skapar köp i Stripe |
-| `/api/verify-purchase` | 30 per minut | Tacksidan frågar flera gånger medan betalningen blir klar |
-| `/api/recover-license` | 5 per 3 minuter | Skyddar mot att någon provar sig fram med e-post och kvittonummer |
-| `/api/recipe-fetch` | 10 per minut | Hämtar andra webbplatser åt appen |
+| `/api/create-checkout` | 10 per minut och IP-adress | Skapar köp i Stripe |
+| `/api/verify-purchase` | 30 per minut och IP-adress | Tacksidan frågar flera gånger medan betalningen blir klar |
+| `/api/recover-license` | 20 per 3 minuter för **hela webbplatsen** (plus 5 per 10 minuter per IP-adress och 10 per timme per e-postadress i funktionen) | Skyddar mot att någon provar sig fram med e-post och kvittonummer – även från många adresser |
+| `/api/recipe-fetch` | 10 per minut och IP-adress | Hämtar andra webbplatser åt appen. Kräver dessutom appens ursprung (Origin) – anrop från curl och skript nekas. |
+| `/api/license-revocations` | 60 per minut och IP-adress | Spärrlistan (svaret cachas en timme) |
+| `/api/stripe-webhook` | ingen | Stripe skickar händelser i klump; signaturen kontrolleras alltid |
 
-Syntaxen (kontrollera mot Netlifys dokumentation om rate limiting om den ändras):
+**Kontrollera efter första driftsättningen** (byt `<din adress>`):
 
-```toml
-[[redirects]]
-  from = "/api/recover-license"
-  to = "/.netlify/functions/recover-license"
-  status = 200
-  force = true
-  [redirects.rate_limit]
-    window_limit = 5
-    window_size = 180
-    aggregate_by = ["ip", "domain"]
+```bash
+curl -i https://<din adress>/.netlify/functions/recover-license   # ska ge 404
+curl -i https://<din adress>/api/license-revocations?x=1          # ska ge 400
 ```
 
-`window_size` får vara 1–180 sekunder. Om din Netlify-plan inte godtar reglerna vid driftsättningen: ta bort blocken `[redirects.rate_limit]` (den allmänna `/api/*`-regeln fungerar ändå) och lägg i stället in samma gränser under **Site configuration → Rate limiting** om din plan har det. Begränsningen i funktionernas minne gäller alltid.
+Om din Netlify-plan har ett tak för antalet regler, eller inte godtar en regel: driftsättningsloggen säger det. Ta då bort `rateLimit` ur den funktion det gäller (adressen `path` ska stå kvar) – begränsningen i funktionernas minne gäller alltid. Lägg inga `[[redirects]]` för `/api/` i `netlify.toml`: de skulle peka på `/.netlify/functions/…`, som inte längre finns.
 
 ### 7. Webhook (rekommenderad)
 
@@ -271,7 +269,7 @@ I Stripe: **Developers → Webhooks → Add endpoint** (i nyare dashboard under 
   - `charge.dispute.funds_withdrawn`, `charge.dispute.closed` – följa upp tvister (en vunnen tvist tar bort spärren)
 - Kopiera _Signing secret_ (`whsec_…`) till `STRIPE_WEBHOOK_SECRET`.
 
-Webhooken kontrollerar Stripes signatur (HMAC-SHA256, högst fem minuter gammal), utfärdar licensen för betalda Lagom-köp och sparar den på betalningen – även om kunden stängde fliken. Vid full återbetalning eller tvist sätter den `lagom_revoked = 1` på betalningen. Loggen innehåller bara id:n, plan, belopp och status, inga personuppgifter. Testläget och skarpt läge har olika webhooks och olika hemligheter.
+Webhooken kontrollerar Stripes signatur (HMAC-SHA256, högst fem minuter gammal), utfärdar licensen för betalda Lagom-köp och sparar den på betalningen – även om kunden stängde fliken. Vid full återbetalning eller tvist skriver den `lagom_status` på betalningen (bara information – spärren räknas fram ur Stripes återbetalningar och tvister, se [spärrlistan](#återbetalda-köp-och-spärrlistan)). Loggen innehåller bara id:n, plan, belopp och status, inga personuppgifter. Testläget och skarpt läge har olika webhooks och olika hemligheter.
 
 Spärren fungerar även utan webhook – verifieringen och spärrlistan läser återbetalningar och tvister direkt från Stripe – men markeringen gör det lätt att se i Stripes dashboard.
 
@@ -302,7 +300,7 @@ Innan du börjar sälja, i **skarpt läge** med alla uppgifter ifyllda:
 
 ## Testa med Stripes testläge
 
-1. Använd Stripes **testnycklar** (`sk_test_…`/`rk_test_…`), priser skapade i **testläget** och ett **testnyckelpar** för licenserna. Sätt `VITE_COMMERCE_MODE=live` i förhandsversionen så att hela flödet används.
+1. Använd Stripes **testnycklar** (`sk_test_…`/`rk_test_…`), priser skapade i **testläget** och ett **testnyckelpar** för licenserna – **aldrig** samma `LICENSE_PRIVATE_KEY` som i produktionen. Sätt `VITE_COMMERCE_MODE=live` i förhandsversionen så att hela flödet används. (Förhandsversionen godtar licenser från testkort tack vare `VITE_ACCEPT_TEST_PURCHASES=1` i `netlify.toml`.)
 2. Köp med testkort:
    - `4242 4242 4242 4242` – godkänns (valfritt framtida datum, valfri CVC)
    - `4000 0025 0000 3155` – kräver 3D Secure-verifiering
@@ -317,8 +315,8 @@ Innan du börjar sälja, i **skarpt läge** med alla uppgifter ifyllda:
    - [ ] Avbryter du i Checkout kommer du tillbaka till köpsidan och inget dras.
    - [ ] Webhooken svarar 200 (Stripe visar varje leverans).
    - [ ] Licensen fungerar i flygplansläge.
-   - [ ] "Tappat nyckeln?" med köpets e-post och kvittonummer (eller köp-id:t `cs_test_…`) ger samma nyckel.
-   - [ ] Efter en full återbetalning: tacksidan svarar 410, betalningen har `lagom_revoked = 1` och `/api/license-revocations` innehåller köp-id:t.
+   - [ ] "Tappat nyckeln?" med köpets e-post och kvittonummer (eller köp-id:t `cs_test_…`) ger samma nyckel. Fakturanumret godtas inte (det är löpande och går att gissa).
+   - [ ] Efter en full återbetalning: tacksidan svarar 410, betalningen har `lagom_status = aterbetald` och `/api/license-revocations` har en post till (köp-id:t står där som en hash, se [spärrlistan](#återbetalda-köp-och-spärrlistan)).
 
 **Lokalt:** installera Netlify CLI (`npm install -g netlify-cli`), lägg variablerna i `.env.local` (ignoreras av git) och kör `netlify dev`. Appen och funktionerna nås då på `http://localhost:8888`. Webhooks lokalt: `stripe listen --forward-to localhost:8888/api/stripe-webhook` (Stripe CLI skriver ut en `whsec_…` att använda). Om säkerhetsheadersna i `netlify.toml` stör Vites utvecklingsserver: kör `npm run build` och sedan `netlify dev --dir dist`.
 
@@ -337,6 +335,14 @@ curl -s https://<din adress>/api/license-revocations
 # → {"token":"LAGOMREV1.…","issuedAt":…}
 ```
 
+### Testköp i produktionen – och skarpa köp i förhandsversioner
+
+Ett köp med Stripes testkort (`4242 …`) får aldrig bli en giltig licens i den skarpa appen, inte ens om en förhandsversion av misstag delar `LICENSE_PRIVATE_KEY` med produktionen:
+
+- **Servern** vägrar lämna ut en licens för ett testköp (`livemode: false`) i produktionen (`ej-konfigurerad`, och loggen säger varför) – utom när `LAGOM_ALLOW_TEST_COMMERCE=1` är satt för funktionerna före lanseringen. Omvänt ger ett skarpt köp ingen licens i en förhandsversion eller ett grenbygge.
+- **Appen** underkänner i skarpt läge licenser vars köp-id börjar med `cs_test_` (”Det här är en testlicens och gäller inte i den riktiga appen.”). Bara förhandsversioner och grenbyggen godtar dem (`VITE_ACCEPT_TEST_PURCHASES=1` i `netlify.toml`), och byggkontrollen stoppar ett produktionsbygge med den flaggan.
+- Använd ändå **olika nyckelpar** för test och skarpt läge (Netlify: _Different value for each deploy context_).
+
 ---
 
 ## Gå live – checklista
@@ -344,7 +350,7 @@ curl -s https://<din adress>/api/license-revocations
 **Företaget och uppgifterna**
 
 - [ ] Enskild firma anmäld hos Skatteverket (F-skatt). Kontrollera om du ska vara momsregistrerad eller momsbefriad (steg 4). Registrering hos Bolagsverket är oftast frivillig för enskild firma – läs mer på verksamt.se.
-- [ ] Säljarens uppgifter satta i Netlify med scope **Builds och Functions**: `VITE_SELLER_NAME`, `VITE_SELLER_ORGNR`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE`, en riktig `VITE_SUPPORT_EMAIL` (inte `…@example.invalid`) och `VITE_SELLER_VAT` om du är momsregistrerad.
+- [ ] Säljarens uppgifter satta i Netlify med scope **Builds och Functions**: `VITE_SELLER_NAME`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE`, en riktig `VITE_SUPPORT_EMAIL` (inte `…@example.invalid`) och `VITE_SELLER_VAT` om du är momsregistrerad. `VITE_SELLER_ORGNR` (personnumret för enskild firma) bara om Verksamt eller en jurist säger att det behövs – se rutan i steg 6.
 
 **Stripe (skarpt läge)**
 
@@ -360,13 +366,14 @@ curl -s https://<din adress>/api/license-revocations
 **Nycklar och bygge**
 
 - [ ] **Nytt skarpt nyckelpar** → `VITE_LICENSE_PUBLIC_KEY` och `LICENSE_PRIVATE_KEY` för _Production_, med säker kopia. (Licenser från testperioden slutar då gälla – så ska det vara.)
-- [ ] `VITE_COMMERCE_MODE=live`, `VITE_DISTRIBUTION=web` och `APP_URL` är satta. `LAGOM_ALLOW_TEST_COMMERCE` är **borttagen**. Nytt bygge gjort (bygget stoppas om något fattas).
-- [ ] Anropsbegränsningen i `netlify.toml` godtogs vid driftsättningen (se [Anropsbegränsning](#anropsbegränsning)).
+- [ ] `VITE_COMMERCE_MODE=live`, `VITE_DISTRIBUTION=web` och `APP_URL` är satta. `LAGOM_ALLOW_TEST_COMMERCE` är **borttagen**, och `VITE_ACCEPT_TEST_PURCHASES` är inte satt för _Production_. Nytt bygge gjort (bygget stoppas om något fattas).
+- [ ] Anropsbegränsningen i funktionerna godtogs vid driftsättningen, och `/.netlify/functions/recover-license` ger 404 (se [Anropsbegränsning](#anropsbegränsning)).
+- [ ] **Uppdateringsfrågan:** den första versionen med "En ny version av Lagom finns – Uppdatera" tar över direkt från den gamla versionen (`public/sw-overgang.js`). Kontrollera efter driftsättningen att en öppen flik med den gamla versionen laddas om till den nya inom någon minut.
 
 **Villkor och integritet**
 
-- [ ] **Köpvillkor** publicerade (`/villkor/`) och angivna i `TERMS_URL`, `VITE_TERMS_URL` och i Stripe. `TERMS_VERSION` stämmer med versionen i villkoren. De bör innehålla: säljarens namn, organisationsnummer, adress och e-post; pris inklusive moms; vad licensen ger och hur länge; att årslicensen **inte förnyas automatiskt**; vad livstid betyder (för alltid, felrättningar ingår); att leveransen sker direkt och att ångerrätten då upphör; reklamation och kontakt; att tvister kan prövas av Allmänna reklamationsnämnden (ARN).
-- [ ] **Integritetspolicy:** följ checklistan i [`docs/INTEGRITETSPOLICY.md`](INTEGRITETSPOLICY.md) och publicera den (`/integritet/`). Observera att licensnyckeln innehåller köpets id (köp-id). Köp-id:t kan kopplas till betalningen i Stripe och därmed till kunden, så nyckeln räknas som en (pseudonymiserad) personuppgift – även om den inte innehåller namn eller e-post. Spärrlistan innehåller köp-id för återbetalda köp men inga namn eller e-postadresser.
+- [ ] **Köpvillkor** publicerade (`/villkor/`) och angivna i `TERMS_URL`, `VITE_TERMS_URL` och i Stripe. `TERMS_VERSION` stämmer med versionen i villkoren. De bör innehålla: säljarens namn, adress, telefon och e-post (organisationsnummer om det ska visas); pris inklusive moms; vad licensen ger och hur länge; att årslicensen **inte förnyas automatiskt**; vad livstid betyder (för alltid, felrättningar ingår); att leveransen sker direkt och att ångerrätten då upphör; reklamation och kontakt; att tvister kan prövas av Allmänna reklamationsnämnden (ARN).
+- [ ] **Integritetspolicy:** följ checklistan i [`docs/INTEGRITETSPOLICY.md`](INTEGRITETSPOLICY.md) och publicera den (`/integritet/`). Observera att licensnyckeln innehåller köpets id (köp-id). Köp-id:t kan kopplas till betalningen i Stripe och därmed till kunden, så nyckeln räknas som en (pseudonymiserad) personuppgift – även om den inte innehåller namn eller e-post. Spärrlistan innehåller hashar av köp-id för återbetalda köp men inga namn eller e-postadresser.
 - [ ] **Bokföring:** Stripes utbetalningar, avgifter och eventuella återbetalningar bokförs; spara underlagen i sju år. Momsen redovisas (om du är momsregistrerad).
 
 **Sista kontrollen**
@@ -416,7 +423,7 @@ Appen kan ha flera publika nycklar (`VITE_LICENSE_PUBLIC_KEYS`, kommaseparerade,
 En licens från ett köp som har **återbetalats helt** eller **bestridits** (tvist där pengarna har dragits tillbaka från dig) gäller inte:
 
 - `/api/verify-purchase` och `/api/recover-license` lämnar inte ut nyckeln (410 `aterbetald`: _"Köpet har återbetalats och licensen gäller inte längre. Hör av dig om det är fel."_).
-- `/api/license-revocations` publicerar en **signerad spärrlista** (`LAGOMREV1.…`, signerad med `LICENSE_PRIVATE_KEY`) med köp-id:n för återbetalda och bestridda köp, plus `LICENSE_REVOKED_IDS`. Ett återbetalt **livstidsköp** står kvar i listan för alltid (annars skulle nyckeln börja gälla igen). **Årslicenser** tas bara med från köp de senaste 400 dagarna – äldre har ändå gått ut. Appen hämtar listan ungefär en gång per dygn när den är online, kontrollerar signaturen och sparar den. En nyckel vars köp-id (eller nyckelhash) finns i listan visas som återkallad; all data finns kvar och kan ses, exporteras och raderas.
+- `/api/license-revocations` publicerar en **signerad spärrlista** (`LAGOMREV1.…`, format `v: 2`, signerad med `LICENSE_PRIVATE_KEY`) för återbetalda och bestridda köp, plus `LICENSE_REVOKED_IDS`. Köp-id:n står bara som **hashar** (SHA-256, base64url) – aldrig i klartext, eftersom köp-id:t är det som `/api/verify-purchase` kräver för att lämna ut nyckeln. Adressen svarar bara utan frågeparametrar (annars 400), så att ingen kan förbigå cachen. Ett återbetalt **livstidsköp** står kvar i listan för alltid (annars skulle nyckeln börja gälla igen). **Årslicenser** tas bara med från köp de senaste 400 dagarna – äldre har ändå gått ut. Appen hämtar listan ungefär en gång per dygn när den är online, kontrollerar signaturen och sparar den. En nyckel vars köp-id (eller nyckelhash) finns i listan visas som återkallad; all data finns kvar och kan ses, exporteras och raderas.
 - **Ingen databas:** listan räknas fram ur Stripes återbetalningar och tvister. Den cachas i en timme (och funktionen minns den i tio minuter), så det kan ta upp till ett dygn innan en återbetalning når en app som är online.
 
 Regler:
@@ -427,14 +434,15 @@ Regler:
 | Delvis återbetalt, t.ex. prisavdrag vid en reklamation | Gäller |
 | Tvist med status _needs response_, _under review_, _lost_ eller _prevented_ | Spärrad |
 | Förfrågan (_warning_…_) eller vunnen tvist (_won_) | Gäller |
-| `lagom_revoked = 1` på betalningen (webhooken eller du) | Lämnas inte ut igen. En nyckel som redan är aktiverad stoppas bara av spärrlistan – som bygger på återbetalningar och tvister, inte på markeringen. Spärrar du utan återbetalning: använd `LICENSE_REVOKED_IDS` (nedan). |
+| `lagom_revoked = 1` på betalningen (bara du sätter den) | Lämnas inte ut igen. En nyckel som redan är aktiverad stoppas bara av spärrlistan – som bygger på återbetalningar och tvister, inte på markeringen. Spärrar du utan återbetalning: använd `LICENSE_REVOKED_IDS` (nedan). |
+| Köp-id i `LICENSE_REVOKED_IDS` | Spärrad: står i spärrlistan och lämnas inte ut igen av `/api/verify-purchase` eller "Tappat nyckeln?". |
 | `lagom_revoked = 0` på betalningen | **Gäller alltid** – ditt undantag, t.ex. om du återbetalar av goodwill och kunden får behålla licensen |
 
-Markeringen sätter du i Stripe under **Payments → betalningen → Metadata**. Webhooken ändrar aldrig en `0`, så du kan sätta den före eller efter återbetalningen.
+Markeringen sätter du i Stripe under **Payments → betalningen → Metadata**. `lagom_revoked` är **bara för dina manuella beslut** – webhooken rör den aldrig. Webhooken skriver i stället `lagom_status` (`aterbetald`, `bestriden`, `tvist-vunnen`, `tvist-forlorad`, `forfragan-stangd`) som information. Själva spärren räknas alltid fram ur Stripes återbetalningar och tvister, så en händelse som kommer i fel ordning kan varken spärra en vunnen tvist eller häva din spärr.
 
 **Spärra en licens utan återbetalning** (t.ex. en nyckel som har delats öppet på nätet, eller en manuell licens): lägg köp-id:t (`cs_live_…` eller `lic_…`) i `LICENSE_REVOKED_IDS` och driftsätt på nytt. Sätt gärna också `lagom_revoked = 1` på betalningen, så att nyckeln inte lämnas ut igen.
 
-Licens-id i listan är köp-id:t, som är samma för alla nycklar som har utfärdats för ett köp. Listan kan också innehålla en nyckelhash: SHA-256 (base64url) av hela nyckelsträngen, samma som `licenseIdOf` i `netlify/lib/licensing.ts` och `licenseKeyHash` i appen.
+Posterna i listan är hashar av köp-id:t (`purchaseIdHash` i `src/lib/license.ts`), som är samma för alla nycklar som har utfärdats för ett köp. Listan kan också innehålla en nyckelhash: SHA-256 (base64url) av hela nyckelsträngen, samma som `licenseIdOf` i `netlify/lib/licensing.ts` och `licenseKeyHash` i appen. Appar med en äldre version (som bara förstår `v: 1`) behåller sin sparade lista tills de uppdateras.
 
 ---
 
@@ -446,7 +454,7 @@ Licens-id i listan är köp-id:t, som är samma för alla nycklar som har utfär
 2. Flytta dagboken med **Inställningar → Data → Säkerhetskopia**: spara på den gamla enheten och återställ på den nya.
 3. Har kunden kvar länken till tacksidan ger den samma nyckel igen.
 
-**Kunden har tappat nyckeln.** På webben finns **"Tappat nyckeln?"**: kunden skriver e-postadressen från köpet och kvittonumret (t.ex. `1234-5678` från Stripes kvittomejl), fakturanumret eller köp-id:t (`cs_live_…`), och får samma nyckel igen (`/api/recover-license`). Fel e-post och fel nummer ger samma svar och samma svarstid, så det går inte att ta reda på vem som har köpt. Hittas inget köp – t.ex. om kunden skrev e-postadressen med andra stora och små bokstäver än vid köpet – kan du hjälpa till: sök upp betalningen i Stripe (t.ex. på kundens e-post) och kopiera `lagom_license` från betalningens metadata. Finns den inte där: ta köpets id (`cs_live_…`) och anropa `/api/verify-purchase` enligt curl-exemplet ovan.
+**Kunden har tappat nyckeln.** På webben finns **"Tappat nyckeln?"**: kunden skriver e-postadressen från köpet och kvittonumret (t.ex. `1234-5678` från Stripes kvittomejl) eller köp-id:t (`cs_live_…`), och får samma nyckel igen. Fakturanumret godtas inte – Stripes fakturanummer är löpande och går att gissa (`/api/recover-license`). Fel e-post och fel nummer ger samma svar och samma svarstid, så det går inte att ta reda på vem som har köpt. Hittas inget köp – t.ex. om kunden skrev e-postadressen med andra stora och små bokstäver än vid köpet – kan du hjälpa till: sök upp betalningen i Stripe (t.ex. på kundens e-post) och kopiera `lagom_license` från betalningens metadata. Finns den inte där: ta köpets id (`cs_live_…`) och anropa `/api/verify-purchase` enligt curl-exemplet ovan.
 
 **Utfärda en licens manuellt** (reklamation, presskod, förlängd provperiod):
 
@@ -518,7 +526,7 @@ Kropp: `{ "sessionId": "cs_…" }`.
 
 ### `POST /api/recover-license`
 
-Kropp: `{ "email": "…", "receipt": "…" }` där `receipt` är kvittonumret, fakturanumret eller köp-id:t.
+Kropp: `{ "email": "…", "receipt": "…" }` där `receipt` är kvittonumret eller köp-id:t (fakturanumret godtas inte).
 
 | Status | Kod | När |
 | --- | --- | --- |

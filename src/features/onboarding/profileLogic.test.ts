@@ -10,6 +10,7 @@ import {
   hasErrors,
   isDraftComplete,
   isMinor,
+  UNDER_AGE_TEXT,
   lossBlockReason,
   maxRateFor,
   minHealthyWeight,
@@ -52,13 +53,14 @@ describe('validering av Om dig', () => {
     expect(validateAbout(draft(), TODAY)).toEqual({})
   })
 
-  it('födelseår: fyra siffror, inte i framtiden och minst 13 år', () => {
+  it('födelseår: fyra siffror, inte i framtiden och 18 år (Lagom är gjord för vuxna)', () => {
     expect(validateBirthYear(undefined, TODAY)).toMatch(/Fyll i/)
-    expect(validateBirthYear(2015, TODAY)).toMatch(/kan användas från 13 år/)
-    // Född 2013 kan vara 12 år i september 2026 – släpps inte igenom för tidigt.
-    expect(validateBirthYear(2013, TODAY)).toMatch(/kan användas från 13 år/)
-    expect(validateBirthYear(2013, '2026-12-31')).toBeUndefined()
-    expect(validateBirthYear(2012, TODAY)).toBeUndefined()
+    expect(validateBirthYear(2015, TODAY)).toBe(UNDER_AGE_TEXT)
+    expect(validateBirthYear(2010, TODAY)).toBe(UNDER_AGE_TEXT)
+    expect(validateBirthYear(2009, '2026-12-31')).toBe(UNDER_AGE_TEXT)
+    // Den som fyller 18 i år släpps in – säkerhetsreglerna räknar ändå försiktigt (isMinor).
+    expect(validateBirthYear(2008, TODAY)).toBeUndefined()
+    expect(validateBirthYear(2007, TODAY)).toBeUndefined()
     expect(validateBirthYear(1950, TODAY)).toBeUndefined()
   })
 
@@ -72,9 +74,9 @@ describe('validering av Om dig', () => {
     expect(validateBirthYear(1850, TODAY)).toBe('Ange ett födelseår mellan 1916 och 2026.')
     expect(validateBirthYear(1915, TODAY)).toBe('Ange ett födelseår mellan 1916 och 2026.')
     expect(validateBirthYear(1916, TODAY)).toBeUndefined()
-    // Vänlig text för de yngsta – Lagom är gjord för vuxna.
+    // Vänlig text för de yngre – Lagom är gjord för vuxna.
     expect(validateBirthYear(2016, TODAY)).toBe(
-      'Lagom är gjord för vuxna och kan användas från 13 år. Funderar du på mat och hälsa – prata gärna med en vuxen eller skolsköterskan.',
+      'Lagom är gjord för vuxna, 18 år och äldre. Funderar du på mat och hälsa – prata gärna med en vuxen, skolsköterskan eller 1177.',
     )
   })
 
@@ -93,10 +95,13 @@ describe('validering av Om dig', () => {
     expect(validateWeight(72.4)).toBeUndefined()
   })
 
-  it('känner igen minderåriga (13–17 år)', () => {
-    expect(isMinor(draft({ birthYear: 2010 }), TODAY)).toBe(true)
+  it('känner igen den som får använda Lagom men kan vara 17 år', () => {
+    // Född 2008 fyller 18 i år men kan fortfarande vara 17 i september.
     expect(isMinor(draft({ birthYear: 2008 }), TODAY)).toBe(true)
+    expect(isMinor(draft({ birthYear: 2008 }), '2026-12-31')).toBe(false)
     expect(isMinor(draft({ birthYear: 2007 }), TODAY)).toBe(false)
+    // Yngre än så kan inte använda Lagom – då visas felet för födelseåret i stället.
+    expect(isMinor(draft({ birthYear: 2010 }), TODAY)).toBe(false)
   })
 })
 

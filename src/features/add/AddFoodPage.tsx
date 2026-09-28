@@ -566,29 +566,49 @@ function lastAmount(usage: Readonly<Record<string, FoodUsage>>, food: Food): { a
 // ---------------------------------------------------------------------------
 
 function DateButton({ date, today, onChange }: { date: string; today: string; onChange: (date: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const label = relativeDayLabel(date, today)
+  // En synlig knapp som öppnar webbläsarens datumväljare. Själva datumfältet är dolt och utanför
+  // tabbordningen – annars hamnar fokus på fältets dolda delar (dag, månad, år) en efter en.
+  const openPicker = () => {
+    const el = inputRef.current
+    if (!el) return
+    try {
+      if (typeof el.showPicker === 'function') {
+        el.showPicker()
+        return
+      }
+    } catch {
+      /* t.ex. äldre Safari – fall tillbaka nedan */
+    }
+    el.focus()
+    el.click()
+  }
   return (
-    <label className="relative -ml-1 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-ink-2 transition-colors focus-within:ring-2 focus-within:ring-gran hover:bg-surface-3 hover:text-ink">
-      <CalendarDays className="size-3.5" aria-hidden />
-      <span>{relativeDayLabel(date, today)}</span>
-      <ChevronDown className="size-3.5" aria-hidden />
+    <span className="relative -ml-1 inline-flex">
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label={`Dag: ${label}. Byt dag`}
+        // 32 px synlig chip, 8 px extra upp och ned ger en tryckyta på minst 44 px.
+        className="relative inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-ink-2 transition-colors after:absolute after:inset-x-0 after:-inset-y-2 hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gran"
+      >
+        <CalendarDays className="size-3.5" aria-hidden />
+        <span>{label}</span>
+        <ChevronDown className="size-3.5" aria-hidden />
+      </button>
       <input
+        ref={inputRef}
         type="date"
+        tabIndex={-1}
+        aria-hidden="true"
         value={date}
         onChange={(e) => {
           if (e.target.value) onChange(e.target.value)
         }}
-        onClick={(e) => {
-          try {
-            e.currentTarget.showPicker?.()
-          } catch {
-            /* stöds inte – webbläsarens egen väljare öppnas ändå */
-          }
-        }}
-        aria-label={`Dag: ${relativeDayLabel(date, today)}. Byt dag`}
-        // Osynligt fält över chippen – 6 px extra upp och ned ger 44 px tryckyta.
-        className="absolute inset-x-0 -inset-y-1.5 cursor-pointer opacity-0"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-px w-px opacity-0"
       />
-    </label>
+    </span>
   )
 }
 

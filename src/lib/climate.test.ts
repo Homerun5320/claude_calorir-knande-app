@@ -249,7 +249,7 @@ describe('swapSuggestions', () => {
     expect(s.savingKg).toBeCloseTo(5.2)
   })
 
-  it('föreslår inget för klimatsmarta val eller små mängder', () => {
+  it('föreslår inget för val med lågt klimatavtryck eller små mängder', () => {
     expect(swapSuggestions([entry(kycklingfars, 150), entry(potatis, 300)])).toEqual([])
     expect(swapSuggestions([entry(food('Smör', 'fett_olja'), 5)])).toEqual([])
     expect(swapSuggestions([entry(food('Kycklingkorv', 'chark'), 100)])).toEqual([])

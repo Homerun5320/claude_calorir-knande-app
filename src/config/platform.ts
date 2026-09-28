@@ -27,8 +27,16 @@ export function parseDistribution(value: string | undefined): Distribution | nul
 // `import.meta.env` finns inte när filen körs utanför Vite (t.ex. i en Netlify-funktion).
 const env: Record<string, string | undefined> = (import.meta.env as Record<string, string | undefined> | undefined) ?? {}
 
-/** Vilken butik (eller webben) bygget är gjort för. Ogiltiga värden stoppas av byggkontrollen. */
-export const DISTRIBUTION: Distribution = parseDistribution(env.VITE_DISTRIBUTION) ?? 'web'
+/** Sätts av vite.config.ts (`define`); finns inte i testerna eller i serverfunktionerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * Vilken butik (eller webben) bygget är gjort för. Ogiltiga värden stoppas av byggkontrollen.
+ * I bygget är värdet en konstant (`__LAGOM_DISTRIBUTION__`, vite.config.ts), så att kod som bara
+ * gäller webben kan tas bort ur butiksappens paket; i testerna läses VITE_DISTRIBUTION.
+ */
+export const DISTRIBUTION: Distribution =
+  (typeof __LAGOM_DISTRIBUTION__ === 'string' ? parseDistribution(__LAGOM_DISTRIBUTION__) : parseDistribution(env.VITE_DISTRIBUTION)) ?? 'web'
 
 /** true i byggen för App Store och Google Play. */
 export const IS_STORE_BUILD = DISTRIBUTION !== 'web'
@@ -168,6 +176,11 @@ function isNativeIos(): boolean {
     /* faller tillbaka på webbläsarens uppgifter */
   }
   return isIosUserAgent()
+}
+
+/** iPhone eller iPad – webbläsaren eller den inbyggda appen (t.ex. för "Spara i Filer"). */
+export function isIosDevice(): boolean {
+  return isNativeIos() || isIosUserAgent()
 }
 
 /** Webbköp med Stripe erbjuds här: webbversionen i en vanlig webbläsare, med webbförsäljningen på. */

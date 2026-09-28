@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { isAppleWebKit, isInApp, isStandalone } from '../../config/platform'
+import { useDemoData } from '../../hooks/useDemoData'
 
 export const LAST_BACKUP_KEY = 'lagom-last-backup'
 /** Påminn om säkerhetskopia efter så här många dagar. */
@@ -115,7 +116,9 @@ export function usePersistedStorage(): boolean | null {
 export function useBackupDue(hasData: boolean, now: number = Date.now()): boolean {
   const last = useLastBackup()
   const persisted = usePersistedStorage()
-  return backupDue(last, now, hasData, { safariTab: isSafariBrowserTab(), persisted })
+  // Exempeldata är påhittad – ingen påminnelse om att säkerhetskopiera den.
+  const demo = useDemoData()
+  return backupDue(last, now, hasData && !demo, { safariTab: isSafariBrowserTab(), persisted })
 }
 
 function subscribe(listener: () => void) {

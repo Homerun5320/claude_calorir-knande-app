@@ -38,6 +38,7 @@ import { TRIAL_DAYS } from '../../config/commerce'
 import { storagePlace } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { daysText, priceSummaryText } from '../premium/premiumLogic'
+import { usePriceSummaryText } from '../premium/useStorePrices'
 import {
   DIET_OPTIONS,
   GOAL_CHOICES,
@@ -102,20 +103,24 @@ export function StepHeading({
 /** Vad som gäller efter provperioden – samma mening i välkomststeget och sammanfattningen. */
 export const AFTER_TRIAL_TEXT = 'Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.'
 
-const PROMISES: ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
-  { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
-  {
-    icon: Gift,
-    tone: 'lingon',
-    title: `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
-    // Kronpriser bara där Lagom säljs på webben – i butiksapparna kommer priset från butiken.
-    text: `Sedan väljer du ${priceSummaryText()} – ingen reklam och ingen automatisk förnyelse. ${AFTER_TRIAL_TEXT}`,
-  },
-  { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Inget konto och ingen spårning. Exportera eller radera allt när du vill.' },
-]
+/** Löftena i välkomststeget. `priceText`: priserna efter provperioden (se `usePriceSummaryText`). */
+function promises(priceText: string): ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> {
+  return [
+    { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
+    {
+      icon: Gift,
+      tone: 'lingon',
+      title: `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
+      // Kronpriser där Lagom säljs på webben – i butiksapparna butikens priser (när de har hämtats).
+      text: `Sedan väljer du ${priceText} – ingen reklam och ingen automatisk förnyelse. ${AFTER_TRIAL_TEXT}`,
+    },
+    { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Inget konto och ingen spårning. Exportera eller radera allt när du vill.' },
+  ]
+}
 
 export function WelcomeStep({ today }: { today: ISODate }) {
   const reduce = useReducedMotion()
+  const priceText = usePriceSummaryText()
   return (
     <div>
       <SeasonalHeader date={today} height={224} className="lg:rounded-b-[2rem]" contentClassName="absolute inset-x-0 top-0 px-5 pt-[calc(var(--sa-top)+1.25rem)]">
@@ -136,7 +141,7 @@ export function WelcomeStep({ today }: { today: ISODate }) {
         </motion.h1>
         <p className="mt-3 text-[1.0625rem] leading-relaxed text-ink-2">Varken för mycket eller för lite – gott, varierat och utan skuld.</p>
         <ul className="mt-6 flex flex-col gap-2.5">
-          {PROMISES.map((p, i) => (
+          {promises(priceText).map((p, i) => (
             <motion.li
               key={p.title}
               initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
@@ -497,6 +502,8 @@ export function CareNote() {
 export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) {
   const mindful = draft.goalChoice === 'medvetet'
   const { status } = useAccess()
+  // Ritar om när butikens priser har hämtats – trialNote visar dem före provperioden.
+  usePriceSummaryText()
   const result = useMemo(() => {
     try {
       const profile = buildProfile(draft, { today })

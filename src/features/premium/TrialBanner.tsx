@@ -12,6 +12,7 @@ import { Button, Card, cx } from '../../components/ui'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { daysText, formatLongDate, priceSummaryText, trialBannerLevel } from './premiumLogic'
 import { TRIAL_DAYS } from '../../config/commerce'
+import { LICENSE_ERRORS } from '../../lib/license'
 
 function expiredTitle(status: AccessStatus): string {
   if (status.kind === 'utgangen' && status.revoked) return 'Licensen har återkallats'
@@ -72,7 +73,7 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
         {expiredTitle(status)} – din data finns kvar
       </h2>
       <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        {status.kind === 'utgangen' && status.revoked ? 'Köpet återbetalades, så licensen gäller inte längre. Kontakta support om det är fel. ' : ''}
+        {status.kind === 'utgangen' && status.revoked ? `${LICENSE_ERRORS.aterkallad} ` : ''}
         Du kan se, exportera och radera allt som vanligt. För att logga nytt behöver du en licens: {priceSummaryText()}, utan automatisk förnyelse.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">

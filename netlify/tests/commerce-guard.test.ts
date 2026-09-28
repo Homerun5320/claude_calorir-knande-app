@@ -27,8 +27,12 @@ const seller = () => ({
 const complete = (): Record<string, string | undefined> => ({
   VITE_COMMERCE_MODE: 'live',
   VITE_LICENSE_PUBLIC_KEY: keys.pub,
+  VITE_TERMS_URL: 'https://annasfirma.se/villkor/',
   ...seller(),
 })
+
+/** Ett butiksbygge med köp i appen inkopplade. */
+const READY = { nativePurchasesReady: true }
 
 /** En JWT-liknande sträng (som Supabases äldre nycklar) med given roll. */
 function jwt(role: string): string {
@@ -89,6 +93,27 @@ describe('byggkontrollen för betalningen', () => {
     expect(checkCommerceBuild({ ...complete(), LICENSE_PRIVATE_KEY: keys.priv, STRIPE_SECRET_KEY: 'sk_live_x' }).errors).toEqual([])
   })
 
+  it('privata nycklar i andra format och andra tjänsters hemligheter stoppas också', async () => {
+    const { generateKeyPairSync } = await import('node:crypto')
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+    const pem = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString()
+    const sec1 = (privateKey.export({ format: 'der', type: 'sec1' }) as Buffer).toString('base64')
+    const jwk = JSON.stringify(privateKey.export({ format: 'jwk' }))
+    const values = [
+      pem,
+      sec1,
+      jwk,
+      '{"type":"service_account","private_key":"-----BEGIN PRIVATE KEY-----\\nMIIE…"}',
+      'sk_AbCdEfGhIjKlMnOpQrSt',
+    ]
+    for (const value of values) {
+      const { errors } = checkCommerceBuild({ VITE_LICENSE_PUBLIC_KEY: value })
+      expect(errors.some((e) => e.includes('ser ut att innehålla en hemlighet')), value.slice(0, 30)).toBe(true)
+    }
+    // En publik nyckel är ingen hemlighet.
+    expect(checkCommerceBuild({ VITE_LICENSE_PUBLIC_KEY: keys.pub }).errors).toEqual([])
+  })
+
   it('felmeddelandet om hemligheter nämner Supabases hemliga nyckel', () => {
     const { errors } = checkCommerceBuild({ VITE_SUPABASE_KEY: 'sb_secret_abc123' })
     expect(errors.join(' ')).toContain('SUPABASE_SECRET_KEY')
@@ -113,19 +138,28 @@ describe('byggkontrollen för betalningen', () => {
 })
 
 describe('säljarens uppgifter (distansavtalslagen)', () => {
-  it('skarpt läge utan org.nr stoppas', () => {
-    const { errors } = checkCommerceBuild({ ...complete(), VITE_SELLER_ORGNR: undefined })
-    expect(errors).toHaveLength(1)
-    expect(errors[0]).toContain('VITE_SELLER_ORGNR saknas')
-    expect(errors[0]).toContain('distansavtalslagen')
+  it('org.nr är frivilligt (för enskild firma personnumret) – bara en varning när det saknas', () => {
+    const { errors, warnings } = checkCommerceBuild({ ...complete(), VITE_SELLER_ORGNR: undefined })
+    expect(errors).toEqual([])
+    expect(warnings).toEqual([expect.stringContaining('VITE_SELLER_ORGNR saknas')])
+    expect(warnings[0]).toContain('Verksamt eller en jurist')
+    // En platshållare från mallen stoppas ändå.
+    expect(checkCommerceBuild({ ...complete(), VITE_SELLER_ORGNR: '[Org.nr]' }).errors).toEqual([expect.stringContaining('platshållare')])
   })
 
-  it('alla uppgifter krävs i skarpt läge – namn, e-post, org.nr, adress och telefon', () => {
+  it('namn, e-post, adress och telefon krävs i skarpt läge', () => {
     const res = checkCommerceBuild({ VITE_COMMERCE_MODE: 'live', VITE_LICENSE_PUBLIC_KEY: keys.pub })
-    for (const name of ['VITE_SELLER_NAME', 'VITE_SUPPORT_EMAIL', 'VITE_SELLER_ORGNR', 'VITE_SELLER_ADDRESS', 'VITE_SELLER_PHONE']) {
+    for (const name of ['VITE_SELLER_NAME', 'VITE_SUPPORT_EMAIL', 'VITE_SELLER_ADDRESS', 'VITE_SELLER_PHONE']) {
       expect(res.errors.some((e) => e.startsWith(`${name} saknas`))).toBe(true)
     }
+    expect(res.errors).toHaveLength(4)
     expect(res.errors.every((e) => e.includes('distansavtalslagen'))).toBe(true)
+  })
+
+  it('skarpt läge på webben utan VITE_TERMS_URL ger en varning', () => {
+    const res = checkCommerceBuild({ ...complete(), VITE_TERMS_URL: undefined })
+    expect(res.errors).toEqual([])
+    expect(res.warnings.join(' ')).toContain('VITE_TERMS_URL saknas')
   })
 
   it('en supportadress som bara är ett exempel stoppas', () => {
@@ -191,28 +225,50 @@ describe('distribution och butiksbyggen', () => {
   })
 
   it('App Store utan VITE_API_BASE stoppas', () => {
-    const { errors } = checkCommerceBuild(storeEnv('appstore'))
+    const { errors } = checkCommerceBuild(storeEnv('appstore'), READY)
     expect(errors).toEqual(['Butiksappen når inte serverfunktionerna – sätt VITE_API_BASE till webbplatsens https-adress.'])
   })
 
   it('App Store med http:// stoppas', () => {
-    expect(checkCommerceBuild(storeEnv('appstore', 'http://lagom.example')).errors).toHaveLength(1)
+    expect(checkCommerceBuild(storeEnv('appstore', 'http://lagom.example'), READY).errors).toHaveLength(1)
   })
 
   it('Google Play med https godkänns', () => {
-    expect(checkCommerceBuild(storeEnv('play', 'https://lagom.example'))).toEqual({ errors: [], warnings: [] })
+    expect(checkCommerceBuild(storeEnv('play', 'https://lagom.example'), READY)).toEqual({ errors: [], warnings: [] })
   })
 
   it('butiksbyggen kräver säljarens uppgifter även utan VITE_COMMERCE_MODE=live', () => {
-    const { errors } = checkCommerceBuild({ VITE_DISTRIBUTION: 'appstore', VITE_API_BASE: 'https://lagom.example', VITE_LICENSE_PUBLIC_KEY: keys.pub })
-    expect(errors.length).toBe(5)
+    const { errors } = checkCommerceBuild({ VITE_DISTRIBUTION: 'appstore', VITE_API_BASE: 'https://lagom.example', VITE_LICENSE_PUBLIC_KEY: keys.pub }, READY)
+    expect(errors.length).toBe(4)
     expect(errors.every((e) => e.includes('distansavtalslagen'))).toBe(true)
   })
 
-  it('varnar när butiksbygget saknar publik licensnyckel', () => {
-    const res = checkCommerceBuild({ ...storeEnv('play', 'https://lagom.example'), VITE_LICENSE_PUBLIC_KEY: undefined })
+  it('varnar när Play-bygget saknar publik licensnyckel – men inte App Store-bygget, där nycklar inte används', () => {
+    const res = checkCommerceBuild({ ...storeEnv('play', 'https://lagom.example'), VITE_LICENSE_PUBLIC_KEY: undefined }, READY)
     expect(res.errors).toEqual([])
-    expect(res.warnings.join(' ')).toContain('licensnycklar kan inte aktiveras i appen')
+    expect(res.warnings.join(' ')).toContain('licensnycklar från webbköp kan inte aktiveras i appen')
+    expect(checkCommerceBuild({ ...storeEnv('appstore', 'https://lagom.example'), VITE_LICENSE_PUBLIC_KEY: undefined }, READY)).toEqual({ errors: [], warnings: [] })
+  })
+
+  it('butiksbyggen stoppas tills köp i appen är inkopplade – ett testbygge går med LAGOM_ALLOW_STORE_WITHOUT_IAP=1', () => {
+    for (const d of ['appstore', 'play']) {
+      const stopped = checkCommerceBuild(storeEnv(d, 'https://lagom.example'))
+      expect(stopped.errors).toEqual([expect.stringContaining('Köp i appen är inte inkopplade')])
+      const test = checkCommerceBuild(storeEnv(d, 'https://lagom.example'), { allowStoreWithoutIap: '1' })
+      expect(test.errors).toEqual([])
+      expect(test.warnings).toEqual([expect.stringContaining('aldrig skickas in')])
+    }
+    // Webbygget påverkas inte.
+    expect(checkCommerceBuild(complete()).errors).toEqual([])
+  })
+
+  it('testköp får aldrig godtas i produktionsbyggen eller butiksbyggen', () => {
+    const flag = { VITE_ACCEPT_TEST_PURCHASES: '1' }
+    expect(checkCommerceBuild({ ...complete(), ...flag }, { netlifyContext: 'deploy-preview' }).errors).toEqual([])
+    expect(checkCommerceBuild({ ...complete(), ...flag }, { netlifyContext: 'production' }).errors).toEqual([
+      expect.stringContaining('VITE_ACCEPT_TEST_PURCHASES=1'),
+    ])
+    expect(checkCommerceBuild({ ...storeEnv('play', 'https://lagom.example'), ...flag }, READY).errors).toEqual([expect.stringContaining('VITE_ACCEPT_TEST_PURCHASES=1')])
   })
 })
 
@@ -230,7 +286,7 @@ describe('webbförsäljningen på eller av', () => {
 
 describe('flera publika licensnycklar', () => {
   it('varje nyckel i VITE_LICENSE_PUBLIC_KEYS kontrolleras', () => {
-    const base = { ...seller(), VITE_COMMERCE_MODE: 'live', VITE_LICENSE_PUBLIC_KEY: undefined }
+    const base = { ...seller(), VITE_COMMERCE_MODE: 'live', VITE_TERMS_URL: 'https://annasfirma.se/villkor/', VITE_LICENSE_PUBLIC_KEY: undefined }
     expect(checkCommerceBuild({ ...base, VITE_LICENSE_PUBLIC_KEYS: `${keys.pub}, ${keys2.pub}` })).toEqual({ errors: [], warnings: [] })
     const broken = checkCommerceBuild({ ...base, VITE_LICENSE_PUBLIC_KEYS: `${keys.pub},${keys2.pub.slice(0, -8)}` })
     expect(broken.errors).toEqual([expect.stringContaining('Nyckel 2 i VITE_LICENSE_PUBLIC_KEYS är ingen publik ECDSA P-256-nyckel')])

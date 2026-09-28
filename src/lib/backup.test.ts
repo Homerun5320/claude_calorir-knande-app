@@ -580,6 +580,25 @@ describe('saveFile', () => {
     expect(clicks).toHaveLength(3)
   })
 
+  it('i den inbyggda appen: "failed" i stället för en nedladdning som inte fungerar i webbvyn', async () => {
+    vi.stubGlobal('Capacitor', { isNativePlatform: () => true, getPlatform: () => 'ios' })
+    vi.resetModules()
+    const fresh = await import('./backup')
+    coarse(false)
+    // Ingen delning möjlig: ingen <a download>, och påminnelsen om säkerhetskopia tystnar inte.
+    await expect(fresh.saveFile('kopia.json', '{}')).resolves.toBe('failed')
+    expect(clicks).toHaveLength(0)
+    // Delningen fungerar: 'shared'.
+    defineNavigator('share', vi.fn().mockResolvedValue(undefined))
+    defineNavigator('canShare', () => true)
+    await expect(fresh.saveFile('kopia.json', '{}')).resolves.toBe('shared')
+    // En delning som misslyckas av annat skäl än avbrott laddar inte ned något.
+    defineNavigator('share', vi.fn().mockRejectedValue(new DOMException('Nej', 'NotAllowedError')))
+    await expect(fresh.saveFile('kopia.json', '{}')).resolves.toBe('failed')
+    expect(clicks).toHaveLength(0)
+    vi.resetModules()
+  })
+
   it('rapporterar "failed" när filen inte går att spara', async () => {
     defineUrl('createObjectURL', () => {
       throw new Error('stöds inte')

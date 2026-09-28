@@ -59,6 +59,32 @@ create table public.vaults (
 
 comment on table public.vaults is 'Lagom Moln: ett valv per konto. Bara inslagna (krypterade) nycklar – aldrig lösenfras eller nyckel i klartext.';
 
+-- Tidsstämplarna sätts alltid av databasen – aldrig av appen. Samtycket till behandling av
+-- hälsouppgifter måste gå att visa (art. 7.1 GDPR), så consent_at får inte kunna bakdateras:
+-- den sätts till now() när ett valv skapas med samtycke och när consent_version ändras, och står
+-- annars kvar. updated_at sätts vid varje ändring.
+create or replace function public.vaults_set_times()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at := now();
+  if tg_op = 'INSERT' then
+    new.consent_at := case when new.consent_version is null then null else now() end;
+  elsif new.consent_version is distinct from old.consent_version then
+    new.consent_at := case when new.consent_version is null then null else now() end;
+  else
+    new.consent_at := old.consent_at;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger vaults_set_times
+  before insert or update on public.vaults
+  for each row execute function public.vaults_set_times();
+
 -- -----------------------------------------------------------------------------
 -- sync_items – krypterade poster (fas 1: en enda post, säkerhetskopian)
 -- -----------------------------------------------------------------------------
@@ -115,10 +141,11 @@ comment on table public.webhook_events is 'Behandlade webhook-händelser. Bara s
 -- -----------------------------------------------------------------------------
 revoke all on table public.vaults, public.sync_items, public.entitlements, public.webhook_events from anon, authenticated;
 
--- Valvet: läsa, skapa och ändra bara de här kolumnerna. user_id, seq och bytes_used kan inte sättas.
+-- Valvet: läsa, skapa och ändra bara de här kolumnerna. user_id, seq, bytes_used och tidsstämplarna
+-- (consent_at, updated_at – sätts av vaults_set_times) kan inte sättas av appen.
 grant select on table public.vaults to authenticated;
-grant insert (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version, consent_at, updated_at) on table public.vaults to authenticated;
-grant update (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version, consent_at, updated_at) on table public.vaults to authenticated;
+grant insert (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version) on table public.vaults to authenticated;
+grant update (format, kdf, wrapped_key_passphrase, wrapped_key_recovery, consent_version) on table public.vaults to authenticated;
 
 -- Poster: läsa och radera direkt. Skriva bara via sync_push.
 grant select, delete on table public.sync_items to authenticated;
@@ -160,7 +187,10 @@ create policy entitlements_own on public.entitlements
 -- Svar:    { "applied": [{ "id", "rev", "seq" }], "conflicts": [{ "id", "rev" }] }
 --
 -- En post vars baseRev inte stämmer med nuvarande rev skrivs inte, utan hamnar i conflicts
--- (en annan enhet hann före). Kvoten är 50 000 000 byte totalt och 4 000 000 byte per post.
+-- (en annan enhet hann före). Kvoten är 50 000 000 byte totalt och 4 000 000 byte per post, och
+-- varje post räknas som minst 512 byte (även en gravsten) – annars skulle många små poster fylla
+-- databasen. Högst 16 poster per konto (fas 1 använder bara en: säkerhetskopian; höj gränsen i en
+-- ny migrering när synkningen behöver fler). En gravsten för en post som inte finns ger konflikt.
 -- Ett valv utan samtycke (consent_version saknas) tar inte emot något (42501).
 -- Allt sker i en transaktion med valvraden låst – två samtidiga anrop kan inte krocka.
 create or replace function public.sync_push(p_items jsonb)
@@ -179,6 +209,8 @@ declare
   v_base int;
   v_payload text;
   v_size int;
+  v_cost int;
+  v_count int;
   v_cur_rev int;
   v_cur_size int;
   v_applied jsonb := '[]'::jsonb;
@@ -204,8 +236,8 @@ begin
     raise exception 'Samtycke saknas' using errcode = '42501';
   end if;
 
-  -- Använt utrymme räknas om från posterna (poster kan ha raderats direkt).
-  select coalesce(sum(s.size), 0) into v_bytes from public.sync_items s where s.user_id = v_uid;
+  -- Använt utrymme och antal poster räknas om från posterna (poster kan ha raderats direkt).
+  select coalesce(sum(greatest(s.size, 512)), 0), count(*) into v_bytes, v_count from public.sync_items s where s.user_id = v_uid;
 
   for v_item in select value from jsonb_array_elements(p_items) loop
     if jsonb_typeof(v_item) <> 'object' then
@@ -221,6 +253,8 @@ begin
     if v_size > 4000000 then
       raise exception 'Posten är större än 4 000 000 byte' using errcode = '53400';
     end if;
+    -- Varje post (även en gravsten) räknas som minst 512 byte i kvoten. `size` sparas som den är.
+    v_cost := greatest(v_size, 512);
 
     select s.rev, s.size into v_cur_rev, v_cur_size
       from public.sync_items s
@@ -230,12 +264,20 @@ begin
       v_cur_size := 0;
     end if;
 
-    if v_base <> v_cur_rev then
+    -- Fel revision, eller en gravsten för en post som inte finns: konflikt, inget skrivs.
+    if v_base <> v_cur_rev or (v_payload is null and v_cur_rev = 0) then
       v_conflicts := v_conflicts || jsonb_build_array(jsonb_build_object('id', v_id, 'rev', v_cur_rev));
       continue;
     end if;
 
-    v_bytes := v_bytes - v_cur_size + v_size;
+    if v_cur_rev = 0 then
+      v_count := v_count + 1;
+      if v_count > 16 then
+        raise exception 'För många poster (högst 16 per konto)' using errcode = '53400';
+      end if;
+    end if;
+
+    v_bytes := v_bytes - greatest(v_cur_size, 512) + v_cost;
     if v_bytes > 50000000 then
       raise exception 'Kvoten på 50 000 000 byte är full' using errcode = '53400';
     end if;
@@ -259,7 +301,7 @@ begin
 end;
 $$;
 
-comment on function public.sync_push(jsonb) is 'Lagom Moln: skriv krypterade poster med revisionskontroll, kvot (50 MB totalt, 4 MB per post) och gravstenar.';
+comment on function public.sync_push(jsonb) is 'Lagom Moln: skriv krypterade poster med revisionskontroll, kvot (50 MB totalt, 4 MB per post, minst 512 byte per post, högst 16 poster) och gravstenar.';
 
 -- -----------------------------------------------------------------------------
 -- delete_my_account – radera det egna kontot (valv, poster och köp följer med i kaskad)
@@ -287,5 +329,7 @@ comment on function public.delete_my_account() is 'Lagom Moln: radera det egna k
 -- Varje funktion måste stängas för PUBLIC och anon uttryckligen (se OBS överst i filen).
 revoke execute on function public.sync_push(jsonb) from public, anon;
 revoke execute on function public.delete_my_account() from public, anon;
+-- Triggerfunktionen körs bara av triggern – ingen ska kunna anropa den.
+revoke execute on function public.vaults_set_times() from public, anon, authenticated;
 grant execute on function public.sync_push(jsonb) to authenticated;
 grant execute on function public.delete_my_account() to authenticated;

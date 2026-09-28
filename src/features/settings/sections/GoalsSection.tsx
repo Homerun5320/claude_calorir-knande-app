@@ -209,9 +209,16 @@ function AddSupplementSheet({ open, onClose }: { open: boolean; onClose: () => v
   const over = overUpperLimit(amounts)
   const missing = template.nutrients.some((n) => !(strengths[n.key] !== undefined && (strengths[n.key] as number) >= 0))
   const primary = template.nutrients[0]
+  const name = supplementName(template, cleanStrengths)
+  // Samma tillskott med samma styrka finns redan – annars blir det två likadana bockar på Idag.
+  const customFoods = useFoodStore((s) => s.customFoods)
+  const duplicate = useMemo(() => {
+    const wanted = name.toLocaleLowerCase('sv-SE')
+    return Object.values(customFoods).some((f) => isSupplementFood(f) && f.name.toLocaleLowerCase('sv-SE') === wanted)
+  }, [customFoods, name])
 
   const save = () => {
-    if (missing || !requireAccess('livsmedel')) return
+    if (missing || duplicate || !requireAccess('livsmedel')) return
     const food = supplementFood(template, cleanStrengths)
     useFoodStore.getState().addCustomFood(food)
     toast(`${food.name} är tillagt – bocka av det på Idag`, {
@@ -229,8 +236,8 @@ function AddSupplementSheet({ open, onClose }: { open: boolean; onClose: () => v
       description="Välj tillskott och ange styrkan från din förpackning."
       width="sm"
       footer={
-        <Button fullWidth size="lg" iconLeft={Plus} onClick={save} disabled={missing}>
-          Lägg till {supplementName(template, cleanStrengths)}
+        <Button fullWidth size="lg" iconLeft={Plus} onClick={save} disabled={missing || duplicate}>
+          Lägg till {name}
         </Button>
       }
     >
@@ -261,6 +268,11 @@ function AddSupplementSheet({ open, onClose }: { open: boolean; onClose: () => v
               </Chip>
             ))}
           </div>
+        )}
+        {duplicate && (
+          <p className="rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2" role="status">
+            Du har redan {name}. Välj ett annat tillskott eller en annan styrka.
+          </p>
         )}
         {over.length > 0 && (
           <p className="rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2" role="note">

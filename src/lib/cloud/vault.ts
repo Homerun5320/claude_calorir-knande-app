@@ -46,34 +46,32 @@ export function vaultRecordFromRow(row: VaultRow | null): VaultRecord | null {
 /**
  * Spara ett nytt valv tillsammans med samtycket. `existingRow` = en rad finns redan (t.ex. ett
  * avbrutet försök) och uppdateras i stället för att läggas till. `user_id` sätts av databasen
- * (auth.uid()) och kan inte väljas av appen.
+ * (auth.uid()) och kan inte väljas av appen – och inte heller tidsstämplarna: samtyckets tidpunkt
+ * (consent_at) och updated_at sätts av databasen, så att samtycket inte kan bakdateras.
  */
-export async function saveNewVault(userId: string, record: VaultRecord, consentVersion: string, existingRow: boolean, now: Date = new Date()): Promise<void> {
+export async function saveNewVault(userId: string, record: VaultRecord, consentVersion: string, existingRow: boolean): Promise<void> {
   const values = {
     format: record.format,
     kdf: record.kdf,
     wrapped_key_passphrase: record.wrappedKeyPassphrase,
     wrapped_key_recovery: record.wrappedKeyRecovery,
     consent_version: consentVersion,
-    consent_at: now.toISOString(),
-    updated_at: now.toISOString(),
   }
   if (existingRow) await update('vaults', eqUser(userId), values)
   else await insert('vaults', values)
 }
 
-/** Spara ett nytt samtycke (när samtyckestexten har ändrats). */
-export async function saveConsent(userId: string, consentVersion: string, now: Date = new Date()): Promise<void> {
-  await update('vaults', eqUser(userId), { consent_version: consentVersion, consent_at: now.toISOString(), updated_at: now.toISOString() })
+/** Spara ett nytt samtycke (när samtyckestexten har ändrats). Tidpunkten sätts av databasen. */
+export async function saveConsent(userId: string, consentVersion: string): Promise<void> {
+  await update('vaults', eqUser(userId), { consent_version: consentVersion })
 }
 
 /** Spara om valvets nycklar (ny lösenfras). */
-export async function saveVaultRecord(userId: string, record: VaultRecord, now: Date = new Date()): Promise<void> {
+export async function saveVaultRecord(userId: string, record: VaultRecord): Promise<void> {
   await update('vaults', eqUser(userId), {
     format: record.format,
     kdf: record.kdf,
     wrapped_key_passphrase: record.wrappedKeyPassphrase,
     wrapped_key_recovery: record.wrappedKeyRecovery,
-    updated_at: now.toISOString(),
   })
 }

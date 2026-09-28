@@ -160,7 +160,12 @@ export default function MorePage() {
       to: '/planering',
       icon: CalendarDays,
       tone: 'mossa',
-      stat: planned > 0 ? `${plural(planned, 'måltid', 'måltider')} planerade i veckan` : 'Planera veckan – få inköpslistan',
+      stat:
+        planned === 1
+          ? '1 måltid planerad i veckan'
+          : planned > 0
+            ? `${plural(planned, 'måltid', 'måltider')} planerade i veckan`
+            : 'Planera veckan – få inköpslistan',
     },
     { id: 'matkalender', title: 'Matkalender', to: '/matkalender', icon: CalendarHeart, tone: 'sol', stat: foodDay },
     { id: 'installningar', title: 'Inställningar', to: '/installningar', icon: Settings, tone: 'gran', stat: 'Mål, tema och data' },

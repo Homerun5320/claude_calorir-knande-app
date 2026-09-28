@@ -171,7 +171,7 @@ describe('supportsidan (public/support/index.html)', () => {
   it('svarar på de vanliga frågorna och länkar till integritetspolicyn och villkoren', () => {
     for (const heading of [
       'Jag har bytt telefon',
-      'Återställ köp i App Store eller Google Play',
+      'Återställ köp i appen',
       'Hur exporterar jag min data?',
       'Hur raderar jag allt?',
       'Vad händer när provperioden är slut?',
@@ -191,7 +191,8 @@ describe('supportsidan (public/support/index.html)', () => {
     expect(filled).toContain('<a href="mailto:hej@lagom.se">hej@lagom.se</a>')
   })
 
-  it('länkar aldrig till köp', () => {
+  it('länkar aldrig till köp och nämner inte webbköp (sidan är Support-URL i App Store Connect)', () => {
     expect(html).not.toMatch(/checkout|stripe|\/premium|köp licens/i)
+    expect(html).not.toMatch(/köpt på webben|Lagoms webbplats/i)
   })
 })

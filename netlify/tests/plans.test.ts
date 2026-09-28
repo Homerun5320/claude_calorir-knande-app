@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { PLANS, TRIAL_DAYS } from '../../src/config/commerce.ts'
+import { LIFETIME_PROMISE, LIFETIME_SHORT, PLANS, TRIAL_DAYS } from '../../src/config/commerce.ts'
 import { PLANS as SCRIPT_PLANS } from '../../scripts/issue-license.mjs'
-import { SERVER_PLANS, isPlanId, priceInOre } from '../lib/plans.ts'
+import { LIFETIME_PROMISE as SERVER_PROMISE, LIFETIME_SHORT as SERVER_SHORT, SERVER_PLANS, acceptedAmountsInOre, isPlanId, priceInOre } from '../lib/plans.ts'
 
 describe('planerna är desamma i appen, på servern och i supportskriptet', () => {
   it('samma id, namn, pris och giltighet som src/config/commerce.ts', () => {
@@ -34,6 +34,14 @@ describe('planerna är desamma i appen, på servern och i supportskriptet', () =
     expect(SERVER_PLANS.livstid.checkoutNote).toContain('gäller för alltid')
     expect(SERVER_PLANS.livstid.checkoutNote).toContain('felrättningar ingår')
     expect(SERVER_PLANS.livstid.checkoutNote).not.toMatch(/framtida uppdateringar/i)
+    // Samma löfte i appen, i villkoren och på kvittot.
+    expect(SERVER_PROMISE).toBe(LIFETIME_PROMISE)
+    expect(SERVER_SHORT).toBe(LIFETIME_SHORT)
+  })
+
+  it('köp till tidigare priser (299 kr och 599 kr) godtas fortfarande när de verifieras', () => {
+    expect(acceptedAmountsInOre(SERVER_PLANS.ar)).toEqual([34_900, 29_900])
+    expect(acceptedAmountsInOre(SERVER_PLANS.livstid)).toEqual([69_900, 59_900])
   })
 
   it('pris i öre och plan-id (ägarens beslut 2026-09-28: 349 kr och 699 kr)', () => {

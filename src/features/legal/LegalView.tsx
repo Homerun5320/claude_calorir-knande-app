@@ -74,7 +74,7 @@ function TableCards({ columns, rows }: { columns: readonly string[]; rows: reado
 
 export function LegalSectionCard({ section }: { section: LegalSection }) {
   const headingId = useId()
-  const items = [...(section.items ?? []), ...(section.webItems ?? [])]
+  const items = [...(section.items ?? []), ...(section.webItems ?? []), ...(section.keyItems ?? [])]
   return (
     <section aria-labelledby={headingId} className="card p-5">
       <h2 id={headingId} className="font-display text-[1.1875rem] font-semibold leading-snug tracking-tight text-ink">

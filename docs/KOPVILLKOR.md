@@ -8,7 +8,7 @@
 
 ### Beslut som texten bygger på (2026-09-28)
 
-- Säljaren är en enskild firma. Lansering bara i Sverige; Lagom riktar sig till vuxna.
+- Säljaren är en enskild firma. Lansering bara i Sverige; Lagom är gjord för vuxna (18 år och äldre).
 - Priser på webben: Årslicens 349 kr och Livstidslicens 699 kr inklusive 25 % moms (`src/config/commerce.ts`). I butikerna sätts priset i App Store Connect och Play Console.
 - Livstid betyder för alltid. Felrättningar ingår – nya funktioner utlovas inte.
 - I apparna från App Store och Google Play görs köpet bara som köp i appen, och köp återställs med Återställ köp. I App Store-appen kan inga licensnycklar aktiveras.
@@ -18,13 +18,13 @@
 ### Att fylla i av ägaren
 
 - [ ] **Företagsnamn** – för enskild firma ditt namn eller det registrerade firmanamnet → `VITE_SELLER_NAME`
-- [ ] **Organisationsnummer** – för enskild firma samma som ditt personnummer → `VITE_SELLER_ORGNR`
+- [ ] **Organisationsnummer** (frivilligt) – för enskild firma samma som ditt personnummer → `VITE_SELLER_ORGNR`. Sätter du det visas det i appen, i villkoren och på varje kvitto. Lämnar du det tomt utelämnas det överallt, och bygget ger bara en varning. Distansavtalslagen (2 kap. 2 §) kräver namn, adress, telefon och e-post; e-handelslagen (8 §) kräver registreringsnummer om firman finns i handelsregistret. Fråga Verksamt eller en jurist vad som gäller för just din firma (se ”Låt en jurist granska”).
 - [ ] **Postadress** → `VITE_SELLER_ADDRESS`
 - [ ] **Telefon** → `VITE_SELLER_PHONE`
 - [ ] **Momsregistreringsnummer** (om firman är momsregistrerad) → `VITE_SELLER_VAT`
 - [ ] **E-post för support** – en riktig adress som du läser → `VITE_SUPPORT_EMAIL`
 
-Variablerna sätts i Netlify (Site configuration → Environment variables). Appen visar dem automatiskt, och när sajten byggs fylls platshållarna i de fristående sidorna i ([Företagsnamn], [Org.nr], [Adress], [Telefon], [Momsreg.nr], [E-post]). Här i docs står platshållarna kvar. Saknas en uppgift visar appen ”[fylls i av ägaren]”, och bygget för butikerna och för skarpa webbköp stoppas.
+Variablerna sätts i Netlify (Site configuration → Environment variables). Appen visar dem automatiskt, och när sajten byggs fylls platshållarna i de fristående sidorna i ([Företagsnamn], [Org.nr], [Adress], [Telefon], [Momsreg.nr], [E-post]). Här i docs står platshållarna kvar. Saknas en obligatorisk uppgift visar appen ”[fylls i av ägaren]”, och bygget för butikerna och för skarpa webbköp stoppas. Organisationsnumret och momsregistreringsnumret är frivilliga – saknas de tas de bort ur texten.
 
 - [ ] Ta reda på om firman ska vara momsregistrerad eller momsbefriad (fråga Skatteverket). Texterna förutsätter 25 % moms – se **Till ägaren** under ”Pris och betalning”. Utan momsregistrering finns inget momsregistreringsnummer att fylla i.
 - [ ] Sätt `VITE_TERMS_URL` till `https://<din domän>/villkor/`, så att köpsidan och Stripe länkar till villkoren.
@@ -41,13 +41,13 @@ Variablerna sätts i Netlify (Site configuration → Environment variables). App
 
 ### Appen och den publicerade sidan
 
-I appen finns villkoren på sidan Köp- och användarvillkor (`#/villkor`). I apparna från App Store och Google Play visas inte avsnitten som bara gäller köp på webben (pris i kronor, Stripe, ångerrätt vid webbköp) – där sköter butiken köpet. Den publicerade sidan innehåller allt.
+I appen finns villkoren på sidan Köp- och användarvillkor (`#/villkor`). I apparna från App Store och Google Play visas inte avsnitten som bara gäller köp på webben (pris i kronor, Stripe, ångerrätt vid webbköp) – där sköter butiken köpet. I iPhone-appen nämns bara iPhone och App Store; de texterna står nedan under _I iPhone-appen (App Store) står i stället_. Den publicerade sidan innehåller allt.
 
 ---
 
 ## Säljare
 
-Lagom säljs av [Företagsnamn], enskild firma med organisationsnummer [Org.nr].
+Lagom säljs av [Företagsnamn] (enskild firma, organisationsnummer [Org.nr]).
 
 Adress: [Adress]. Telefon: [Telefon]. E-post: [E-post]. Momsregistreringsnummer: [Momsreg.nr].
 
@@ -81,8 +81,8 @@ _Gäller köp på Lagoms webbplats – visas inte i butiksapparna._
 Så här köper du en licens på webben:
 
 1. Välj licens under Lagom Premium.
-2. Läs sammanfattningen, godkänn villkoren och kryssa i att du vill ha licensen levererad direkt.
-3. Betala hos Stripe. Innan du betalar kan du se och rätta dina uppgifter, till exempel e-post och kortnummer – eller gå tillbaka och välja en annan licens.
+2. Läs sammanfattningen och köpvillkoren och kryssa i att du vill ha licensen levererad direkt (och att ångerrätten då upphör).
+3. Betala hos Stripe, där du också godkänner köpvillkoren. Innan du betalar kan du se och rätta dina uppgifter, till exempel e-post och kortnummer – eller gå tillbaka och välja en annan licens.
 4. När betalningen är klar visas licensnyckeln, och den aktiveras på enheten.
 
 Avtalet ingås på svenska. Köpet sparas hos Stripe och i vår bokföring. En bekräftelse med kvitto, de viktigaste villkoren och villkorens version skickas till den e-post du anger hos Stripe, och hela villkoren finns alltid på den här sidan med versionsdatum.
@@ -107,7 +107,15 @@ Köp i App Store eller Google Play följer ditt Apple- eller Google-konto – p�
 
 En licensnyckel från ett köp på webben klistrar du in under Inställningar → Licens på varje enhet där du vill använda den.
 
-> **Till ägaren:** Skriv gärna in lägsta iOS- och Android-version när apparna är byggda.
+> **I iPhone-appen (App Store) står i stället:**
+>
+> Lagom fungerar på iPhone med en aktuell version av iOS. Appen fungerar utan uppkoppling; sökning online, streckkoder, köp och receptimport kräver uppkoppling.
+>
+> Din data sparas i appen på din iPhone och synkas inte mellan enheter. Du flyttar den med en säkerhetskopia (Inställningar → Data).
+>
+> Köp i App Store följer ditt Apple-konto – på en ny iPhone trycker du på Återställ köp.
+
+> **Till ägaren:** Skriv gärna in lägsta iOS- och Android-version när apparna är byggda (i iPhone-appen står i dag ”en aktuell version av iOS”).
 
 ## Fel och reklamation
 
@@ -117,9 +125,17 @@ I första hand rättar vi felet. Går det inte har du rätt till prisavdrag elle
 
 Har du köpt i App Store eller Google Play kan du också begära återbetalning hos butiken enligt dess villkor.
 
+> **I iPhone-appen (App Store) står i stället:**
+>
+> Om Lagom inte fungerar som vi har lovat har du rätt att reklamera enligt konsumentköplagen (2022:260), som också gäller digitalt innehåll. Kontakta oss på [E-post] och beskriv felet inom skälig tid efter att du märkt det – inom två månader räknas alltid som i tid.
+>
+> I första hand rättar vi felet. Går det inte har du rätt till prisavdrag eller att häva köpet och få pengarna tillbaka.
+>
+> Har du köpt i App Store kan du också begära återbetalning hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com).
+
 ## Uppdateringar och support
 
-Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.
+Vi ger ut de uppdateringar som behövs för att Lagom ska fortsätta fungera som utlovat, även säkerhetsuppdateringar, under den tid du rimligen kan förvänta dig. Felrättningar ingår i båda licenserna medan licensen gäller – för livstidslicensen så länge vi ger ut Lagom. Nya funktioner kan komma, men de ingår inte i det du köper och utlovas inte.
 
 Support ges på svenska via e-post: [E-post]. Vi svarar så snart vi kan, normalt inom några arbetsdagar.
 
@@ -127,11 +143,11 @@ Support ges på svenska via e-post: [E-post]. Vi svarar så snart vi kan, normal
 
 ## Livstidslicensen
 
-Livstidslicensen har ingen tidsgräns och ingen årsavgift – du köper den en gång och den upphör aldrig att gälla. Felrättningar ingår efter felanmälan så länge vi tillhandahåller Lagom, men vi lovar inte nya funktioner.
+Livstidslicensen gäller för alltid – ingen tidsgräns och ingen årsavgift. Felrättningar ingår så länge vi ger ut Lagom; nya funktioner kan komma men utlovas inte. Om Lagom läggs ned fortsätter din version att fungera på din enhet så länge enheten stöder den.
 
-Lägger vi någon gång ned Lagom fortsätter den version du har att fungera på din enhet så länge enheten stöder den, och du kan alltid exportera din data.
+Du betalar en gång, och du kan alltid exportera din data.
 
-> **Till ägaren:** Ägaren ska bekräfta definitionen av livstid före lansering (beslut 2026-09-28: för alltid, felrättningar ingår, inga löften om nya funktioner). Texten är avsiktligt försiktig – lova inte mer i butikstexter eller i Stripe.
+> **Till ägaren:** Ägaren ska bekräfta definitionen av livstid före lansering (beslut 2026-09-28: för alltid, felrättningar ingår, inga löften om nya funktioner). Texten är avsiktligt försiktig och är samma som i köparket och på kvittot (LIFETIME_PROMISE i src/config/commerce.ts) – lova inte mer i butikstexter eller i Stripe.
 
 ## Provperioden
 
@@ -149,6 +165,16 @@ Köpet följer ditt Apple- eller Google-konto. På en ny telefon trycker du på 
 
 För köp i App Store gäller även Apples [standardvillkor för appar](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/). Din rätt att reklamera enligt konsumentköplagen påverkas inte.
 
+> **I iPhone-appen (App Store) står i stället:**
+>
+> Rubrik: Köp i App Store
+>
+> Köper du Lagom i App Store sköter Apple betalningen, kvittot och eventuell återbetalning enligt sina villkor, och priset visas i App Store. Återbetalning begär du hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com).
+>
+> Köpet följer ditt Apple-konto. På en ny iPhone trycker du på Återställ köp i Lagom.
+>
+> För köp i App Store gäller även Apples [standardvillkor för appar](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/). Din rätt att reklamera enligt konsumentköplagen påverkas inte.
+
 ## Användarvillkor
 
 Villkoren gäller all användning av Lagom, även under provperioden och utan köp.
@@ -159,11 +185,19 @@ Villkoren gäller all användning av Lagom, även under provperioden och utan k�
 - Din data: du ansvarar själv för din dagbok och för att spara säkerhetskopior. Vi har ingen kopia och kan inte återställa data som försvunnit från din enhet.
 - Ansvarsbegränsning: i den utsträckning lagen tillåter ansvarar vi inte för indirekta skador, till exempel förlorad data eller beslut du fattar utifrån appens uppskattningar. Begränsningen inskränker aldrig dina rättigheter enligt tvingande konsumentlagstiftning.
 
+> **I iPhone-appen (App Store) står i stället:**
+>
+> - Rätt att använda appen: du får använda Lagom för ditt eget, privata bruk. Du får inte kopiera, sälja eller sprida appen, kringgå licenskontrollen eller använda appen på ett sätt som skadar den eller andra.
+> - Inte medicinsk rådgivning: Lagom ger allmän information om mat och näring och är inte en medicinteknisk produkt. Mål och beräkningar är uppskattningar och ersätter inte råd från vården. Rådgör med vården om du har en sjukdom, är gravid eller ammar, eller funderar på att ändra din vikt – kontakta [1177](https://www.1177.se) vid frågor om hälsa. Tänker du mycket på mat och vikt finns stöd hos [Frisk & Fri](https://www.friskfri.se).
+> - Innehåll från andra: näringsvärden kommer från Livsmedelsverket, Open Food Facts och andra källor och kan innehålla fel. Jämför gärna med förpackningen.
+> - Din data: du ansvarar själv för din dagbok och för att spara säkerhetskopior. Vi har ingen kopia och kan inte återställa data som försvunnit från din enhet.
+> - Ansvarsbegränsning: i den utsträckning lagen tillåter ansvarar vi inte för indirekta skador, till exempel förlorad data eller beslut du fattar utifrån appens uppskattningar. Begränsningen inskränker aldrig dina rättigheter enligt tvingande konsumentlagstiftning.
+
 ## Minderåriga
 
-Lagom är avsett för vuxna. Är du under 18 år – prata med en vuxen eller skolsköterskan om mat och vikt; Lagom ger aldrig underskott för dig som är under 18.
+Lagom är gjord för vuxna, 18 år och äldre, och går inte att använda om du är yngre. Funderar du på mat och vikt – prata gärna med en vuxen, skolsköterskan eller [1177](https://www.1177.se).
 
-Du som är under 13 år kan inte använda Lagom. Är du under 18 år behöver du normalt din vårdnadshavares godkännande för att köpa en licens, om du inte betalar med pengar du själv har tjänat.
+Lagom föreslår aldrig viktnedgång (kaloriunderskott) för den som kan vara under 18 år.
 
 ## Tvister
 

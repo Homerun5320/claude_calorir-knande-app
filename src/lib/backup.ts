@@ -11,7 +11,7 @@ import { useLicenseStore } from '../stores/licenseStore'
 import { usePlanStore } from '../stores/planStore'
 import { releaseNewerData, STORE_KEYS } from '../stores/storage'
 import { COMMERCE_MODE } from '../config/commerce'
-import { allowsLicenseKeyEntry, isInApp } from '../config/platform'
+import { allowsLicenseKeyEntry, isInApp, isIosDevice, isNativeApp } from '../config/platform'
 import { isAbort } from '../features/diary/share'
 import { decodeLicense } from './license'
 import type { DiaryEntry, ISODate, MealConfig } from '../types'
@@ -388,6 +388,11 @@ export function backupFilename(): string {
  */
 export type SaveOutcome = 'saved' | 'shared' | 'cancelled' | 'failed'
 
+/** Toasten efter en delning – "Spara i Filer" heter så bara på iPhone och iPad. */
+export function sharedFileToast(): string {
+  return isIosDevice() ? 'Delad – välj Spara i Filer för att behålla den' : 'Delad – spara filen där du hittar den igen, t.ex. i Filer eller Google Drive'
+}
+
 /** Pekskärm som huvudsaklig pekare (telefon, surfplatta) – där fungerar nedladdning sämre än delning. */
 function hasCoarsePointer(): boolean {
   try {
@@ -413,6 +418,10 @@ function canShareFile(file: File): boolean {
  *   laddas en nedladdad fil annars lätt ned "ingenstans". Avbryter användaren dialogen blir
  *   utfallet 'cancelled'; misslyckas delningen av annat skäl laddas filen ned i stället.
  * - Annars laddas filen ned som vanligt (`<a download>`).
+ * - I den inbyggda appen (Capacitor) gör en nedladdning med `<a download>` ingenting i webbvyn.
+ *   Där blir utfallet 'failed' om delningen inte går – aldrig 'saved' – så att påminnelsen om
+ *   säkerhetskopia inte tystnar för en fil som aldrig sparades. (När Capacitor installeras kan
+ *   Filesystem- och Share-tilläggen användas här.)
  *
  * OBS: delningen måste starta i samma klick som användaren gjorde. Anropa därför `saveFile`
  * direkt från klickhanteraren, utan `await` före anropet.
@@ -429,6 +438,7 @@ export async function saveFile(filename: string, content: string, mime = 'applic
         // Annat fel (t.ex. NotAllowedError): ladda ned i stället nedan.
       }
     }
+    if (isNativeApp()) return 'failed'
     downloadFile(filename, content, mime)
     return 'saved'
   } catch {

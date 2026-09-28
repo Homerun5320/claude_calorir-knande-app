@@ -369,7 +369,12 @@ export function ingredientAmount(
   }
   if (unit !== undefined && own(VOLUME_ML, unit)) {
     const vol = unit as VolumeUnit
-    if (raw && rawDensity(food) !== undefined) return done((amount * VOLUME_ML[vol]) / VOLUME_ML.dl, 'dl-ra')
+    if (raw) {
+      // Receptets volym är rå/okokt. Utan rå densitet går den inte att räkna om säkert – livsmedlets
+      // vanliga densitet gäller den tillagade varan ("2 dl nudlar" är inte 2 dl kokta nudlar).
+      // Raden hamnar då under "Kontrollera mängden".
+      return rawDensity(food) !== undefined ? done((amount * VOLUME_ML[vol]) / VOLUME_ML.dl, 'dl-ra') : undefined
+    }
     const direct = done(amount, vol)
     if (direct) return direct
     // Annars kanske livsmedlet har måttet som portion ("1 msk") – se nedan.

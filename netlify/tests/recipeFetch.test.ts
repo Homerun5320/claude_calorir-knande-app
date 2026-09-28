@@ -277,6 +277,26 @@ describe('fetchRecipeJsonLd', () => {
     // "</scripts>" avslutar inte skriptet.
     expect(extractRecipeJsonLd('<script type="application/ld+json">{"@type":"Recipe","t":"</scripts>"}</script>')).toContain('</scripts>')
   })
+
+  it('tar linjär tid även på elaka sidor (ingen ReDoS) – 2 MB på bråkdelen av en sekund', () => {
+    const size = 2 * 1024 * 1024
+    const cases = [
+      // Många "<script " utan ">" – gav kvadratisk backtracking med det gamla uttrycket.
+      '<script '.repeat(size / 8),
+      // Många oavslutade ld+json-block.
+      '<script type=application/ld+json>'.repeat(Math.floor(size / 34)),
+      // Många taggar med ">" långt bort.
+      `${'<script a'.repeat(size / 9)}>`,
+    ]
+    for (const html of cases) {
+      const t0 = performance.now()
+      expect(extractRecipeJsonLd(html)).toBe('')
+      expect(performance.now() - t0).toBeLessThan(500)
+    }
+    // Ett vanligt skript före receptet och ett recept efter en lång tagg hittas fortfarande.
+    const page = `<script>var s = "<script";</script><script data-x="${'a'.repeat(2000)}" type="application/ld+json">{"@type":"Organization"}</script><script type="application/ld+json">{"@type":"Recipe"}</script>`
+    expect(extractRecipeJsonLd(page)).toBe('<script type="application/ld+json">{"@type":"Recipe"}</script>')
+  })
 })
 
 describe('POST /api/recipe-fetch', () => {
@@ -318,6 +338,14 @@ describe('POST /api/recipe-fetch', () => {
     const evil = await handleRecipeFetch(post({ url: 'https://recept.example/p' }, 'https://ond.example'), d)
     expect(evil.status).toBe(403)
     expect(await evil.json()).toMatchObject({ code: 'fel-ursprung' })
+  })
+
+  it('anrop utan Origin (curl, skript) nekas – funktionen är ingen öppen hämtare', async () => {
+    const d = deps(pages({ 'https://recept.example/p': { body: PAGE } }), dns({ 'recept.example': [PUBLIC_V4] }))
+    const req = new Request(`${APP}/api/recipe-fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://recept.example/p' }) })
+    const res = await handleRecipeFetch(req, d)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ code: 'fel-ursprung' })
   })
 
   it('högst 10 anrop per minut och IP-adress', async () => {

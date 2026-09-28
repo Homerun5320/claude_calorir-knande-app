@@ -90,6 +90,19 @@ describe('Kosttillskott i målen', () => {
     expect(screen.getByRole('list', { name: 'Dina kosttillskott' })).toHaveTextContent('Vitamin B12 50 µg')
   })
 
+  it('samma tillskott med samma styrka kan inte läggas till två gånger', async () => {
+    renderGoals()
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till kosttillskott' }))
+    let sheet = await screen.findByRole('dialog', { name: 'Lägg till kosttillskott' })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Lägg till D-vitamin 10 µg' }))
+    await waitFor(() => expect(Object.values(useFoodStore.getState().customFoods)).toHaveLength(1))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Lägg till kosttillskott' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till kosttillskott' }))
+    sheet = await screen.findByRole('dialog', { name: 'Lägg till kosttillskott' })
+    expect(within(sheet).getByText('Du har redan D-vitamin 10 µg. Välj ett annat tillskott eller en annan styrka.')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Lägg till D-vitamin 10 µg' })).toBeDisabled()
+  })
+
   it('säger lugnt till när styrkan passerar den övre gränsen', async () => {
     renderGoals()
     fireEvent.click(screen.getByRole('button', { name: 'Lägg till kosttillskott' }))
