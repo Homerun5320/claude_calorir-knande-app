@@ -23,7 +23,8 @@ import { requireAccess } from '../premium/requireAccess'
 const MIN_KG = 20
 const MAX_KG = 400
 const TREND_ICON = { up: ArrowUpRight, down: ArrowDownRight, flat: ArrowRight } as const
-const TREND_WORD = { up: 'uppåt', down: 'nedåt', flat: 'oförändrad' } as const
+/** Skärmläsartext före trendetiketten: "Trenden går uppåt: +0,3 kg/vecka", "Trenden är stabil". */
+const TREND_SR = { up: 'Trenden går uppåt:', down: 'Trenden går nedåt:', flat: 'Trenden är stabil' } as const
 
 function cautionText(caution: WeightCaution, age: number | undefined): string {
   if (caution === 'snabb') {
@@ -126,10 +127,13 @@ export const WeightCard = memo(function WeightCard({ today, goalPause = null }: 
                   }`}
                 >
                   <TrendIcon className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
-                  <span className="sr-only">Trenden går {TREND_WORD[snap.direction]}:</span>
-                  {snap.direction === 'flat'
-                    ? 'Stabil'
-                    : `${snap.weekChangeKg > 0 ? '+' : '−'}${formatNumber(Math.abs(snap.weekChangeKg), 1)}\u00a0kg/vecka`}
+                  <span className="sr-only">{TREND_SR[snap.direction]}</span>
+                  {snap.direction === 'flat' ? (
+                    // "Stabil" syns, men skärmläsaren har redan sagt "Trenden är stabil".
+                    <span aria-hidden="true">Stabil</span>
+                  ) : (
+                    <span>{`${snap.weekChangeKg > 0 ? '+' : '−'}${formatNumber(Math.abs(snap.weekChangeKg), 1)}\u00a0kg/vecka`}</span>
+                  )}
                 </span>
               )}
               <span>Vägd {relativeDayLabel(snap.latest.date, today).toLowerCase()}</span>

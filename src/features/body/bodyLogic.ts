@@ -544,14 +544,18 @@ export function waistToHeight(waistCm: number, heightCm: number): number | undef
 }
 
 /**
- * Tolkning av midja/längd-kvoten. Under 0,5 är förknippat med lägre risk för hjärt-kärlsjukdom
- * och typ 2-diabetes ("håll midjan under halva längden").
+ * Vilket intervall midja/längd-kvoten ligger i. Etiketterna är neutrala intervall – inga
+ * riskbedömningar för den enskilda personen (Lagom är ingen medicinteknisk produkt, se
+ * docs/AVSETT-ANDAMAL.md). Den allmänna kopplingen till befolkningsstudier förklaras i text
+ * under nyckeltalen, med hänvisning till 1177.
  */
 export function whtrCategory(ratio: number): { label: string; tone: 'mossa' | 'hjortron' | 'neutral' } {
-  if (ratio < 0.4) return { label: 'Låg kvot', tone: 'neutral' }
-  if (ratio < 0.5) return { label: 'Lägre risk', tone: 'mossa' }
-  if (ratio < 0.6) return { label: 'Något förhöjd risk', tone: 'hjortron' }
-  return { label: 'Förhöjd risk', tone: 'hjortron' }
+  // Samma två decimaler som visas ("0,60" hamnar i 0,5–0,6, inte "Över 0,6").
+  const r = Math.round(ratio * 100) / 100
+  if (r < 0.4) return { label: 'Under 0,4', tone: 'neutral' }
+  if (r < 0.5) return { label: 'Under 0,5', tone: 'mossa' }
+  if (r <= 0.6) return { label: '0,5–0,6', tone: 'hjortron' }
+  return { label: 'Över 0,6', tone: 'hjortron' }
 }
 
 // ---------------------------------------------------------------------------

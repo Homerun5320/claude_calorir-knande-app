@@ -4,11 +4,11 @@
  */
 import { useMemo } from 'react'
 import { BadgeCheck, Barcode, CloudDownload, Database, ExternalLink, Landmark, Trash, TriangleAlert, X } from 'lucide-react'
-import { Badge, Button, Card, ListGroup, ListRow, ProgressBar, Skeleton, confirmDialog, toast } from '../../../components/ui'
+import { Badge, Button, Card, ExternalLink as TextLink, ListGroup, ListRow, ProgressBar, Skeleton, confirmDialog, toast } from '../../../components/ui'
 import { useBuiltinCatalog } from '../../../hooks/useFood'
 import { formatDayLong } from '../../../lib/dates'
 import { formatNumber, plural } from '../../../lib/format'
-import { LMV_ATTRIBUTION } from '../../../lib/livsmedelsverket'
+import { LMV_ATTRIBUTION, LMV_LICENSE, LMV_LICENSE_URL } from '../../../lib/livsmedelsverket'
 import { useFoodStore } from '../../../stores/foodStore'
 import { cachedFoodStats, pruneCachedFoods } from '../settingsLogic'
 import { useLmvImport } from '../useLmvImport'
@@ -29,12 +29,16 @@ function BuiltinCard() {
   const counts = useMemo(() => {
     if (!catalog) return null
     let lagom = 0
+    let lagomFromLmv = 0
     let lmv = 0
     for (const f of catalog.foods) {
-      if (f.source === 'lagom') lagom++
-      else if (f.source === 'livsmedelsverket') lmv++
+      if (f.source === 'lagom') {
+        lagom++
+        // Kopplade till ett livsmedel hos Livsmedelsverket – värdena kommer direkt därifrån.
+        if (f.lmvNumber !== undefined) lagomFromLmv++
+      } else if (f.source === 'livsmedelsverket') lmv++
     }
-    return { total: catalog.foods.length, lagom, lmv }
+    return { total: catalog.foods.length, lagom, lagomFromLmv, lmv }
   }, [catalog])
 
   return (
@@ -56,8 +60,9 @@ function BuiltinCard() {
             <li className="flex gap-3">
               <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-mossa" />
               <span>
-                <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} granskade svenska livsmedel</strong> – namn och näringsvärden per
-                100{'\u00a0'}g från Livsmedelsverket, kvalitetskontrollerade och med svenska portioner och mått.
+                <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} granskade svenska livsmedel</strong> med svenska portioner och mått –{' '}
+                {formatNumber(counts.lagomFromLmv)} med värden direkt från Livsmedelsverket, övriga samlingsvärden för vanliga märken, värden från förpackningar
+                eller beräknade recept. Källan visas på varje livsmedel.
               </span>
             </li>
             {counts.lmv > 0 && (
@@ -65,7 +70,8 @@ function BuiltinCard() {
                 <Landmark aria-hidden className="mt-0.5 size-5 shrink-0 text-blabar" />
                 <span>
                   <strong className="font-semibold text-ink">{formatNumber(counts.lmv)} från Livsmedelsverkets databas</strong>
-                  {catalog.lmv?.version ? ` (hämtad ${formatDayLong(catalog.lmv.version)})` : ''}.
+                  {catalog.lmv?.version ? ` (hämtad ${formatDayLong(catalog.lmv.version).toLocaleLowerCase('sv-SE')})` : ''}. Licens:{' '}
+                  <LicenseLink />.
                 </span>
               </li>
             )}
@@ -137,8 +143,8 @@ function LmvImportCard() {
   return (
     <Card eyebrow="Livsmedelsverket" title="Hämta hela databasen">
       <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        Livsmedelsverkets öppna databas har cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen. Importen tar några minuter och sparas på din enhet, så att
-        allt går att söka även offline.
+        Livsmedelsverkets öppna databas har cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen och publiceras under licensen <LicenseLink />. Importen tar
+        några minuter och sparas på din enhet, så att allt går att söka även offline.
       </p>
 
       {running && p && (
@@ -201,9 +207,24 @@ function LmvImportCard() {
   )
 }
 
+/** Länk till licensen för Livsmedelsverkets databas (CC BY 4.0). */
+function LicenseLink() {
+  return <TextLink href={LMV_LICENSE_URL}>{LMV_LICENSE}</TextLink>
+}
+
 const SOURCES: ReadonlyArray<{ title: string; text: string; href: string; badge?: string }> = [
-  { title: 'Livsmedelsverkets livsmedelsdatabas', text: LMV_ATTRIBUTION.replace('Källa: ', 'Namn och näringsvärden per 100\u00a0g – '), href: 'https://soknaringsinnehall.livsmedelsverket.se/' },
-  { title: 'Open Food Facts', text: 'Streckkoder och produkter, öppna data under ODbL. Användarbidrag – jämför gärna med förpackningen.', href: 'https://se.openfoodfacts.org/', badge: 'ODbL' },
+  {
+    title: 'Livsmedelsverkets livsmedelsdatabas',
+    text: `${LMV_ATTRIBUTION.replace('Källa: ', 'Namn och näringsvärden per 100\u00a0g – ')}. Värdena har bearbetats av Lagom (kategorier, portioner, avrundning och ifyllda värden).`,
+    href: 'https://soknaringsinnehall.livsmedelsverket.se/',
+    badge: LMV_LICENSE,
+  },
+  {
+    title: 'Open Food Facts',
+    text: 'Streckkoder och produkter – data ODbL, bilder CC BY-SA. Användarbidrag – jämför gärna med förpackningen.',
+    href: 'https://se.openfoodfacts.org/',
+    badge: 'ODbL · CC BY-SA',
+  },
   { title: 'Nordiska näringsrekommendationer 2023', text: 'Referensvärden för vitaminer, mineraler och makron.', href: 'https://www.norden.org/en/publication/nordic-nutrition-recommendations-2023' },
 ]
 
@@ -211,11 +232,10 @@ function SourcesCard() {
   return (
     <ListGroup title="Källor">
       {SOURCES.map((s) => (
-        <a
+        <TextLink
           key={s.title}
           href={s.href}
-          target="_blank"
-          rel="noreferrer"
+          showIcon={false}
           className="flex min-h-[3.75rem] items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors hover:bg-surface-2"
         >
           <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-ink-2">
@@ -229,8 +249,7 @@ function SourcesCard() {
             <span className="mt-0.5 block text-[0.8125rem] leading-snug text-ink-3">{s.text}</span>
           </span>
           <ExternalLink aria-hidden className="size-4 shrink-0 text-ink-3" />
-          <span className="sr-only">(öppnas i ny flik)</span>
-        </a>
+        </TextLink>
       ))}
     </ListGroup>
   )

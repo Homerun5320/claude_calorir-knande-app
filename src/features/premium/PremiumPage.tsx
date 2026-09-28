@@ -7,6 +7,9 @@
  *
  * - Testläge: köpknappen utfärdar en testlicens direkt (ingen betalning).
  * - Skarpt läge: POST /api/create-checkout → Stripe Checkout → #/tack?session_id=…
+ * - Butiksappar (`!sellsOnWeb()` i en app): inga kronpriser, ingen Stripe – köpet görs i App Store
+ *   eller Google Play (`StorePurchasePanel`) och priset visas av butiken.
+ * - Webben med webbförsäljningen avstängd: länkar till appbutikerna (`StoreLinksPanel`).
  *
  * Nås även före välkomstflödet och efter provperioden.
  */
@@ -15,6 +18,7 @@ import { ArrowRight, Download, Sprout, UserRound } from 'lucide-react'
 import { Button, Card, PageHeader, Spinner, toast } from '../../components/ui'
 import { Confetti } from '../../components/signature'
 import { COMMERCE_MODE, PLANS, TRIAL_DAYS, type Plan } from '../../config/commerce'
+import { allowsLicenseKeyEntry, isInApp, offersLicenseRecovery, sellsOnWeb } from '../../config/platform'
 import { useAccess } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -23,13 +27,17 @@ import {
   FeatureList,
   LicenseActivation,
   LicenseManage,
+  LicenseRecovery,
   PlanCard,
   PurchaseSuccess,
   SellerFooter,
   StatusHero,
+  StoreLinksPanel,
+  StorePurchasePanel,
   TermsContent,
   TestModeBanner,
 } from './components'
+import { StartOwnProfileButton } from './AccessGate'
 import { PURCHASE_ERRORS, PurchaseError, buyInTestMode, createCheckout, plansToOffer, redirectTo } from './premiumLogic'
 
 function SectionHeading({ id, title, subtitle }: { id: string; title: string; subtitle?: string }) {
@@ -44,7 +52,7 @@ function SectionHeading({ id, title, subtitle }: { id: string; title: string; su
 }
 
 export default function PremiumPage() {
-  const { status, checking } = useAccess()
+  const { status, checking, demo } = useAccess()
   const licenseKey = useLicenseStore((s) => s.licenseKey)
   const onboardingDone = useProfileStore((s) => s.settings.onboardingDone)
   const [plan, setPlan] = useState<Plan | null>(null)
@@ -86,8 +94,13 @@ export default function PremiumPage() {
     }
   }
 
+  const web = sellsOnWeb()
+  const inApp = isInApp()
+  const keyEntry = allowsLicenseKeyEntry()
   const offered = plansToOffer(status, PLANS)
   const licensed = status.kind === 'licensierad'
+  // Utan webbköp visas köppanelen så länge det finns något att köpa (inte vid livstidslicens).
+  const showStorePanel = !web && offered.length > 0
   const plansTitle = !licensed ? 'Välj din licens' : offered.length === 1 ? 'Vill du ha Lagom för alltid?' : 'Förnya din licens'
   const next = onboardingDone ? (
     <Button to="/" iconRight={ArrowRight}>
@@ -118,7 +131,9 @@ export default function PremiumPage() {
               <StatusHero
                 status={status}
                 actions={
-                  status.kind === 'ny' ? (
+                  demo ? (
+                    <StartOwnProfileButton confirm fullWidth={false} />
+                  ) : status.kind === 'ny' ? (
                     <Button to="/valkommen" iconLeft={UserRound}>
                       Skapa min profil
                     </Button>
@@ -133,7 +148,9 @@ export default function PremiumPage() {
           )}
         </div>
 
-        {offered.length > 0 && (
+        {showStorePanel && (inApp ? <StorePurchasePanel headingId="premium-planer" planIds={offered.map((p) => p.id)} /> : <StoreLinksPanel headingId="premium-planer" />)}
+
+        {web && offered.length > 0 && (
           <section aria-labelledby="premium-planer">
             <SectionHeading
               id="premium-planer"
@@ -153,21 +170,36 @@ export default function PremiumPage() {
           <FeatureList />
         </section>
 
-        <section aria-labelledby="premium-licens">
-          <SectionHeading
-            id="premium-licens"
-            title={licenseKey ? 'Din licens' : 'Har du redan en licens?'}
-            subtitle={
-              licenseKey
-                ? 'Flytta Lagom till en ny enhet genom att klistra in nyckeln där.'
-                : 'Klistra in licensnyckeln från ditt köp – t.ex. för att använda Lagom på en ny telefon.'
-            }
-          />
-          <Card padding="md">{licenseKey ? <LicenseManage /> : <LicenseActivation />}</Card>
-        </section>
+        {(keyEntry || licenseKey) && (
+          <section aria-labelledby="premium-licens">
+            <SectionHeading
+              id="premium-licens"
+              title={licenseKey ? 'Din licens' : 'Har du redan en licens?'}
+              subtitle={
+                licenseKey
+                  ? keyEntry
+                    ? 'Flytta Lagom till en ny enhet genom att klistra in nyckeln där.'
+                    : 'Licensnyckeln som är sparad på den här enheten.'
+                  : 'Klistra in licensnyckeln från ditt köp – t.ex. för att använda Lagom på en ny telefon.'
+              }
+            />
+            <Card padding="md">
+              {licenseKey ? <LicenseManage /> : <LicenseActivation />}
+              {offersLicenseRecovery() && (
+                <div className="mt-3 border-t border-line pt-2">
+                  <LicenseRecovery />
+                </div>
+              )}
+            </Card>
+          </section>
+        )}
 
         <section aria-labelledby="premium-villkor">
-          <SectionHeading id="premium-villkor" title="Köpvillkor och integritet" subtitle="Kort och begripligt – det här gäller när du köper Lagom." />
+          <SectionHeading
+            id="premium-villkor"
+            title="Köpvillkor och integritet"
+            subtitle={web ? 'Kort och begripligt – det här gäller när du köper Lagom.' : 'Kort och begripligt – det här gäller när du köper Lagom i appen.'}
+          />
           <Card padding="md">
             <TermsContent />
           </Card>
@@ -178,16 +210,16 @@ export default function PremiumPage() {
             <p className="text-[0.9375rem] leading-relaxed text-ink">Ingen brådska – din data finns kvar oavsett vad du väljer.</p>
             {offered.length > 0 && (
               <Button variant="soft" size="sm" iconLeft={Sprout} onClick={() => document.getElementById('premium-planer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                Till priserna
+                {web ? 'Till priserna' : 'Till köpet'}
               </Button>
             )}
           </Card>
         )}
 
-        <SellerFooter />
+        {web && <SellerFooter />}
       </div>
 
-      <CheckoutSheet plan={plan} open={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={confirm} busy={busy} error={error} />
+      {web && <CheckoutSheet plan={plan} open={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={confirm} busy={busy} error={error} />}
     </div>
   )
 }

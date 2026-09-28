@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Integritetspolicy – Lagom</title>
+    <meta name="description" content="Så hanterar Lagom dina uppgifter: dagboken stannar på din enhet, ingen reklam och ingen spårning." />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f3ec;
+        --surface: #ffffff;
+        --surface-2: #efeae0;
+        --line: #e3dccd;
+        --ink: #16201c;
+        --ink-2: #48524d;
+        --ink-3: #5c645f;
+        --gran: #1f5a43;
+        --fyll: #fbead0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1210;
+          --surface: #131c19;
+          --surface-2: #1a2522;
+          --line: #26332e;
+          --ink: #eeebe3;
+          --ink-2: #b9beb8;
+          --ink-3: #99a29c;
+          --gran: #6cc49a;
+          --fyll: #3a2b16;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink-2);
+        font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+      h1, h2, h3 { color: var(--ink); font-family: Fraunces, Georgia, "Times New Roman", serif; line-height: 1.2; letter-spacing: -0.01em; }
+      h1 { font-size: 2rem; margin: 0.25rem 0 0.5rem; }
+      h2 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { margin: 0.5rem 0 0; }
+      a { color: var(--gran); font-weight: 600; text-underline-offset: 2px; }
+      a:focus-visible { outline: 2px solid var(--gran); outline-offset: 2px; border-radius: 4px; }
+      .eyebrow { margin: 0; color: var(--ink-3); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .meta { color: var(--ink-3); font-size: 0.875rem; }
+      .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem; margin-top: 1rem; }
+      .omfang { color: var(--ink-3); font-size: 0.8125rem; font-weight: 600; margin: 0 0 0.25rem; }
+      nav ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+      nav li { margin: 0.25rem 0; }
+      ul, ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+      li { margin: 0.375rem 0; }
+      .fyll { background: var(--fyll); border-radius: 0.25rem; padding: 0 0.2em; }
+      table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.875rem; }
+      th, td { text-align: left; vertical-align: top; padding: 0.5rem; border-top: 1px solid var(--line); }
+      th { color: var(--ink); background: var(--surface-2); }
+      @media (max-width: 40rem) {
+        thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        table, tbody, tr, td { display: block; width: 100%; }
+        tr { background: var(--surface-2); border-radius: 1rem; padding: 0.5rem 0.75rem; margin-top: 0.625rem; }
+        td { border: 0; padding: 0.25rem 0; }
+        td:first-child { color: var(--ink); font-weight: 600; }
+        td + td::before { content: attr(data-label) ": "; color: var(--ink-3); font-weight: 600; }
+      }
+      footer { margin-top: 2rem; color: var(--ink-3); font-size: 0.875rem; }
+    </style>
+  </head>
+  <body>
+    <!-- Genereras från src/features/legal/legalContent.ts – ändra texten där och kör: npx vitest run src/features/legal -u -->
+    <main>
+      <header>
+        <p class="eyebrow">Lagom</p>
+        <h1>Integritetspolicy</h1>
+        <p class="meta">Version 2026-10-01 · gäller från 1 oktober 2026</p>
+      </header>
+      <nav class="kort" aria-label="Innehåll">
+        <h2>Innehåll</h2>
+        <ol>
+          <li><a href="#ansvarig">Vem ansvarar för dina uppgifter</a></li>
+          <li><a href="#dagbok">Din dagbok finns bara på din enhet</a></li>
+          <li><a href="#lagring">Lagring på din enhet</a></li>
+          <li><a href="#tjanster">Tjänster som appen kontaktar</a></li>
+          <li><a href="#kameran">Kameran</a></li>
+          <li><a href="#kop">När du köper</a></li>
+          <li><a href="#rattslig-grund">Varför vi får behandla uppgifterna</a></li>
+          <li><a href="#lagringstid">Hur länge vi sparar</a></li>
+          <li><a href="#mottagare">Mottagare och överföringar utanför EU</a></li>
+          <li><a href="#barn">Barn och unga</a></li>
+          <li><a href="#ingen-sparning">Ingen reklam, ingen spårning</a></li>
+          <li><a href="#rattigheter">Dina rättigheter</a></li>
+          <li><a href="#andringar">Ändringar i policyn</a></li>
+          <li><a href="#kontakt">Kontakt</a></li>
+        </ol>
+      </nav>
+      <section class="kort" id="ansvarig" aria-labelledby="ansvarig-rubrik">
+        <h2 id="ansvarig-rubrik">Vem ansvarar för dina uppgifter</h2>
+        <p>Lagom är en svensk kalori- och näringsdagbok. Den här policyn gäller Lagom på webben och i App Store och Google Play. Den förklarar vilka uppgifter som behandlas, varför, och vad du själv kan göra.</p>
+        <p>Personuppgiftsansvarig är <span class="fyll">[Företagsnamn]</span>, enskild firma med organisationsnummer <span class="fyll">[Org.nr]</span>, <span class="fyll">[Adress]</span>. Du når oss på <span class="fyll">[E-post]</span>.</p>
+        <p>Kort sagt: din dagbok stannar på din enhet. Vi behandlar bara de uppgifter som behövs när du köper en licens, när du kontaktar oss och när appen hämtas från vår server.</p>
+      </section>
+      <section class="kort" id="dagbok" aria-labelledby="dagbok-rubrik">
+        <h2 id="dagbok-rubrik">Din dagbok finns bara på din enhet</h2>
+        <p>Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara på din enhet, i webbläsaren eller i appen. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.</p>
+        <p>Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.</p>
+        <p>Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort enheten eller rensar webbläsaren försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.</p>
+      </section>
+      <section class="kort" id="lagring" aria-labelledby="lagring-rubrik">
+        <h2 id="lagring-rubrik">Lagring på din enhet</h2>
+        <p>Lagom sparar det som behövs för att appen ska fungera i enhetens lagring: IndexedDB, localStorage, sessionStorage och service workerns cache. Inget av det används för reklam eller spårning, och inget skickas till oss. All lagring är nödvändig för tjänsten du har bett om, så Lagom behöver inte fråga om samtycke till kakor.</p>
+        <table>
+          <thead><tr><th scope="col">Vad</th><th scope="col">Var</th><th scope="col">Varför</th><th scope="col">Hur länge</th><th scope="col">Så rensar du</th></tr></thead>
+          <tbody>
+            <tr><td data-label="Vad">Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering och inställningar</td><td data-label="Var">IndexedDB</td><td data-label="Varför">Det är själva dagboken – appen fungerar inte utan den</td><td data-label="Hur länge">Tills du raderar den</td><td data-label="Så rensar du">Inställningar → Data → Radera all data</td></tr>
+            <tr><td data-label="Vad">Licens och när provperioden startade</td><td data-label="Var">IndexedDB</td><td data-label="Varför">För att veta om Lagom är upplåst</td><td data-label="Hur länge">Tills du tar bort den. Provperiodens startdatum finns kvar när du raderar din data, så att provperioden inte börjar om</td><td data-label="Så rensar du">Licensen: Inställningar → Data → Radera all data med valet Ta även bort licensen. Provperiodens startdatum: rensa webbplatsens data eller avinstallera appen</td></tr>
+            <tr><td data-label="Vad">Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet återbetalades</td><td data-label="Var">localStorage (lagom-sparrlista)</td><td data-label="Varför">Så att en återkallad licens slutar gälla även utan uppkoppling</td><td data-label="Hur länge">Tills en nyare lista hämtas</td><td data-label="Så rensar du">Rensa webbplatsens data eller avinstallera appen</td></tr>
+            <tr><td data-label="Vad">Tema (ljust eller mörkt)</td><td data-label="Var">localStorage (lagom-theme)</td><td data-label="Varför">Så att appen startar i rätt färger utan att blinka</td><td data-label="Hur länge">Tills du byter tema</td><td data-label="Så rensar du">Inställningar → Utseende och visning, eller rensa webbplatsens data</td></tr>
+            <tr><td data-label="Vad">Små visningsval, till exempel dolda tips och pausad animation</td><td data-label="Var">localStorage</td><td data-label="Varför">Så att appen minns dina val</td><td data-label="Hur länge">Tills du ändrar dem</td><td data-label="Så rensar du">Rensa webbplatsens data</td></tr>
+            <tr><td data-label="Vad">När varje del av dagboken senast sparades – bara en slumpad tidsstämpel, ingen data</td><td data-label="Var">localStorage (lagom-sparad:…)</td><td data-label="Varför">Så att flera öppna flikar med Lagom inte skriver över varandras ändringar</td><td data-label="Hur länge">Tills du rensar webbplatsens data</td><td data-label="Så rensar du">Rensa webbplatsens data eller avinstallera appen</td></tr>
+            <tr><td data-label="Vad">Markering att exempeldata visas</td><td data-label="Var">localStorage (lagom-demo)</td><td data-label="Varför">Så att appen vet att det är exempeldata</td><td data-label="Hur länge">Tills du börjar med din egen profil</td><td data-label="Så rensar du">Börja med din egen profil, eller Inställningar → Data → Radera all data</td></tr>
+            <tr><td data-label="Vad">När du senast sparade en säkerhetskopia</td><td data-label="Var">localStorage (lagom-last-backup)</td><td data-label="Varför">För att påminna dig om att spara en ny</td><td data-label="Hur länge">Tills du raderar din data</td><td data-label="Så rensar du">Inställningar → Data → Radera all data</td></tr>
+            <tr><td data-label="Vad">Fellogg: högst 20 korta felbeskrivningar, utan livsmedel och värden</td><td data-label="Var">localStorage (lagom-error-log)</td><td data-label="Varför">För felsökning – den skickas bara om du själv mejlar den till oss</td><td data-label="Hur länge">De 20 senaste felen</td><td data-label="Så rensar du">Om Lagom → Felsökning → Rensa felloggen</td></tr>
+            <tr><td data-label="Vad">Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet, om appen startats från Google Play och när appen senast laddades om efter en uppdatering</td><td data-label="Var">sessionStorage (lagom-korg, lagom-onboarding, lagom-twa, lagom-chunk-reload)</td><td data-label="Varför">Så att inget försvinner om sidan laddas om – och så att appen inte laddas om gång på gång efter en uppdatering</td><td data-label="Hur länge">Tills du stänger fliken eller appen</td><td data-label="Så rensar du">Stäng fliken eller appen</td></tr>
+            <tr><td data-label="Vad">Appens filer, Livsmedelsverkets databas och produktbilder du har visat</td><td data-label="Var">Service workerns cache</td><td data-label="Varför">Så att appen startar snabbt och fungerar utan uppkoppling</td><td data-label="Hur länge">Tills en ny version ersätter filerna. Produktbilder högst 60 dagar</td><td data-label="Så rensar du">Rensa webbplatsens data i webbläsaren eller avinstallera appen</td></tr>
+          </tbody>
+        </table>
+        <p>Allt rensas också om du tar bort webbplatsens data i webbläsarens inställningar eller avinstallerar appen.</p>
+      </section>
+      <section class="kort" id="tjanster" aria-labelledby="tjanster-rubrik">
+        <h2 id="tjanster-rubrik">Tjänster som appen kontaktar</h2>
+        <p>För att appen ska fungera kontaktar den några tjänster på internet. Varje gång det sker ser mottagaren din IP-adress – så fungerar internet. Din dagbok, ditt namn och din e-post skickas aldrig med.</p>
+        <ul>
+          <li>Netlify, vårt webbhotell: när du öppnar Lagom på webben eller i Google Play-appen hämtas appen därifrån, och där körs också våra serverfunktioner – för köp, för spärrlistan över återkallade licenser och för receptimport. Netlify sparar IP-adressen en kort tid i sina loggar, och våra funktioner använder den en kort stund för att begränsa missbruk.</li>
+          <li>Open Food Facts: när du söker efter livsmedel online, skannar en streckkod eller visar en produktbild skickas sökordet eller streckkoden dit, och bilden hämtas från deras server. Open Food Facts är en ideell förening i Frankrike och ansvarar själv för sin behandling – läs deras <a href="https://world.openfoodfacts.org/privacy" rel="noopener noreferrer">integritetspolicy</a>.</li>
+          <li>Livsmedelsverket: bara om du själv väljer att hämta hela databasen under Inställningar → Livsmedelsdatabas. Då anropas Livsmedelsverkets öppna API direkt från din enhet.</li>
+          <li>Receptimport: om du hämtar ett recept från en webbadress skickas adressen till vår serverfunktion, som hämtar receptet åt dig. Adressen sparas inte – går hämtningen inte att göra loggas bara webbplatsens namn, för felsökning.</li>
+          <li>App Store och Google Play: när du köper i appen eller trycker på Återställ köp kontaktar appen butiken via din telefon.</li>
+          <li>Stripe: när du köper en licens på webben (se ”När du köper”).</li>
+          <li>Spärrlistan: har du aktiverat en licensnyckel hämtar appen ungefär en gång per dygn en lista över licenser som har återkallats, till exempel för att köpet återbetalades. Inget om dig skickas med – kontrollen görs på enheten.</li>
+        </ul>
+      </section>
+      <section class="kort" id="kameran" aria-labelledby="kameran-rubrik">
+        <h2 id="kameran-rubrik">Kameran</h2>
+        <p>Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.</p>
+      </section>
+      <section class="kort" id="kop" aria-labelledby="kop-rubrik">
+        <h2 id="kop-rubrik">När du köper</h2>
+        <p>I App Store och Google Play sköter Apple respektive Google betalningen. Appen får bara en bekräftelse på köpet – vilken licens och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Apple och Google ansvarar själva för sin behandling.</p>
+        <p>På webben sköter Stripe betalningen. Stripe behandlar din e-postadress, ditt namn, land, betalkortsuppgifter (eller uppgifter för det betalsätt du väljer) och köp-id. Vi ser köpet i Stripe – e-post, namn, land, belopp, licens och köp-id – men aldrig dina kortuppgifter. Vid köpet sparas köp-id, licenstyp och när du samtyckte till omedelbar leverans på köpet hos Stripe – vi har ingen egen databas – så att vi kan utfärda licensen, hjälpa dig om du tappar nyckeln, spärra licensen om köpet återbetalas och sköta bokföringen.</p>
+        <p>Licensnyckeln innehåller inte ditt namn eller din e-post – bara licenstyp, datum och ett köp-id som vi kan koppla till betalningen om du behöver hjälp.</p>
+        <p>Tappar du nyckeln kan du be om den igen med din e-post och ditt kvittonummer. Uppgifterna skickas via vår serverfunktion till Stripe för att hitta köpet och sparas inte hos oss.</p>
+      </section>
+      <section class="kort" id="rattslig-grund" aria-labelledby="rattslig-grund-rubrik">
+        <h2 id="rattslig-grund-rubrik">Varför vi får behandla uppgifterna</h2>
+        <p>Vi behandlar bara personuppgifter när dataskyddsförordningen (GDPR) ger stöd för det:</p>
+        <ul>
+          <li>Avtal (artikel 6.1 b): för att sälja och leverera licensen, hjälpa dig med köpet och ge dig de funktioner du ber om, till exempel sökning och streckkodsläsning.</li>
+          <li>Rättslig förpliktelse (artikel 6.1 c): för att bokföra köpet enligt bokföringslagen.</li>
+          <li>Berättigat intresse (artikel 6.1 f): för säkerhet, för att begränsa missbruk av våra serverfunktioner, för spärrlistan över återkallade licenser och för att kunna svara när du kontaktar oss. Du kan invända mot sådan behandling (se ”Dina rättigheter”).</li>
+        </ul>
+      </section>
+      <section class="kort" id="lagringstid" aria-labelledby="lagringstid-rubrik">
+        <h2 id="lagringstid-rubrik">Hur länge vi sparar</h2>
+        <ul>
+          <li>Bokföringsunderlag, till exempel kvitton och utbetalningsrapporter: så länge bokföringslagen kräver (7 kap. 2 §) – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.</li>
+          <li>Supportmejl: i 24 månader efter vår senaste kontakt, om de inte behövs längre för en pågående reklamation eller för bokföringen.</li>
+          <li>Serverloggar hos Netlify: enligt Netlifys lagringstid för loggar.</li>
+          <li>Anropsbegränsning: IP-adressen finns bara i serverns minne i några minuter.</li>
+          <li>Din dagbok: tills du själv raderar den – vi har ingen kopia.</li>
+          <li>Köp på webben: uppgifterna om köpet finns kvar hos Stripe lika länge som bokföringsunderlaget. Stripe sparar också uppgifter enligt sina egna regler.</li>
+        </ul>
+        <p>Apple och Google sparar uppgifter om köp i butikerna enligt sina egna regler.</p>
+      </section>
+      <section class="kort" id="mottagare" aria-labelledby="mottagare-rubrik">
+        <h2 id="mottagare-rubrik">Mottagare och överföringar utanför EU</h2>
+        <p>Vi säljer aldrig uppgifter och lämnar inte ut dem till någon annan, om vi inte måste enligt lag. De här tar emot uppgifter för vår räkning som personuppgiftsbiträden:</p>
+        <ul>
+          <li>Netlify, Inc. (USA) – webbhotell och serverfunktioner.</li>
+          <li>Vår e-posttjänst – när du mejlar oss.</li>
+          <li>Stripe (Stripe Payments Europe Ltd, Irland) – betalningar på webben. Stripe är vårt personuppgiftsbiträde för själva betalningen, men självständigt personuppgiftsansvarig för till exempel bedrägerikontroll och lagkrav.</li>
+        </ul>
+        <p>Våra biträden kan föra över uppgifter till USA. Det sker med stöd av EU–US Data Privacy Framework (för certifierade företag) och EU-kommissionens standardavtalsklausuler.</p>
+        <p>Apple, Google, Open Food Facts och Livsmedelsverket är själva ansvariga för den behandling de gör när du använder deras tjänster.</p>
+      </section>
+      <section class="kort" id="barn" aria-labelledby="barn-rubrik">
+        <h2 id="barn-rubrik">Barn och unga</h2>
+        <p>Lagom är avsett för vuxna. Är du under 18 år – prata med en vuxen eller skolsköterskan om mat och vikt; Lagom ger aldrig underskott för dig som är under 18.</p>
+        <p>Du som är under 13 år kan inte använda Lagom. Din dagbok stannar på enheten oavsett ålder – vi får inga uppgifter om dig när du använder appen. För att köpa en licens som omyndig behövs normalt vårdnadshavarens godkännande.</p>
+      </section>
+      <section class="kort" id="ingen-sparning" aria-labelledby="ingen-sparning-rubrik">
+        <h2 id="ingen-sparning-rubrik">Ingen reklam, ingen spårning</h2>
+        <p>Lagom visar ingen reklam och innehåller inga analysverktyg, spårningspixlar, reklam-id eller andra tredjepartsskript. Vi bygger inga profiler om dig, fattar inga automatiska beslut och säljer aldrig uppgifter.</p>
+        <p>Skulle vi någon gång vilja lägga till något sådant frågar vi om ditt samtycke först och uppdaterar den här policyn.</p>
+      </section>
+      <section class="kort" id="rattigheter" aria-labelledby="rattigheter-rubrik">
+        <h2 id="rattigheter-rubrik">Dina rättigheter</h2>
+        <p>Du har rätt att:</p>
+        <ul>
+          <li>Få veta vilka uppgifter vi har om dig och få en kopia (registerutdrag).</li>
+          <li>Få felaktiga uppgifter rättade.</li>
+          <li>Få uppgifter raderade – bokföringsunderlag måste vi dock spara så länge lagen kräver.</li>
+          <li>Få ut dina uppgifter i ett maskinläsbart format (dataportabilitet). Din dagbok exporterar du själv under Inställningar → Data.</li>
+          <li>Invända mot behandling som bygger på vårt berättigade intresse, och begära att behandlingen begränsas.</li>
+        </ul>
+        <p>Din dagbok raderar du själv under Inställningar → Data – vi har ingen kopia. För uppgifter om köp och support: mejla <span class="fyll">[E-post]</span>. Vi svarar inom en månad.</p>
+        <p>Tycker du att vi behandlar uppgifter fel kan du klaga hos Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" rel="noopener noreferrer">imy.se</a>.</p>
+      </section>
+      <section class="kort" id="andringar" aria-labelledby="andringar-rubrik">
+        <h2 id="andringar-rubrik">Ändringar i policyn</h2>
+        <p>Vi uppdaterar policyn när Lagom ändras, till exempel om en ny tjänst kopplas in. Datumet överst visar vilken version som gäller. Om större ändringar berättar vi i appen innan de börjar gälla.</p>
+      </section>
+      <section class="kort" id="kontakt" aria-labelledby="kontakt-rubrik">
+        <h2 id="kontakt-rubrik">Kontakt</h2>
+        <p>Frågor om integritet och dina uppgifter: <span class="fyll">[E-post]</span>.</p>
+        <p>Post: <span class="fyll">[Företagsnamn]</span>, <span class="fyll">[Adress]</span>.</p>
+        <p>Läs också <a href="../villkor/">köp- och användarvillkoren</a>.</p>
+      </section>
+      <footer>
+        <p><a href="../villkor/">Köp- och användarvillkor</a> · <a href="../">Öppna Lagom</a></p>
+      </footer>
+    </main>
+  </body>
+</html>

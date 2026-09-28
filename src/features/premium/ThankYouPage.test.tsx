@@ -47,6 +47,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 describe('ThankYouPage', () => {
@@ -62,6 +63,8 @@ describe('ThankYouPage', () => {
     expect(screen.getByText(/Livstidslicens · aktiverad/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Till Idag' })).toHaveAttribute('href', '/')
     expect(requireAccess('mat')).toBe(true)
+    // I webbläsaren (inte hemskärmen): påminnelsen om att hemskärmsappen sparar data för sig.
+    expect(screen.getByRole('note')).toHaveTextContent('Har du Lagom på hemskärmen?')
   })
 
   it('före profilen leder vidare till välkomstflödet', async () => {
@@ -87,6 +90,10 @@ describe('ThankYouPage', () => {
     expect(await screen.findByRole('heading', { name: 'Licensen kunde inte hämtas' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('Vi hittar inget genomfört köp')
     expect(screen.getByRole('link', { name: 'Mejla supporten' })).toHaveAttribute('href', expect.stringContaining('cs_test_x'))
+    expect(
+      screen.getByText('Har du betalat? Då finns betalningen hos Stripe – försök igen om en stund, eller mejla oss kvittot så skickar vi licensen.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/köpet är registrerat/)).not.toBeInTheDocument()
     expect(useLicenseStore.getState().licenseKey).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Försök igen' }))
     expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' })).toBeInTheDocument()
@@ -114,9 +121,41 @@ describe('ThankYouPage', () => {
     expect(screen.getByTestId('licensnyckel')).toHaveTextContent('LAGOM1.trasig.nyckel')
   })
 
-  it('utan session-id: förklarar och länkar till köpsidan', () => {
+  it('utan session-id: förklarar och länkar till köpsidan (inget råd om en nyckel som inte finns)', () => {
     renderAt('/tack')
     expect(screen.getByRole('heading', { name: 'Vi hittar inget köp i adressen' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Till Lagom Premium' })).toHaveAttribute('href', '/premium')
+    expect(screen.queryByText(/lösenordshanterare/)).not.toBeInTheDocument()
+  })
+
+  it('installerad på hemskärmen: ingen påminnelse om hemskärmen', async () => {
+    const original = window.matchMedia
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({ matches: query === '(display-mode: standalone)', media: query })) as typeof window.matchMedia
+    try {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ licenseKey: createTestLicense('ar', 365) }))
+      renderAt('/tack?session_id=cs_test_hem')
+      expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' })).toBeInTheDocument()
+      expect(screen.queryByText(/Har du Lagom på hemskärmen/)).not.toBeInTheDocument()
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
+  it('i butiksappar finns inga webbköp – skickar vidare till köpsidan utan att anropa servern', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const { default: FreshThankYou } = await import('./ThankYouPage')
+    const router = createMemoryRouter(
+      [
+        { path: '/tack', element: <FreshThankYou /> },
+        { path: '/premium', element: <p>Köpsidan</p> },
+      ],
+      { initialEntries: ['/tack?session_id=cs_test_app'] },
+    )
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByText('Köpsidan')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/premium')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

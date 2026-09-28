@@ -28,7 +28,9 @@ export interface ClimateFactor {
   source: string
 }
 
-const RISE = 'RISE Klimatdatabas (Öppna listan 2022)'
+/** Källans fullständiga namn (samma som under Om Lagom). */
+export const RISE_SOURCE = 'Öppna listan – ett utdrag från RISE klimatdatabas för livsmedel v 2.1 (2022)'
+const RISE = RISE_SOURCE
 const EST = 'Lagoms uppskattning'
 
 /** Klimatschablon per kategori (kg CO2e per kg ätlig vara, som den registreras). */
@@ -42,18 +44,18 @@ export const CATEGORY_CO2E: Record<FoodCategory, ClimateFactor> = {
   baljvaxter: { kgPerKg: 0.4, source: `${EST} utifrån ${RISE}` },
   notter_fron: { kgPerKg: 1.5, source: EST },
   spannmal: { kgPerKg: 0.6, source: EST },
-  brod: { kgPerKg: 0.7, source: `${RISE} (mjukt vetebröd)` },
+  brod: { kgPerKg: 0.7, source: `${RISE}: mjukt vetebröd` },
   // RISE: okokt spagetti 0,8 kg/kg. Ris har betydligt högre avtryck (se nyckelord nedan).
-  pasta_ris: { kgPerKg: 0.8, source: `${RISE} (spagetti, okokt)` },
+  pasta_ris: { kgPerKg: 0.8, source: `${RISE}: spagetti, okokt` },
   mejeri: { kgPerKg: 1.3, source: `${EST} (RISE: mjölk 0,9–1,3 kg/kg)` },
   ost: { kgPerKg: 11, source: RISE },
   agg: { kgPerKg: 1.4, source: RISE },
   // Viktat snitt av svensk konsumtion av nöt (28) och fläsk (4,4) – nyckelord förfinar per djurslag.
   rott_kott: { kgPerKg: 14, source: `${EST} utifrån ${RISE}` },
   chark: { kgPerKg: 6, source: `${EST} (mest fläskbaserad)` },
-  fagel: { kgPerKg: 3.3, source: `${RISE} (kyckling)` },
+  fagel: { kgPerKg: 3.3, source: `${RISE}: kyckling` },
   fisk: { kgPerKg: 2.5, source: `${EST} (RISE: laxfilé 2,3)` },
-  skaldjur: { kgPerKg: 7, source: `${RISE} (räkor utan skal)` },
+  skaldjur: { kgPerKg: 7, source: `${RISE}: räkor utan skal` },
   vegoprotein: { kgPerKg: 1.5, source: EST },
   vaxtdryck: { kgPerKg: 0.4, source: EST },
   // Rapsolja och margarin dominerar; smör (7 kg/kg enligt RISE) fångas med nyckelord.
@@ -63,9 +65,9 @@ export const CATEGORY_CO2E: Record<FoodCategory, ClimateFactor> = {
   bakverk: { kgPerKg: 1.5, source: EST },
   glass_dessert: { kgPerKg: 2, source: EST },
   snacks: { kgPerKg: 1.8, source: EST },
-  dryck: { kgPerKg: 0.2, source: `${RISE} (bryggt kaffe 0,2 kg/l)` },
+  dryck: { kgPerKg: 0.2, source: `${RISE}: bryggt kaffe 0,2 kg/l` },
   lask_saft: { kgPerKg: 0.2, source: `${EST} (RISE: läsk ca 0,1 kg/l)` },
-  juice: { kgPerKg: 0.6, source: `${RISE} (apelsinjuice)` },
+  juice: { kgPerKg: 0.6, source: `${RISE}: apelsinjuice` },
   alkohol: { kgPerKg: 0.9, source: `${EST} (RISE: öl 0,6 kg/l; vin och sprit högre)` },
   fardigratt: { kgPerKg: 2.5, source: EST },
   snabbmat: { kgPerKg: 4, source: EST },
@@ -90,18 +92,20 @@ export const NAME_CO2E_RULES: ReadonlyArray<{ pattern: RegExp; categories?: read
   // Vilt först, så att t.ex. "älgkalv" inte räknas som nötkött.
   { pattern: GAME, categories: ['rott_kott', 'chark'], kgPerKg: 1.5, source: `${EST} (vilt från jakt saknar foder- och djurhållningsutsläpp)` },
   { pattern: /blandfärs/, categories: ['rott_kott'], kgPerKg: 16, source: `${EST} (hälften nöt, hälften fläsk enligt ${RISE})` },
-  { pattern: LAMB, categories: ['rott_kott', 'chark'], kgPerKg: 21, source: 'RISE Klimatdatabas v 1.7 (svenskt lammkött)' },
-  { pattern: BEEF, categories: ['rott_kott', 'chark'], kgPerKg: 28, source: `${RISE} (nötkött)` },
+  // Värdet för svenskt lammkött kommer från en äldre version av RISE klimatdatabas och har inte
+  // kunnat stämmas av mot Öppna listan v 2.1 – därför redovisas det som Lagoms uppskattning.
+  { pattern: LAMB, categories: ['rott_kott', 'chark'], kgPerKg: 21, source: `${EST} (svenskt lammkött)` },
+  { pattern: BEEF, categories: ['rott_kott', 'chark'], kgPerKg: 28, source: `${RISE}: nötkött` },
   // Sammansatta rätter och hamburgare med nöt- eller lammkött: ungefär en tredjedel kött per vikt.
   { pattern: BEEF_BURGER, categories: ['snabbmat', 'fardigratt'], kgPerKg: 10, source: `${EST} (ca en tredjedel nötkött)` },
   { pattern: new RegExp(`${BEEF.source}|${LAMB.source}|blandfärs`), categories: ['fardigratt'], kgPerKg: 8, source: `${EST} (ca en tredjedel nöt- eller lammkött)` },
-  { pattern: PORK, categories: ['rott_kott', 'chark'], kgPerKg: 4.4, source: `${RISE} (fläskkött)` },
-  { pattern: /kyckling|kalkon/, categories: ['fagel', 'chark'], kgPerKg: 3.3, source: `${RISE} (kyckling)` },
-  { pattern: /lax/, categories: ['fisk'], kgPerKg: 2.3, source: `${RISE} (laxfilé)` },
+  { pattern: PORK, categories: ['rott_kott', 'chark'], kgPerKg: 4.4, source: `${RISE}: fläskkött` },
+  { pattern: /kyckling|kalkon/, categories: ['fagel', 'chark'], kgPerKg: 3.3, source: `${RISE}: kyckling` },
+  { pattern: /lax/, categories: ['fisk'], kgPerKg: 2.3, source: `${RISE}: laxfilé` },
   { pattern: /mussl/, categories: ['skaldjur'], kgPerKg: 0.3, source: `${EST} (odlade musslor har mycket lågt avtryck)` },
-  { pattern: /smör/, categories: ['fett_olja'], kgPerKg: 7, source: `${RISE} (smör)` },
-  { pattern: /margarin/, categories: ['fett_olja'], kgPerKg: 1.1, source: `${RISE} (margarin)` },
-  { pattern: RICE, categories: ['pasta_ris'], kgPerKg: 3.1, source: `${RISE} (jasminris, okokt)` },
+  { pattern: /smör/, categories: ['fett_olja'], kgPerKg: 7, source: `${RISE}: smör` },
+  { pattern: /margarin/, categories: ['fett_olja'], kgPerKg: 1.1, source: `${RISE}: margarin` },
+  { pattern: RICE, categories: ['pasta_ris'], kgPerKg: 3.1, source: `${RISE}: jasminris, okokt` },
   { pattern: /grädde/, categories: ['mejeri'], kgPerKg: 4, source: `${EST} (grädde kräver mycket mjölk)` },
 ]
 

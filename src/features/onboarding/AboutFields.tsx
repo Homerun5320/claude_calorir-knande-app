@@ -4,7 +4,7 @@
  */
 import { useId, type ReactNode } from 'react'
 import { Baby, Info, LifeBuoy } from 'lucide-react'
-import { NumberField, SegmentedControl, TextField, cx } from '../../components/ui'
+import { ExternalLink, NumberField, SegmentedControl, TextField, cx } from '../../components/ui'
 import type { ISODate, LifeStage, Sex } from '../../types'
 import {
   LIFE_STAGE_OPTIONS,
@@ -162,11 +162,11 @@ export function AboutFields({ draft, onChange, errors, visibleErrors, onBlurFiel
       {blocked && <Note>{blocked} Du kan ändra målet när som helst i Inställningar.</Note>}
       {minor && !blocked && (
         <Note tone="mossa" icon={LifeBuoy}>
-          Du som är under 18 år växer fortfarande och behöver mycket energi och näring. Om du funderar på din vikt – prata gärna med
-          skolsköterskan, elevhälsan eller{' '}
-          <a href="https://www.1177.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+          Lagom är i första hand gjord för vuxna. Du som är under 18 år växer fortfarande och behöver mycket energi och näring – därför ger Lagom
+          aldrig något underskott för dig. Om du funderar på mat eller vikt – prata gärna med en vuxen, skolsköterskan, elevhälsan eller{' '}
+          <ExternalLink href="https://www.1177.se" className="font-semibold text-gran underline underline-offset-2">
             1177 Vårdguiden
-          </a>{' '}
+          </ExternalLink>{' '}
           först.
         </Note>
       )}

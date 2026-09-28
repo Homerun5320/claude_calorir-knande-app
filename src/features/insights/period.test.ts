@@ -1,4 +1,4 @@
-import { formatDateRange, makePeriod, parsePeriodKind, parseWeekOffset, previousPeriod, withCountedDays } from './period'
+import { formatDateRange, makePeriod, makeRollingPeriod, parsePeriodKind, parseWeekOffset, previousPeriod, REPORT_DAYS, withCountedDays } from './period'
 
 const TODAY = '2026-09-26' // lördag, vecka 39
 
@@ -111,5 +111,20 @@ describe('withCountedDays – idag räknas först när dagen är klar', () => {
     const p = withCountedDays(makePeriod('30', 0, TODAY), TODAY, false, has)
     expect(p.elapsed).toHaveLength(29)
     expect(p.elapsed.at(-1)).toBe('2026-09-25')
+  })
+
+  it('bygger rapportens rullande perioder (7, 14 och 30 dagar)', () => {
+    expect(REPORT_DAYS).toEqual([7, 14, 30])
+    const p = makeRollingPeriod(7, TODAY)
+    expect(p).toMatchObject({ kind: 'dagar', start: '2026-09-20', end: TODAY, title: 'Senaste 7 dagarna', range: '20–26 sep', isCurrent: true })
+    expect(p.dates).toHaveLength(7)
+    expect(p.elapsed).toEqual(p.dates)
+    expect(makeRollingPeriod(14, TODAY).phrase).toBe('de senaste 14 dagarna')
+    const prev = previousPeriod(makeRollingPeriod(14, TODAY), TODAY)
+    expect(prev.dates).toHaveLength(14)
+    expect(prev.end).toBe('2026-09-12')
+    // Orimliga värden ger en giltig period.
+    expect(makeRollingPeriod(0, TODAY).dates).toHaveLength(1)
+    expect(makeRollingPeriod(Number.NaN, TODAY).dates).toHaveLength(7)
   })
 })

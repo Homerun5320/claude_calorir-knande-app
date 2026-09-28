@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DiaryEntry, Food, FoodAlias, ISODate, MealId, MealTemplate, Recipe, UnitKey } from '../types'
 import { FOOD_ALIASES, aliasAmount, resolveFoodAlias } from '../data/foods/aliases'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 export interface FoodUsage {
   count: number
@@ -34,7 +34,7 @@ export function usageFromEntries(entries: Record<ISODate, readonly DiaryEntry[]>
       lastUsed: e.createdAt,
       lastAmount: last.amount,
       lastUnit: last.unit,
-      meals: { ...(cur?.meals ?? {}), [e.meal]: (cur?.meals?.[e.meal] ?? 0) + 1 },
+      meals: { ...cur?.meals, [e.meal]: (cur?.meals?.[e.meal] ?? 0) + 1 },
     }
   }
   return usage
@@ -176,7 +176,7 @@ export const useFoodStore = create<FoodState>()(
           lastUsed: Date.now(),
           lastAmount: amount,
           lastUnit: unit,
-          meals: { ...(cur?.meals ?? {}), [meal]: (cur?.meals?.[meal] ?? 0) + 1 },
+          meals: { ...cur?.meals, [meal]: (cur?.meals?.[meal] ?? 0) + 1 },
         }
         set({ usage: { ...get().usage, [foodId]: next } })
       },
@@ -187,7 +187,9 @@ export const useFoodStore = create<FoodState>()(
     {
       name: STORE_KEYS.food,
       storage: idbStorage,
-      version: 1,
+      version: PERSIST_VERSIONS[STORE_KEYS.food],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as FoodState,
       // Gamla livsmedels-id:n skrivs om vid varje inläsning (idempotent), så att nya alias i
       // databasen gäller även för redan sparad data utan att versionen behöver höjas. Migreringen
       // får aldrig stoppa inläsningen: kastar den behålls den sparade datan som den är – annars

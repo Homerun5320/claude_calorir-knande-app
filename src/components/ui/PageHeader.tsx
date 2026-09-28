@@ -5,6 +5,7 @@
  * scrollats ur bild tonar raden in en suddig bakgrund och visar rubriken i kompakt form.
  *
  * Placera först på sidan, inuti sidans `px-4`-behållare (raden går kant i kant via -mx-4).
+ * Vid utskrift döljs den klibbiga raden; den stora rubriken skrivs ut.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, type To } from 'react-router-dom'
@@ -95,7 +96,8 @@ export function PageHeader({
       <div
         ref={barRef}
         className={cx(
-          'pt-safe sticky top-0 z-30 -mx-4 px-2 transition-[background-color,box-shadow,backdrop-filter] duration-300',
+          // Knappraden (tillbaka, åtgärder) behövs inte på papper – rubriken nedanför skrivs ut.
+          'pt-safe sticky top-0 z-30 -mx-4 px-2 transition-[background-color,box-shadow,backdrop-filter] duration-300 print:hidden',
           elevated
             ? 'bg-bg/80 shadow-[0_1px_0_0_var(--lg-line)] backdrop-blur-xl backdrop-saturate-150'
             : 'bg-transparent shadow-[0_1px_0_0_transparent]',

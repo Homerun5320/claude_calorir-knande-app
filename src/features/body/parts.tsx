@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Scale } from 'lucide-react'
-import { Button, cx, toast } from '../../components/ui'
+import { Button, ExternalLink, cx, toast } from '../../components/ui'
 import { useProfileStore } from '../../stores/profileStore'
 import { directionOf, formatSignedKg } from './bodyLogic'
 
@@ -90,13 +90,13 @@ export function SwitchToMaintainButton({ className = 'mt-3' }: { className?: str
 export function SupportLinks() {
   return (
     <>
-      <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+      <ExternalLink href="https://www.1177.se/" className="font-semibold text-gran underline underline-offset-2">
         1177
-      </a>{' '}
+      </ExternalLink>{' '}
       och{' '}
-      <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+      <ExternalLink href="https://www.friskfri.se" className="font-semibold text-gran underline underline-offset-2">
         Frisk &amp; Fri
-      </a>
+      </ExternalLink>
     </>
   )
 }

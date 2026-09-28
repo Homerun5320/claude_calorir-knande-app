@@ -19,6 +19,8 @@ import type { Profile } from '../../types'
 import { BUILTIN_FOODS } from '../../data/foods'
 import { nutrientsForGrams, standardDrinks } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
+import { useLicenseStore } from '../../stores/licenseStore'
+import { BLOCKED_ACTION_TEXT, useAccessGateStore } from '../premium/requireAccess'
 
 const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore]
 
@@ -201,6 +203,27 @@ describe('Dryck', () => {
     expect(screen.queryByText('Om standardglas och risknivåer')).not.toBeInTheDocument()
     // Snabbvalen för kaffe och te finns kvar.
     expect(await screen.findByRole('button', { name: /Lägg till Bryggkaffe/ })).toBeInTheDocument()
+  })
+})
+
+describe('Dryck efter provperioden', () => {
+  afterEach(() => {
+    useLicenseStore.getState().resetLicenseState()
+    useAccessGateStore.setState({ blocked: null })
+  })
+
+  it('snabbvalen för kaffe och alkohol säger "logga dryck" – inte "logga mat"', async () => {
+    useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * 86_400_000, licenseKey: null, activatedAt: null })
+    renderAt('/dryck')
+    fireEvent.click(await screen.findByRole('button', { name: /Lägg till Bryggkaffe/ }))
+    expect(useDiaryStore.getState().entries[todayISO()] ?? []).toHaveLength(0)
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'dryck' })
+    expect(BLOCKED_ACTION_TEXT[useAccessGateStore.getState().blocked!.action!]).toBe('logga dryck')
+
+    useAccessGateStore.setState({ blocked: null })
+    fireEvent.click(await screen.findByRole('button', { name: /Lägg till Starköl/ }))
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'dryck' })
+    expect(useDiaryStore.getState().entries[todayISO()] ?? []).toHaveLength(0)
   })
 })
 

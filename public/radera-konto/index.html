@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Radera konto – Lagom</title>
+    <meta name="description" content="Så raderar du ditt konto i Lagom Moln och all krypterad data i molnet – i appen, i webbappen eller via e-post." />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <!--
+      Fristående sida (ingen JavaScript) om att radera kontot. Adressen anges i Google Play Console
+      (Datasäkerhet → "Delete account URL") och kan länkas från App Store Connect och supportsidan.
+      [Företagsnamn] och [E-post] ersätts med VITE_SELLER_NAME och VITE_SUPPORT_EMAIL när sidan
+      byggs (samma mekanism som integritetspolicyn, se src/features/legal/staticSeller.ts).
+      Konton finns bara när den frivilliga tjänsten Lagom Moln är påslagen (docs/BACKEND.md).
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f3ec;
+        --surface: #ffffff;
+        --surface-2: #efeae0;
+        --line: #e3dccd;
+        --ink: #16201c;
+        --ink-2: #48524d;
+        --ink-3: #5c645f;
+        --gran: #1f5a43;
+        --gran-soft: #dcebe2;
+        --fyll: #fbead0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1210;
+          --surface: #131c19;
+          --surface-2: #1a2522;
+          --line: #26332e;
+          --ink: #eeebe3;
+          --ink-2: #b9beb8;
+          --ink-3: #99a29c;
+          --gran: #6cc49a;
+          --gran-soft: #183329;
+          --fyll: #3a2b16;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink-2);
+        font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+      h1, h2 { color: var(--ink); font-family: Fraunces, Georgia, "Times New Roman", serif; line-height: 1.2; letter-spacing: -0.01em; }
+      h1 { font-size: 2rem; margin: 0.25rem 0 0.5rem; }
+      h2 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { margin: 0.5rem 0 0; }
+      a { color: var(--gran); font-weight: 600; text-underline-offset: 2px; }
+      a:focus-visible { outline: 2px solid var(--gran); outline-offset: 2px; border-radius: 4px; }
+      strong { color: var(--ink); font-weight: 600; }
+      .eyebrow { margin: 0; color: var(--ink-3); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .ingress { font-size: 1.0625rem; }
+      .meta { color: var(--ink-3); font-size: 0.875rem; }
+      .kort { background: var(--surface); border: 1px solid var(--line); border-radius: 1.5rem; padding: 1.25rem; margin-top: 1rem; }
+      .kontakt { background: var(--gran-soft); border-color: transparent; }
+      .kontakt a { word-break: break-all; }
+      ul, ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+      li { margin: 0.375rem 0; }
+      .fyll { background: var(--fyll); border-radius: 0.25rem; padding: 0 0.2em; }
+      .vag { color: var(--ink); font-weight: 600; }
+      footer { margin-top: 2rem; color: var(--ink-3); font-size: 0.875rem; }
+      footer a { display: inline-flex; align-items: center; min-height: 44px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Lagom</p>
+        <h1>Radera ditt konto</h1>
+        <p class="ingress">
+          Lagom är en svensk kalori- och näringsdagbok. De flesta som använder Lagom har inget konto alls – dagboken sparas bara på den egna
+          enheten. Ett konto finns bara om du har slagit på den frivilliga tjänsten <strong>Lagom Moln</strong>, en krypterad kopia av dagboken.
+        </p>
+        <p class="meta">Appens namn: Lagom. Utvecklare: <span class="fyll">[Företagsnamn]</span> (enskild firma).</p>
+      </header>
+
+      <section class="kort" aria-labelledby="i-appen">
+        <h2 id="i-appen">Radera kontot i appen eller webbappen</h2>
+        <ol>
+          <li>Öppna Lagom – appen i telefonen eller webbappen i webbläsaren.</li>
+          <li>Gå till <span class="vag">Inställningar → Lagom Moln</span>. Logga in med din e-postadress om du inte redan är inloggad (du får en kod via e-post).</li>
+          <li>Tryck på <span class="vag">Radera konto och molndata</span> och bekräfta med <span class="vag">Radera konto</span>.</li>
+          <li>
+            Vill du också tömma enheten: kryssa i <span class="vag">Radera också allt på den här enheten</span> innan du bekräftar. Annars finns din
+            data kvar på enheten.
+          </li>
+        </ol>
+        <p>Kontot raderas direkt. Det går inte att ångra.</p>
+      </section>
+
+      <section class="kort" aria-labelledby="vad-raderas">
+        <h2 id="vad-raderas">Det här raderas</h2>
+        <ul>
+          <li>Ditt konto i Lagom Moln och e-postadressen som hör till det.</li>
+          <li>All krypterad data i molnet: kopian av dagboken, vikt, kroppsmått, recept, egna livsmedel och inställningar.</li>
+          <li>Valvets inslagna (krypterade) nycklar och ditt samtycke.</li>
+          <li>Kopplingar mellan kontot och eventuella köp.</li>
+        </ul>
+        <p>
+          Molnleverantörens automatiska säkerhetskopior av databasen skrivs över inom 7 dagar. Innehållet i dem är krypterat på din enhet och kan
+          inte läsas av oss.
+        </p>
+      </section>
+
+      <section class="kort" aria-labelledby="finns-kvar">
+        <h2 id="finns-kvar">Det här finns kvar</h2>
+        <ul>
+          <li>Din data på enheten, om du inte väljer att radera den också. Du kan när som helst radera den under <span class="vag">Inställningar → Data → Radera all data</span> eller genom att avinstallera appen.</li>
+          <li>Köp i App Store eller Google Play finns kvar hos Apple respektive Google och kan återställas med <span class="vag">Återställ köp</span>.</li>
+          <li>Uppgifter om köp på webben som vi enligt bokföringslagen måste spara (kvitton och betalningsuppgifter hos betalningsleverantören Stripe och i vår bokföring) sparas så länge lagen kräver – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.</li>
+        </ul>
+      </section>
+
+      <section class="kort kontakt" aria-labelledby="utan-appen">
+        <h2 id="utan-appen">Har du inte längre appen?</h2>
+        <p>
+          Mejla <a href="mailto:[E-post]?subject=Radera%20mitt%20konto%20i%20Lagom%20Moln"><span class="fyll">[E-post]</span></a> från den e-postadress som
+          du använde för Lagom Moln och skriv att du vill att kontot raderas. Vi raderar kontot och all data i Lagom Moln och bekräftar via e-post
+          – utan onödigt dröjsmål och senast inom en månad.
+        </p>
+        <p>Skriv aldrig din lösenfras eller återställningsnyckel i mejlet – vi behöver dem inte och frågar aldrig efter dem.</p>
+      </section>
+
+      <section class="kort" aria-labelledby="utan-konto">
+        <h2 id="utan-konto">Använder du Lagom utan Lagom Moln?</h2>
+        <p>
+          Då finns inget konto och ingen data hos oss att radera. Allt ligger på din enhet: radera det under
+          <span class="vag">Inställningar → Data → Radera all data</span> eller avinstallera appen.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          <a href="../integritet/">Integritetspolicy</a> · <a href="../support/">Support</a> · <a href="../">Öppna Lagom</a>
+        </p>
+        <p>Lagom är en fristående app och är inte kopplad till Livsmedelsverket.</p>
+      </footer>
+    </main>
+  </body>
+</html>

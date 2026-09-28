@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { classifyCameraError, cleanManualCode, createScanGate, setTorch, stopStream, torchSupported } from './scanner'
 
 describe('createScanGate', () => {
@@ -76,5 +76,130 @@ describe('cleanManualCode', () => {
   it('behåller bara siffror, högst 14', () => {
     expect(cleanManualCode('7310 8650-0063 7')).toBe('7310865000637')
     expect(cleanManualCode('1234567890123456')).toBe('12345678901234')
+  })
+})
+
+describe('kamerafel per plattform', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('i webbläsaren hänvisar texterna till webbläsarens inställningar', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'web')
+    vi.resetModules()
+    const { CAMERA_ERROR_TEXT } = await import('./scanner')
+    expect(CAMERA_ERROR_TEXT.denied.text).toBe(
+      'Tillåt kameran för Lagom i webbläsarens inställningar. Försök sedan igen – eller skriv in siffrorna under streckkoden.',
+    )
+    expect(CAMERA_ERROR_TEXT.unsupported.text).toMatch(/^Webbläsaren kan inte använda kameran/)
+    expect(CAMERA_ERROR_TEXT.insecure.title).toBe('Kameran kräver en säker anslutning')
+  })
+
+  it('i App Store-bygget hänvisar texterna till telefonens Inställningar och nämner aldrig webbläsaren', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const { CAMERA_ERROR_TEXT, classifyCameraError, cameraAvailability } = await import('./scanner')
+    expect(CAMERA_ERROR_TEXT.denied.text).toMatch(/^Tillåt kameran för Lagom i telefonens Inställningar\./)
+    for (const t of Object.values(CAMERA_ERROR_TEXT)) {
+      expect(`${t.title} ${t.text}`).not.toMatch(/webbläsar|https|flik/i)
+    }
+    // "Säker anslutning" visas aldrig i appen.
+    expect(CAMERA_ERROR_TEXT.insecure).toEqual(CAMERA_ERROR_TEXT.unsupported)
+    const secure = Object.getOwnPropertyDescriptor(window, 'isSecureContext')
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true })
+    try {
+      expect(classifyCameraError({ name: 'SecurityError' })).toBe('denied')
+      expect(cameraAvailability()).not.toBe('insecure')
+    } finally {
+      if (secure) Object.defineProperty(window, 'isSecureContext', secure)
+      else delete (window as { isSecureContext?: boolean }).isSecureContext
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ZXing-reserven
+// ---------------------------------------------------------------------------
+
+const zxing = vi.hoisted(() => ({
+  options: undefined as { delayBetweenScanAttempts?: number } | undefined,
+  stop: vi.fn(),
+  fail: false,
+}))
+
+vi.mock('@zxing/browser', () => ({
+  BrowserMultiFormatReader: class {
+    constructor(_hints: unknown, options: { delayBetweenScanAttempts?: number }) {
+      zxing.options = options
+    }
+    async decodeFromStream() {
+      if (zxing.fail) throw new Error('ingen kamera')
+      // ZXing brusar i konsolen för varje bildruta utan streckkod.
+      console.warn('MultiFormatReader: non-ReaderException NotFoundException')
+      return { stop: zxing.stop }
+    }
+  },
+}))
+vi.mock('@zxing/library', () => ({
+  BarcodeFormat: { EAN_13: 1, EAN_8: 2, UPC_A: 3, UPC_E: 4 },
+  DecodeHintType: { POSSIBLE_FORMATS: 1 },
+}))
+
+describe('ZXing-reserven', () => {
+  const stream = {} as MediaStream
+  const video = {} as HTMLVideoElement
+
+  afterEach(() => {
+    zxing.fail = false
+    zxing.stop.mockReset()
+    vi.restoreAllMocks()
+  })
+
+  it('läser var 250:e ms, filtrerar bort brusvarningarna och återställer console.warn vid stop()', async () => {
+    const original = console.warn
+    const spy = vi.fn()
+    console.warn = spy
+    try {
+      const { startBarcodeScanner, ZXING_INTERVAL_MS } = await import('./scanner')
+      expect(ZXING_INTERVAL_MS).toBe(250)
+      const scanner = await startBarcodeScanner(video, stream, () => {})
+      expect(scanner.engine).toBe('zxing')
+      expect(zxing.options?.delayBetweenScanAttempts).toBe(250)
+      // Bruset nådde aldrig konsolen, men andra varningar gör det.
+      expect(spy).not.toHaveBeenCalled()
+      console.warn('Något annat')
+      expect(spy).toHaveBeenCalledWith('Något annat')
+      expect(console.warn).not.toBe(spy)
+      scanner.stop()
+      expect(console.warn).toBe(spy)
+      expect(zxing.stop).toHaveBeenCalledOnce()
+    } finally {
+      console.warn = original
+    }
+  })
+
+  it('återställer console.warn även när stop() kastar eller starten misslyckas', async () => {
+    const original = console.warn
+    const spy = vi.fn()
+    console.warn = spy
+    try {
+      const { startBarcodeScanner } = await import('./scanner')
+      zxing.stop.mockImplementation(() => {
+        throw new Error('redan stoppad')
+      })
+      const scanner = await startBarcodeScanner(video, stream, () => {})
+      scanner.stop()
+      expect(console.warn).toBe(spy)
+      // Ett andra stop() gör ingenting.
+      scanner.stop()
+      expect(console.warn).toBe(spy)
+
+      zxing.fail = true
+      await expect(startBarcodeScanner(video, stream, () => {})).rejects.toThrow('ingen kamera')
+      expect(console.warn).toBe(spy)
+    } finally {
+      console.warn = original
+    }
   })
 })

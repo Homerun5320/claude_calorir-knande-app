@@ -394,7 +394,7 @@ function SheetPanel({
         <div
           className={cx(
             'min-h-0 flex-auto overflow-y-auto overscroll-contain px-5',
-            footer === undefined ? 'pb-[max(1.25rem,env(safe-area-inset-bottom))]' : 'pb-4',
+            footer === undefined ? 'pb-[max(1.25rem,var(--sa-bottom))]' : 'pb-4',
             bodyClassName,
           )}
         >
@@ -402,7 +402,7 @@ function SheetPanel({
         </div>
 
         {footer !== undefined && (
-          <div className="shrink-0 border-t border-line/70 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">{footer}</div>
+          <div className="shrink-0 border-t border-line/70 px-5 pb-[max(1rem,var(--sa-bottom))] pt-3">{footer}</div>
         )}
       </motion.div>
     </div>

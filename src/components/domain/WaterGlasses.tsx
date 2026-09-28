@@ -5,10 +5,11 @@
  * - Tryck på det sista fyllda glaset tömmer det.
  * - Knapparna − och + ändrar ett glas i taget. Sammanfattningen visar t.ex. "1,25 liter av 2 liter"
  *   (siffran i Fraunces, enheten utskriven för sig – "0,88 l" i Fraunces såg ut som "0,881").
- * - Glasen breddas upp till 44 px när det finns plats. På smala skärmar är de smalare (minst
- *   36 px); knapparna − och + (44 × 44 px) gör samma sak.
+ * - Varje glas är en tryckyta på minst 44 × 48 px. Får alla glas plats blir det en rad (högst
+ *   56 px per glas); annars delas de på två jämna rader (t.ex. 4 + 4 i stället för 7 + 1), vilket
+ *   händer på smala telefoner (under ungefär 360 px) och med många glas.
  */
-import { useId } from 'react'
+import { useId, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Minus, Plus } from 'lucide-react'
 import { formatNumber } from '../../lib/format'
@@ -58,6 +59,10 @@ export function WaterGlasses({
   const filledCount = Math.ceil(drunk / size - 1e-6)
   const lastFilled = filledCount - 1
   const interactive = !!onAdd || !!onRemove
+  const showGhost = allFull && !!onAdd
+  // Antal tryckytor i raden (glasen + ev. "lägg till ett glas") – styr radbrytningen, se GLASS_STYLE.
+  const items = count + (showGhost ? 1 : 0)
+  const rowVars = { '--wg-n': items, '--wg-half': Math.ceil(items / 2) } as CSSProperties
 
   const levelOf = (i: number) => Math.max(0, Math.min(1, (drunk - i * size) / size))
 
@@ -86,6 +91,7 @@ export function WaterGlasses({
     <div className={className}>
       <div
         className="flex flex-wrap items-end"
+        style={interactive ? rowVars : undefined}
         role={interactive ? 'group' : 'img'}
         aria-label={`Vatten: ${formatLitersLong(drunk)} av ${formatLitersLong(targetMl)}`}
       >
@@ -97,6 +103,7 @@ export function WaterGlasses({
               onClick={() => tap(i)}
               aria-label={glassLabel(i)}
               className={GLASS_BOX}
+              style={GLASS_STYLE}
             >
               <Glass level={levelOf(i)} />
             </button>
@@ -106,12 +113,13 @@ export function WaterGlasses({
             </span>
           ),
         )}
-        {allFull && onAdd && (
+        {showGhost && onAdd && (
           <button
             type="button"
             onClick={() => onAdd(size)}
             aria-label={`Lägg till ett glas (${formatNumber(size)} ml)`}
             className={`${GLASS_BOX} text-fjall`}
+            style={GLASS_STYLE}
           >
             <GhostGlass />
           </button>
@@ -154,9 +162,22 @@ export function WaterGlasses({
   )
 }
 
-/** Ett glas: 48 px högt, 36–44 px brett (växer med tillgänglig bredd). */
+/** Ett glas: 48 px högt och minst 44 px brett (tryckyta enligt WCAG 2.5.5 och Apples riktlinjer). */
 const GLASS_BOX =
-  'grid h-12 min-w-9 max-w-11 flex-1 basis-9 place-items-center rounded-xl transition-transform hover:-translate-y-0.5 active:scale-90'
+  'grid h-12 min-w-11 shrink-0 grow-0 place-items-center rounded-xl transition-transform hover:-translate-y-0.5 active:scale-90'
+
+/**
+ * Bredden per glas, med antalet i raden i --wg-n och hälften (avrundat uppåt) i --wg-half.
+ * "Om n glas à 44 px får plats: 100 %/n (högst 56 px), annars 100 %/hälften" – två jämna rader.
+ * Valet görs med clamp(): (2,75rem − 100 %/n) × 9999 är negativt när alla får plats (då vinner
+ * minvärdet) och mycket stort annars (då vinner maxvärdet). Blir även två rader för trångt tar
+ * min-w-11 över och glasen bryts som vanligt.
+ */
+const FITS_ONE_ROW = 'calc((2.75rem - 100% / var(--wg-n)) * 9999)'
+const GLASS_STYLE: CSSProperties = {
+  flexBasis: `clamp(calc(100% / var(--wg-n)), ${FITS_ONE_ROW}, calc(100% / var(--wg-half)))`,
+  maxWidth: `clamp(3.5rem, ${FITS_ONE_ROW}, 100%)`,
+}
 
 const GLASS_PATH = 'M5 4H27L24.6 35.2A3 3 0 0 1 21.6 38H10.4A3 3 0 0 1 7.4 35.2Z'
 const INNER_TOP = 4

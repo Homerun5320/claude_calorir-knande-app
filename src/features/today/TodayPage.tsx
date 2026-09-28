@@ -6,13 +6,15 @@
  *  2. Dagsringen med makron
  *  3. Måltiderna
  *  4. Vatten
- *  5. Dagens tallrik
- *  6. Veckan
- *  7. Vikt
- *  8. Kostråden i veckan
- *  9. Dagens tips
- * 10. Sammanhangskort (fasta, träning, koffein, alkohol)
- * 11. Kvällsreflektion
+ *  5. Kosttillskott (bara när användaren har lagt till tillskott)
+ *  6. Dagens tallrik
+ *  7. Veckans fokus (bara när ett fokus är valt)
+ *  8. Veckan
+ *  9. Vikt
+ * 10. Kostråden i veckan
+ * 11. Dagens tips
+ * 12. Sammanhangskort (fasta, träning, koffein, alkohol)
+ * 13. Kvällsreflektion (med veckans fokus summerat på söndagar)
  *
  * Överst (när det behövs): markeringen för exempeldata och provperioden – diskret som ett chip,
  * tydligare de sista dagarna och som ett lugnt kort när den är slut.
@@ -27,16 +29,22 @@ import { Skeleton, useMediaQuery } from '../../components/ui'
 import { useTargets } from '../../hooks/useTargets'
 import { useToday } from '../../hooks/useToday'
 import type { PlateVariant } from '../../lib/plate'
+import type { Food } from '../../types'
+import { isSupplementFood } from '../../data/supplements'
+import { focusGoal } from '../../lib/focusGoals'
 import { useDiaryStore } from '../../stores/diaryStore'
+import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
 import { ContextCards } from './ContextCards'
 import { DayRingCard } from './DayRingCard'
 import { EveningCheckIn } from './EveningCheckIn'
+import { FocusCard } from './FocusCard'
 import { KostradCard } from './KostradCard'
 import { MealsOverview } from './MealsOverview'
 import { PlateCard } from './PlateCard'
 import { Reveal } from './Reveal'
+import { SupplementsCard } from './SupplementsCard'
 import { TipCard } from './TipCard'
 import { TodayHeader } from './TodayHeader'
 import { WaterCard } from './WaterCard'
@@ -46,13 +54,47 @@ import { WelcomeCard } from './WelcomeCard'
 import { isDiaryEmpty } from './todayLogic'
 import { TrialBanner } from '../premium/TrialBanner'
 import { DemoBanner } from '../onboarding/DemoBanner'
+import InstallHintCard from './InstallHintCard'
 
-type SectionId = 'welcome' | 'ring' | 'meals' | 'water' | 'plate' | 'week' | 'weight' | 'kostrad' | 'tip' | 'context' | 'evening'
+type SectionId =
+  | 'welcome'
+  | 'ring'
+  | 'meals'
+  | 'water'
+  | 'supplements'
+  | 'plate'
+  | 'focus'
+  | 'week'
+  | 'weight'
+  | 'kostrad'
+  | 'tip'
+  | 'context'
+  | 'evening'
 
-const MOBILE_ORDER: readonly SectionId[] = ['welcome', 'ring', 'meals', 'water', 'plate', 'week', 'weight', 'kostrad', 'tip', 'context', 'evening']
+const MOBILE_ORDER: readonly SectionId[] = [
+  'welcome',
+  'ring',
+  'meals',
+  'water',
+  'supplements',
+  'plate',
+  'focus',
+  'week',
+  'weight',
+  'kostrad',
+  'tip',
+  'context',
+  'evening',
+]
 const WIDE_TOP: readonly SectionId[] = ['welcome', 'ring']
-const WIDE_LEFT: readonly SectionId[] = ['meals', 'plate', 'evening']
-const WIDE_RIGHT: readonly SectionId[] = ['context', 'water', 'week', 'weight', 'kostrad', 'tip']
+const WIDE_LEFT: readonly SectionId[] = ['meals', 'supplements', 'plate', 'evening']
+const WIDE_RIGHT: readonly SectionId[] = ['context', 'water', 'focus', 'week', 'weight', 'kostrad', 'tip']
+
+/** Har användaren lagt till kosttillskott? (Boolean – stabilt värde för selektorn.) */
+function hasSupplementFoods(customFoods: Record<string, Food>): boolean {
+  for (const id in customFoods) if (isSupplementFood(customFoods[id])) return true
+  return false
+}
 
 function TodaySkeleton() {
   return (
@@ -91,6 +133,8 @@ export default function TodayPage() {
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
   const activityLevel = useProfileStore((s) => s.profile?.activityLevel)
   const firstDay = useDiaryStore((s) => isDiaryEmpty(s.entries))
+  const hasFocus = useProfileStore((s) => focusGoal(s.settings.weeklyFocus?.id) !== undefined)
+  const hasSupplements = useFoodStore((s) => hasSupplementFoods(s.customFoods))
 
   if (!hydrated) return <TodaySkeleton />
 
@@ -114,7 +158,10 @@ export default function TodayPage() {
     ),
     meals: <MealsOverview today={today} meals={meals} mindful={mindful} />,
     water: <WaterCard today={today} targetMl={targets.waterMl} glassMl={glassMl} />,
+    // Korten själva returnerar null när inga tillskott finns eller inget fokus är valt.
+    supplements: hasSupplements ? <SupplementsCard today={today} /> : null,
     plate: <PlateCard today={today} variant={plateVariant} />,
+    focus: hasFocus ? <FocusCard today={today} mindful={mindful} /> : null,
     week: firstDay ? null : <WeekCard today={today} targetKcal={targets.kcal} addBackPct={addBackPct} mindful={mindful} unit={unit} />,
     // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt). Är viktmålet
     // pausat för att vikten redan är låg visas ändå en varsam notis, utan siffror.
@@ -147,6 +194,7 @@ export default function TodayPage() {
       <TodayHeader today={today} />
       <div className="px-4 pt-1">
         <div className="mb-4 flex flex-col gap-3 empty:hidden">
+          <InstallHintCard />
           <DemoBanner />
           <TrialBanner />
         </div>

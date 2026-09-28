@@ -1,7 +1,8 @@
 /**
  * Snabbval för vanliga svenska drycker (kaffe, te, öl, vin …) ur Lagoms livsmedelsdatabas.
  * Ett tryck lägger till en portion i måltiden som passar klockslaget, med klockslaget sparat
- * (så att koffeinkurvan blir rätt) och "Ångra" i notisen.
+ * (så att koffeinkurvan blir rätt) och "Ångra" i notisen. Efter provperioden säger spärrarket
+ * "logga dryck" (inte "logga mat") – gäller både kaffe/te (CaffeineCard) och alkohol (AlcoholCard).
  */
 import { memo, useMemo } from 'react'
 import { Plus } from 'lucide-react'
@@ -70,7 +71,7 @@ export const QuickDrinks = memo(function QuickDrinks({ options, kind, date, mind
   const catalog = useBuiltinCatalog()
   const resolve = useFoodResolver()
   const meals = useProfileStore((s) => s.settings.meals)
-  const { addFood } = useAddFood()
+  const { addFood } = useAddFood('dryck')
 
   const items = useMemo<ResolvedOption[]>(() => {
     const out: ResolvedOption[] = []

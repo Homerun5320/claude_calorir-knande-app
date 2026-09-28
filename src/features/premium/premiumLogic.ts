@@ -1,23 +1,39 @@
 /**
  * Lagom Premium – ren logik för köp, aktivering och statustexter (testbar utan React).
  *
- * Köp i skarpt läge: `startCheckout` → POST /api/create-checkout { plan } → { url } → Stripe
- * Checkout → tillbaka till #/tack?session_id=… → `verifyPurchase` → POST /api/verify-purchase
- * { sessionId } → { licenseKey } → nyckeln verifieras lokalt (ECDSA) och sparas.
+ * Köp på webben (bara när `sellsOnWeb()`): `createCheckout` → POST /api/create-checkout { plan }
+ * → { url } → Stripe Checkout → tillbaka till #/tack?session_id=… → `verifyPurchase` → POST
+ * /api/verify-purchase { sessionId } → { licenseKey } → nyckeln verifieras lokalt (ECDSA) och sparas.
+ *
+ * Köp i butiksapparna: `buyInStore` / `restoreStorePurchases` via src/lib/storePurchases.ts –
+ * priset kommer från butiken och inga Stripe-anrop görs.
  */
-import { API_BASE, COMMERCE_MODE, LICENSE_PUBLIC_KEY, PLANS, SUPPORT_EMAIL, TRIAL_DAYS, type Plan, type PlanId } from '../../config/commerce'
-import { LICENSE_ERRORS, createTestLicense, normalizeLicenseKey, verifyLicense, type LicensePayload } from '../../lib/license'
+import {
+  API_BASE,
+  COMMERCE_MODE,
+  LICENSE_PUBLIC_KEYS,
+  PLANS,
+  SUPPORT_EMAIL,
+  TRIAL_DAYS,
+  WEB_CHECKOUT_ENABLED,
+  type Plan,
+  type PlanId,
+} from '../../config/commerce'
+import { DISTRIBUTION, IS_STORE_BUILD, allowsLicenseKeyEntry, isAppleWebKit, isInApp, isTwa, sellsOnWeb } from '../../config/platform'
+import { LICENSE_ERRORS, LICENSE_PREFIX, createTestLicense, normalizeLicenseKey, verifyLicense, type LicensePayload } from '../../lib/license'
+import { getStorePurchases, type StoreProductId, type StorePurchaseResult } from '../../lib/storePurchases'
 import { MONTHS } from '../../lib/dates'
 import { formatNumber, plural } from '../../lib/format'
 import type { Tone } from '../../components/ui'
-import { primeLicenseCheck, type AccessStatus } from '../../hooks/useAccess'
+import { isActiveStorePurchase, primeLicenseCheck, refreshStoreEntitlements, type AccessStatus } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
+import { isLicenseRevoked, prepareRevocationCheck, refreshRevocations } from './revocations'
 
 // ---------------------------------------------------------------------------
 // Formatering
 // ---------------------------------------------------------------------------
 
-/** 599 → "599 kr" (hela kronor, fast mellanslag). */
+/** 699 → "699 kr" (hela kronor, fast mellanslag). */
 export function formatPrice(kr: number): string {
   return `${formatNumber(kr)} kr`
 }
@@ -40,9 +56,31 @@ export function daysText(n: number): string {
   return plural(n, 'dag', 'dagar')
 }
 
-/** "299 kr/år eller 599 kr för alltid" – planerna i en mening. */
+/** "349 kr/år eller 699 kr för alltid" – planerna i en mening (webbpriser). */
 export function priceSummary(plans: readonly Plan[] = PLANS): string {
   return plans.map((p) => `${formatPrice(p.priceKr)}${p.durationDays ? '/år' : ' för alltid'}`).join(' eller ')
+}
+
+/**
+ * Priserna i en mening där de får visas: kronpriserna när Lagom säljs på webben, annars en
+ * beskrivning utan belopp – i butiksapparna kommer priset från butiken.
+ */
+export function priceSummaryText(): string {
+  if (sellsOnWeb()) return priceSummary()
+  if (!isInApp()) return 'årslicens eller livstidslicens i appbutikerna'
+  return 'årslicens eller livstidslicens som köp i appen'
+}
+
+/** Butiken som säljer Lagom här: App Store eller Google Play. */
+export function storeName(): 'App Store' | 'Google Play' {
+  if (DISTRIBUTION === 'appstore') return 'App Store'
+  if (DISTRIBUTION === 'play' || isTwa()) return 'Google Play'
+  return isAppleWebKit() ? 'App Store' : 'Google Play'
+}
+
+/** Kontot som köp i appen följer: "Apple-konto" eller "Google-konto". */
+export function storeAccountName(): string {
+  return storeName() === 'App Store' ? 'Apple-konto' : 'Google-konto'
 }
 
 /** Pris per månad för en årslicens, avrundat ("25 kr/mån"). */
@@ -80,6 +118,14 @@ export function statusSummary(status: AccessStatus): StatusSummary {
         tone: 'gran',
       }
     case 'utgangen':
+      if (status.revoked) {
+        return {
+          label: 'Licensen har återkallats',
+          title: 'Licensen har återkallats – din data finns kvar',
+          text: `${LICENSE_ERRORS.aterkallad} Du kan fortfarande se, exportera och radera allt.`,
+          tone: 'sol',
+        }
+      }
       return status.licenseExpired
         ? {
             label: 'Licensen har gått ut',
@@ -96,7 +142,7 @@ export function statusSummary(status: AccessStatus): StatusSummary {
     case 'licensierad': {
       const name = status.plan?.name ?? 'Licens'
       if (status.expiresAt === undefined) {
-        return { label: name, title: 'Lagom är ditt – för alltid', text: 'Gäller utan tidsgräns, med alla framtida uppdateringar. Tack för att du stödjer Lagom!', tone: 'mossa' }
+        return { label: name, title: 'Lagom är ditt – för alltid', text: 'Gäller utan tidsgräns, och felrättningar ingår. Tack för att du stödjer Lagom!', tone: 'mossa' }
       }
       return {
         label: name,
@@ -137,27 +183,80 @@ export function plansToOffer(status: AccessStatus, plans: readonly Plan[]): Plan
 
 export type ActivationResult = { ok: true; key: string; payload: LicensePayload } | { ok: false; message: string }
 
-/** Verifiera en inklistrad nyckel och spara den på enheten om den är giltig. */
+/** Hur länge aktiveringen väntar på en färsk spärrlista innan den använder den sparade. */
+const REVOCATION_WAIT_MS = 5000
+
+/** Vänta på `p`, men högst `ms` millisekunder (ger då undefined). */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms)
+  })
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer))
+}
+
+/**
+ * Verifiera en inklistrad nyckel och spara den på enheten om den är giltig. Spärrlistan hämtas
+ * samtidigt (när appen är online), så att en återbetald licens inte går att aktivera.
+ */
+/** App Store-bygget: licensnycklar låser inte upp något där (bara köp i appen gäller). */
+export const KEY_ENTRY_DISABLED = 'Licensnycklar kan inte aktiveras i den här versionen av Lagom. Har du köpt Lagom i appen? Tryck på Återställ köp.'
+
 export async function activateLicense(input: string, now: number = Date.now()): Promise<ActivationResult> {
+  if (!allowsLicenseKeyEntry()) return { ok: false, message: KEY_ENTRY_DISABLED }
   const key = normalizeLicenseKey(input)
   if (!key) return { ok: false, message: 'Klistra in din licensnyckel först.' }
-  const result = await verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEY, mode: COMMERCE_MODE, now })
+  const [result] = await Promise.all([
+    verifyLicense(key, { publicKey: LICENSE_PUBLIC_KEYS, mode: COMMERCE_MODE, now }),
+    withTimeout(refreshRevocations({ force: true }), REVOCATION_WAIT_MS),
+  ])
   if (!result.ok) return { ok: false, message: LICENSE_ERRORS[result.reason] }
+  await prepareRevocationCheck(key)
+  if (isLicenseRevoked(key, result.payload)) return { ok: false, message: LICENSE_ERRORS.aterkallad }
   primeLicenseCheck(key, result)
   useLicenseStore.getState().setLicense(key)
   return { ok: true, key, payload: result.payload }
 }
 
-/** Testläge: utfärda en osignerad testlicens direkt (ingen betalning). */
+/** Testläge: utfärda en osignerad testlicens direkt (ingen betalning). Aldrig i butiksappar. */
 export async function buyInTestMode(plan: Plan, now: number = Date.now()): Promise<ActivationResult> {
+  if (IS_STORE_BUILD || !WEB_CHECKOUT_ENABLED) return { ok: false, message: 'Testköp är avstängda i den här versionen.' }
   return activateLicense(createTestLicense(plan.id, plan.durationDays, now), now)
+}
+
+// ---------------------------------------------------------------------------
+// Köp i appen (App Store, Google Play)
+// ---------------------------------------------------------------------------
+
+/** Köp en produkt i butiken. Vid ett genomfört köp uppdateras tillgången direkt. */
+export async function buyInStore(id: StoreProductId): Promise<StorePurchaseResult> {
+  let result: StorePurchaseResult
+  try {
+    result = await getStorePurchases().purchase(id)
+  } catch {
+    return 'failed'
+  }
+  if (result === 'purchased') await refreshStoreEntitlements({ fresh: true })
+  return result
+}
+
+/**
+ * "Återställ köp": hämta tidigare köp i appen från butiken (t.ex. på en ny telefon). Returnerar
+ * antalet betalda köp som gäller nu – utgångna årslicenser och provperioden ('prov14') räknas
+ * inte. Kastar om butiken inte svarar.
+ */
+export async function restoreStorePurchases(): Promise<number> {
+  const restored = await getStorePurchases().restore()
+  await refreshStoreEntitlements({ fresh: true })
+  const now = Date.now()
+  return restored.filter((e) => isActiveStorePurchase(e, now)).length
 }
 
 // ---------------------------------------------------------------------------
 // Serveranrop (skarpt läge)
 // ---------------------------------------------------------------------------
 
-export type PurchaseErrorCode = 'offline' | 'server' | 'not-found' | 'invalid'
+export type PurchaseErrorCode = 'offline' | 'server' | 'not-found' | 'invalid' | 'rate-limit'
 
 export class PurchaseError extends Error {
   code: PurchaseErrorCode
@@ -172,7 +271,11 @@ export const PURCHASE_ERRORS: Record<PurchaseErrorCode, string> = {
   server: `Det gick inte att nå betaltjänsten just nu. Försök igen om en stund – eller mejla ${SUPPORT_EMAIL} om det fortsätter.`,
   'not-found': `Vi hittar inget genomfört köp för den här betalningen. Har pengar dragits från ditt konto? Mejla ${SUPPORT_EMAIL} så löser vi det.`,
   invalid: `Svaret från betaltjänsten gick inte att läsa. Försök igen – eller mejla ${SUPPORT_EMAIL} om det fortsätter.`,
+  'rate-limit': `Du har försökt många gånger på kort tid. Vänta en stund och försök igen – eller mejla ${SUPPORT_EMAIL} så hjälper vi dig.`,
 }
+
+/** Webbköp är avstängda här (butiksapp eller webbförsäljningen av) – inga Stripe-anrop görs. */
+const WEB_CHECKOUT_DISABLED = 'Köp via webben är avstängda i den här versionen av Lagom.'
 
 const REQUEST_TIMEOUT_MS = 20_000
 
@@ -223,6 +326,7 @@ function serverMessage(json: Record<string, unknown> | null, fallback: string): 
  * upphör (servern sparar samtycket och tidpunkten på köpet).
  */
 export async function createCheckout(plan: PlanId): Promise<string> {
+  if (!WEB_CHECKOUT_ENABLED) throw new PurchaseError('invalid', WEB_CHECKOUT_DISABLED)
   const { status, json } = await postJson('/api/create-checkout', { plan, consent: true })
   if (status < 200 || status >= 300) throw new PurchaseError('server', serverMessage(json, PURCHASE_ERRORS.server))
   const url = json?.url
@@ -246,7 +350,39 @@ export async function verifyPurchase(sessionId: string): Promise<VerifyPurchaseR
 
 /** Lämna appen för betalningen (egen funktion så att testerna kan fånga den). */
 export function redirectTo(url: string): void {
+  if (!WEB_CHECKOUT_ENABLED) throw new PurchaseError('invalid', WEB_CHECKOUT_DISABLED)
   window.location.assign(url)
+}
+
+// ---------------------------------------------------------------------------
+// "Tappat nyckeln?" – hämta licensnyckeln från ett webbköp igen
+// ---------------------------------------------------------------------------
+
+export const RECOVER_ERRORS = {
+  email: 'Skriv e-postadressen du använde vid köpet.',
+  receipt: 'Skriv kvittonumret eller ordernumret från kvittot.',
+  'not-found': `Vi hittar inget köp med den e-postadressen och det numret. Kontrollera att det är samma e-post som vid köpet och numret från kvittot från Stripe – eller mejla ${SUPPORT_EMAIL} så hjälper vi dig.`,
+  server: `Det gick inte att hämta licensen just nu. Försök igen om en stund – eller mejla ${SUPPORT_EMAIL} om det fortsätter.`,
+} as const
+
+/** Enkel rimlighetskontroll av en e-postadress (servern kontrollerar på riktigt). */
+export function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
+/**
+ * Hämta licensnyckeln för ett webbköp igen: POST /api/recover-license { email, receipt } →
+ * { key }. Kastar `PurchaseError` med ett svenskt meddelande (offline, för många försök, inget
+ * köp hittades eller serverfel).
+ */
+export async function recoverLicense(email: string, receipt: string): Promise<string> {
+  const { status, json } = await postJson('/api/recover-license', { email: email.trim(), receipt: receipt.trim() })
+  if (status === 429) throw new PurchaseError('rate-limit', PURCHASE_ERRORS['rate-limit'])
+  if (status >= 500) throw new PurchaseError('server', serverMessage(json, RECOVER_ERRORS.server))
+  if (status < 200 || status >= 300) throw new PurchaseError('not-found', serverMessage(json, RECOVER_ERRORS['not-found']))
+  const key = typeof json?.key === 'string' ? json.key : json?.licenseKey
+  if (typeof key !== 'string' || !normalizeLicenseKey(key).startsWith(`${LICENSE_PREFIX}.`)) throw new PurchaseError('invalid', PURCHASE_ERRORS.invalid)
+  return normalizeLicenseKey(key)
 }
 
 /** Session-id från adressen – i hash-delen (#/tack?session_id=…) eller, som reserv, före den. */

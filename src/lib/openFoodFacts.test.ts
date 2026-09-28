@@ -9,13 +9,16 @@ import {
   OpenFoodFactsError,
   fetchProductByBarcode,
   hasUsableNutrition,
+  invalidBarcodeMessage,
   isAbortError,
   isValidEan,
   mapOffNutriments,
   mapOffProduct,
   offAllergens,
   offCategory,
+  offAttributionText,
   offLabels,
+  offProductUrl,
   parseQuantity,
   searchProducts,
   type OffProduct,
@@ -168,6 +171,23 @@ describe('isValidEan', () => {
     expect(isValidEan('40063813339311')).toBe(false)
     expect(isValidEan('abcdefghijklm')).toBe(false)
     expect(isValidEan('')).toBe(false)
+  })
+})
+
+describe('texter och länkar', () => {
+  it('ber om att skanna igen bara när kameran fungerar', () => {
+    expect(invalidBarcodeMessage(true)).toBe(OFF_MESSAGES.invalid_barcode)
+    expect(invalidBarcodeMessage(true)).toMatch(/Skanna igen/)
+    expect(invalidBarcodeMessage(false)).toBe('Streckkoden ser inte ut att stämma. Kontrollera siffrorna under streckkoden och skriv in dem igen.')
+    expect(invalidBarcodeMessage(false)).not.toMatch(/Skanna/)
+  })
+
+  it('anger licenserna och länkar till produktsidan', () => {
+    expect(offAttributionText(true)).toBe(
+      'Produktdata från Open Food Facts (ODbL), produktbild under CC BY-SA 3.0 – en öppen databas som byggs av användare. Kontrollera mot förpackningen.',
+    )
+    expect(offAttributionText(false)).not.toMatch(/CC BY-SA/)
+    expect(offProductUrl('7310 865-000637')).toBe('https://world.openfoodfacts.org/product/7310865000637')
   })
 })
 

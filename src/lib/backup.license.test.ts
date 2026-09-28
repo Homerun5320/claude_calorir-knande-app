@@ -2,7 +2,7 @@
  * Licens och provperiod i säkerhetskopian: följer med, förlänger aldrig en provperiod, skriver
  * aldrig över en giltig licens – och radering startar inte om provperioden.
  */
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { waitFor } from '@testing-library/react'
 import { createBackup, licenseRank, mergeLicense, parseBackup, restoreBackup, wipeAllData } from './backup'
 import { createTestLicense } from './license'
@@ -116,5 +116,82 @@ describe('radering', () => {
 describe('exempeldata', () => {
   it('exempelprofilen har inget namn', () => {
     expect('name' in DEMO_PROFILE).toBe(false)
+  })
+})
+
+describe('App Store-bygget: licensnycklar följer inte med', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  /** Ladda om backup-modulen (och dess butiker) för en viss distribution. */
+  async function load(distribution: 'appstore' | 'web') {
+    vi.stubEnv('VITE_DISTRIBUTION', distribution)
+    vi.resetModules()
+    const platform = await import('../config/platform')
+    expect(platform.DISTRIBUTION).toBe(distribution)
+    const mod = await import('./backup')
+    const license = await import('./license')
+    const { useLicenseStore: store } = await import('../stores/licenseStore')
+    await waitFor(() => expect(store.persist.hasHydrated()).toBe(true))
+    store.getState().resetLicenseState()
+    return { ...mod, createTestLicense: license.createTestLicense, store }
+  }
+
+  it('en importerad giltig licensnyckel aktiveras inte – den lokala behålls', async () => {
+    const { createTestLicense: makeKey, mergeLicense: merge, parseBackup: parse, restoreBackup: restore, store } = await load('appstore')
+    const key = makeKey('livstid', undefined)
+    const file = {
+      format: 'lagom-backup',
+      version: 1,
+      exportedAt: new Date(NOW).toISOString(),
+      app: 'Lagom',
+      data: {
+        profile: { profile: null, settings: {} },
+        diary: { entries: {}, water: {}, exercise: {}, days: {} },
+        food: {},
+        body: { weights: [], measurements: [] },
+        license: { licenseKey: key, trialStartedAt: NOW - 20 * DAY },
+      },
+    }
+    for (const mode of ['replace', 'merge'] as const) {
+      store.getState().resetLicenseState()
+      store.setState({ trialStartedAt: NOW - 3 * DAY })
+      restore(parse(JSON.stringify(file), NOW), mode)
+      expect(store.getState().licenseKey).toBeNull()
+      expect(store.getState().activatedAt).toBeNull()
+      // Provstarten slås ihop som vanligt – den tidigaste gäller.
+      expect(store.getState().trialStartedAt).toBe(NOW - 20 * DAY)
+    }
+    // En befintlig nyckel på enheten (t.ex. från en äldre version) byts inte heller ut.
+    const local = makeKey('ar', 365, NOW - 10 * DAY)
+    expect(merge({ licenseKey: local, trialStartedAt: null }, { licenseKey: key, trialStartedAt: null }, NOW)).toEqual({ licenseKey: local, trialStartedAt: null })
+    expect(merge({ licenseKey: null, trialStartedAt: null }, { licenseKey: key, trialStartedAt: null }, NOW).licenseKey).toBeNull()
+  })
+
+  it('provperioden förlängs aldrig', async () => {
+    const { mergeLicense: merge } = await load('appstore')
+    expect(merge({ licenseKey: null, trialStartedAt: NOW - 30 * DAY }, { licenseKey: null, trialStartedAt: NOW - 2 * DAY }, NOW).trialStartedAt).toBe(NOW - 30 * DAY)
+    expect(merge({ licenseKey: null, trialStartedAt: NOW - 2 * DAY }, { licenseKey: null, trialStartedAt: NOW - 30 * DAY }, NOW).trialStartedAt).toBe(NOW - 30 * DAY)
+    expect(merge({ licenseKey: null, trialStartedAt: null }, { licenseKey: null, trialStartedAt: NOW + 300 * DAY }, NOW).trialStartedAt).toBe(NOW)
+  })
+
+  it('createBackup utelämnar licensnyckeln men tar med provstarten', async () => {
+    const { createBackup: create, createTestLicense: makeKey, store } = await load('appstore')
+    store.setState({ trialStartedAt: NOW - 3 * DAY, licenseKey: makeKey('livstid', undefined) })
+    expect(create().data.license).toEqual({ licenseKey: null, trialStartedAt: NOW - 3 * DAY })
+  })
+
+  it('webbygget beter sig som tidigare', async () => {
+    const { createBackup: create, createTestLicense: makeKey, parseBackup: parse, restoreBackup: restore, store } = await load('web')
+    const key = makeKey('livstid', undefined)
+    store.setState({ trialStartedAt: NOW - 40 * DAY, licenseKey: key })
+    const text = JSON.stringify(create())
+    expect(JSON.parse(text).data.license.licenseKey).toBe(key)
+    store.getState().resetLicenseState()
+    restore(parse(text, NOW), 'replace')
+    expect(store.getState()).toMatchObject({ trialStartedAt: NOW - 40 * DAY, licenseKey: key })
+    expect(store.getState().activatedAt).not.toBeNull()
   })
 })

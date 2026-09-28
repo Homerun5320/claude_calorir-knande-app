@@ -8,6 +8,8 @@ import {
   formatFraction,
   initialSelection,
   isUsableUnit,
+  largeAmountText,
+  maxAmount,
   mindfulPortionLabel,
   portionNoun,
   quickChoices,
@@ -16,6 +18,9 @@ import {
 import { useFoodStore } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { bulle, havregryn, kycklingbrost, mjolk, risKokt } from './testFoods'
+import { MemoryRouter } from 'react-router-dom'
+import { PortionSheet } from './PortionSheet'
+import type { Food } from '../../types'
 
 describe('initialSelection', () => {
   it('använder livsmedlets första portion som standard', () => {
@@ -235,5 +240,94 @@ describe('rå/okokt vikt i väljaren', () => {
     render(<PortionPicker food={kycklingbrost} onConfirm={() => {}} onChange={onChange} />)
     expect(onChange).toHaveBeenLastCalledWith({ amount: 180, unit: 'g-ra', grams: 135 })
     expect(screen.getByText(/1 g rå ≈ 0,75 g tillagat/)).toBeInTheDocument()
+  })
+})
+
+describe('orimliga mängder', () => {
+  const grot: Food = {
+    id: 'lagom:grot-test',
+    name: 'Havregrynsgröt',
+    source: 'lagom',
+    category: 'spannmal',
+    nutrients: { kcal: 60, protein: 2, carbs: 10, fat: 1 },
+    portions: [{ id: 'portion', label: '1 portion gröt (1 dl)', grams: 35 }],
+  }
+
+  beforeEach(() => {
+    useFoodStore.setState({ usage: {} })
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, mindfulMode: false, energyUnit: 'kcal' } }))
+  })
+
+  it('portioner går upp till 50, gram och ml till 10 000', () => {
+    expect(maxAmount('portion:st')).toBe(50)
+    expect(maxAmount('g')).toBe(10000)
+    expect(maxAmount('g-ra')).toBe(10000)
+    expect(maxAmount('ml')).toBe(10000)
+    expect(maxAmount('dl')).toBe(1000)
+  })
+
+  it('hjälpraden visar antalet när det är fler än en portion', () => {
+    expect(amountHint(grot, 1000, 'portion:portion')).toMatch(/^1\s000 × 1 portion gröt \(1 dl\) ≈ 35\s000 g$/)
+    expect(amountHint(bulle, 3, 'portion:stor')).toBe('3 × 1 stor kafébulle (ca 110 g) ≈ 330 g')
+    expect(amountHint(bulle, 0.5, 'portion:stor')).toBe('½ × 1 stor kafébulle (ca 110 g) ≈ 55 g')
+    // En portion: etiketten räcker.
+    expect(amountHint(bulle, 1, 'portion:stor')).toBe('1 stor kafébulle (ca 110 g)')
+    expect(largeAmountText(35000)).toBe('Det blir 35 kg – stämmer det?')
+  })
+
+  it('en portion över 50 godtas inte', () => {
+    const onConfirm = vi.fn()
+    render(<PortionPicker food={bulle} onConfirm={onConfirm} />)
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Mängd' }), { target: { value: '60' } })
+    expect(screen.getByRole('button', { name: 'Lägg till' })).toBeDisabled()
+    expect(screen.getByText(/högst 50|mellan 0 och 50/)).toBeInTheDocument()
+  })
+
+  it('över 3 kg krävs ett extra tryck på "Ja, lägg till"', () => {
+    const onConfirm = vi.fn()
+    const onChange = vi.fn()
+    render(<PortionPicker food={bulle} initialUnit="g" initialAmount={100} onConfirm={onConfirm} onChange={onChange} />)
+    const input = screen.getByRole('spinbutton', { name: 'Mängd' })
+    fireEvent.change(input, { target: { value: '3500' } })
+    expect(screen.getByText('Det blir 3,5 kg – stämmer det?')).toBeInTheDocument()
+    expect(onChange).toHaveBeenLastCalledWith({ amount: 3500, unit: 'g', grams: 3500, needsConfirmation: true })
+    // Bekräftelseknappen och Enter fungerar inte ännu.
+    expect(screen.getByRole('button', { name: 'Lägg till' })).toBeDisabled()
+    fireEvent.submit(input.closest('form')!)
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Ja, lägg till' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'Ja, lägg till' }))
+    expect(onConfirm).toHaveBeenCalledWith(3500, 'g', 3500)
+    expect(onChange).toHaveBeenLastCalledWith({ amount: 3500, unit: 'g', grams: 3500 })
+    expect(screen.queryByText(/stämmer det\?/)).not.toBeInTheDocument()
+    // Under 3 kg: ingen fråga.
+    fireEvent.change(input, { target: { value: '2500' } })
+    expect(screen.queryByRole('button', { name: 'Ja, lägg till' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lägg till' })).toBeEnabled()
+  })
+
+  it('portionsarkets knappar väntar också på bekräftelsen', async () => {
+    const onPrimary = vi.fn()
+    const onSecondary = vi.fn()
+    render(
+      <MemoryRouter>
+        <PortionSheet
+          food={bulle}
+          onClose={() => {}}
+          initialUnit="g"
+          initialAmount={4000}
+          primary={{ label: 'Lägg till i Fika', onClick: onPrimary }}
+          secondary={{ label: 'Lägg i korgen', onClick: onSecondary }}
+        />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Det blir 4 kg – stämmer det?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lägg till i Fika' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Lägg i korgen' })).toBeDisabled()
+    // Bekräftelsen säger vad huvudknappen gör.
+    fireEvent.click(screen.getByRole('button', { name: 'Ja, lägg till i Fika' }))
+    expect(onPrimary).toHaveBeenCalledWith(4000, 'g', 4000)
+    expect(screen.getByRole('button', { name: 'Lägg i korgen' })).toBeEnabled()
+    expect(onSecondary).not.toHaveBeenCalled()
   })
 })

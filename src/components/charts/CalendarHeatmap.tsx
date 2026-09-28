@@ -6,6 +6,7 @@
  * - Dagar utan data visas tomma, idag får en ring och vald dag en tydligare markering.
  * - Piltangenter flyttar mellan dagar (upp/ned = en vecka), PageUp/PageDown byter månad.
  * - Valfria små markeringar per dag (`marks`), t.ex. "🎉" på helgdagar.
+ * - Varje dag har en osynligt utökad tryckyta (44 px hög), eftersom cellerna är smala på mobil.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -287,7 +288,9 @@ export function CalendarHeatmap({
                   onBlur={() => setFocused((f) => (f === d ? null : f))}
                   onKeyDown={(e) => onKeyDown(e, d)}
                   onPointerEnter={() => setHover(d)}
-                  className={`relative grid aspect-square min-h-9 place-items-center rounded-[0.8rem] text-[13px] font-medium tabular-nums transition-[transform,box-shadow] duration-150 enabled:hover:scale-[1.06] enabled:active:scale-95 disabled:cursor-default ${
+                  // after:-inset-1: osynlig utökning av tryckytan till 44 px höjd (cellerna är ca 33 × 36 px
+                  // på en 375 px-telefon). Den fyller mellanrummet mellan dagarna utan att synas.
+                  className={`relative grid aspect-square min-h-9 place-items-center rounded-[0.8rem] after:absolute after:-inset-1 after:rounded-[1rem] after:content-[''] text-[13px] font-medium tabular-nums transition-[transform,box-shadow] duration-150 enabled:hover:scale-[1.06] enabled:active:scale-95 disabled:cursor-default ${
                     lvl === null ? 'text-ink-3' : strong ? 'text-on-gran' : 'text-ink'
                   } ${future ? 'opacity-45' : ''} ${
                     isSel

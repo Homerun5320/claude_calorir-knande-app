@@ -1,17 +1,21 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, ChartNoAxesColumn, ChefHat, CloudOff, Download, Dumbbell, GlassWater, Menu, Plus, Scale, Sun, Timer, type LucideIcon } from 'lucide-react'
+import { BookOpen, ChartNoAxesColumn, ChefHat, CloudOff, Download, Dumbbell, GlassWater, Menu, Plus, RotateCw, Scale, Sun, Timer, type LucideIcon } from 'lucide-react'
 import { motion } from 'motion/react'
-import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { LogoMark, Wordmark } from './Logo'
 import { ToastViewport, toast } from '../ui/toast'
 import { DialogHost } from '../ui/Dialog'
 import { useProfileStore } from '../../stores/profileStore'
 import { mealForTime } from '../../lib/meals'
-import { downloadBackup } from '../../lib/backup'
+import { ensurePersistentStorage, saveBackup } from '../../lib/backup'
+import { IS_STORE_BUILD, isNativeApp } from '../../config/platform'
 import { useTheme } from '../../hooks/useTheme'
-import { useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
+import { useHasNewerData, useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
+import { hasNewerData } from '../../stores/storage'
+import { markBackupNow } from '../../features/settings/backupStatus'
 import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGate'
 import { requireAccess } from '../../features/premium/requireAccess'
+import { storeName } from '../../features/premium/premiumLogic'
 
 interface NavItem {
   to: string
@@ -24,12 +28,26 @@ interface NavItem {
 }
 
 /** Sidor man når via "Mer" – fliken markeras på dem också. */
-const MORE_SECTIONS = ['/vikt', '/recept', '/traning', '/dryck', '/fasta', '/matkalender', '/installningar', '/om', '/premium', '/tack'] as const
+const MORE_SECTIONS = [
+  '/vikt',
+  '/recept',
+  '/traning',
+  '/dryck',
+  '/fasta',
+  '/matkalender',
+  '/planering',
+  '/installningar',
+  '/om',
+  '/premium',
+  '/tack',
+  '/integritet',
+  '/villkor',
+] as const
 
 const TABS: readonly NavItem[] = [
   { to: '/', label: 'Idag', icon: Sun, end: true },
   { to: '/dagbok', label: 'Dagbok', icon: BookOpen },
-  { to: '/insikter', label: 'Insikter', icon: ChartNoAxesColumn },
+  { to: '/insikter', label: 'Insikter', icon: ChartNoAxesColumn, sections: ['/rapport'] },
   { to: '/mer', label: 'Mer', icon: Menu, sections: MORE_SECTIONS },
 ]
 
@@ -56,20 +74,25 @@ const ROUTE_TITLES: ReadonlyArray<[RegExp, string]> = [
   [/^\/livsmedel\/[^/]+\/redigera/, 'Redigera livsmedel'],
   [/^\/livsmedel/, 'Livsmedel'],
   [/^\/recept\/nytt/, 'Nytt recept'],
+  [/^\/recept\/importera/, 'Importera recept'],
   [/^\/recept\/[^/]+\/redigera/, 'Redigera recept'],
   [/^\/recept/, 'Recept'],
   [/^\/vikt/, 'Vikt & mått'],
   [/^\/insikter/, 'Insikter'],
+  [/^\/rapport/, 'Rapport'],
   [/^\/traning/, 'Träning'],
   [/^\/dryck/, 'Dryck'],
   [/^\/fasta/, 'Fasta'],
   [/^\/mer/, 'Mer'],
   [/^\/om/, 'Om Lagom'],
   [/^\/matkalender/, 'Matkalender'],
+  [/^\/planering/, 'Veckoplanering'],
   [/^\/installningar/, 'Inställningar'],
   [/^\/valkommen/, 'Välkommen'],
   [/^\/premium/, 'Lagom Premium'],
   [/^\/tack/, 'Tack för ditt köp'],
+  [/^\/integritet/, 'Integritetspolicy'],
+  [/^\/villkor/, 'Köp- och användarvillkor'],
 ]
 
 /** Dokumenttitel för en sökväg, t.ex. "Vikt & mått – Lagom". */
@@ -125,12 +148,61 @@ function AddButton({ className = '', withLabel = false }: { className?: string; 
   )
 }
 
-/** Lugn, beständig varning när ändringar inte kan sparas på enheten. */
+/**
+ * Uppdateringsfrågan (ny version finns) laddas bara i webbversionen med service worker – i
+ * butiksapparna kommer uppdateringarna via App Store och Google Play.
+ */
+const UpdatePrompt = lazy(() => import('./UpdatePrompt'))
+
+function canPromptForUpdate(): boolean {
+  return !IS_STORE_BUILD && typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+}
+
+const WARNING_ACTION = 'inline-flex min-h-11 items-center gap-1.5 font-semibold text-gran underline-offset-2 hover:underline'
+
+/**
+ * Lugn, beständig varning när ändringar inte kan sparas på enheten – eller när sparad data kommer
+ * från en nyare version av Lagom (den läses inte in och skrivs aldrig över).
+ */
 function StorageWarning() {
   const memoryOnly = useMemoryOnlyStorage()
-  if (!memoryOnly) return null
+  const newerData = useHasNewerData()
+  if (!memoryOnly && !newerData) return null
+
+  if (newerData) {
+    // Appen från butiken har sin kod inbyggd och uppdateras i butiken. Webbversionen (även
+    // Play-appen, som visar webbversionen) hämtar den nya versionen när sidan laddas om.
+    const bundled = IS_STORE_BUILD || isNativeApp()
+    return (
+      <div className="px-4 pt-safe lg:pt-4 print:hidden">
+        <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
+          <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Din data är från en nyare version av Lagom – uppdatera appen innan du fortsätter. Inget skrivs över.</p>
+            <p className="text-ink-2">
+              {bundled
+                ? `Uppdatera Lagom i ${storeName()}. Det du ändrar innan dess sparas inte.`
+                : 'Ladda om sidan så att den nya versionen hämtas. Det du ändrar innan dess sparas inte.'}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {!bundled && (
+                <button type="button" className={WARNING_ACTION} onClick={() => window.location.reload()}>
+                  <RotateCw className="size-4" aria-hidden />
+                  Ladda om
+                </button>
+              )}
+              <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+                Mer om data
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="px-4 pt-safe lg:pt-4">
+    <div className="px-4 pt-safe lg:pt-4 print:hidden">
       <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
         <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -141,9 +213,13 @@ function StorageWarning() {
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <button
               type="button"
-              className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-gran underline-offset-2 hover:underline"
+              className={WARNING_ACTION}
               onClick={() => {
-                if (!downloadBackup()) toast('Säkerhetskopian kunde inte skapas. Försök igen.', { tone: 'error' })
+                // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
+                void saveBackup().then((outcome) => {
+                  if ((outcome === 'saved' || outcome === 'shared') && !hasNewerData()) markBackupNow()
+                  else if (outcome === 'failed') toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
+                })
               }}
             >
               <Download className="size-4" aria-hidden />
@@ -208,6 +284,16 @@ export function AppShell() {
 
   useFocusOnNavigate(pathname)
 
+  // Be en gång om beständig lagring, så att webbläsaren (t.ex. Safari efter sju dagar utan besök)
+  // inte rensar dagboken automatiskt. Tyst – inget visas om det inte går.
+  useEffect(() => {
+    try {
+      void ensurePersistentStorage().catch(() => {})
+    } catch {
+      /* lagrings-API:t saknas – inget att göra */
+    }
+  }, [])
+
   // Bottennavigeringen täcker nederkanten – håll fokuserade element ovanför den (se index.css).
   useEffect(() => {
     document.documentElement.classList.toggle('has-bottom-nav', !fullscreen)
@@ -218,7 +304,7 @@ export function AppShell() {
     <div className="grain min-h-dvh">
       {/* Sidomeny på stora skärmar */}
       {!fullscreen && (
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-line bg-surface/70 px-4 py-6 backdrop-blur-xl lg:flex">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-line bg-surface/70 px-4 py-6 backdrop-blur-xl lg:flex print:hidden">
           <div className="mb-8 flex items-center gap-3 px-2">
             <LogoMark size={36} />
             <Wordmark />
@@ -242,7 +328,7 @@ export function AppShell() {
         </aside>
       )}
 
-      <main className={`mx-auto w-full max-w-3xl ${fullscreen ? '' : 'pb-nav lg:pl-64 lg:max-w-none'}`}>
+      <main className={`mx-auto w-full max-w-3xl ${fullscreen ? '' : 'pb-nav lg:pl-64 lg:max-w-none print:pb-0 print:pl-0'}`}>
         <div className={fullscreen ? '' : 'mx-auto max-w-3xl'}>
           <StorageWarning />
           <Suspense fallback={<PageFallback />}>
@@ -256,8 +342,8 @@ export function AppShell() {
         <nav
           aria-label="Huvudmeny"
           data-main-nav=""
-          className="fixed inset-x-0 bottom-0 z-50 px-3 lg:hidden"
-          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          className="fixed inset-x-0 bottom-0 z-50 px-3 lg:hidden print:hidden"
+          style={{ paddingBottom: 'max(0.75rem, var(--sa-bottom))' }}
         >
           <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.75rem] border border-line/70 bg-surface/85 px-2 py-2 shadow-[var(--shadow-float)] backdrop-blur-xl">
             {TABS.slice(0, 2).map((t) => (
@@ -274,6 +360,11 @@ export function AppShell() {
       <DialogHost />
       <AccessSync />
       <AccessBlockedDialog />
+      {canPromptForUpdate() && (
+        <Suspense fallback={null}>
+          <UpdatePrompt />
+        </Suspense>
+      )}
     </div>
   )
 }

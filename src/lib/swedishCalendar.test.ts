@@ -221,3 +221,14 @@ describe('matkalendern', () => {
     expect(foodDayCountdown({ date: '2026-09-01' }, '2026-09-26')).toBe('Har varit')
   })
 })
+
+describe('texterna', () => {
+  it('använder svenska citattecken (”…”) – aldrig raka', () => {
+    const days = [...foodDaysForYear(2026), ...foodDaysForYear(2027)]
+    for (const d of days) {
+      for (const text of [d.name, d.description, d.tip ?? '']) expect(text, d.key).not.toMatch(/"/)
+    }
+    const cake = days.find((d) => d.key === 'prinsesstartans-vecka')
+    expect(cake?.description).toMatch(/”grön tårta”/)
+  })
+})

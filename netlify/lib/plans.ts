@@ -29,7 +29,7 @@ export const SERVER_PLANS: Record<PlanId, ServerPlan> = {
   ar: {
     id: 'ar',
     name: 'Årslicens',
-    priceKr: 299,
+    priceKr: 349,
     durationDays: 365,
     priceEnv: 'STRIPE_PRICE_AR',
     checkoutNote:
@@ -38,9 +38,12 @@ export const SERVER_PLANS: Record<PlanId, ServerPlan> = {
   livstid: {
     id: 'livstid',
     name: 'Livstidslicens',
-    priceKr: 599,
+    priceKr: 699,
     priceEnv: 'STRIPE_PRICE_LIVSTID',
-    checkoutNote: 'Engångsköp – inga fler dragningar görs. Licensnyckeln visas direkt efter betalningen.',
+    // Försiktigt löfte (ägarens beslut 2026-09-28): licensen gäller för alltid och felrättningar
+    // ingår – nya funktioner eller alla framtida uppdateringar utlovas inte.
+    checkoutNote:
+      'Engångsköp – inga fler dragningar görs. Licensen gäller för alltid och felrättningar ingår. Licensnyckeln visas direkt efter betalningen.',
   },
 }
 

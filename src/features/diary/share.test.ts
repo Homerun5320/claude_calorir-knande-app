@@ -1,4 +1,4 @@
-import { shareOrCopy } from './share'
+import { isAbort, shareOrCopy } from './share'
 
 describe('shareOrCopy', () => {
   it('använder Web Share när det finns', async () => {
@@ -29,5 +29,15 @@ describe('shareOrCopy', () => {
   it('misslyckas vänligt utan delning och urklipp', async () => {
     await expect(shareOrCopy('T', 'x', {})).resolves.toBe('failed')
     await expect(shareOrCopy('T', 'x', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('nej')) } })).resolves.toBe('failed')
+  })
+})
+
+describe('isAbort', () => {
+  it('känner igen en stängd delningsdialog', () => {
+    expect(isAbort(new DOMException('Avbrutet', 'AbortError'))).toBe(true)
+    expect(isAbort(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe(true)
+    expect(isAbort(new DOMException('Nej', 'NotAllowedError'))).toBe(false)
+    expect(isAbort(null)).toBe(false)
+    expect(isAbort('AbortError')).toBe(false)
   })
 })

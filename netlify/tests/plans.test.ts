@@ -30,9 +30,17 @@ describe('planerna är desamma i appen, på servern och i supportskriptet', () =
     expect(TRIAL_DAYS).toBeGreaterThan(0)
   })
 
-  it('pris i öre och plan-id', () => {
-    expect(priceInOre(SERVER_PLANS.ar)).toBe(29_900)
-    expect(priceInOre(SERVER_PLANS.livstid)).toBe(59_900)
+  it('livstidslicensen lovar försiktigt: för alltid och felrättningar – inte alla framtida uppdateringar', () => {
+    expect(SERVER_PLANS.livstid.checkoutNote).toContain('gäller för alltid')
+    expect(SERVER_PLANS.livstid.checkoutNote).toContain('felrättningar ingår')
+    expect(SERVER_PLANS.livstid.checkoutNote).not.toMatch(/framtida uppdateringar/i)
+  })
+
+  it('pris i öre och plan-id (ägarens beslut 2026-09-28: 349 kr och 699 kr)', () => {
+    expect(SERVER_PLANS.ar.priceKr).toBe(349)
+    expect(SERVER_PLANS.livstid.priceKr).toBe(699)
+    expect(priceInOre(SERVER_PLANS.ar)).toBe(34_900)
+    expect(priceInOre(SERVER_PLANS.livstid)).toBe(69_900)
     expect(isPlanId('ar')).toBe(true)
     expect(isPlanId('livstid')).toBe(true)
     expect(isPlanId('manad')).toBe(false)

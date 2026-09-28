@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { useAddFood } from './useAddFood'
 import { useBasketStore } from './basketStore'
 import { useDiaryStore } from '../../stores/diaryStore'
@@ -7,6 +8,10 @@ import { useFoodStore } from '../../stores/foodStore'
 import { useToastStore } from '../../components/ui/toast'
 import { bulle, mjolk, offBar } from './testFoods'
 import type { FoodEntry } from '../../types'
+import { useLicenseStore } from '../../stores/licenseStore'
+import { useProfileStore } from '../../stores/profileStore'
+import { useAccessGateStore } from '../premium/requireAccess'
+import { EntrySheet } from '../diary/EntrySheet'
 
 const target = { date: '2026-09-26', meal: 'frukost' as const }
 
@@ -207,5 +212,72 @@ describe('korgen', () => {
     expect(useBasketStore.getState().items.map((i) => i.food.id)).toEqual([mjolk.id])
     useBasketStore.getState().clear()
     expect(useBasketStore.getState().items).toEqual([])
+  })
+})
+
+describe('anteckningar och spärrtext', () => {
+  beforeEach(reset)
+  afterEach(() => {
+    useLicenseStore.getState().resetLicenseState()
+    useAccessGateStore.setState({ blocked: null })
+  })
+
+  const expire = () => {
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, onboardingDone: true } }))
+    useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * 86_400_000, licenseKey: null, activatedAt: null })
+  }
+
+  it('en anteckning på en vara följer med till dagboken', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addMany([{ food: bulle, amount: 1, unit: 'portion:st', note: 'Uppskattat med tallriken' }, { food: mjolk, amount: 2, unit: 'dl' }], target)
+    })
+    const [a, b] = useDiaryStore.getState().entries[target.date]
+    expect(a.note).toBe('Uppskattat med tallriken')
+    expect(b.note).toBeUndefined()
+  })
+
+  it('efter provperioden säger spärren "logga mat" som standard och "logga dryck" för dryck', () => {
+    expire()
+    const food = renderHook(() => useAddFood())
+    act(() => {
+      food.result.current.addFood(bulle, 1, 'portion:st', target)
+    })
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'mat' })
+    useAccessGateStore.setState({ blocked: null })
+    const drink = renderHook(() => useAddFood('dryck'))
+    act(() => {
+      drink.result.current.addFood(mjolk, 2, 'dl', target)
+    })
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'dryck' })
+    act(() => {
+      drink.result.current.addMany([{ food: mjolk, amount: 2, unit: 'dl' }], target)
+    })
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'dryck' })
+    expect(useDiaryStore.getState().entries[target.date]).toBeUndefined()
+  })
+
+  it('"Lägg till igen" i dagboken spärras som "logga mat", "Kopiera till idag" som kopiering', () => {
+    const today = target.date
+    const entry = useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Gröt', nutrients: { kcal: 300 }, date: today, meal: 'frukost' })
+    const older = useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Soppa', nutrients: { kcal: 250 }, date: '2026-09-25', meal: 'lunch' })
+    expire()
+    const props = { session: 1, open: true, onClose: () => {}, today, meals: [], mindful: false, energyUnit: 'kcal' as const }
+    const { unmount } = render(
+      <MemoryRouter>
+        <EntrySheet target={{ date: today, id: entry.id }} {...props} />
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till igen' }))
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'mat' })
+    unmount()
+    useAccessGateStore.setState({ blocked: null })
+    render(
+      <MemoryRouter>
+        <EntrySheet target={{ date: older.date, id: older.id }} {...props} />
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Kopiera till idag' }))
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'kopiera' })
   })
 })

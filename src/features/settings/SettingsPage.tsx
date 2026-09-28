@@ -4,10 +4,11 @@
  * Indexsidan är en lugn lista i grupper med en kort sammanfattning av varje inställning.
  * Varje sektion är en egen sida med tillbaka-knapp till listan.
  */
-import { useState, type ComponentType } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { lazy, Suspense, useState, type ComponentType } from 'react'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import {
   CalendarHeart,
+  Cloud,
   Database,
   Dumbbell,
   HardDrive,
@@ -15,12 +16,14 @@ import {
   Info,
   KeyRound,
   Palette,
+  FileText,
+  ShieldCheck,
   Target,
   UserRound,
   UtensilsCrossed,
   type LucideIcon,
 } from 'lucide-react'
-import { Card, ListGroup, ListRow, PageHeader, type Tone } from '../../components/ui'
+import { Card, ListGroup, ListRow, PageHeader, Spinner, type Tone } from '../../components/ui'
 import { useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
 import { useTargets } from '../../hooks/useTargets'
 import { ageFromBirthYear, relativeDayLabel, toISODate } from '../../lib/dates'
@@ -42,8 +45,13 @@ import { LicenseSection } from './sections/LicenseSection'
 import { useAccess } from '../../hooks/useAccess'
 import { premiumStatusLine } from '../premium/TrialBanner'
 import { overrideCount } from './settingsLogic'
+import { CLOUD_ENABLED } from '../../config/cloud'
+import { useCloudStore } from '../../stores/cloudStore'
 
-export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'data' | 'databas' | 'licens'
+/** Lagom Moln laddas bara när funktionen finns i bygget (VITE_SUPABASE_URL) – se docs/BACKEND.md. */
+const CloudSection = lazy(() => import('./sections/CloudSection'))
+
+export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'data' | 'databas' | 'licens' | 'moln'
 
 interface SectionMeta {
   title: string
@@ -62,9 +70,11 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger på din enhet.', icon: HardDrive, tone: 'gran', component: DataSection },
   databas: { title: 'Livsmedelsdatabas', description: 'Vad som finns inbyggt, källor och import.', icon: Database, tone: 'mossa', component: DatabaseSection },
   licens: { title: 'Licens', description: 'Provperiod, licensnyckel och köp.', icon: KeyRound, tone: 'sol', component: LicenseSection },
+  moln: { title: 'Lagom Moln', description: 'Krypterad kopia av din dagbok i molnet.', icon: Cloud, tone: 'fjall', component: CloudSection },
 }
 
 function isSection(s: string | undefined): s is SectionId {
+  if (s === 'moln' && !CLOUD_ENABLED) return false
   return s !== undefined && Object.prototype.hasOwnProperty.call(SECTIONS, s)
 }
 
@@ -78,7 +88,16 @@ export default function SettingsPage() {
     return (
       <div className="px-4 pb-8">
         <PageHeader backTo="/installningar" backLabel="Till inställningar" eyebrow="Inställningar" title={meta.title} subtitle={meta.description} />
-        <Component />
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-10" role="status" aria-busy="true">
+              <Spinner />
+              <span className="sr-only">Laddar …</span>
+            </div>
+          }
+        >
+          <Component />
+        </Suspense>
       </div>
     )
   }
@@ -112,6 +131,8 @@ function SettingsIndex() {
   const lastBackup = useLastBackup()
   const memoryOnly = useMemoryOnlyStorage()
   const [support, setSupport] = useState(false)
+  const cloudSignedIn = useCloudStore((s) => s.session !== null)
+  const cloudLastUpload = useCloudStore((s) => s.lastUploadAt)
   const { status, checking } = useAccess()
   const today = toISODate(new Date())
 
@@ -127,6 +148,11 @@ function SettingsIndex() {
     : lastBackup === null
       ? 'Ingen säkerhetskopia ännu'
       : `Säkerhetskopierad ${relativeDayLabel(toISODate(new Date(lastBackup)), today).toLocaleLowerCase('sv-SE')}`
+  const cloudSub = !cloudSignedIn
+    ? 'Av'
+    : cloudLastUpload === null
+      ? 'Inloggad'
+      : `Senaste kopian ${relativeDayLabel(toISODate(new Date(cloudLastUpload)), today).toLocaleLowerCase('sv-SE')}`
   const trainingSub = exerciseAddBack.includedInTarget ? 'Träningen ingår i det adaptiva målet' : `${formatNumber(settings.exerciseAddBackPct)}\u00a0% av träningen räknas`
 
   const row = (id: SectionId, subtitle: string) => (
@@ -171,13 +197,30 @@ function SettingsIndex() {
 
         <ListGroup title="Lagom Premium">{row('licens', checking ? 'Kontrollerar licensen …' : premiumStatusLine(status))}</ListGroup>
 
-        <ListGroup title="Data och integritet" footer="Lagom har inga konton och din dagbok finns inte på någon server. Din data lämnar aldrig din enhet om du inte själv exporterar den.">
+        <ListGroup
+          title="Data och integritet"
+          footer={
+            <>
+              {CLOUD_ENABLED
+                ? 'Din dagbok lämnar bara enheten om du själv exporterar den eller slår på Lagom Moln – då krypteras den först på enheten. '
+                : 'Din dagbok lämnar aldrig enheten. '}
+              Sökningar och streckkoder skickas till Open Food Facts – läs mer i{' '}
+              <Link to="/integritet" className="font-semibold text-gran underline underline-offset-2">
+                integritetspolicyn
+              </Link>
+              .
+            </>
+          }
+        >
           {row('data', backupSub)}
+          {CLOUD_ENABLED && row('moln', cloudSub)}
           {row('databas', 'Källor, import och sparade livsmedel')}
         </ListGroup>
 
         <ListGroup title="Om">
           <ListRow to="/om" leading={Info} title="Om Lagom" subtitle="Källor, licenser och integritet" />
+          <ListRow to="/integritet" leading={ShieldCheck} leadingTone="gran" title="Integritetspolicy" subtitle="Vilken data som finns var – och dina rättigheter" />
+          <ListRow to="/villkor" leading={FileText} leadingTone="mossa" title="Köp- och användarvillkor" subtitle="Provperiod, licenser och användning" />
           <ListRow onClick={() => setSupport(true)} leading={HeartHandshake} leadingTone="vinbar" title="Stöd & hjälp" subtitle="1177, Frisk & Fri och Alkoholhjälpen" chevron />
         </ListGroup>
       </div>

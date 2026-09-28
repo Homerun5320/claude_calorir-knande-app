@@ -39,7 +39,8 @@ export function Chip({ selected, icon, count, tone = 'gran', size = 'md', classN
       transition={{ type: 'spring', stiffness: 600, damping: 30 }}
       style={toneVars(tone, style)}
       className={cx(
-        'relative inline-flex shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-full font-semibold',
+        // min-w-11: även smala chips ("g", "l", "1 h") blir minst 44 px breda.
+        'relative inline-flex min-w-11 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold',
         'transition-[background-color,color,box-shadow] duration-200 disabled:pointer-events-none disabled:opacity-45',
         // Osynlig utökning av tryckytan till minst 44 px höjd.
         'after:absolute after:inset-x-0 after:-inset-y-1.5',

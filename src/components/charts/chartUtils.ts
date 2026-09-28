@@ -217,7 +217,7 @@ export function monotoneTangents(points: readonly Point[]): number[] {
     h.push(dx)
     s.push(dx === 0 ? 0 : (points[i + 1].y - points[i].y) / dx)
   }
-  const m = new Array<number>(n).fill(0)
+  const m: number[] = Array.from({ length: n }, () => 0)
   for (let i = 1; i < n - 1; i++) {
     const s0 = s[i - 1]
     const s1 = s[i]

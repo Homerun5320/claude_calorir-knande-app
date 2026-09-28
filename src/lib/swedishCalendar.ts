@@ -225,7 +225,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     kind: 'tradition',
     date: fixed(1, 13),
     description:
-      'Tjugondag Knut – den tjugonde dagen i julen räknat från juldagen – är dagen då julen dansas ut. Förr hängde godis, äpplen och pepparkakor i granen, och på julgransplundringen fick barnen "plundra" den.',
+      'Tjugondag Knut – den tjugonde dagen i julen räknat från juldagen – är dagen då julen dansas ut. Förr hängde godis, äpplen och pepparkakor i granen, och på julgransplundringen fick barnen ”plundra” den.',
     foods: ['pepparkaka', 'äpple', 'godis'],
     tip: 'Bjud på äppelbitar och clementiner vid julgransplundringen – det blir färgglatt och uppskattat av både stora och små.',
   },
@@ -283,7 +283,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     kind: 'matdag',
     date: fixed(3, 25),
     description:
-      'Våffeldagen är egentligen Vårfrudagen, Marie bebådelsedag. När "vårfrudagen" uttalades snabbt blev det "vaffeldagen" – och av en språklig slump började vi äta våfflor den 25 mars.',
+      'Våffeldagen är egentligen Vårfrudagen, Marie bebådelsedag. När ”vårfrudagen” uttalades snabbt blev det ”vaffeldagen” – och av en språklig slump började vi äta våfflor den 25 mars.',
     foods: ['våffla', 'sylt', 'vispgrädde', 'hjortronsylt'],
     tip: 'Toppa våfflan med färska eller frysta bär och en klick kvarg eller yoghurt – den blir både fräsch och mer mättande.',
   },
@@ -508,7 +508,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     date: (y) => princessCakeWeek(y).start,
     endDate: (y) => princessCakeWeek(y).end,
     description:
-      'Prinsesstårtan hette från början "grön tårta" i Prinsessornas kokbok från 1929 och fick sitt namn för att prinsessorna Margaretha, Märtha och Astrid tyckte så mycket om den. Under veckan skänker konditorier en del av intäkterna till Kronprinsessan Victorias fond.',
+      'Prinsesstårtan hette från början ”grön tårta” i Prinsessornas kokbok från 1929 och fick sitt namn för att prinsessorna Margaretha, Märtha och Astrid tyckte så mycket om den. Under veckan skänker konditorier en del av intäkterna till Kronprinsessan Victorias fond.',
     foods: ['prinsesstårta'],
     tip: 'Köp en bit på ditt lokala konditori och njut av den till kaffet – då gör tårtan nytta för fler än dig.',
   },
@@ -519,7 +519,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     kind: 'matdag',
     date: fixed(9, 29),
     description:
-      'Svenskarna hör till världens mest kaffedrickande folk, och ordet "fika" kommer troligen från "kaffi" med stavelserna omkastade. Kaffets dag firas i Sverige den 29 september, den internationella kaffedagen den 1 oktober.',
+      'Svenskarna hör till världens mest kaffedrickande folk, och ordet ”fika” kommer troligen från ”kaffi” med stavelserna omkastade. Kaffets dag firas i Sverige den 29 september, den internationella kaffedagen den 1 oktober.',
     foods: ['kaffe', 'mjölk', 'kanelbulle'],
     tip: 'Upp till omkring 400 mg koffein om dagen – ungefär fyra koppar bryggkaffe – bedöms som säkert för de flesta vuxna. Vid graviditet gäller en lägre gräns.',
   },
@@ -532,7 +532,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     description:
       'Sedan 2020 uppmärksammar FN den 29 september som internationell dag för medvetenhet om matsvinn. En stor del av svinnet uppstår i hemmen – och där är det också lättast att göra skillnad.',
     foods: ['matlåda', 'pytt i panna', 'soppa'],
-    tip: '"Bäst före" betyder ofta bra efter – titta, lukta och smaka innan du slänger. "Sista förbrukningsdag" ska däremot tas på allvar.',
+    tip: '”Bäst före” betyder ofta bra efter – titta, lukta och smaka innan du slänger. ”Sista förbrukningsdag” ska däremot tas på allvar.',
   },
   {
     key: 'kanelbullens-dag',
@@ -563,7 +563,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     kind: 'matdag',
     date: fixed(10, 14),
     description:
-      'Räkmackan med räkor, ägg, majonnäs, sallad och dill är en svensk klassiker. Att "glida in på en räkmacka" betyder att få något serverat utan ansträngning.',
+      'Räkmackan med räkor, ägg, majonnäs, sallad och dill är en svensk klassiker. Att ”glida in på en räkmacka” betyder att få något serverat utan ansträngning.',
     foods: ['räksmörgås', 'räkor', 'ägg'],
     tip: 'Räkor är magra och proteinrika – en räkmacka på grovt bröd med mycket sallad blir en mättande lunch.',
   },
@@ -699,7 +699,7 @@ const TEMPLATES: readonly FoodDayTemplate[] = [
     kind: 'hogtid',
     date: fixed(12, 31),
     description:
-      'Nyårsafton firas med festmiddag, tolvslag och fyrverkerier. Sedan slutet av 1800-talet läses dikten "Nyårsklockan" upp på Skansen vid tolvslaget.',
+      'Nyårsafton firas med festmiddag, tolvslag och fyrverkerier. Sedan slutet av 1800-talet läses dikten ”Nyårsklockan” upp på Skansen vid tolvslaget.',
     foods: ['räkor', 'hummer', 'oxfilé', 'bubbel'],
     tip: 'Ät ordentligt under kvällen och drick gärna vatten mellan glasen – så mår du bättre på nyårsdagen.',
   },

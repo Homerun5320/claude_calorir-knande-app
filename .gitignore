@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Butiksbygget (VITE_DISTRIBUTION=appstore/play)
+dist-native
 *.local
 
 # Editor directories and files
@@ -22,3 +24,27 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Miljövariabler och hemligheter (.env.example checkas in som mall)
+.env
+.env.*
+!.env.example
+
+# Netlify CLI
+.netlify/
+
+# Signeringsnycklar för Android – får aldrig checkas in
+*.jks
+*.keystore
+android.keystore
+
+# Apple: App Store Connect API-nyckel (.p8), certifikat (.p12) och provisioneringsprofiler –
+# hör hemma i lösenordshanteraren och molnbyggets hemligheter, aldrig i Git
+*.p8
+*.p12
+*.mobileprovision
+
+# Butiksskärmdumpar – tas fram med scripts/app-store-screenshots.mjs från det färdiga bygget
+# precis före inskickningen (de beror på dagens datum och exempeldata). Laddas upp direkt från
+# mappen. Ikonerna och funktionsgrafiken i store-assets/ checkas däremot in.
+store-assets/screenshots/

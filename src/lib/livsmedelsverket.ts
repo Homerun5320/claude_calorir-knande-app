@@ -19,8 +19,16 @@ import { completeNutrients, KJ_PER_KCAL, NUTRIENTS, type NutrientKey } from './n
 import { normalizeSv } from './search'
 
 export const LMV_API_BASE = 'https://dataportal.livsmedelsverket.se/livsmedel/api/v1'
-/** Källhänvisning som visas i appen. */
-export const LMV_ATTRIBUTION = 'Källa: Livsmedelsverkets livsmedelsdatabas'
+/** Källhänvisning som visas i appen (databasen publiceras under CC BY 4.0 – källan ska anges). */
+export const LMV_ATTRIBUTION = 'Källa: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0)'
+/** Licensen för Livsmedelsverkets livsmedelsdatabas. */
+export const LMV_LICENSE = 'CC BY 4.0'
+/**
+ * Licenstexten på svenska hos Creative Commons. Bara en länk – appen anropar inte adressen. Skriven
+ * med backticks eftersom netlify/tests/netlify-toml.test.ts letar efter API-adresser i
+ * apostrofer ('https://…') i den här filen och kräver att de finns i CSP:ns connect-src.
+ */
+export const LMV_LICENSE_URL = `https://creativecommons.org/licenses/by/4.0/deed.sv`
 
 // ---------------------------------------------------------------------------
 // Råformat

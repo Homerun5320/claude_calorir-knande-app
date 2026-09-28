@@ -4,10 +4,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DialogHost } from '../../components/ui'
 import { resetLicenseChecks, useAccess } from '../../hooks/useAccess'
-import { isDemoData, setDemoFlag } from '../../lib/demoFlag'
+import { clearDemoFlag, isDemoData, setDemoFlag } from '../../lib/demoFlag'
 import { createTestLicense } from '../../lib/license'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useLicenseStore } from '../../stores/licenseStore'
@@ -41,8 +41,13 @@ beforeAll(async () => {
   await waitFor(() => expect([useLicenseStore, useProfileStore, useDiaryStore].every((s) => s.persist.hasHydrated())).toBe(true))
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 beforeEach(() => {
   localStorage.clear()
+  clearDemoFlag()
   resetLicenseChecks()
   useLicenseStore.getState().resetLicenseState()
   useProfileStore.setState({ profile: { ...PROFILE }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true } })
@@ -61,7 +66,7 @@ describe('TrialBanner på Idag', () => {
     useLicenseStore.setState({ trialStartedAt: Date.now() - 12 * DAY })
     inRouter(<TrialBanner />)
     expect(screen.getByText('2 dagar kvar av provperioden')).toBeInTheDocument()
-    expect(screen.getByText(/All din data finns kvar efter provperioden/)).toBeInTheDocument()
+    expect(screen.getByText(/All din data finns kvar efter provperioden/)).toHaveTextContent('349 kr/år eller 699 kr för alltid')
     expect(screen.getByRole('link', { name: 'Se priser' })).toHaveAttribute('href', '/premium')
   })
 
@@ -70,6 +75,23 @@ describe('TrialBanner på Idag', () => {
     inRouter(<TrialBanner />)
     expect(screen.getByRole('heading', { name: 'Provperioden är slut – din data finns kvar' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Exportera min data' })).toHaveAttribute('href', '/installningar/data')
+  })
+
+  it('i App Store-bygget: inga kronor, köp i appen', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const [{ TrialBanner: FreshBanner }, license] = await Promise.all([import('./TrialBanner'), import('../../stores/licenseStore')])
+    await waitFor(() => expect(license.useLicenseStore.persist.hasHydrated()).toBe(true))
+    license.useLicenseStore.setState({ trialStartedAt: Date.now() - 12 * DAY, licenseKey: null })
+    const { unmount } = inRouter(<FreshBanner />)
+    expect(screen.getByText(/All din data finns kvar efter provperioden/)).toHaveTextContent(
+      'Vill du fortsätta logga: årslicens eller livstidslicens som köp i appen.',
+    )
+    unmount()
+    license.useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * DAY })
+    const { container } = inRouter(<FreshBanner />)
+    expect(container).toHaveTextContent('För att logga nytt behöver du en licens: årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse.')
+    expect(container.textContent).not.toMatch(/\skr(?![a-zåäö])|Stripe/)
   })
 
   it('syns inte med licens', async () => {
@@ -147,13 +169,16 @@ describe('exempeldata', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('exempelprofilens bakdaterade start ger ingen utgången provperiod', async () => {
+  it('exempeldata startar ingen provperiod – varken från den bakdaterade profilen eller från nu', async () => {
     setDemoFlag()
     useProfileStore.setState({ profile: { ...PROFILE, createdAt: Date.now() - 14 * DAY }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true } })
     inRouter(<TrialProbe />)
-    await waitFor(() => expect(useLicenseStore.getState().trialStartedAt).not.toBeNull())
-    expect(useLicenseStore.getState().trialStartedAt).toBeGreaterThan(Date.now() - DAY)
-    expect(screen.getByText('prov')).toBeInTheDocument()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+    expect(screen.getByText('ny')).toBeInTheDocument()
+    // Inget kort om provperioden på Idag medan exemplet visas.
+    const { container } = inRouter(<TrialBanner />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('en profil från en tidigare version (utan provstart) får hela provperioden från nu – spärras inte direkt', async () => {

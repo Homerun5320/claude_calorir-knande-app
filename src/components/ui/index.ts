@@ -23,6 +23,7 @@ export { Button, type ButtonProps, type ButtonAsButtonProps, type ButtonAsLinkPr
 export { IconButton, type IconButtonProps, type IconButtonSize } from './IconButton'
 export { Chip, type ChipProps } from './Chip'
 export { Badge, type BadgeProps, type BadgeVariant } from './Badge'
+export { ExternalLink, externalLinkHint, isAppLink, type ExternalLinkProps } from './ExternalLink'
 
 // Ytor och layout
 export { Card, type CardProps, type CardPadding, type CardVariant } from './Card'

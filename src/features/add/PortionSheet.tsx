@@ -15,6 +15,7 @@ import { PortionPicker, type PortionSelection } from '../../components/domain/Po
 import { hasUsableNutrition } from '../../lib/openFoodFacts'
 import { sourceMeta } from './addLogic'
 import { AverageBadge, FoodSourceBadge } from './components'
+import { PregnancyNote } from './PregnancyNote'
 
 export interface SheetAction {
   label: string
@@ -67,7 +68,7 @@ export function PortionSheet({
 
   const run = (action: SheetAction) => {
     const s = sel.current
-    if (!s || !Number.isFinite(s.grams) || s.grams <= 0) return
+    if (!s || !Number.isFinite(s.grams) || s.grams <= 0 || s.needsConfirmation) return
     action.onClick(s.amount, s.unit, s.grams)
   }
 
@@ -122,6 +123,7 @@ export function PortionSheet({
       {current && (
         <div className="flex flex-col gap-4 pb-2">
           {children}
+          <PregnancyNote food={current} />
           {meta?.crowdSourced && (
             <p className="flex items-start gap-2.5 rounded-2xl bg-hjortron-soft px-4 py-3 text-sm text-ink">
               <Users className="mt-0.5 size-4 shrink-0 text-hjortron" aria-hidden />
@@ -149,9 +151,11 @@ export function PortionSheet({
             amountRef={amountRef}
             onChange={(s) => {
               sel.current = s
-              setValid(Number.isFinite(s.grams) && s.grams > 0)
+              setValid(Number.isFinite(s.grams) && s.grams > 0 && !s.needsConfirmation)
             }}
             onConfirm={(amount, unit, grams) => primary.onClick(amount, unit, grams)}
+            // Över 3 kg: "Ja, lägg till i Fika", "Ja, lägg i korgen", "Ja, spara ändring".
+            largeConfirmLabel={`Ja, ${primary.label.charAt(0).toLocaleLowerCase('sv-SE')}${primary.label.slice(1)}`}
           />
         </div>
       )}

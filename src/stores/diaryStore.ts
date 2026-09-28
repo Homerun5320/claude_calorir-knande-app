@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayMeta, DiaryEntry, ExerciseEntry, FoodEntry, ISODate, MealId, QuickEntry } from '../types'
 import { uid } from '../lib/id'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 type NewFoodEntry = Omit<FoodEntry, 'id' | 'createdAt'>
 type NewQuickEntry = Omit<QuickEntry, 'id' | 'createdAt'>
@@ -154,6 +154,12 @@ export const useDiaryStore = create<DiaryState>()(
       setDayMeta: (date, patch) => set({ days: { ...get().days, [date]: { ...get().days[date], ...patch } } }),
       clearDiary: () => set({ entries: {}, water: {}, exercise: {}, days: {} }),
     }),
-    { name: STORE_KEYS.diary, storage: idbStorage, version: 1 },
+    {
+      name: STORE_KEYS.diary,
+      storage: idbStorage,
+      version: PERSIST_VERSIONS[STORE_KEYS.diary],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as DiaryState,
+    },
   ),
 )

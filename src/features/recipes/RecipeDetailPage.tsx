@@ -15,6 +15,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ExternalLink,
   IconButton,
   PageHeader,
   Skeleton,
@@ -53,6 +54,7 @@ import {
   servingClimate,
   servingsText,
   showPlateFor,
+  sourceHost,
   weightInfo,
   type ServingNoun,
 } from './recipeLogic'
@@ -243,6 +245,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
             <TagBadges tags={tags} hide={builtin ? CLASSIC_HIDDEN_TAGS : OWN_HIDDEN_TAGS} size="md" />
           </div>
         )}
+        {recipe.sourceUrl && <SourceRow url={recipe.sourceUrl} hasSteps={parsed.steps.length > 0} />}
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <Button size="lg" iconLeft={Plus} onClick={() => requireAccess('mat') && setLogOpen(true)} fullWidth>
             Logga en portion
@@ -311,8 +314,10 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
               <Card title="Klimatavtryck" eyebrow={perServingText(noun)}>
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <span className="display-num text-4xl font-semibold text-ink">{formatNumber(climate.kg, climate.kg < 0.1 ? 2 : 1)}</span>
-                    <span className="ml-1.5 text-sm font-medium text-ink-3">kg CO₂e</span>
+                    <span className="display-num text-4xl font-semibold text-ink">
+                      {climate.kg < 0.005 ? '<0,01' : formatNumber(climate.kg, climate.kg < 0.1 ? 2 : 1)}
+                    </span>{' '}
+                    <span className="ml-1 text-sm font-medium text-ink-3">kg CO₂e</span>
                   </div>
                   <Badge tone={climate.tone} icon={Leaf} size="md">
                     {climate.label}
@@ -371,6 +376,24 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
 
       <LogRecipeSheet recipe={recipe} open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
+  )
+}
+
+/** "Källa: ica.se ↗" – länken till originalreceptet för importerade recept. */
+function SourceRow({ url, hasSteps }: { url: string; hasSteps: boolean }) {
+  return (
+    <dl className="mt-3 flex flex-wrap items-center gap-x-1.5 text-sm text-ink-2">
+      <dt className="font-medium text-ink-3">Källa</dt>
+      <dd className="min-w-0">
+        <ExternalLink
+          href={url}
+          className="inline-flex min-h-11 max-w-full items-center gap-0.5 font-semibold text-gran underline-offset-2 hover:underline"
+        >
+          <span className="truncate">{sourceHost(url)}</span>
+        </ExternalLink>
+      </dd>
+      {!hasSteps && <dd className="w-full text-xs text-ink-3">Instruktionerna finns hos källan.</dd>}
+    </dl>
   )
 }
 

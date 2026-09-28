@@ -8,13 +8,14 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { ChefHat, Copy, Info, Save, Scale, Sparkles, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, ClipboardPaste, Copy, Info, Save, Scale, Sparkles, UtensilsCrossed } from 'lucide-react'
 import type { Food, FoodTag, Recipe, RecipeIngredient, UnitKey } from '../../types'
 import {
   Button,
   Card,
   Chip,
   EmptyState,
+  ExternalLink,
   NumberField,
   PageHeader,
   Stepper,
@@ -44,6 +45,7 @@ import {
   isDraftDirty,
   makeIngredient,
   recipeFromDraft,
+  sourceHost,
   validateDraft,
   weightInfo,
   type RecipeDraft,
@@ -51,6 +53,7 @@ import {
 import { useRecipe } from './useRecipes'
 import { RecipeEmoji } from './components'
 import { AmountSheet, IngredientRow, IngredientSearch, type IngredientSearchHandle, type PickerState } from './IngredientPicker'
+import { PasteIngredientsSheet } from './IngredientImport'
 import { requireAccess } from '../premium/requireAccess'
 
 export default function RecipeEditorPage() {
@@ -139,6 +142,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [picker, setPicker] = useState<PickerState | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const [announce, setAnnounce] = useState('')
   const savedRef = useRef(false)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -207,6 +211,19 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
       setAnnounce(`Mängden för ${food.name} är ändrad.`)
     }
     setPickerOpen(false)
+  }
+
+  const addPasted = (list: RecipeIngredient[]) => {
+    if (list.length === 0) return
+    const ids = new Set(list.map((i) => i.id))
+    setDraft((d) => ({ ...d, ingredients: [...d.ingredients, ...list] }))
+    setPasteOpen(false)
+    const text = list.length === 1 ? '1 ingrediens är tillagd' : `${list.length} ingredienser är tillagda`
+    setAnnounce(`${text}.`)
+    toast(text, {
+      tone: 'success',
+      action: { label: 'Ångra', onClick: () => setDraft((d) => ({ ...d, ingredients: d.ingredients.filter((i) => !ids.has(i.id)) })) },
+    })
   }
 
   const removeIngredient = (ing: RecipeIngredient) => {
@@ -344,6 +361,17 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
               )}
             </AnimatePresence>
 
+            {draft.sourceUrl && (
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-3">
+                Källa:{' '}
+                <ExternalLink
+                  href={draft.sourceUrl}
+                  className="inline-flex min-h-11 items-center gap-0.5 font-semibold text-gran underline-offset-2 hover:underline"
+                >
+                  {sourceHost(draft.sourceUrl)}
+                </ExternalLink>
+              </p>
+            )}
             <div className="mt-4 grid grid-cols-1 gap-4 min-[400px]:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-ink-2" id={`${nameId}-servings`}>
@@ -414,6 +442,9 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
               onPick={(food) => openPicker({ mode: 'add', food })}
               error={shownErrors.ingredients}
             />
+            <Button variant="ghost" size="sm" iconLeft={ClipboardPaste} className="mt-2" onClick={() => setPasteOpen(true)}>
+              Klistra in ingredienser
+            </Button>
             <span className="sr-only" aria-live="polite">
               {announce}
             </span>
@@ -558,6 +589,8 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
           {existing ? 'Spara ändringar' : 'Spara recept'}
         </Button>
       </form>
+
+      <PasteIngredientsSheet open={pasteOpen} onClose={() => setPasteOpen(false)} onAdd={addPasted} excludeId={excludeId} />
 
       <AmountSheet
         state={picker}

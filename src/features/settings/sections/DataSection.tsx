@@ -1,19 +1,23 @@
 /**
- * Inställningar → Data och säkerhetskopia (GDPR: dataportabilitet och rätten att radera).
+ * Inställningar → Data och säkerhetskopia (dataportabilitet och rätten att radera).
  * All data ligger lokalt – säkerhetskopian är användarens enda "moln".
  */
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
+  ArrowRightLeft,
   CircleCheck,
   CloudOff,
+  CreditCard,
   Download,
   FileBraces,
   FileSpreadsheet,
+  FileUp,
   HardDrive,
   Merge,
   Replace,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Trash,
   TriangleAlert,
@@ -22,37 +26,103 @@ import {
 import { Badge, Button, Card, Dialog, ProgressBar, Sheet, TextField, confirmDialog, toast } from '../../../components/ui'
 import {
   BackupError,
-  backupFilename,
-  createBackup,
   diaryToCsv,
-  downloadFile,
   parseBackup,
   requestPersistentStorage,
+  saveBackup,
+  saveFile,
   storageEstimate,
   summarizeBackup,
   type BackupFile,
   type ImportSummary,
+  type SaveOutcome,
 } from '../../../lib/backup'
+import { applyImport, gateImport, importDays, ImportCsvError, readImportFile, type CsvImport } from '../../../lib/importCsv'
+import { UnzipError } from '../../../lib/unzip'
 import { clearDemoFlag } from '../../../lib/demoFlag'
+import { plural } from '../../../lib/format'
 import { useDemoData } from '../../../hooks/useDemoData'
+import { currentAccess } from '../../../hooks/useAccess'
 import { useLicenseStore } from '../../../stores/licenseStore'
-import { useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
+import { hasNewerData } from '../../../stores/storage'
+import { useHasNewerData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
+import { SUPPORT_EMAIL } from '../../../config/commerce'
+import { CLOUD_ENABLED } from '../../../config/cloud'
+import { DISTRIBUTION, allowsLicenseKeyEntry, isInApp, isNativeApp, isTwa, sellsOnWeb, storagePlace } from '../../../config/platform'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
 import { markBackupNow, useLastBackup } from '../backupStatus'
 import { wipeAndReset } from '../wipe'
 import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
-function exportBackup() {
-  try {
-    const backup = createBackup()
-    downloadFile(backupFilename(), JSON.stringify(backup, null, 1))
-    markBackupNow()
-    toast('Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.', { tone: 'success' })
-  } catch {
-    toast('Säkerhetskopian kunde inte skapas. Försök igen.', { tone: 'error' })
+const SHARED_TOAST = 'Delad – välj Spara i Filer för att behålla den'
+
+/**
+ * Spara en säkerhetskopia. "Senaste säkerhetskopian" uppdateras bara när filen faktiskt har sparats
+ * eller delats – inte om delningsdialogen stängdes. Anropas direkt från klicket (se `saveFile`).
+ */
+async function exportBackup(): Promise<SaveOutcome> {
+  const outcome = await saveBackup()
+  if (outcome === 'saved' || outcome === 'shared') {
+    // Med data från en nyare version innehåller kopian bara det som gjorts nu – den sparade datan
+    // är inte med, så påminnelsen om säkerhetskopia ska inte tystna.
+    if (!hasNewerData()) markBackupNow()
+    toast(outcome === 'saved' ? 'Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.' : SHARED_TOAST, { tone: 'success' })
+  } else if (outcome === 'failed') {
+    toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
+  }
+  return outcome
+}
+
+/** Butiken som sköter köpen i den här versionen av appen (aldrig en annan plattforms namn i iPhone-appen). */
+function purchaseText(): string {
+  if (sellsOnWeb()) return 'När du köper en licens på webben sköts betalningen av Stripe.'
+  if (DISTRIBUTION === 'appstore' || (isNativeApp() && !isTwa())) return 'Köp sköts av App Store.'
+  if (DISTRIBUTION === 'play' || isTwa()) return 'Köp sköts av Google Play.'
+  return 'Köp sköts av App Store eller Google Play.'
+}
+
+/** Vem som ser IP-adressen hos vårt webbhotell: på webben (och i Play-appen) laddas appen därifrån. */
+function hostingText(): string {
+  return isNativeApp() && !isTwa()
+    ? 'vårt webbhotell Netlify ser din IP-adress när appen anropar våra serverfunktioner'
+    : 'vårt webbhotell Netlify ser din IP-adress när appen laddas'
+}
+
+/** "a", "a och b", "a, b och c". */
+function joinSv(parts: string[]): string {
+  return parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} och ${parts.at(-1)}`
+}
+
+const hasSupportEmail = () => !/\.invalid$/i.test(SUPPORT_EMAIL)
+
+interface OtherAppImport {
+  fileName: string
+  data: CsvImport
+  summary: ImportSummary
+  /** Dagar från provperiodens start som hoppas över (kräver licens). */
+  blockedDays: number
+  /** Exempeldata visas – den är skrivskyddad. */
+  demo: boolean
+}
+
+function otherAppSummaryEmpty(summary: ImportSummary): boolean {
+  return summary.entries === 0 && summary.weights === 0 && (summary.measurements ?? 0) === 0
+}
+
+function otherAppSummary(data: CsvImport): ImportSummary {
+  return {
+    days: importDays(data),
+    entries: data.quick.length,
+    weights: data.weights.length,
+    measurements: data.measurements.length,
+    customFoods: 0,
+    recipes: 0,
+    skipped: data.skipped,
+    repaired: 0,
+    skippedDetails: [],
   }
 }
 
@@ -70,7 +140,10 @@ export function DataSection() {
   // Sparas inget på enheten just nu flyttas lagringskortet överst, så att det syns direkt.
   const memoryOnly = useMemoryOnlyStorage()
   const fileRef = useRef<HTMLInputElement>(null)
+  const otherRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<{ backup: BackupFile; summary: ImportSummary; fileName: string } | null>(null)
+  const [other, setOther] = useState<OtherAppImport | null>(null)
+  const [readingOther, setReadingOther] = useState(false)
   const demo = useDemoData()
   const hasLicense = useLicenseStore((s) => s.licenseKey !== null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -89,9 +162,12 @@ export function DataSection() {
     }
   }
 
-  const doImport = async (mode: 'merge' | 'replace') => {
+  const doImport = async (requested: 'merge' | 'replace') => {
     if (!pending) return
-    if (mode === 'replace') {
+    // Exempeldatan är skrivskyddad och ska aldrig blandas med riktig data: med exempeldata ersätter
+    // säkerhetskopian allt (utan extra fråga – exemplet är påhittat).
+    const mode = demo ? 'replace' : requested
+    if (mode === 'replace' && !demo) {
       const ok = await confirmDialog({
         title: 'Ersätta all data?',
         message: 'Allt som finns i appen nu ersätts med innehållet i säkerhetskopian. Tips: exportera en säkerhetskopia av nuvarande data först.',
@@ -112,10 +188,65 @@ export function DataSection() {
     }
   }
 
-  const exportCsv = () => {
-    const csv = diaryToCsv(useDiaryStore.getState().entries)
-    downloadFile(`lagom-dagbok-${todayISO()}.csv`, csv, 'text/csv')
-    toast('Dagboken är exporterad som CSV', { tone: 'success' })
+  const exportCsv = async () => {
+    let csv: string
+    try {
+      csv = diaryToCsv(useDiaryStore.getState().entries)
+    } catch {
+      toast('Dagboken kunde inte exporteras. Försök igen.', { tone: 'error' })
+      return
+    }
+    const outcome = await saveFile(`lagom-dagbok-${todayISO()}.csv`, csv, 'text/csv')
+    if (outcome === 'saved') toast('Dagboken är exporterad som CSV', { tone: 'success' })
+    else if (outcome === 'shared') toast(SHARED_TOAST, { tone: 'success' })
+    else if (outcome === 'failed') toast('Dagboken kunde inte exporteras. Försök igen.', { tone: 'error' })
+  }
+
+  const onOtherFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // samma fil ska kunna väljas igen
+    if (!file) return
+    setReadingOther(true)
+    try {
+      const all = await readImportFile(file)
+      // Betalväggen: allt före provperiodens start importeras alltid, resten bara om man får logga.
+      const access = currentAccess()
+      const trialStartedAt = useLicenseStore.getState().trialStartedAt
+      const { data, blockedDays } = gateImport(all, {
+        trialStart: trialStartedAt === null ? null : toISODate(new Date(trialStartedAt)),
+        canLog: access.canLog,
+      })
+      if (all.quick.length === 0 && all.weights.length === 0 && all.measurements.length === 0) {
+        toast('Hittade inget att importera i filen.', { tone: 'error' })
+        return
+      }
+      setOther({ fileName: file.name, data, summary: otherAppSummary(data), blockedDays, demo: access.demo })
+    } catch (err) {
+      toast(err instanceof ImportCsvError || err instanceof UnzipError ? err.message : 'Filen kunde inte läsas.', { tone: 'error' })
+    } finally {
+      setReadingOther(false)
+    }
+  }
+
+  const doOtherImport = () => {
+    if (!other) return
+    try {
+      const counts = applyImport(other.data)
+      setOther(null)
+      const parts = [
+        counts.entries > 0 ? plural(counts.entries, 'måltid', 'måltider') : '',
+        counts.weights > 0 ? plural(counts.weights, 'vägning', 'vägningar') : '',
+        counts.measurements > 0 ? plural(counts.measurements, 'mätning', 'mätningar') : '',
+      ].filter(Boolean)
+      const updated = counts.updated > 0 ? `${plural(counts.updated, 'måltid', 'måltider')} fick nya värden från filen.` : ''
+      const dupes = counts.duplicates > 0 ? ` ${plural(counts.duplicates, 'post', 'poster')} fanns redan och hoppades över.` : ''
+      const blocked = other.blockedDays > 0 ? ` ${plural(other.blockedDays, 'dag', 'dagar')} efter provperiodens start hoppades över – de kräver en licens.` : ''
+      if (parts.length === 0 && !updated) toast(`Inget nytt att importera – allt fanns redan.${blocked}`)
+      else if (parts.length === 0) toast(`${updated}${dupes}${blocked}`, { tone: 'success' })
+      else toast(`Importerat: ${joinSv(parts)}.${updated ? ` ${updated}` : ''}${dupes}${blocked}`, { tone: 'success' })
+    } catch {
+      toast('Importen misslyckades. Försök igen.', { tone: 'error' })
+    }
   }
 
   const clearDemo = async () => {
@@ -175,7 +306,7 @@ export function DataSection() {
           {lastBackupText(lastBackup)}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-          <Button iconLeft={Download} onClick={exportBackup}>
+          <Button iconLeft={Download} onClick={() => void exportBackup()}>
             Exportera (JSON)
           </Button>
           <Button variant="secondary" iconLeft={Upload} onClick={() => fileRef.current?.click()}>
@@ -185,14 +316,64 @@ export function DataSection() {
         <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" tabIndex={-1} aria-hidden onChange={onFile} />
       </Card>
 
+      <Card eyebrow="Ny enhet" title="Byta telefon eller flytta till appen">
+        <div className="-mt-1 flex items-start gap-3">
+          <Smartphone aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
+          <div className="min-w-0 text-[0.9375rem] leading-relaxed text-ink-2">
+            <p>
+              Din data finns {storagePlace()} och flyttar inte med automatiskt. Spara en säkerhetskopia här, öppna Lagom på den nya enheten eller i
+              appen och välj Återställ från säkerhetskopia.
+            </p>
+            {/* I iPhone-appen – och på webben för den som har en licens och funderar på att flytta dit. */}
+            {(!allowsLicenseKeyEntry() || (hasLicense && !isInApp())) && (
+              <p className="mt-2">
+                En licens som köpts på webben följer inte med till iPhone-appen –{' '}
+                {hasSupportEmail() ? (
+                  <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Licens från webben')}`} className="font-semibold text-gran underline underline-offset-2">
+                    kontakta oss
+                  </a>
+                ) : (
+                  'kontakta oss'
+                )}{' '}
+                så hjälper vi dig.
+              </p>
+            )}
+          </div>
+        </div>
+        <Button className="mt-4" variant="secondary" iconLeft={Download} onClick={() => void exportBackup()}>
+          Spara säkerhetskopia
+        </Button>
+      </Card>
+
       <Card eyebrow="Export" title="Dagboken i Excel">
         <p className="-mt-1 mb-4 text-[0.9375rem] leading-relaxed text-ink-2">
           Alla poster med datum, måltid, mängd och näringsvärden. Semikolon och decimalkomma – öppnas direkt i svenska Excel och Numbers.
         </p>
-        <Button variant="secondary" iconLeft={FileSpreadsheet} onClick={exportCsv} disabled={!hasDiary}>
+        <Button variant="secondary" iconLeft={FileSpreadsheet} onClick={() => void exportCsv()} disabled={!hasDiary}>
           Exportera dagbok som CSV
         </Button>
         {!hasDiary && <p className="mt-2 text-[0.8125rem] text-ink-3">Dagboken är tom än så länge.</p>}
+      </Card>
+
+      <Card eyebrow="Import" title="Byt från annan app">
+        <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
+          Har du loggat i MyFitnessPal eller en annan app? Välj exporten – en CSV-fil eller zip-filen från MyFitnessPal – så tar Lagom med vikt,
+          midjemått och dagens kalorier och makron per måltid.
+        </p>
+        <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">Enskilda livsmedel följer inte med – varje måltid blir en snabbregistrering.</p>
+        <Button className="mt-4" variant="secondary" iconLeft={FileUp} onClick={() => otherRef.current?.click()} loading={readingOther}>
+          Välj fil att importera
+        </Button>
+        <input
+          ref={otherRef}
+          type="file"
+          accept=".csv,.zip,text/csv,application/zip"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          data-testid="annan-app-fil"
+          onChange={onOtherFile}
+        />
       </Card>
 
       {!memoryOnly && <StorageCard lastBackup={lastBackup} />}
@@ -201,18 +382,25 @@ export function DataSection() {
         <ul className="flex flex-col gap-3 text-[0.9375rem] leading-relaxed text-ink-2">
           <li className="flex gap-3">
             <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
-            <span>Allt sparas lokalt i den här webbläsaren. Lagom har inga konton, ingen reklam och ingen spårning – din dagbok finns inte på någon server.</span>
-          </li>
-          <li className="flex gap-3">
-            <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
             <span>
-              Inget skickas någonstans – förutom när du själv söker eller skannar en streckkod (då skickas bara sökordet eller streckkoden till Open Food
-              Facts) och när du köper en licens (betalningen sköts av Stripe).
+              {CLOUD_ENABLED
+                ? `Din dagbok sparas ${storagePlace()} – och bara om du själv slår på Lagom Moln även som en krypterad kopia i molnet.`
+                : `Din dagbok sparas bara ${storagePlace()}.`}{' '}
+              Sökord och streckkoder skickas till Open Food Facts, produktbilder hämtas därifrån och{' '}
+              {hostingText()}. Läs mer i{' '}
+              <Link to="/integritet" className="font-semibold text-gran underline underline-offset-2">
+                integritetspolicyn
+              </Link>
+              .
             </span>
           </li>
           <li className="flex gap-3">
+            <CreditCard aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
+            <span>{purchaseText()}</span>
+          </li>
+          <li className="flex gap-3">
             <FileBraces aria-hidden className="mt-0.5 size-5 shrink-0 text-gran" />
-            <span>Du kan när som helst ta med dig all data (export) eller radera den – så som GDPR ger dig rätt till.</span>
+            <span>Du kan när som helst ta med dig all data (export) eller radera den.</span>
           </li>
         </ul>
       </Card>
@@ -233,21 +421,70 @@ export function DataSection() {
         title="Importera säkerhetskopia"
         description={pending ? `${pending.fileName} · skapad ${backupDateLabel(pending.backup.exportedAt)}` : undefined}
         footer={
-          <div className="flex flex-col gap-2">
-            <Button fullWidth iconLeft={Merge} onClick={() => doImport('merge')}>
-              Slå ihop med min data
+          demo ? (
+            <Button fullWidth iconLeft={Replace} onClick={() => doImport('replace')}>
+              Ersätt exempeldatan
             </Button>
-            <Button fullWidth variant="outline" iconLeft={Replace} onClick={() => doImport('replace')}>
-              Ersätt allt
-            </Button>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Button fullWidth iconLeft={Merge} onClick={() => doImport('merge')}>
+                Slå ihop med min data
+              </Button>
+              <Button fullWidth variant="outline" iconLeft={Replace} onClick={() => doImport('replace')}>
+                Ersätt allt
+              </Button>
+            </div>
+          )
         }
       >
         {pending && <ImportSummaryList summary={pending.summary} />}
-        <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-3">
-          <strong className="font-semibold text-ink-2">Slå ihop</strong> behåller det du har och lägger till det som saknas.{' '}
-          <strong className="font-semibold text-ink-2">Ersätt allt</strong> gör appen till en exakt kopia av säkerhetskopian.
-        </p>
+        {demo ? (
+          <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-3">
+            Exempeldatan tas bort och appen blir en exakt kopia av säkerhetskopian – din egen data blandas aldrig med exemplet.
+          </p>
+        ) : (
+          <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-3">
+            <strong className="font-semibold text-ink-2">Slå ihop</strong> behåller det du har och lägger till det som saknas.{' '}
+            <strong className="font-semibold text-ink-2">Ersätt allt</strong> gör appen till en exakt kopia av säkerhetskopian.
+          </p>
+        )}
+      </Sheet>
+
+      <Sheet
+        open={other !== null}
+        onClose={() => setOther(null)}
+        title={other?.data.source === 'MyFitnessPal' ? 'Importera från MyFitnessPal' : 'Importera från annan app'}
+        description={other?.fileName}
+        footer={
+          <Button fullWidth iconLeft={ArrowRightLeft} onClick={doOtherImport} disabled={!other || other.demo || otherAppSummaryEmpty(other.summary)}>
+            Importera
+          </Button>
+        }
+      >
+        {other && (
+          <>
+            <ImportSummaryList summary={other.summary} kind="annan-app" />
+            <div className="mt-4 flex flex-col gap-2 text-[0.875rem] leading-relaxed text-ink-3">
+              {other.demo ? (
+                <p className="text-ink-2">Exempeldatan är skrivskyddad. Skapa din egen profil först – sedan kan du importera.</p>
+              ) : (
+                other.blockedDays > 0 && (
+                  <p className="text-ink-2">
+                    {plural(other.blockedDays, 'dag', 'dagar')} efter provperiodens start hoppas över – de kräver en licens.{' '}
+                    <Link to="/premium" className="font-semibold text-gran underline underline-offset-2">
+                      Om licenser
+                    </Link>
+                  </p>
+                )
+              )}
+              <p>
+                Det du själv har loggat i Lagom ändras inte – en egen vikt eller ett eget mått samma dag behålls. Samma fil kan importeras igen utan
+                dubbletter, och en nyare export uppdaterar måltider som redan har importerats.
+              </p>
+              {other.summary.weights > 0 && <p>Vikten läses som kilo, om inte kolumnen anger pund (lb).</p>}
+            </div>
+          </>
+        )}
       </Sheet>
 
       <Dialog
@@ -263,7 +500,7 @@ export function DataSection() {
             <Button variant="danger" fullWidth onClick={confirmDelete} disabled={!isDeleteConfirmed(typed)}>
               Radera allt
             </Button>
-            <Button variant="ghost" fullWidth onClick={exportBackup} iconLeft={Download}>
+            <Button variant="ghost" fullWidth onClick={() => void exportBackup()} iconLeft={Download}>
               Exportera säkerhetskopia först
             </Button>
           </div>
@@ -306,12 +543,15 @@ export function DataSection() {
 }
 
 /**
- * Sparas ändringarna på enheten just nu? Normalt ja (IndexedDB). Om webbläsaren blockerar
- * lagringen (privat läge, full lagring, avstängda webbplatsdata) ligger ändringarna bara i minnet
- * tills fliken stängs – då är en säkerhetskopia det enda sättet att behålla dem.
+ * Sparas ändringarna på enheten just nu? Normalt ja (IndexedDB). Om lagringen är blockerad (privat
+ * läge, full lagring, avstängda webbplatsdata) ligger ändringarna bara i minnet tills fliken eller
+ * appen stängs – då är en säkerhetskopia det enda sättet att behålla dem. Kommer den sparade datan
+ * från en nyare version av Lagom lämnas den orörd tills appen har uppdaterats.
  */
 export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
   const memoryOnly = useMemoryOnlyStorage()
+  const newer = useHasNewerData()
+  const inApp = isInApp()
   if (memoryOnly) {
     return (
       <div role="status" className="flex flex-col items-start gap-3 rounded-2xl bg-sol-soft p-3.5">
@@ -320,34 +560,52 @@ export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
           <div className="min-w-0">
             <p className="text-[0.9375rem] font-semibold text-ink">Sparas inte på enheten just nu</p>
             <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-2">
-              Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns
-              kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.
+              {newer
+                ? 'Din data är från en nyare version av Lagom – uppdatera appen. Den sparade datan lämnas orörd, och det du gör nu finns bara kvar tills du stänger appen.'
+                : inApp
+                  ? 'Lagom kan inte spara på enheten just nu – t.ex. när lagringen är full. Det du gör finns kvar tills du stänger appen, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'
+                  : 'Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'}
             </p>
           </div>
         </div>
-        <Button size="sm" iconLeft={Download} onClick={exportBackup}>
+        <Button size="sm" iconLeft={Download} onClick={() => void exportBackup()}>
           Spara säkerhetskopia nu
         </Button>
       </div>
     )
   }
+  const moln = `den är ditt enda moln om du byter enhet${inApp ? '' : ' eller webbläsarens data rensas'}.`
   return (
     <div role="status" className="flex items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
       <CircleCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-good" />
       <div className="min-w-0">
         <p className="text-[0.9375rem] font-semibold text-ink">Sparas på enheten</p>
         <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-3">
-          Allt du gör sparas direkt i den här webbläsaren.{' '}
-          {lastBackup === null
-            ? 'Exportera gärna en säkerhetskopia – den är ditt enda moln om du byter enhet eller webbläsarens data rensas.'
-            : 'Exportera gärna en ny säkerhetskopia då och då – den är ditt enda moln om du byter enhet eller webbläsarens data rensas.'}
+          Allt du gör sparas direkt {storagePlace()}.{' '}
+          {lastBackup === null ? `Exportera gärna en säkerhetskopia – ${moln}` : `Exportera gärna en ny säkerhetskopia då och då – ${moln}`}
         </p>
       </div>
     </div>
   )
 }
 
+/**
+ * Lagringskortet. I appen (butiksapparna) visas bara om ändringarna sparas: uppskattningen av
+ * utrymmet och skyddet mot automatisk rensning gäller webbläsaren, och hemskärmstipset är
+ * meningslöst där.
+ */
 function StorageCard({ lastBackup }: { lastBackup: number | null }) {
+  const inApp = isInApp()
+  return (
+    <Card eyebrow="Lagring" title="På den här enheten">
+      <StorageStatus lastBackup={lastBackup} />
+      {!inApp && <BrowserStorageDetails />}
+    </Card>
+  )
+}
+
+/** Använt utrymme och skydd mot automatisk rensning (bara i webbläsaren). */
+function BrowserStorageDetails() {
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null | undefined>(undefined)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [asking, setAsking] = useState(false)
@@ -377,29 +635,28 @@ function StorageCard({ lastBackup }: { lastBackup: number | null }) {
   }
 
   return (
-    <Card eyebrow="Lagring" title="På den här enheten">
-      <div className="mb-4">
-        <StorageStatus lastBackup={lastBackup} />
+    <>
+      <div className="mt-4">
+        {estimate === undefined ? (
+          <div className="h-10 animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Läser lagring" />
+        ) : estimate ? (
+          <ProgressBar
+            value={estimate.usage}
+            max={Math.max(estimate.quota, 1)}
+            size="sm"
+            label={
+              <span className="flex items-center gap-1.5">
+                <HardDrive aria-hidden className="size-4 text-ink-3" />
+                Använt utrymme
+              </span>
+            }
+            valueLabel={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
+            valueText={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
+          />
+        ) : (
+          <p className="text-[0.9375rem] text-ink-2">Webbläsaren visar inte hur mycket utrymme som används.</p>
+        )}
       </div>
-      {estimate === undefined ? (
-        <div className="h-10 animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Läser lagring" />
-      ) : estimate ? (
-        <ProgressBar
-          value={estimate.usage}
-          max={Math.max(estimate.quota, 1)}
-          size="sm"
-          label={
-            <span className="flex items-center gap-1.5">
-              <HardDrive aria-hidden className="size-4 text-ink-3" />
-              Använt utrymme
-            </span>
-          }
-          valueLabel={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
-          valueText={`${formatBytes(estimate.usage)} av ${formatBytes(estimate.quota)}`}
-        />
-      ) : (
-        <p className="text-[0.9375rem] text-ink-2">Webbläsaren visar inte hur mycket utrymme som används.</p>
-      )}
 
       <div className="mt-4 flex flex-col items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
         <div className="min-w-0">
@@ -423,6 +680,6 @@ function StorageCard({ lastBackup }: { lastBackup: number | null }) {
           </Button>
         )}
       </div>
-    </Card>
+    </>
   )
 }

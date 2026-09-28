@@ -25,6 +25,20 @@ export const OFF_SEARCH_URL = 'https://se.openfoodfacts.org/cgi/search.pl'
 export const OFF_TIMEOUT_MS = 10_000
 export const OFF_ATTRIBUTION = 'Produktdata från Open Food Facts (ODbL)'
 
+/** Produktsidan hos Open Food Facts (där bilden och värdena kommer ifrån). */
+export function offProductUrl(barcode: string): string {
+  return `https://world.openfoodfacts.org/product/${encodeURIComponent(normalizeBarcode(barcode))}`
+}
+
+/**
+ * Licenstext för en produkt från Open Food Facts: databasen under ODbL och produktbilderna under
+ * CC BY-SA 3.0 (bilden nämns bara när produkten har en).
+ */
+export function offAttributionText(hasImage: boolean): string {
+  const image = hasImage ? ', produktbild under CC BY-SA 3.0' : ''
+  return `Produktdata från Open Food Facts (ODbL)${image} – en öppen databas som byggs av användare. Kontrollera mot förpackningen.`
+}
+
 /** Fält som hämtas – håller svaren små. */
 export const OFF_FIELDS = [
   'code',
@@ -71,6 +85,14 @@ export const OFF_MESSAGES: Record<OffErrorCode, string> = {
   invalid_barcode: 'Streckkoden ser inte ut att stämma. Skanna igen eller skriv in siffrorna under streckkoden.',
   bad_response: 'Oväntat svar från Open Food Facts. Försök igen senare.',
   not_found: 'Produkten hittades inte i Open Food Facts.',
+}
+
+/** Felaktig streckkod när kameran inte kan användas – då går det inte att "skanna igen". */
+export const OFF_INVALID_BARCODE_MANUAL = 'Streckkoden ser inte ut att stämma. Kontrollera siffrorna under streckkoden och skriv in dem igen.'
+
+/** Meddelandet för en felaktig streckkod – utan "Skanna igen" när kameran saknas. */
+export function invalidBarcodeMessage(cameraAvailable: boolean): string {
+  return cameraAvailable ? OFF_MESSAGES.invalid_barcode : OFF_INVALID_BARCODE_MANUAL
 }
 
 export class OpenFoodFactsError extends Error {

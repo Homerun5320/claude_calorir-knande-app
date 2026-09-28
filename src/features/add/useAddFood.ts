@@ -10,7 +10,8 @@
  *    "Senaste" eller i förslagen.
  *
  * Efter provperioden (utan licens) läggs inget till: `requireAccess` visar en lugn förklaring och
- * funktionerna returnerar null/[] – precis som när inget kunde läggas till.
+ * funktionerna returnerar null/[] – precis som när inget kunde läggas till. Förklaringen säger vad
+ * man försökte göra: standard är "logga mat", `useAddFood('dryck')` ger "logga dryck".
  *
  * ```ts
  * const { addFood, addQuick } = useAddFood()
@@ -31,7 +32,7 @@ import { canonicalFoodId } from '../../data/foods/aliases'
 import { uid } from '../../lib/id'
 import { toast } from '../../components/ui/toast'
 import { countLabel } from './addLogic'
-import { requireAccess } from '../premium/requireAccess'
+import { requireAccess, type BlockedAction } from '../premium/requireAccess'
 
 export interface AddTarget {
   date: ISODate
@@ -51,6 +52,8 @@ export interface AddItem {
   food: Food
   amount: number
   unit: UnitKey
+  /** Anteckning på posten, t.ex. "Uppskattat med tallriken". */
+  note?: string
 }
 
 export interface QuickMeta extends AddTarget {
@@ -154,7 +157,11 @@ function templateFood(food: Food): Food {
   return { ...food, extra }
 }
 
-export function useAddFood(): UseAddFoodResult {
+/**
+ * @param action Vad spärrarket (efter provperioden) säger att man försökte göra – standard 'mat'
+ *   ("logga mat"); snabbvalen för dryck skickar 'dryck'. Snabbregistrering använder alltid 'snabb'.
+ */
+export function useAddFood(action: BlockedAction = 'mat'): UseAddFoodResult {
   const meals = useProfileStore((s) => s.settings.meals)
 
   return useMemo<UseAddFoodResult>(() => {
@@ -186,11 +193,13 @@ export function useAddFood(): UseAddFoodResult {
     const toEntry = (item: AddItem, target: AddTarget): NewDiaryEntry | null => {
       const grams = gramsFor(item.food, item.amount, item.unit)
       if (!Number.isFinite(grams) || grams <= 0) return null
-      return makeFoodEntry(item.food, item.amount, item.unit, target.date, target.meal, target.time)
+      const entry = makeFoodEntry(item.food, item.amount, item.unit, target.date, target.meal, target.time)
+      const note = item.note?.trim()
+      return note ? { ...entry, note } : entry
     }
 
     const addMany: UseAddFoodResult['addMany'] = (items, target, opts) => {
-      if (items.length > 0 && !requireAccess('mat')) return []
+      if (items.length > 0 && !requireAccess(action)) return []
       const valid: AddItem[] = []
       const drafts: NewDiaryEntry[] = []
       for (const item of items) {
@@ -214,7 +223,7 @@ export function useAddFood(): UseAddFoodResult {
 
     return {
       addFood: (food, amount, unit, target, opts) => {
-        if (!requireAccess('mat')) return null
+        if (!requireAccess(action)) return null
         const draft = toEntry({ food, amount, unit }, target)
         if (!draft) {
           toast('Mängden kunde inte räknas om till gram – välj en annan enhet.', { tone: 'error' })
@@ -272,5 +281,5 @@ export function useAddFood(): UseAddFoodResult {
         return template
       },
     }
-  }, [meals])
+  }, [meals, action])
 }

@@ -6,7 +6,8 @@ Lagom är en svensk kalori- och näringsdagbok (PWA): React 19 + TypeScript 6 + 
 
 - `npx tsc -b` – typkontroll (måste vara felfri)
 - `npx vitest run [sökväg]` – tester (vitest + jsdom + fake-indexeddb, `globals: true`)
-- `npx vite build` – produktionsbygge
+- `npx oxlint src netlify scripts` – lint (samma som CI i `.github/workflows/ci.yml`)
+- `npx vite build` – produktionsbygge (`dist/`). Butiksbygge: se "Plattform och butiker".
 - Ändra inte `package.json` och installera inga paket. Om ett paket verkligen behövs: skriv det i din slutrapport.
 
 ## Kodstil
@@ -20,10 +21,15 @@ Lagom är en svensk kalori- och näringsdagbok (PWA): React 19 + TypeScript 6 + 
 - Datum är lokala `ISODate`-strängar ('YYYY-MM-DD') – använd `src/lib/dates.ts` (`todayISO`, `addDays`, `relativeDayLabel`, `isoWeek` …). Veckan börjar på måndag.
 - Mått: `src/lib/units.ts` (`gramsFor`, `availableUnits`, `formatAmount`) – svenska köksmått dl/msk/tsk/krm/cl och portioner. `formatAmount(…, true)` böjer portionsord och upprepar aldrig gramvikten ("2 smörgåsar (124 g)"). Kött, fågel, fisk, pasta, ris och gryn anges tillagade; med `Food.rawWeight` finns enheterna `'g-ra'` ("g rå"/"g okokt") och `'dl-ra'` ("dl okokt") som räknas om till tillagad vikt.
 - Ett saknat näringsvärde (`undefined`) betyder okänt, inte 0. Visa "–".
+- Externa länkar: alltid `<ExternalLink>` från `components/ui` (ny flik, `rel="noopener noreferrer"`, ikon och "(öppnas i ny flik)"/"(öppnas utanför appen)" för skärmläsare). `showIcon={false}` när länken har en egen ikon; mailto:/tel: får varken ny flik eller ikon. Aldrig `target="_blank"` direkt.
+- Fel som fångas: `logError(error, context)` från `src/lib/errorLog.ts` (lokal fellogg, högst 20 poster i `lagom-error-log`, utan livsmedel och värden – skickas bara om användaren själv mejlar den).
+- Version: `typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0-dev'` (och `__BUILD_ID__`, reserv `'lokal'`) – sätts i `vite.config.ts`, finns inte i testerna.
+- Utskrift: dölj navigering och knappar med `print:hidden`; ljusa tokens gäller automatiskt vid utskrift.
 
 ## Zustand – viktigt
 
-- Butiker: `useProfileStore`, `useDiaryStore`, `useFoodStore`, `useBodyStore`, `useFastingStore` i `src/stores/`.
+- Butiker: `useProfileStore`, `useDiaryStore`, `useFoodStore`, `useBodyStore`, `useFastingStore`, `useLicenseStore` och `usePlanStore` (veckoplaneringen) i `src/stores/`.
+- En ny persisterad butik registreras på alla ställen: `STORE_KEYS` och `PERSIST_VERSIONS` i `stores/storage.ts` (butiken tar sin version därifrån), `STORES`/`BY_KEY` i `stores/hydration.ts` och `persist.test.ts`, säkerhetskopian (`lib/backup.ts`: `createBackup`, `restoreBackup`, `wipeAllData`; `lib/backupValidation.ts`) och `PERSISTED_STORES` i `lib/cloud/cloudBackup.ts`. Lagom Molns nycklar `lagom-cloud` och `lagom-cloud-key` ligger medvetet utanför `STORE_KEYS` (följer aldrig med i säkerhetskopior eller "Radera all data").
 - Selektorer får **inte** skapa nya objekt/arrayer vid varje anrop (ger oändlig renderingsloop i React 19). Välj fält var för sig, använd stabila tomma konstanter (`?? EMPTY`) eller `useShallow` från `zustand/react/shallow`. Beräkna härledda värden med `useMemo`.
 - Färdiga hooks: `useDay(date)` (poster, summor, vatten, träning), `useTargets()` (dagsmål), `useToday()`, `useDocumentTitle(title)` (förfina sidtiteln – AppShell sätter en per sökväg), `useMemoryOnlyStorage()` (true när data inte kan sparas).
 - Toast-notiser: `toast('Tillagt', { action: { label: 'Ångra', onClick } })` från `src/components/ui/toast.tsx`. Notiser med åtgärd visas 8 s och pausas vid hovring/fokus; fel (`tone: 'error'`) läses upp direkt.
@@ -43,6 +49,8 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 - Kort: klassen `card` (rundad 1.5rem, mjuk skugga) + `p-4`/`p-5`. Knappar/chips rundade (`rounded-2xl`/`rounded-full`).
 - Ikoner: `lucide-react`. Animationer: `motion/react` (sparsamt, fjädrande; respektera reducerad rörelse).
 - Mobil först (375 px), innehåll max `max-w-3xl`. Tryckytor minst 44 px. Sidor har `px-4` och inleds med `PageHeader` (som hanterar safe area – lägg inte till `pt-safe` utöver den).
+- Safe areas: använd `var(--sa-top)`, `var(--sa-bottom)`, `var(--sa-left)`, `var(--sa-right)` (även i Tailwind, t.ex. `pb-[max(1rem,var(--sa-bottom))]`) – aldrig `env(safe-area-inset-*)` direkt (testas i `layout.test.tsx`).
+- Nya sidor: lägg routen i `src/App.tsx` och sökvägen i `ROUTE_TITLES` (och vid behov `MORE_SECTIONS`/`FULLSCREEN`) i `components/layout/AppShell.tsx`.
 - Tillgänglighet: semantiska element, `aria-label` på ikonknappar, etiketter på fält, synlig fokus.
 
 ## Livsmedelsdatabasen
@@ -53,6 +61,22 @@ Designsystemet finns i `src/index.css`. Använd alltid tokens, aldrig hårdkodad
 - Ta aldrig bort eller byt ett id utan alias: `{ from, to, unit?, scale?, density? }` i `src/data/foods/aliases/<fil>.ts` (`unit: 'g-ra'` när en rå rad ersätts av den tillagade; `scale` när ersättaren har helt annan energi per gram, t.ex. tillagade → torra snabbnudlar; `density` för att räkna om gamla volymer). Kontrollera att gamla mängder ger ungefär samma energi hos ersättaren – annars behövs en egen rad eller `scale`. `legacy-ids.ts` är genererad – ändra inte. I `aliases/legacy-portions.ts` ändras inte befintliga rader; slås en rad ihop läggs dess gamla portioner till där. Slå upp livsmedel via `lib/foodRepo`/`useFood` (följer alias; `resolveFoodAlias`, `canonicalFoodId`, `aliasAmount`). Inbyggda recept (`src/data/recipes.ts`) och exempeldata (`src/lib/demo.ts`) pekar direkt på dagens id:n – det testas.
 - Livsmedelsverkets fullständiga databas (`public/data/livsmedelsverket.json`, 2 606 livsmedel, id `lmv:<nr>`) visas bara i sökningens hopfällda sektion "Fler från Livsmedelsverket" – även poster som sparats i `cachedFoods` (importen i Inställningar). Råa och okokta poster, torkade baljväxter och specialposter (barnmat, inälvor …) döljs där om sökningen inte innehåller ordet. Ett kurerat livsmedel länkas med `lmv` (nummer) bara när det är samma livsmedel med ungefär samma värden: den länkade posten fyller i saknade näringsämnen och döljs i sökningen.
 - Undvik att ett kurerat namn krockar med en inbyggd klassiker (`src/data/recipes.ts`), t.ex. "Färdiga köttbullar" mot receptet "Köttbullar".
+
+## Plattform och butiker
+
+- `VITE_DISTRIBUTION` (`web` | `appstore` | `play`, standard `web`) väljer bygge. Körmiljön avgörs i `src/config/platform.ts`: `sellsOnWeb()`, `isInApp()`, `isNativeApp()`, `isTwa()`, `allowsLicenseKeyEntry()`, `offersLicenseRecovery()`, `storagePlace()` ("i den här webbläsaren"/"i appen på den här enheten") och `cameraSettingsHint()`. Skriv aldrig "i den här webbläsaren" direkt – använd `storagePlace()`.
+- Stripe, kronpriser och `priceSummary()` visas bara när `sellsOnWeb()`. Annars används `priceSummaryText()`, och butikspriserna kommer från butiken (`src/lib/storePurchases.ts`, i dag en stubbe tills Capacitor och ett IAP-tillägg installeras – produkt-id `livstid`, `ar` och `prov14`). I App Store-bygget går det inte att klistra in licensnycklar; köp återställs med "Återställ köp".
+- Butiksbygge: `VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> npx vite build` → `dist-native/` (ingen service worker, CSP som meta-tagg från `netlify.toml`). Byggkontrollen `scripts/commerce-guard.ts` stoppar skarpa byggen och butiksbyggen utan `VITE_SELLER_NAME`, `VITE_SELLER_ORGNR`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` och en riktig `VITE_SUPPORT_EMAIL` (`VITE_SELLER_VAT` är frivillig), och ett Netlify-produktionsbygge i testläge utan `LAGOM_ALLOW_TEST_COMMERCE=1`.
+- Övriga variabler: `VITE_WEB_SALES=on|off`, `VITE_APPSTORE_URL`, `VITE_PLAY_URL`, `VITE_LICENSE_PUBLIC_KEYS` (kommaseparerad, den nuvarande nyckeln först). Se `.env.example` och `docs/BETALNING.md`.
+- Exempeldata är skrivskyddad: `useAccess().demo` är true, och `requireAccess(action)` visar exempelarket i stället för att logga. Provperioden startar först när den egna profilen skapas. Anropa `requireAccess('<åtgärd>')` före allt som skapar nytt.
+- Lagom Moln är avstängt tills `VITE_SUPABASE_URL` och `VITE_SUPABASE_PUBLISHABLE_KEY` sätts (`CLOUD_ENABLED` i `src/config/cloud.ts`, se `docs/BACKEND.md`). Koden i `src/lib/cloud` får bara laddas med dynamisk import. Lägg ingen Supabase-adress i CSP:n förrän projektet finns och ägaren har godkänt det.
+
+## Juridik och integritet
+
+- Inga analysverktyg, ingen reklam och inga tredjepartsskript utan samtyckeslösning och uppdaterad integritetspolicy (lagringen på enheten är i dag bara nödvändig lagring enligt LEK 9 kap. 28 §). Ny lagring (localStorage, IndexedDB …) ska in i lagringstabellen i policyn.
+- Juridiska texter ändras bara i `src/features/legal/legalContent.ts`; kör sedan `npx vitest run src/features/legal -u` (skapar `public/integritet/`, `public/villkor/` och `docs/INTEGRITETSPOLICY.md`, `KOPVILLKOR.md`, `ANVANDARVILLKOR.md`). Säljarens uppgifter fylls i vid bygget (`staticSeller.ts`, `vite.config.ts`).
+- Målgruppen är vuxna (18+). Graviditetsråden finns i `src/lib/pregnancy.ts` och ses över varje år (nästa gång senast juni 2027).
+- Fritextloggningen finns i `src/lib/freeText.ts` ("X med Y" slås ihop när det är ett livsmedelsnamn), och tallrikens antaganden i `src/features/add/plateLog.ts`.
 
 ## Ton
 

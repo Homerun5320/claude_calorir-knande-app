@@ -115,14 +115,22 @@ export interface IngredientSearchProps {
   excludeId?: string
   onPick: (food: Food) => void
   error?: string
+  /** Sökfältets (dolda) etikett. Standard "Lägg till ingrediens". */
+  label?: string
+  /** Sökningen från början, t.ex. ingrediensraden som ska bytas. */
+  initialQuery?: string
+  /** Id för träfflistan – behövs när flera sökfält finns samtidigt. */
+  resultsId?: string
+  /** Fokusera sökfältet direkt. */
+  autoFocus?: boolean
 }
 
 /** Sökfält med träfflista och snabbval bland senast använda livsmedel. */
 export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSearchProps>(function IngredientSearch(
-  { excludeId, onPick, error },
+  { excludeId, onPick, error, label = 'Lägg till ingrediens', initialQuery = '', resultsId = 'ingredient-results', autoFocus },
   ref,
 ) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const inputRef = useRef<HTMLInputElement>(null)
   const search = useFoodSearch(query, { limit: 8 })
   const { loading, pending } = search
@@ -147,8 +155,9 @@ export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSea
     <div>
       <TextField
         ref={inputRef}
-        label="Lägg till ingrediens"
+        label={label}
         labelHidden
+        autoFocus={autoFocus}
         type="search"
         fieldClassName={HIDE_NATIVE_CLEAR}
         prefix={Search}
@@ -159,10 +168,10 @@ export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSea
         autoComplete="off"
         enterKeyHint="search"
         error={error}
-        aria-controls="ingredient-results"
+        aria-controls={resultsId}
       />
 
-      <div id="ingredient-results" aria-live="polite" aria-busy={loading || pending || undefined}>
+      <div id={resultsId} aria-live="polite" aria-busy={loading || pending || undefined}>
         {trimmed === '' ? (
           recentShown.length > 0 && (
             <div className="mt-3">
@@ -237,6 +246,7 @@ export function AmountSheet({
           initialAmount={state.mode === 'edit' ? state.ingredient.amount : undefined}
           initialUnit={state.mode === 'edit' ? state.ingredient.unit : recipeStartUnit(food)}
           confirmLabel={state.mode === 'edit' ? 'Spara mängd' : 'Lägg till i receptet'}
+          largeConfirmLabel={state.mode === 'edit' ? 'Ja, spara mängden' : 'Ja, lägg till i receptet'}
           confirmIcon={Check}
           onConfirm={(amount, unit, grams) => onConfirm(food, amount, unit, grams)}
         />

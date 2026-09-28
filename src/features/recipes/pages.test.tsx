@@ -1,12 +1,13 @@
 /**
  * Röktester för receptsidorna: listan, en klassiker, kopiering, loggning och redigeraren.
  */
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import RecipesPage from './RecipesPage'
 import RecipeDetailPage from './RecipeDetailPage'
 import RecipeEditorPage from './RecipeEditorPage'
+import RecipeImportPage from './RecipeImportPage'
 import { DialogHost } from '../../components/ui/Dialog'
 import { useToastStore } from '../../components/ui/toast'
 import { useDiaryStore } from '../../stores/diaryStore'
@@ -21,6 +22,7 @@ function renderAt(path: string) {
       { path: '/', element: <div>Hem</div> },
       { path: '/recept', element: <RecipesPage /> },
       { path: '/recept/nytt', element: <RecipeEditorPage /> },
+      { path: '/recept/importera', element: <RecipeImportPage /> },
       { path: '/recept/:id', element: <RecipeDetailPage /> },
       { path: '/recept/:id/redigera', element: <RecipeEditorPage /> },
     ],
@@ -101,6 +103,11 @@ describe('RecipesPage', () => {
     expect(screen.getByText('Laxpudding')).toBeInTheDocument()
   })
 
+  it('har en knapp för att importera recept från en länk', () => {
+    renderAt('/recept')
+    expect(screen.getByRole('link', { name: 'Importera recept' })).toHaveAttribute('href', '/recept/importera')
+  })
+
   it('visar egna recept med energi per portion', () => {
     useFoodStore.setState({ recipes: { [ownRecipe.id]: ownRecipe } })
     renderAt('/recept')
@@ -177,6 +184,24 @@ describe('RecipeDetailPage', () => {
     await waitFor(() => expect(useFoodStore.getState().recipes).toEqual({}))
     expect(useFoodStore.getState().favorites).toEqual([])
     await waitFor(() => expect(router.state.location.pathname).toBe('/recept'))
+  })
+
+  it('visar källan med länk för importerade recept', async () => {
+    const imported: Recipe = { ...ownRecipe, instructions: undefined, sourceUrl: 'https://www.recept.example.se/kladdkaka' }
+    useFoodStore.setState({ recipes: { [imported.id]: imported } })
+    renderAt('/recept/r_test1')
+    expect(await screen.findByText('Källa')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /recept\.example\.se/ })
+    expect(link).toHaveAttribute('href', 'https://www.recept.example.se/kladdkaka')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(screen.getByText('Instruktionerna finns hos källan.')).toBeInTheDocument()
+  })
+
+  it('visar ingen källa för recept utan länk', async () => {
+    useFoodStore.setState({ recipes: { [ownRecipe.id]: ownRecipe } })
+    renderAt('/recept/r_test1')
+    await screen.findByRole('heading', { level: 1, name: 'Mormors gröt' })
+    expect(screen.queryByText('Källa')).not.toBeInTheDocument()
   })
 
   it('visar ett vänligt fel för okända recept', () => {
@@ -303,5 +328,184 @@ describe('RecipeEditorPage', () => {
     await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
     fireEvent.click(button)
     expect(Object.values(useFoodStore.getState().recipes)).toHaveLength(1)
+  })
+})
+
+describe('Klistra in ingredienser', () => {
+  it('matchar rader mot livsmedel, låter användaren ta bort rader och lägger till resten', async () => {
+    renderAt('/recept/nytt')
+    fireEvent.click(screen.getByRole('button', { name: 'Klistra in ingredienser' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Klistra in ingredienser' })
+    fireEvent.change(within(sheet).getByRole('textbox', { name: 'Ingredienser' }), {
+      target: { value: '2 dl havregryn\nsmör till formen\n1 tsk salt' },
+    })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Matcha 3 rader' }))
+
+    const list = await within(sheet).findByRole('list', { name: 'Ingredienser att kontrollera' })
+    // Havregryn med mängden omräknad från "2 dl".
+    await waitFor(() => expect(within(list).getByRole('button', { name: /^Havregryn: 2 dl · \d+ g$/ })).toBeInTheDocument(), { timeout: 3000 })
+    // Raden utan mängd ska kontrolleras.
+    await waitFor(() => expect(within(list).getAllByText('Kontrollera mängden').length).toBeGreaterThan(0), { timeout: 3000 })
+    fireEvent.click(within(list).getByRole('button', { name: 'Ta bort smör till formen' }))
+    await waitFor(() => expect(within(list).queryByText('smör till formen')).not.toBeInTheDocument())
+
+    const add = await within(sheet).findByRole('button', { name: 'Lägg till 2 ingredienser' }, { timeout: 3000 })
+    fireEvent.click(add)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Klistra in ingredienser' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Ändra mängd: Havregryn/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ändra mängd: Salt/ })).toBeInTheDocument()
+  })
+
+  it('byter livsmedel för en rad', async () => {
+    renderAt('/recept/nytt')
+    fireEvent.click(screen.getByRole('button', { name: 'Klistra in ingredienser' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Klistra in ingredienser' })
+    fireEvent.change(within(sheet).getByRole('textbox', { name: 'Ingredienser' }), { target: { value: '3 dl havregryn' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Matcha 1 rad' }))
+    const list = await within(sheet).findByRole('list', { name: 'Ingredienser att kontrollera' })
+    await within(list).findByRole('button', { name: /^Havregryn: 3 dl/ }, { timeout: 3000 })
+
+    fireEvent.click(within(list).getByRole('button', { name: 'Byt livsmedel för 3 dl havregryn' }))
+    const search = within(list).getByRole('searchbox', { name: 'Sök livsmedel för 3 dl havregryn' })
+    fireEvent.change(search, { target: { value: 'vetemjöl' } })
+    const hits = await within(list).findByRole('list', { name: 'Sökträffar' }, { timeout: 3000 })
+    const hit = await waitFor(() => {
+      const b = within(hits)
+        .getAllByRole('button')
+        .find((x) => x.querySelector('.line-clamp-2')?.textContent === 'Vetemjöl')
+      expect(b).toBeDefined()
+      return b!
+    })
+    fireEvent.click(hit)
+    expect(await within(list).findByRole('button', { name: /^Vetemjöl: 3 dl/ })).toBeInTheDocument()
+  })
+})
+
+const RECIPE_HTML = `<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Gröt"},{"@type":"Recipe","name":"Havregrynsgröt med äpple","recipeYield":"2 portioner","totalTime":"PT10M","recipeIngredient":["2 dl havregryn","1 krm salt","Äpple till servering"],"recipeInstructions":"Koka upp."}]}</script>`
+
+function mockRecipeFetch(respond: (url: string) => Response | Promise<Response>) {
+  const spy = vi.mocked(globalThis.fetch)
+  spy.mockImplementation(async (input, init) => {
+    const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    if (!target.endsWith('/api/recipe-fetch')) throw new TypeError('offline')
+    const body = JSON.parse(String(init?.body ?? '{}')) as { url: string }
+    return respond(body.url)
+  })
+  return spy
+}
+
+const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
+
+describe('RecipeImportPage', () => {
+  afterEach(() => {
+    vi.mocked(globalThis.fetch).mockReset()
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('offline'))
+  })
+
+  it('hämtar ett recept från en länk, visar det för kontroll och sparar det med källan', async () => {
+    const spy = mockRecipeFetch(() => json({ html: RECIPE_HTML }))
+    const { router } = renderAt('/recept/importera')
+    expect(screen.getByRole('heading', { level: 1, name: 'Importera recept' })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://recept.example.se/grot' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+
+    expect(await screen.findByRole('textbox', { name: 'Namn' })).toHaveValue('Havregrynsgröt med äpple')
+    const call = spy.mock.calls.find(([input]) => String(input).endsWith('/api/recipe-fetch'))
+    expect(call?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ url: 'https://recept.example.se/grot' }) })
+    expect(screen.getByRole('spinbutton', { name: /Tid/ })).toHaveValue('10')
+    expect(screen.getByText('Från recept.example.se')).toBeInTheDocument()
+
+    const list = screen.getByRole('list', { name: 'Ingredienser att kontrollera' })
+    await within(list).findByRole('button', { name: /^Havregryn: 2 dl/ }, { timeout: 3000 })
+    await waitFor(() => expect(within(list).getAllByText('Kontrollera mängden').length).toBeGreaterThan(0), { timeout: 3000 })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Skapa receptet' }))
+    })
+    const saved = Object.values(useFoodStore.getState().recipes)
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).toMatchObject({ name: 'Havregrynsgröt med äpple', servings: 2, prepMinutes: 10, sourceUrl: 'https://recept.example.se/grot' })
+    // Instruktionerna importeras inte – bara länken.
+    expect(saved[0].instructions).toBeUndefined()
+    expect(saved[0].ingredients.map((i) => i.food.id)).toContain('lagom:havregryn')
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/recept/${saved[0].id}`))
+    expect(await screen.findByText('Källa')).toBeInTheDocument()
+  })
+
+  it('säger till när sidan saknar recept', async () => {
+    mockRecipeFetch(() => json({ html: '<script type="application/ld+json">{"@type":"Organization","name":"X"}</script>' }))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se/om-oss' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Hittade inget recept på sidan')).toBeInTheDocument()
+  })
+
+  it('tolkar serverns svar "no-recipe" som att receptet saknas', async () => {
+    mockRecipeFetch(() => json({ error: 'no-recipe' }, 422))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se/blogg' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Hittade inget recept på sidan')).toBeInTheDocument()
+  })
+
+  it('låter användaren klistra in ingredienserna när sidan inte angav några', async () => {
+    mockRecipeFetch(() => json({ html: '<script type="application/ld+json">{"@type":"Recipe","name":"Soppa","recipeYield":"4"}</script>' }))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://recept.example.se/soppa' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText(/Sidan angav inga ingredienser/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Matcha ingredienser' })).toBeDisabled()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ingredienser' }), { target: { value: '2 dl havregryn' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Matcha ingredienser' }))
+    const list = await screen.findByRole('list', { name: 'Ingredienser att kontrollera' })
+    await within(list).findByRole('button', { name: /^Havregryn: 2 dl/ }, { timeout: 3000 })
+  })
+
+  it('säger till när sidan inte kunde hämtas', async () => {
+    mockRecipeFetch(() => json({ error: 'fetch_failed' }, 502))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se/recept' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Kunde inte hämta sidan – kontrollera länken')).toBeInTheDocument()
+  })
+
+  it('tolkar serverns riktiga felsvar (422 inget-recept, 400 ogiltig)', async () => {
+    mockRecipeFetch(() => json({ code: 'inget-recept', error: 'Hittade inget recept på sidan.' }, 422))
+    const first = renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se/blogg' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Hittade inget recept på sidan')).toBeInTheDocument()
+    first.unmount()
+
+    mockRecipeFetch(() => json({ code: 'ogiltig', error: 'Länken går inte att hämta.' }, 400))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se:8443/recept' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText(/Klistra in hela länken till receptet/)).toBeInTheDocument()
+  })
+
+  it('lägger till https:// på länkar utan protokoll och byter http mot https', async () => {
+    const sent: string[] = []
+    mockRecipeFetch((url) => {
+      sent.push(url)
+      return json({ html: RECIPE_HTML })
+    })
+    renderAt('/recept/importera')
+    const field = screen.getByRole('textbox', { name: 'Länk till receptet' })
+    fireEvent.change(field, { target: { value: 'recept.example.se/grot' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByRole('textbox', { name: 'Namn' })).toHaveValue('Havregrynsgröt med äpple')
+    fireEvent.change(field, { target: { value: 'http://recept.example.se/grot' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    await waitFor(() => expect(sent).toEqual(['https://recept.example.se/grot', 'https://recept.example.se/grot']))
+  })
+
+  it('kontrollerar länken innan något skickas', async () => {
+    const spy = mockRecipeFetch(() => json({ html: RECIPE_HTML }))
+    renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'kladdkaka' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText(/Klistra in hela länken till receptet/)).toBeInTheDocument()
+    expect(spy.mock.calls.some(([input]) => String(input).endsWith('/api/recipe-fetch'))).toBe(false)
   })
 })

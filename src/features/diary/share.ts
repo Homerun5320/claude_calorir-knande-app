@@ -10,7 +10,8 @@ interface ShareEnv {
   clipboard?: { writeText?: (text: string) => Promise<void> }
 }
 
-function isAbort(err: unknown): boolean {
+/** true om felet är att användaren stängde delningsdialogen (AbortError). */
+export function isAbort(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'name' in err && (err as { name?: string }).name === 'AbortError'
 }
 

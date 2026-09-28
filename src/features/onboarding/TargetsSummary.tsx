@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react'
 import { Info } from 'lucide-react'
-import { cx, toneVars, type Tone } from '../../components/ui'
+import { ExternalLink, cx, toneVars, type Tone } from '../../components/ui'
 import { useEnergyUnit } from '../../components/domain/EnergyValue'
 import type { EnergyBreakdown } from '../../lib/energy'
 import { formatNumber } from '../../lib/format'
@@ -37,20 +37,20 @@ function signed(v: number, unit: 'kcal' | 'kJ'): string {
 
 /**
  * Uträkningen av dagsmålet, steg för steg. De visade talen går alltid jämnt upp med dagsmålet:
- * dagsmålet avrundas till jämna 10 kcal (och kJ räknas om per rad), så avrundningen läggs på
- * justeringsraden – eller på förbrukningen när ingen justering görs – i stället för att summan
- * blir fel ("2 223 − 550 = 1 670"). När säkerhetsgolvet höjer målet visas det som en egen rad.
+ * dagsmålet avrundas till jämna 10 kcal (och kJ räknas om per rad). Justeringen visas som den
+ * är (t.ex. −550 kcal, det man valt), och avrundningen läggs på förbrukningen, som ändå är en
+ * uppskattning: "ca 2 220 − 550 = 1 670" i stället för "2 223 − 553 = 1 670". När säkerhetsgolvet
+ * höjer målet visas förbrukningen som den är och höjningen som en egen rad.
  */
 export function energyRows(energy: EnergyBreakdown, unit: 'kcal' | 'kJ' = 'kcal'): EnergyRows {
   const u = (kcal: number) => toUnit(kcal, unit)
   const total = u(energy.kcal)
   const life = energy.lifeStageKcal > 0 ? u(energy.lifeStageKcal) : 0
   let tdee = u(energy.tdee)
-  let adjustment = energy.adjustment === 0 ? 0 : u(energy.adjustment)
+  const adjustment = energy.adjustment === 0 ? 0 : u(energy.adjustment)
   let floorRaise = 0
   if (energy.atFloor) floorRaise = total - tdee - life - adjustment
-  else if (adjustment !== 0) adjustment = total - tdee - life
-  else tdee = total - life
+  else tdee = total - life - adjustment
 
   const rows: Row[] = [
     { label: 'Basalomsättning', hint: 'Energin kroppen gör av med i vila', value: `${formatNumber(u(energy.bmr))} ${unit}` },
@@ -60,7 +60,7 @@ export function energyRows(energy: EnergyBreakdown, unit: 'kcal' | 'kJ' = 'kcal'
         energy.tdeeSource === 'adaptiv'
           ? 'Räknad ur din vikttrend och ditt faktiska intag'
           : `Basalomsättning × ${formatNumber(energy.pal, 2)} för din vardagsaktivitet`,
-      value: `${formatNumber(tdee)} ${unit}`,
+      value: `ca ${formatNumber(tdee)} ${unit}`,
     },
   ]
   if (life > 0) rows.push({ label: 'Graviditet/amning', hint: 'Extra energi till dig och barnet', value: signed(life, unit) })
@@ -79,9 +79,9 @@ export function energyRows(energy: EnergyBreakdown, unit: 'kcal' | 'kJ' = 'kcal'
  * Talet i Fraunces och enheten i Inter – i Fraunces liknar ett gement "l" (liter) en etta, så
  * "1,6 l" skulle läsas som "1,61".
  */
-function MacroTile({ label, value, unit, tone, sub }: { label: string; value: string; unit: string; tone: Tone; sub?: string }) {
+function MacroTile({ label, ariaLabel, value, unit, tone, sub }: { label: ReactNode; ariaLabel: string; value: string; unit: string; tone: Tone; sub?: string }) {
   return (
-    <div style={toneVars(tone)} className="min-w-0 rounded-2xl bg-(--tone-soft) px-2.5 py-2.5 min-[400px]:px-3">
+    <div role="group" aria-label={ariaLabel} style={toneVars(tone)} className="min-w-0 rounded-2xl bg-(--tone-soft) px-2.5 py-2.5 min-[400px]:px-3">
       <div className="flex min-w-0 items-center gap-1.5 truncate text-[0.75rem] font-semibold text-(--tone-ink)">
         <span aria-hidden className="hidden size-2 shrink-0 rounded-full bg-(--tone) min-[400px]:inline-block" />
         {label}
@@ -102,10 +102,15 @@ export interface TargetsSummaryProps {
   showBreakdown?: boolean
   /** Extra förklaringar (t.ex. säkerhetsregler) som visas under målen. */
   extraNotes?: ReactNode[]
+  /**
+   * Påminnelsen om att målen är uppskattningar och att rådgöra med vården (standard true). Stängs av
+   * där en fullständig ansvarsfriskrivning redan står intill, som i välkomstflödets sammanfattning.
+   */
+  careNote?: boolean
   className?: string
 }
 
-export function TargetsSummary({ energy, targets, showBreakdown = true, extraNotes = [], className }: TargetsSummaryProps) {
+export function TargetsSummary({ energy, targets, showBreakdown = true, extraNotes = [], careNote = true, className }: TargetsSummaryProps) {
   const unit = useEnergyUnit()
   const { rows, total } = energyRows(energy, unit)
   // Ett eget energimål (Inställningar → Mål och makron) går före det beräknade.
@@ -140,13 +145,32 @@ export function TargetsSummary({ energy, targets, showBreakdown = true, extraNot
         </dl>
       )}
 
+      {careNote && (
+        <p className="text-[0.8125rem] leading-snug text-ink-3">
+          Målen är uppskattningar. Rådgör med vården om du har en sjukdom, är gravid eller ammar, eller funderar på att ändra din vikt. Läs mer på{' '}
+          <ExternalLink href="https://www.1177.se">1177.se</ExternalLink>.
+        </p>
+      )}
+
       <div className="grid grid-cols-3 gap-2">
-        <MacroTile label="Protein" tone="protein" value={formatNumber(targets.proteinG)} unit="g" />
-        <MacroTile label="Kolhydrater" tone="carbs" value={formatNumber(targets.carbsG)} unit="g" />
-        <MacroTile label="Fett" tone="fat" value={formatNumber(targets.fatG)} unit="g" />
-        <MacroTile label="Fibrer" tone="fiber" value={formatNumber(targets.fiberG)} unit="g" sub="minst" />
-        <MacroTile label="Dryck" tone="water" value={formatNumber(targets.waterMl / 1000, 2)} unit="liter" sub="per dag" />
-        <MacroTile label="Salt" tone="neutral" value={formatNumber(targets.saltMaxG, 1)} unit="g" sub="högst" />
+        <MacroTile label="Protein" ariaLabel="Protein" tone="protein" value={formatNumber(targets.proteinG)} unit="g" />
+        <MacroTile
+          // "Kolhydrater" får inte plats i en tredjedel av en smal skärm (under 360 px).
+          label={
+            <>
+              <span className="min-[360px]:hidden">Kolhydr.</span>
+              <span className="hidden min-[360px]:inline">Kolhydrater</span>
+            </>
+          }
+          ariaLabel="Kolhydrater"
+          tone="carbs"
+          value={formatNumber(targets.carbsG)}
+          unit="g"
+        />
+        <MacroTile label="Fett" ariaLabel="Fett" tone="fat" value={formatNumber(targets.fatG)} unit="g" />
+        <MacroTile label="Fibrer" ariaLabel="Fibrer" tone="fiber" value={formatNumber(targets.fiberG)} unit="g" sub="minst" />
+        <MacroTile label="Dryck" ariaLabel="Dryck" tone="water" value={formatNumber(targets.waterMl / 1000, 2)} unit="liter" sub="per dag" />
+        <MacroTile label="Salt" ariaLabel="Salt" tone="neutral" value={formatNumber(targets.saltMaxG, 1)} unit="g" sub="högst" />
       </div>
 
       {notes.length > 0 && (

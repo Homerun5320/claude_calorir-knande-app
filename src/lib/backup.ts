@@ -8,7 +8,11 @@ import { useFastingStore } from '../stores/fastingStore'
 import { migrateFoodRefs, useFoodStore } from '../stores/foodStore'
 import { useProfileStore, DEFAULT_SETTINGS } from '../stores/profileStore'
 import { useLicenseStore } from '../stores/licenseStore'
+import { usePlanStore } from '../stores/planStore'
+import { releaseNewerData, STORE_KEYS } from '../stores/storage'
 import { COMMERCE_MODE } from '../config/commerce'
+import { allowsLicenseKeyEntry, isInApp } from '../config/platform'
+import { isAbort } from '../features/diary/share'
 import { decodeLicense } from './license'
 import type { DiaryEntry, ISODate, MealConfig } from '../types'
 import { entryNutrients } from './diary'
@@ -17,6 +21,7 @@ import { todayISO } from './dates'
 import { mealName } from './meals'
 import { isRawUnit, unitLabel } from './units'
 import { describeRepairs, sanitizeBackupData, skippedCount, type BackupRepairs } from './backupValidation'
+import { MAX_EXTRAS_PER_WEEK, MAX_ITEMS_PER_DAY, type PlanData, type WeekShopping } from './planning'
 
 export const BACKUP_FORMAT = 'lagom-backup'
 export const BACKUP_VERSION = 1
@@ -37,6 +42,8 @@ export interface BackupFile {
      * tidigaste provstarten och en giltig licens på enheten behålls.
      */
     license?: BackupLicense
+    /** Veckoplaneringen och inköpslistan (saknas i äldre säkerhetskopior). */
+    plan?: PlanData
   }
   /**
    * Vad som rättades eller hoppades över när filen lästes in (sätts av `parseBackup`, sparas
@@ -46,11 +53,19 @@ export interface BackupFile {
 }
 
 export interface BackupLicense {
+  /**
+   * Licensnyckel från ett webbköp. Alltid null i kopior från App Store-bygget – där gäller bara
+   * köp i appen, som återställs via Apple-ID ("Återställ köp").
+   */
   licenseKey: string | null
   /** När provperioden började (epoch-ms). */
   trialStartedAt: number | null
 }
 
+/**
+ * Hela appens data som en säkerhetskopia. I App Store-bygget (och den inbyggda iPhone-appen) tas
+ * ingen licensnyckel med – där kan nycklar inte användas.
+ */
 export function createBackup(): BackupFile {
   const p = useProfileStore.getState()
   const d = useDiaryStore.getState()
@@ -58,6 +73,7 @@ export function createBackup(): BackupFile {
   const b = useBodyStore.getState()
   const fa = useFastingStore.getState()
   const li = useLicenseStore.getState()
+  const pl = usePlanStore.getState()
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -76,7 +92,8 @@ export function createBackup(): BackupFile {
       },
       body: { weights: b.weights, measurements: b.measurements },
       fasting: { active: fa.active, history: fa.history },
-      license: { licenseKey: li.licenseKey, trialStartedAt: li.trialStartedAt },
+      license: { licenseKey: allowsLicenseKeyEntry() ? li.licenseKey : null, trialStartedAt: li.trialStartedAt },
+      plan: { items: pl.items, shopping: pl.shopping },
     },
   }
 }
@@ -131,6 +148,8 @@ export interface ImportSummary {
   repaired: number
   /** Vad som hoppas över, t.ex. ["2 dagboksposter", "1 vägning"]. Tom för en hel säkerhetskopia. */
   skippedDetails: string[]
+  /** Antal kroppsmått (visas bara vid import från andra appar). */
+  measurements?: number
 }
 
 export function summarizeBackup(b: BackupFile): ImportSummary {
@@ -153,11 +172,11 @@ export function summarizeBackup(b: BackupFile): ImportSummary {
  * - 'merge': slår ihop – poster med samma id skrivs inte dubbelt; importerad profil används bara om ingen finns.
  */
 export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
-  const { profile, diary, food, body, fasting } = b.data
+  const { profile, diary, food, body, fasting, plan } = b.data
   // Licens och provperiod: samma regler för båda lägena (förläng aldrig en provperiod).
   restoreLicense(b.data.license)
   if (mode === 'replace') {
-    useProfileStore.setState({ profile: profile.profile ?? null, settings: { ...DEFAULT_SETTINGS, ...(profile.settings ?? {}) } })
+    useProfileStore.setState({ profile: profile.profile ?? null, settings: { ...DEFAULT_SETTINGS, ...profile.settings } })
     useDiaryStore.setState({ entries: diary.entries ?? {}, water: diary.water ?? {}, exercise: diary.exercise ?? {}, days: diary.days ?? {} })
     // Gamla livsmedels-id:n i en äldre säkerhetskopia skrivs om till ersättarna (alias).
     useFoodStore.setState(
@@ -172,6 +191,7 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
     )
     useBodyStore.setState({ weights: body.weights ?? [], measurements: body.measurements ?? [] })
     useFastingStore.setState({ active: fasting?.active ?? null, history: fasting?.history ?? [] })
+    usePlanStore.setState({ items: plan?.items ?? {}, shopping: plan?.shopping ?? {} })
     return
   }
 
@@ -192,17 +212,17 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   for (const [date, list] of Object.entries(diary.exercise ?? {})) exercise[date] = mergeById(exercise[date], list)
   const water = { ...d.water }
   for (const [date, ml] of Object.entries(diary.water ?? {})) water[date] = Math.max(water[date] ?? 0, ml)
-  const days = { ...(diary.days ?? {}), ...d.days }
+  const days = { ...diary.days, ...d.days }
   useDiaryStore.setState({ entries, exercise, water, days })
 
   const f = useFoodStore.getState()
   useFoodStore.setState(
     migrateFoodRefs({
-      customFoods: { ...(food.customFoods ?? {}), ...f.customFoods },
-      recipes: { ...(food.recipes ?? {}), ...f.recipes },
-      cachedFoods: { ...(food.cachedFoods ?? {}), ...f.cachedFoods },
+      customFoods: { ...food.customFoods, ...f.customFoods },
+      recipes: { ...food.recipes, ...f.recipes },
+      cachedFoods: { ...food.cachedFoods, ...f.cachedFoods },
       favorites: [...new Set([...f.favorites, ...(food.favorites ?? [])])],
-      usage: { ...(food.usage ?? {}), ...f.usage },
+      usage: { ...food.usage, ...f.usage },
       templates: mergeById(f.templates, food.templates),
     }),
   )
@@ -216,6 +236,23 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
 
   const fa = useFastingStore.getState()
   useFastingStore.setState({ history: mergeById(fa.history, fasting?.history) })
+
+  // Veckoplaneringen: rader per datum som dagboken; inköpslistans bockar slås ihop och egna rader
+  // läggs till (inom samma gränser som i appen).
+  if (plan) {
+    const pl = usePlanStore.getState()
+    const items = { ...pl.items }
+    for (const [date, list] of Object.entries(plan.items)) items[date] = mergeById(items[date], list).slice(0, MAX_ITEMS_PER_DAY)
+    const shopping: Record<ISODate, WeekShopping> = { ...pl.shopping }
+    for (const [week, incoming] of Object.entries(plan.shopping)) {
+      const local = shopping[week]
+      shopping[week] = {
+        checked: [...new Set([...(local?.checked ?? []), ...incoming.checked])],
+        extras: mergeById(local?.extras, incoming.extras).slice(0, MAX_EXTRAS_PER_WEEK),
+      }
+    }
+    usePlanStore.setState({ items, shopping })
+  }
 }
 
 /**
@@ -236,16 +273,21 @@ export function licenseRank(key: string | null | undefined, now: number = Date.n
  * Slå ihop licens och provperiod från en säkerhetskopia med enhetens:
  * - Den TIDIGASTE provstarten gäller – en återställning kan aldrig förlänga provperioden.
  * - En giltig licens på enheten behålls. Kopians licens används bara om enheten saknar en giltig.
+ * - Där licensnycklar inte kan användas (`acceptKey` false: App Store-bygget och den inbyggda
+ *   iPhone-appen) läses ingen nyckel in från kopian – enhetens egen behålls. Bara provstarten slås
+ *   ihop. Den som köpt på webben får i stället en erbjudandekod via supporten.
  */
 export function mergeLicense(
   local: BackupLicense,
   incoming: BackupLicense | undefined,
   now: number = Date.now(),
+  acceptKey: boolean = allowsLicenseKeyEntry(),
 ): BackupLicense {
   if (!incoming) return local
   const starts = [local.trialStartedAt, incoming.trialStartedAt].filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
   // En provstart i framtiden (fel klocka eller ändrad fil) räknas som nu.
   const trialStartedAt = starts.length > 0 ? Math.min(now, ...starts) : null
+  if (!acceptKey) return { licenseKey: local.licenseKey, trialStartedAt }
   const localRank = licenseRank(local.licenseKey, now)
   const incomingRank = licenseRank(incoming.licenseKey, now)
   const licenseKey = localRank > 0 || incomingRank <= localRank ? local.licenseKey : incoming.licenseKey
@@ -255,7 +297,8 @@ export function mergeLicense(
 function restoreLicense(incoming: BackupLicense | undefined): void {
   if (!incoming) return
   const li = useLicenseStore.getState()
-  const merged = mergeLicense({ licenseKey: li.licenseKey, trialStartedAt: li.trialStartedAt }, incoming)
+  // I App Store-bygget ignoreras kopians licensnyckel (se `mergeLicense`).
+  const merged = mergeLicense({ licenseKey: li.licenseKey, trialStartedAt: li.trialStartedAt }, incoming, Date.now(), allowsLicenseKeyEntry())
   const patch: Partial<ReturnType<typeof useLicenseStore.getState>> = {}
   if (merged.trialStartedAt !== li.trialStartedAt) patch.trialStartedAt = merged.trialStartedAt
   if (merged.licenseKey !== li.licenseKey) {
@@ -273,10 +316,15 @@ function restoreLicense(incoming: BackupLicense | undefined): void {
  * (`removeLicense`).
  */
 export function wipeAllData(opts: { removeLicense?: boolean } = {}): void {
+  // Sparad data från en nyare version av Lagom skyddas annars mot att skrivas över – men här har
+  // användaren bett om att allt ska raderas. Licensbutiken förblir skyddad: den här versionen har
+  // inte kunnat läsa provperiodens start, och en överskrivning skulle starta om provperioden.
+  releaseNewerData([STORE_KEYS.license])
   useDiaryStore.getState().clearDiary()
   useFoodStore.getState().clearFoods()
   useBodyStore.getState().clearBody()
   useFastingStore.getState().clearFasting()
+  usePlanStore.getState().clearPlan()
   useProfileStore.getState().resetProfile()
   if (opts.removeLicense) useLicenseStore.getState().clearLicense()
 }
@@ -314,7 +362,7 @@ export function diaryToCsv(entries: Record<ISODate, DiaryEntry[]>, meals: MealCo
   return '\ufeff' + rows.join('\r\n')
 }
 
-/** Starta nedladdning av en fil i webbläsaren. */
+/** Starta nedladdning av en fil i webbläsaren (`<a download>`). */
 export function downloadFile(filename: string, content: string, mime = 'application/json'): void {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` })
   const url = URL.createObjectURL(blob)
@@ -329,6 +377,78 @@ export function downloadFile(filename: string, content: string, mime = 'applicat
 
 export function backupFilename(): string {
   return `lagom-sakerhetskopia-${todayISO()}.json`
+}
+
+/**
+ * Hur det gick att spara en fil:
+ * - 'saved'     – filen laddades ned
+ * - 'shared'    – delningsdialogen användes (t.ex. "Spara i Filer" på iPhone)
+ * - 'cancelled' – användaren stängde delningsdialogen utan att välja något
+ * - 'failed'    – filen gick inte att skapa eller spara
+ */
+export type SaveOutcome = 'saved' | 'shared' | 'cancelled' | 'failed'
+
+/** Pekskärm som huvudsaklig pekare (telefon, surfplatta) – där fungerar nedladdning sämre än delning. */
+function hasCoarsePointer(): boolean {
+  try {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  } catch {
+    return false
+  }
+}
+
+/** Kan filen delas med delningsdialogen? (canShare kan kasta för okända filtyper.) */
+function canShareFile(file: File): boolean {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
+    return navigator.canShare({ files: [file] })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Spara en fil så att den faktiskt hamnar hos användaren:
+ * - I appen och på telefoner (pekskärm) används delningsdialogen när den klarar filer – där
+ *   laddas en nedladdad fil annars lätt ned "ingenstans". Avbryter användaren dialogen blir
+ *   utfallet 'cancelled'; misslyckas delningen av annat skäl laddas filen ned i stället.
+ * - Annars laddas filen ned som vanligt (`<a download>`).
+ *
+ * OBS: delningen måste starta i samma klick som användaren gjorde. Anropa därför `saveFile`
+ * direkt från klickhanteraren, utan `await` före anropet.
+ */
+export async function saveFile(filename: string, content: string, mime = 'application/json'): Promise<SaveOutcome> {
+  try {
+    const file = new File([content], filename, { type: mime })
+    if ((isInApp() || hasCoarsePointer()) && canShareFile(file)) {
+      try {
+        await navigator.share({ files: [file], title: filename })
+        return 'shared'
+      } catch (err) {
+        if (isAbort(err)) return 'cancelled'
+        // Annat fel (t.ex. NotAllowedError): ladda ned i stället nedan.
+      }
+    }
+    downloadFile(filename, content, mime)
+    return 'saved'
+  } catch {
+    return 'failed'
+  }
+}
+
+/**
+ * Spara en säkerhetskopia av all data (nedladdning eller delningsdialogen, se `saveFile`).
+ * Ersätter `downloadBackup` i nya anrop – den ger ett riktigt utfall, så att "senaste
+ * säkerhetskopian" bara uppdateras när filen verkligen har sparats eller delats.
+ */
+export async function saveBackup(): Promise<SaveOutcome> {
+  let content: string
+  try {
+    content = JSON.stringify(createBackup(), null, 1)
+  } catch {
+    return 'failed'
+  }
+  return saveFile(backupFilename(), content)
 }
 
 /**
@@ -349,6 +469,23 @@ export async function requestPersistentStorage(): Promise<boolean> {
   try {
     if (navigator.storage?.persisted && (await navigator.storage.persisted())) return true
     return (await navigator.storage?.persist?.()) ?? false
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Vid start: be tyst om beständig lagring om den inte redan är beviljad (skydd mot automatisk
+ * rensning, bl.a. Safaris rensning av webbplatser man inte besökt på sju dagar). Frågar inte i
+ * Firefox, som visar en dialog för det – där sköts det från Inställningar → Data i stället.
+ * Returnerar true om lagringen är beständig.
+ */
+export async function ensurePersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.storage?.persisted !== 'function') return false
+    if (await navigator.storage.persisted()) return true
+    if (/\bFirefox\//.test(navigator.userAgent ?? '')) return false
+    return await requestPersistentStorage()
   } catch {
     return false
   }

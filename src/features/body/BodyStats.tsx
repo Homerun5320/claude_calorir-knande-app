@@ -1,10 +1,11 @@
 /**
  * Nyckeltal: BMI, midjemått (med midja/längd-kvot), förändring sedan start och snittakt.
- * BMI och WHtR presenteras ödmjukt – som grova fingervisningar, inte betyg.
+ * BMI och WHtR presenteras ödmjukt – som grova fingervisningar, inte betyg. Midjekvoten visas som
+ * ett neutralt intervall och kopplingen till hälsa beskrivs bara allmänt (befolkningsstudier).
  */
 import type { ReactNode } from 'react'
 import { Ruler } from 'lucide-react'
-import { Badge, Button, Stat } from '../../components/ui'
+import { Badge, Button, ExternalLink, Stat } from '../../components/ui'
 import { formatDayShort } from '../../lib/dates'
 import { formatKg, formatNumber } from '../../lib/format'
 import type { GoalType, LifeStage } from '../../types'
@@ -28,6 +29,10 @@ interface BodyStatsProps {
   plannedRateKg: number | undefined
   waist: LatestMeasure | undefined
   onMeasureWaist: () => void
+}
+
+function Link1177() {
+  return <ExternalLink href="https://www.1177.se/">1177 Vårdguiden</ExternalLink>
 }
 
 function Tile({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
@@ -139,19 +144,27 @@ export function BodyStats({ overview, heightCm, lifeStage, goal, plannedRateKg, 
       </div>
       <p className="mt-3 px-1 text-[0.8125rem] leading-relaxed text-ink-3">
         BMI och midjemått är grova mått framtagna för grupper. De skiljer inte på muskler och fett och säger inget om hur du
-        mår – se dem som en fingervisning, inte ett betyg. Midja/längd under 0,5 brukar förknippas med lägre risk för
-        hjärt-kärlsjukdom.
+        mår – se dem som en fingervisning, inte ett betyg.
         {older && (
           <>
             {' '}
-            Från {OLDER_ADULT_AGE} år brukar BMI 22–27 räknas som normalt – lite marginal skyddar mot undernäring. Läs mer hos{' '}
-            <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
-              1177
-            </a>
-            .
+            Från {OLDER_ADULT_AGE} år brukar BMI 22–27 räknas som normalt – lite marginal skyddar mot undernäring.
+            {ratio === undefined && (
+              <>
+                {' '}
+                Läs mer hos <Link1177 />.
+              </>
+            )}
           </>
         )}
       </p>
+      {ratio !== undefined && (
+        // Allmän information om midjekvoten – ingen bedömning av den enskilda personen.
+        <p className="mt-2 px-1 text-[0.8125rem] leading-relaxed text-ink-3">
+          I befolkningsstudier förknippas en midjekvot under 0,5 med lägre risk för hjärt-kärlsjukdom. Det säger inget om just dig –
+          prata med vården om du är orolig. Läs mer hos <Link1177 />.
+        </p>
+      )}
     </section>
   )
 }

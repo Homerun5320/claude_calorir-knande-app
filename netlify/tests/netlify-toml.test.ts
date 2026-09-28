@@ -26,7 +26,44 @@ describe('netlify.toml', () => {
 
   it('varje fil i netlify/functions är en funktion (inga tester eller hjälpfiler där)', () => {
     const files = readdirSync(`${root}netlify/functions`)
-    expect(files.sort()).toEqual(['create-checkout.mts', 'stripe-webhook.mts', 'verify-purchase.mts'])
+    expect(files.sort()).toEqual([
+      'create-checkout.mts',
+      'license-revocations.mts',
+      'recipe-fetch.mts',
+      'recover-license.mts',
+      'stripe-webhook.mts',
+      'verify-purchase.mts',
+    ])
+  })
+
+  it('anropsbegränsning (Netlify rate limiting) för de publika funktionerna, före den allmänna /api/*-regeln', () => {
+    const blocks = toml.split(/^\[\[/m).filter((b) => b.startsWith('redirects]]'))
+    const catchAll = blocks.findIndex((b) => /from = "\/api\/\*"/.test(b))
+    expect(catchAll).toBeGreaterThanOrEqual(0)
+    for (const name of ['create-checkout', 'verify-purchase', 'recover-license', 'recipe-fetch']) {
+      const i = blocks.findIndex((b) => b.includes(`from = "/api/${name}"`))
+      expect(i, `[[redirects]] för /api/${name} saknas i netlify.toml`).toBeGreaterThanOrEqual(0)
+      expect(i, `/api/${name} måste stå före /api/*`).toBeLessThan(catchAll)
+      const block = blocks[i]
+      expect(block).toContain(`to = "/.netlify/functions/${name}"`)
+      expect(block).toMatch(/status = 200/)
+      expect(block).toMatch(/\[redirects\.rate_limit\]/)
+      expect(block).toMatch(/window_limit = \d+/)
+      // Netlify godtar fönster på 1–180 sekunder.
+      const size = Number(/window_size = (\d+)/.exec(block)?.[1])
+      expect(size).toBeGreaterThanOrEqual(1)
+      expect(size).toBeLessThanOrEqual(180)
+      expect(block).toMatch(/aggregate_by = \[[^\]]*"ip"/)
+    }
+  })
+
+  it('Play Billing i TWA-appen kräver Payment Request: payment=(self)', () => {
+    expect(toml).toMatch(/payment=\(self\)/)
+    expect(toml).not.toMatch(/payment=\(\)/)
+  })
+
+  it('/.well-known/assetlinks.json skickas som application/json (Digital Asset Links för Google Play)', () => {
+    expect(toml).toMatch(/for = "\/\.well-known\/assetlinks\.json"\s+\[headers\.values\][^[]*Content-Type = "application\/json/)
   })
 
   it('CSP tillåter temaskriptet i index.html via hash', () => {

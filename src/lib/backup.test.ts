@@ -1,9 +1,21 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { createBackup, diaryToCsv, parseBackup, restoreBackup, summarizeBackup, wipeAllData, BackupError } from './backup'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createBackup,
+  diaryToCsv,
+  ensurePersistentStorage,
+  parseBackup,
+  restoreBackup,
+  saveBackup,
+  saveFile,
+  summarizeBackup,
+  wipeAllData,
+  BackupError,
+} from './backup'
 import { useDiaryStore } from '../stores/diaryStore'
 import { useBodyStore } from '../stores/bodyStore'
 import { useFastingStore } from '../stores/fastingStore'
 import { useFoodStore } from '../stores/foodStore'
+import { usePlanStore } from '../stores/planStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../stores/profileStore'
 import type { Food } from '../types'
 import { MEAL_IDS } from '../types'
@@ -77,6 +89,44 @@ describe('backup', () => {
     restoreBackup(parsed, 'replace')
     expect(useDiaryStore.getState().entries['2026-09-20']).toHaveLength(1)
     expect(useBodyStore.getState().weights[0].kg).toBe(72.4)
+  })
+
+  it('tar med veckoplaneringen: export, ersätt, sammanfoga och radera', () => {
+    const monday = '2026-09-28'
+    const plan = usePlanStore.getState()
+    const middag = plan.addItem({ kind: 'recipe', date: monday, meal: 'middag', recipeId: 'klassiker-kottbullar', name: 'Köttbullar', servings: 4, eat: 1 })!
+    plan.toggleChecked(monday, 'lagom:lok')
+    const extra = plan.addExtra(monday, 'Diskmedel')!
+    const json = JSON.stringify(createBackup())
+
+    wipeAllData()
+    expect(usePlanStore.getState().items).toEqual({})
+    expect(usePlanStore.getState().shopping).toEqual({})
+
+    restoreBackup(parseBackup(json), 'replace')
+    expect(usePlanStore.getState().items[monday].map((i) => i.id)).toEqual([middag.id])
+    expect(usePlanStore.getState().shopping[monday]).toEqual({ checked: ['lagom:lok'], extras: [extra] })
+
+    // Sammanfoga: enhetens egna rader och bockar finns kvar, kopians läggs till utan dubbletter.
+    const frukost = usePlanStore.getState().addItem({ kind: 'food', date: monday, meal: 'frukost', food: mjolk, amount: 1, unit: 'portion:glas', grams: 206 })!
+    usePlanStore.getState().toggleChecked(monday, 'lagom:mjolk')
+    restoreBackup(parseBackup(json), 'merge')
+    expect(usePlanStore.getState().items[monday].map((i) => i.id).sort()).toEqual([middag.id, frukost.id].sort())
+    expect(usePlanStore.getState().shopping[monday].checked.sort()).toEqual(['lagom:lok', 'lagom:mjolk'])
+    expect(usePlanStore.getState().shopping[monday].extras.map((e) => e.id)).toEqual([extra.id])
+
+    // En äldre säkerhetskopia utan planering läses in utan fel.
+    const old = JSON.parse(json) as { data: Record<string, unknown> }
+    delete old.data.plan
+    expect(parseBackup(JSON.stringify(old)).data.plan).toBeUndefined()
+  })
+
+  it('hoppar över skadade planerade rader och säger det', () => {
+    const backup = JSON.parse(JSON.stringify(createBackup())) as { data: Record<string, unknown> }
+    backup.data.plan = { items: { '2026-09-28': [{ kind: 'recipe' }], 'inte-ett-datum': [] }, shopping: {} }
+    const parsed = parseBackup(JSON.stringify(backup))
+    expect(parsed.data.plan?.items).toEqual({})
+    expect(summarizeBackup(parsed).skippedDetails).toContain('1 planerad rad')
   })
 
   it('sammanfogar utan dubbletter', () => {
@@ -444,5 +494,132 @@ describe('backup', () => {
       expect(parsed.data).toEqual(JSON.parse(JSON.stringify(original.data)))
       expect(summarizeBackup(parsed)).toMatchObject({ skipped: 0, repaired: 0, skippedDetails: [] })
     })
+  })
+})
+
+/** Sätt (eller ta bort) en egenskap på navigator för ett test. */
+function defineNavigator(key: string, value: unknown) {
+  if (value === undefined) Reflect.deleteProperty(navigator, key)
+  else Object.defineProperty(navigator, key, { value, configurable: true, writable: true })
+}
+
+function defineUrl(key: 'createObjectURL' | 'revokeObjectURL', value: unknown) {
+  Object.defineProperty(URL, key, { value, configurable: true, writable: true })
+}
+
+describe('saveFile', () => {
+  let clicks: HTMLAnchorElement[]
+  const coarse = (matches: boolean) => vi.stubGlobal('matchMedia', (q: string) => ({ matches: matches && q === '(pointer: coarse)', media: q }))
+
+  beforeEach(() => {
+    clicks = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicks.push(this)
+    })
+    // jsdom saknar objekt-URL:er.
+    defineUrl('createObjectURL', vi.fn(() => 'blob:lagom'))
+    defineUrl('revokeObjectURL', vi.fn())
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    defineNavigator('share', undefined)
+    defineNavigator('canShare', undefined)
+    Reflect.deleteProperty(URL, 'createObjectURL')
+    Reflect.deleteProperty(URL, 'revokeObjectURL')
+  })
+
+  it('laddar ned filen på en dator', async () => {
+    const share = vi.fn()
+    defineNavigator('share', share)
+    defineNavigator('canShare', () => true)
+    coarse(false)
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('saved')
+    expect(share).not.toHaveBeenCalled()
+    expect(clicks).toHaveLength(1)
+    expect(clicks[0].download).toBe('kopia.json')
+  })
+
+  it('delar filen på en telefon när delningsdialogen klarar filer', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    const canShare = vi.fn(() => true)
+    defineNavigator('share', share)
+    defineNavigator('canShare', canShare)
+    coarse(true)
+    await expect(saveFile('dagbok.csv', 'a;b', 'text/csv')).resolves.toBe('shared')
+    const data = share.mock.calls[0][0] as ShareData
+    expect(data.title).toBe('dagbok.csv')
+    expect(data.files?.[0]).toBeInstanceOf(File)
+    expect(data.files?.[0].name).toBe('dagbok.csv')
+    expect(data.files?.[0].type).toBe('text/csv')
+    expect(clicks).toHaveLength(0)
+  })
+
+  it('avbruten delning blir "cancelled" – inget laddas ned', async () => {
+    defineNavigator('share', vi.fn().mockRejectedValue(new DOMException('Avbrutet', 'AbortError')))
+    defineNavigator('canShare', () => true)
+    coarse(true)
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('cancelled')
+    expect(clicks).toHaveLength(0)
+  })
+
+  it('faller tillbaka på nedladdning när delningen misslyckas eller inte klarar filen', async () => {
+    defineNavigator('share', vi.fn().mockRejectedValue(new DOMException('Nej', 'NotAllowedError')))
+    defineNavigator('canShare', () => true)
+    coarse(true)
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('saved')
+    expect(clicks).toHaveLength(1)
+
+    defineNavigator('canShare', () => false)
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('saved')
+    // canShare kan kasta för okända filtyper.
+    defineNavigator('canShare', () => {
+      throw new TypeError('okänd typ')
+    })
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('saved')
+    expect(clicks).toHaveLength(3)
+  })
+
+  it('rapporterar "failed" när filen inte går att spara', async () => {
+    defineUrl('createObjectURL', () => {
+      throw new Error('stöds inte')
+    })
+    coarse(false)
+    await expect(saveFile('kopia.json', '{}')).resolves.toBe('failed')
+  })
+
+  it('saveBackup sparar hela kopian', async () => {
+    coarse(false)
+    useDiaryStore.getState().addWater('2026-09-27', 250)
+    await expect(saveBackup()).resolves.toBe('saved')
+    expect(clicks[0].download).toMatch(/^lagom-sakerhetskopia-\d{4}-\d{2}-\d{2}\.json$/)
+    wipeAllData()
+  })
+})
+
+describe('ensurePersistentStorage', () => {
+  afterEach(() => defineNavigator('storage', undefined))
+
+  it('ber tyst om beständig lagring när den saknas', async () => {
+    const persist = vi.fn().mockResolvedValue(true)
+    defineNavigator('storage', { persisted: vi.fn().mockResolvedValue(false), persist })
+    await expect(ensurePersistentStorage()).resolves.toBe(true)
+    expect(persist).toHaveBeenCalledTimes(1)
+  })
+
+  it('frågar inte igen när lagringen redan är beständig', async () => {
+    const persist = vi.fn()
+    defineNavigator('storage', { persisted: vi.fn().mockResolvedValue(true), persist })
+    await expect(ensurePersistentStorage()).resolves.toBe(true)
+    expect(persist).not.toHaveBeenCalled()
+  })
+
+  it('kastar aldrig', async () => {
+    defineNavigator('storage', { persisted: vi.fn().mockRejectedValue(new Error('nej')), persist: vi.fn() })
+    await expect(ensurePersistentStorage()).resolves.toBe(false)
+    defineNavigator('storage', { persisted: vi.fn().mockResolvedValue(false), persist: vi.fn().mockRejectedValue(new Error('nej')) })
+    await expect(ensurePersistentStorage()).resolves.toBe(false)
+    defineNavigator('storage', undefined)
+    await expect(ensurePersistentStorage()).resolves.toBe(false)
   })
 })

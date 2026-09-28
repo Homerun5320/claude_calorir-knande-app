@@ -47,10 +47,71 @@ export interface StripeLineItem {
   price: Pick<StripePrice, 'id' | 'unit_amount' | 'currency'> | null
 }
 
+export interface StripeCharge {
+  id: string
+  object: 'charge'
+  /** Belopp i öre. */
+  amount: number
+  /** Återbetalt belopp i öre (hela eller delar). */
+  amount_refunded: number
+  /** true när hela beloppet har återbetalats. */
+  refunded: boolean
+  /** true när betalningen har bestridits (även förfrågningar och vunna tvister). */
+  disputed: boolean
+  /** Kvittonumret i Stripes kvittomejl, t.ex. "1234-5678". */
+  receipt_number?: string | null
+  payment_intent?: string | StripePaymentIntent | null
+}
+
 export interface StripePaymentIntent {
   id: string
   object: 'payment_intent'
+  /** Epoch-sekunder. */
+  created?: number
   metadata: Metadata
+  /** Id eller (expanderad) senaste debiteringen. */
+  latest_charge?: string | StripeCharge | null
+}
+
+export type StripeDisputeStatus =
+  | 'warning_needs_response'
+  | 'warning_under_review'
+  | 'warning_closed'
+  | 'needs_response'
+  | 'under_review'
+  | 'won'
+  | 'lost'
+  | 'prevented'
+
+export interface StripeDispute {
+  id: string
+  object: 'dispute'
+  status: StripeDisputeStatus
+  charge: string | StripeCharge
+  payment_intent: string | StripePaymentIntent | null
+}
+
+export interface StripeRefund {
+  id: string
+  object: 'refund'
+  amount: number
+  status: 'pending' | 'requires_action' | 'succeeded' | 'failed' | 'canceled' | null
+  charge: string | StripeCharge | null
+  payment_intent: string | StripePaymentIntent | null
+}
+
+export interface StripeInvoice {
+  id: string
+  object: 'invoice'
+  /** Fakturanumret på fakturan/kvittot, t.ex. "A1B2C3D4-0001". */
+  number: string | null
+}
+
+/** Stripes listsvar (sidor om högst 100). */
+export interface StripeList<T> {
+  object: 'list'
+  data: T[]
+  has_more: boolean
 }
 
 export interface StripeCheckoutSession {
@@ -69,6 +130,10 @@ export interface StripeCheckoutSession {
   line_items?: { data: StripeLineItem[] }
   payment_intent?: string | StripePaymentIntent | null
   consent?: { terms_of_service?: 'accepted' | null } | null
+  /** Kundens uppgifter från Checkout. Personuppgifter – loggas aldrig. */
+  customer_details?: { email?: string | null } | null
+  /** Fakturan som Checkout skapade (invoice_creation), id eller expanderad. */
+  invoice?: string | StripeInvoice | null
 }
 
 export interface StripeEvent {
@@ -152,6 +217,30 @@ export async function stripeRequest<T>(req: StripeRequest): Promise<T> {
     throw new StripeError(err?.message ?? `Stripe svarade med HTTP ${res.status}`, res.status, err?.type ?? '', err?.code ?? '')
   }
   return body as T
+}
+
+/**
+ * Hämta en hel Stripe-lista, sida för sida (100 per sida, nyast först), högst `maxPages` sidor.
+ * `truncated` = det fanns fler än så (de äldsta kom inte med).
+ */
+export async function stripeListAll<T extends { id: string }>(
+  req: Omit<StripeRequest, 'method'> & { maxPages?: number },
+): Promise<{ items: T[]; truncated: boolean }> {
+  const items: T[] = []
+  let startingAfter: string | undefined
+  const maxPages = req.maxPages ?? 20
+  for (let page = 0; page < maxPages; page++) {
+    const res = await stripeRequest<StripeList<T>>({
+      ...req,
+      method: 'GET',
+      params: { ...req.params, limit: 100, starting_after: startingAfter },
+    })
+    const data = Array.isArray(res.data) ? res.data : []
+    items.push(...data)
+    if (!res.has_more || data.length === 0) return { items, truncated: false }
+    startingAfter = data[data.length - 1].id
+  }
+  return { items, truncated: true }
 }
 
 // ---------------------------------------------------------------------------

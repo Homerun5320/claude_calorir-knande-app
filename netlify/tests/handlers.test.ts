@@ -1,13 +1,24 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest'
-import { verifyLicense } from '../../src/lib/license.ts'
-import { LICENSE_METADATA_KEY, validatePaidSession } from '../lib/fulfillment.ts'
-import { checkoutParams, handleCreateCheckout, handleStripeWebhook, handleVerifyPurchase, withErrorBoundary, type HandlerDeps } from '../lib/handlers.ts'
-import { RateLimiter } from '../lib/http.ts'
+import { keyId, verifyLicense } from '../../src/lib/license.ts'
+import { LICENSE_METADATA_KEY, REVOKED_METADATA_KEY, validatePaidSession } from '../lib/fulfillment.ts'
+import {
+  INVOICE_FIELD_NAME_MAX,
+  INVOICE_FIELD_VALUE_MAX,
+  INVOICE_FOOTER_MAX,
+  checkoutParams,
+  handleCreateCheckout,
+  handleStripeWebhook,
+  handleVerifyPurchase,
+  invoiceFooter,
+  withErrorBoundary,
+  type HandlerDeps,
+} from '../lib/handlers.ts'
+import { RateLimiter, checkOrigin } from '../lib/http.ts'
 import { issueLicense, licensePayloadFor } from '../lib/licensing.ts'
 import { SERVER_PLANS } from '../lib/plans.ts'
 import { computeStripeSignature } from '../lib/stripe.ts'
-import { CREATED, NOW, SECRET, fakeStripe, licenseKeyPair, paidSession, price, recordingLogger, type FakeStripe } from './fakeStripe.ts'
+import { CREATED, NOW, SECRET, charge, fakeStripe, intent, licenseKeyPair, paidSession, price, recordingLogger, type FakeStripe } from './fakeStripe.ts'
 
 const APP = 'https://lagom.example'
 const WEBHOOK_SECRET = 'whsec_testhemlighet'
@@ -95,11 +106,11 @@ describe('POST /api/create-checkout', () => {
 
   it('priset kontrolleras mot appens pris innan kunden skickas till Stripe', async () => {
     const { stripe, deps, log } = setup({ STRIPE_PRICE_AR: 'price_ar_fel' })
-    stripe.prices.set('price_ar_fel', price('price_ar_fel', { unit_amount: 34900 }))
+    stripe.prices.set('price_ar_fel', price('price_ar_fel', { unit_amount: 29900 }))
     const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
     expect(res.status).toBe(503)
     expect(await read(res)).toMatchObject({ code: 'ej-konfigurerad' })
-    expect(log.text()).toContain('349 kr men appen visar 299 kr')
+    expect(log.text()).toContain('299 kr men appen visar 349 kr')
     expect(stripe.calls.some((c) => c.url.pathname === '/v1/checkout/sessions')).toBe(false)
   })
 
@@ -131,10 +142,101 @@ describe('POST /api/create-checkout', () => {
     expect(form.get('payment_intent_data[description]')).toContain('Lagom Årslicens.')
     expect(form.get('metadata[samtycke]')).toBe('omedelbar-leverans')
     expect(form.get('line_items[0][price_data][currency]')).toBe('sek')
-    expect(form.get('line_items[0][price_data][unit_amount]')).toBe('29900')
+    expect(form.get('line_items[0][price_data][unit_amount]')).toBe('34900')
     expect(form.get('line_items[0][price_data][tax_behavior]')).toBe('inclusive')
     expect(form.get('line_items[0][price_data][product_data][name]')).toBe('Lagom Årslicens')
     expect(form.get('line_items[0][price_data][product_data][description]')).toContain('Förnyas inte automatiskt')
+  })
+
+  it('livstidslicensen beskrivs försiktigt: för alltid, felrättningar ingår – inga löften om alla uppdateringar', async () => {
+    const { stripe, deps } = setup({ STRIPE_PRICE_AR: '', STRIPE_PRICE_LIVSTID: '' })
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid', consent: true }), deps)).status).toBe(200)
+    const form = lastCreate(stripe)
+    expect(form.get('line_items[0][price_data][unit_amount]')).toBe('69900')
+    const description = form.get('line_items[0][price_data][product_data][description]') ?? ''
+    expect(description).toBe('Full tillgång till Lagom för alltid, utan årsavgift. Engångsköp – felrättningar ingår.')
+    expect(description).not.toMatch(/alla framtida uppdateringar/i)
+    expect(form.get('custom_text[submit][message]')).toContain('felrättningar ingår')
+  })
+
+  it('bekräftelse på varaktigt medium: Stripe skapar en faktura med säljaren, samtycket och villkorsversionen', async () => {
+    const { stripe, deps } = setup({
+      VITE_SELLER_NAME: 'Anna Andersson Lagom',
+      VITE_SELLER_ORGNR: '900101-1234',
+      VITE_SELLER_ADDRESS: 'Storgatan 1, 123 45 Småstad',
+      VITE_SELLER_PHONE: '070-123 45 67',
+      VITE_SUPPORT_EMAIL: 'hej@lagom-appen.se',
+      VITE_SELLER_VAT: 'SE900101123401',
+      TERMS_VERSION: '2026-11-15',
+    })
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)).status).toBe(200)
+    const form = lastCreate(stripe)
+    expect(form.get('billing_address_collection')).toBe('required')
+    expect(form.get('metadata[villkor_version]')).toBe('2026-11-15')
+    expect(form.get('invoice_creation[enabled]')).toBe('true')
+    expect(form.get('invoice_creation[invoice_data][description]')).toContain('Lagom Årslicens')
+    expect(form.get('invoice_creation[invoice_data][metadata][villkor_version]')).toBe('2026-11-15')
+    expect(form.get('invoice_creation[invoice_data][custom_fields][0][name]')).toBe('Licens')
+    expect(form.get('invoice_creation[invoice_data][custom_fields][0][value]')).toBe('Årslicens')
+    expect(form.get('invoice_creation[invoice_data][custom_fields][1][name]')).toBe('Villkor')
+    expect(form.get('invoice_creation[invoice_data][custom_fields][1][value]')).toContain('2026-11-15')
+    const footer = form.get('invoice_creation[invoice_data][footer]') ?? ''
+    for (const text of [
+      'Säljare: Anna Andersson Lagom',
+      'Org.nr 900101-1234',
+      'Storgatan 1, 123 45 Småstad',
+      'Tel. 070-123 45 67',
+      'hej@lagom-appen.se',
+      'Momsreg.nr SE900101123401',
+      'Licensen är personlig. Årslicensen gäller 365 dagar och förnyas inte.',
+      'Du samtyckte till omedelbar leverans och att ångerrätten därmed upphörde (2 kap. 11 § distansavtalslagen).',
+      'Reklamation enligt konsumentköplagen. Tvister: Allmänna reklamationsnämnden, www.arn.se.',
+    ]) {
+      expect(footer).toContain(text)
+    }
+    expect(footer.length).toBeLessThanOrEqual(INVOICE_FOOTER_MAX)
+    // Utan Stripe Tax visas ingen momsuppdelning.
+    expect([...form.keys()].some((k) => k.includes('rendering_options'))).toBe(false)
+  })
+
+  it('fakturans fält håller sig inom Stripes gränser, även med långa uppgifter', () => {
+    const long = 'x'.repeat(3000)
+    const seller = { name: long, orgnr: long, address: long, phone: long, email: long, vat: long }
+    for (const plan of Object.values(SERVER_PLANS)) {
+      const footer = invoiceFooter(seller, plan)
+      expect(footer.length).toBeLessThanOrEqual(INVOICE_FOOTER_MAX)
+      expect(footer.length).toBeLessThan(1500)
+      const params = checkoutParams({ plan, returnBase: APP, seller, termsVersion: '2026-10-01' })
+      const data = (params.invoice_creation as { invoice_data: { description: string; custom_fields: Array<{ name: string; value: string }> } }).invoice_data
+      expect(data.description.length).toBeLessThanOrEqual(1500)
+      expect(data.custom_fields.length).toBeLessThanOrEqual(4)
+      for (const f of data.custom_fields) {
+        expect(f.name.length).toBeLessThanOrEqual(INVOICE_FIELD_NAME_MAX)
+        expect(f.value.length).toBeLessThanOrEqual(INVOICE_FIELD_VALUE_MAX)
+      }
+    }
+    expect(invoiceFooter(seller, SERVER_PLANS.livstid)).toContain('Livstidslicensen är ett engångsköp som gäller för alltid.')
+  })
+
+  it('i testläge blir saknade säljaruppgifter tydliga platshållare på fakturan', async () => {
+    const { stripe, deps } = setup()
+    expect((await handleCreateCheckout(post('create-checkout', { plan: 'livstid', consent: true }), deps)).status).toBe(200)
+    const footer = lastCreate(stripe).get('invoice_creation[invoice_data][footer]') ?? ''
+    expect(footer).toContain('[Företagsnamn]')
+    expect(footer).toContain('[Org.nr]')
+    expect(footer).toContain('[E-post]')
+    expect(footer).not.toContain('Momsreg.nr')
+    expect(lastCreate(stripe).get('metadata[villkor_version]')).toBe('2026-10-01')
+  })
+
+  it('skarpa köp startas inte utan säljarens uppgifter (loggen säger vilka som saknas)', async () => {
+    const { stripe, deps, log } = setup({ STRIPE_SECRET_KEY: 'rk_live_abc123', VITE_SELLER_NAME: 'Anna Andersson', VITE_SUPPORT_EMAIL: 'support@example.invalid' })
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }), deps)
+    expect(res.status).toBe(503)
+    expect(await read(res)).toMatchObject({ code: 'ej-konfigurerad' })
+    for (const name of ['VITE_SELLER_ORGNR', 'VITE_SELLER_ADDRESS', 'VITE_SELLER_PHONE', 'VITE_SUPPORT_EMAIL']) expect(log.text()).toContain(name)
+    expect(log.text()).not.toContain('VITE_SELLER_NAME')
+    expect(stripe.calls).toHaveLength(0)
   })
 
   it('köpvillkor och Stripe Tax kan slås på', () => {
@@ -190,7 +292,7 @@ describe('POST /api/create-checkout', () => {
     const pre = await handleCreateCheckout(new Request(`${APP}/api/create-checkout`, { method: 'OPTIONS', headers: { Origin: APP } }), deps)
     expect(pre.status).toBe(204)
     expect(pre.headers.get('Access-Control-Allow-Methods')).toContain('POST')
-    expect(pre.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type')
+    expect(pre.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization')
 
     const extra = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { Origin: 'https://www.lagom-appen.se' }), deps)
     expect(extra.status).toBe(200)
@@ -261,6 +363,60 @@ describe('POST /api/create-checkout', () => {
 
 // ---------------------------------------------------------------------------
 
+describe('anrop från den inbyggda appen (Capacitor)', () => {
+  const CAP = 'capacitor://localhost'
+
+  it('capacitor://localhost godtas som standard – med CORS för appen', async () => {
+    const { stripe, deps } = setup()
+    const s = paidSession()
+    stripe.sessions.set(s.id, s)
+    const pre = await handleVerifyPurchase(new Request(`${APP}/api/verify-purchase`, { method: 'OPTIONS', headers: { Origin: CAP } }), deps)
+    expect(pre.status).toBe(204)
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(CAP)
+    expect(pre.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization')
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }, { Origin: CAP }), deps)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(CAP)
+  })
+
+  it('godtas bara när ursprunget är konfigurerat', async () => {
+    for (const setting of ['https://localhost', 'off']) {
+      const { deps } = setup({ ALLOWED_NATIVE_ORIGINS: setting })
+      const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: paidSession().id }, { Origin: CAP }), deps)
+      expect(res.status).toBe(403)
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    }
+  })
+
+  it('okända scheman och liknande adresser ger 403', async () => {
+    const { deps } = setup()
+    for (const origin of ['ionic://localhost', 'capacitor://localhost.ond.example', 'http://localhost', 'capacitor://LOCALHOST', 'null']) {
+      const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: paidSession().id }, { Origin: origin }), deps)
+      expect(res.status, origin).toBe(403)
+    }
+  })
+
+  it('tillbaka-adressen blir aldrig ett app-schema, utan alltid APP_URL', () => {
+    for (const origin of [CAP, 'https://localhost']) {
+      const check = checkOrigin(new Request(`${APP}/api/x`, { headers: { Origin: origin } }), [APP], [CAP, 'https://localhost'])
+      expect(check).toMatchObject({ allowed: true, native: true, returnBase: APP })
+      expect(check.returnBase).not.toMatch(/^capacitor:|localhost/)
+    }
+    // Utan APP_URL finns ingen tillbaka-adress (hellre 503 än ett app-schema).
+    expect(checkOrigin(new Request('https://lagom.example/api/x', { headers: { Origin: CAP } }), [], [CAP]).returnBase).toBe('')
+  })
+
+  it('Stripe-köp kan inte startas från butiksappen', async () => {
+    const { deps, stripe } = setup()
+    const res = await handleCreateCheckout(post('create-checkout', { plan: 'ar', consent: true }, { Origin: CAP }), deps)
+    expect(res.status).toBe(403)
+    expect(await read(res)).toMatchObject({ code: 'ej-i-appen' })
+    expect(stripe.calls).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
 describe('POST /api/verify-purchase', () => {
   it('betalt köp → signerad licens som appen godkänner; planen kommer från köpet', async () => {
     const { stripe, deps } = setup()
@@ -272,7 +428,8 @@ describe('POST /api/verify-purchase', () => {
     const data = await read(res)
     expect(data).toMatchObject({ plan: 'livstid', issuedAt: new Date(CREATED * 1000).toISOString(), expiresAt: null })
     const check = await verifyLicense(String(data.licenseKey), { publicKey: keys.pub, mode: 'live', now: NOW })
-    expect(check).toEqual({ ok: true, payload: { v: 1, id: s.id, plan: 'livstid', iat: CREATED } })
+    // Nyckel-id:t (kid) visar appen vilken publik nyckel som signerade.
+    expect(check).toEqual({ ok: true, payload: { v: 1, id: s.id, plan: 'livstid', iat: CREATED, kid: await keyId(keys.pub) } })
     // Nyckeln sparas på betalningen i Stripe.
     expect(stripe.intents.get('pi_1')?.metadata[LICENSE_METADATA_KEY]).toBe(data.licenseKey)
   })
@@ -282,8 +439,8 @@ describe('POST /api/verify-purchase', () => {
     const s = paidSession({
       id: 'cs_test_Arslicens000001',
       metadata: { app: 'lagom', plan: 'ar' },
-      amount_total: 29900,
-      line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 29900, currency: 'sek' } }] },
+      amount_total: 34900,
+      line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 34900, currency: 'sek' } }] },
     })
     stripe.sessions.set(s.id, s)
     const data = await read(await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps))
@@ -315,6 +472,17 @@ describe('POST /api/verify-purchase', () => {
     expect(stripe.intents.get('pi_1')?.metadata[LICENSE_METADATA_KEY]).toBe(data.licenseKey)
   })
 
+  it('en äldre nyckel utan kid (från samma nyckelpar) återanvänds – samma köp ger samma nyckel', async () => {
+    const { stripe, deps } = setup()
+    const s = paidSession()
+    stripe.sessions.set(s.id, s)
+    const legacy = await issueLicense(licensePayloadFor(s.id, 'livstid', CREATED), keys.priv)
+    stripe.intents.get('pi_1')!.metadata[LICENSE_METADATA_KEY] = legacy
+    const data = await read(await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps))
+    expect(data.licenseKey).toBe(legacy)
+    expect(stripe.calls.some((c) => c.method === 'POST')).toBe(false)
+  })
+
   it('licensen lämnas ut även om den inte kan sparas i Stripe', async () => {
     const { stripe, deps, log } = setup()
     const s = paidSession({ payment_intent: 'pi_saknas' })
@@ -335,13 +503,13 @@ describe('POST /api/verify-purchase', () => {
     ['fel valuta', { currency: 'eur' }, 422, 'okant-kop'],
     [
       'billigare pris än planen',
-      { line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 29900, currency: 'sek' } }] } },
+      { line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 34900, currency: 'sek' } }] } },
       422,
       'okant-kop',
     ],
     [
       'flera exemplar',
-      { line_items: { data: [{ quantity: 2, price: { id: 'price_livstid', unit_amount: 59900, currency: 'sek' } }] } },
+      { line_items: { data: [{ quantity: 2, price: { id: 'price_livstid', unit_amount: 69900, currency: 'sek' } }] } },
       422,
       'okant-kop',
     ],
@@ -376,7 +544,7 @@ describe('POST /api/verify-purchase', () => {
     expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: old.id }), deps)).status).toBe(200)
     const adhoc = paidSession({
       id: 'cs_test_PrisFranKoden0001',
-      line_items: { data: [{ quantity: 1, price: { id: 'price_1Adhoc', unit_amount: 59900, currency: 'sek' } }] },
+      line_items: { data: [{ quantity: 1, price: { id: 'price_1Adhoc', unit_amount: 69900, currency: 'sek' } }] },
     })
     stripe.sessions.set(adhoc.id, adhoc)
     expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: adhoc.id }), deps)).status).toBe(200)
@@ -388,7 +556,7 @@ describe('POST /api/verify-purchase', () => {
       id: 'cs_test_GammalArslicens01',
       created: CREATED - 400 * 86_400,
       metadata: { app: 'lagom', plan: 'ar' },
-      line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 29900, currency: 'sek' } }] },
+      line_items: { data: [{ quantity: 1, price: { id: 'price_ar', unit_amount: 34900, currency: 'sek' } }] },
     })
     stripe.sessions.set(s.id, s)
     const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps)
@@ -431,6 +599,81 @@ describe('POST /api/verify-purchase', () => {
     const s = paidSession()
     delete s.line_items
     expect(validatePaidSession(s, { priceIds: { ar: [], livstid: [] } })).toMatchObject({ ok: false, code: 'okant-kop' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('återbetalda och bestridda köp ger ingen licens', () => {
+  const REFUNDED_MESSAGE = 'Köpet har återbetalats och licensen gäller inte längre. Hör av dig om det är fel.'
+
+  function purchase(chargeOverrides: Parameters<typeof charge>[1] = {}, metadata: Record<string, string> = {}) {
+    const ctx = setup()
+    const s = paidSession()
+    ctx.stripe.sessions.set(s.id, s)
+    ctx.stripe.charges.set('ch_1', charge('ch_1', chargeOverrides))
+    Object.assign(ctx.stripe.intents.get('pi_1')!.metadata, metadata)
+    return { ...ctx, session: s }
+  }
+
+  it('helt återbetalt → 410 aterbetald, och bara id:n i loggen', async () => {
+    const { deps, log, session, stripe } = purchase({ refunded: true, amount_refunded: 69900 })
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)
+    expect(res.status).toBe(410)
+    expect(await read(res)).toEqual({ code: 'aterbetald', error: REFUNDED_MESSAGE })
+    expect(stripe.intents.get('pi_1')?.metadata[LICENSE_METADATA_KEY]).toBeUndefined()
+    const entry = log.entries.find((e) => e.message.includes('återbetalt eller bestritt'))
+    expect(entry?.data).toEqual({ session: session.id, betalning: 'pi_1', orsak: 'aterbetald' })
+    expect(log.text()).not.toMatch(/@|exempel\.se|customer_details|receipt/i)
+  })
+
+  it('hela beloppet återbetalt i flera delar räknas som återbetalt', async () => {
+    const { deps, session } = purchase({ refunded: false, amount_refunded: 69900 })
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)).status).toBe(410)
+  })
+
+  it('delvis återbetalt (prisavdrag) → licensen gäller', async () => {
+    const { deps, session } = purchase({ amount_refunded: 20000 })
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)).status).toBe(200)
+  })
+
+  it('bestridd betalning där pengarna dragits tillbaka → 410', async () => {
+    const { deps, session, stripe } = purchase({ disputed: true })
+    stripe.disputes.push({ id: 'dp_1', object: 'dispute', status: 'needs_response', charge: 'ch_1', payment_intent: 'pi_1', created: CREATED })
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)
+    expect(res.status).toBe(410)
+    expect((await read(res)).code).toBe('aterbetald')
+  })
+
+  it.each(['won', 'warning_needs_response', 'warning_closed'] as const)('tvist med status %s spärrar inte', async (status) => {
+    const { deps, session, stripe } = purchase({ disputed: true })
+    stripe.disputes.push({ id: 'dp_1', object: 'dispute', status, charge: 'ch_1', payment_intent: 'pi_1', created: CREATED })
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)).status).toBe(200)
+  })
+
+  it('markeringen lagom_revoked: 1 spärrar, 0 släpper (supportens undantag)', async () => {
+    const marked = purchase({}, { [REVOKED_METADATA_KEY]: '1' })
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: marked.session.id }), marked.deps)).status).toBe(410)
+    const exempt = purchase({ refunded: true, amount_refunded: 69900 }, { [REVOKED_METADATA_KEY]: '0' })
+    expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: exempt.session.id }), exempt.deps)).status).toBe(200)
+  })
+
+  it('en tidigare utfärdad nyckel lämnas inte ut igen efter återbetalningen', async () => {
+    const { deps, session, stripe } = purchase()
+    const first = await read(await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps))
+    expect(first.licenseKey).toMatch(/^LAGOM1\./)
+    stripe.charges.set('ch_1', charge('ch_1', { refunded: true, amount_refunded: 69900 }))
+    const again = await read(await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps))
+    expect(again).toMatchObject({ code: 'aterbetald' })
+    expect(again.licenseKey).toBeUndefined()
+  })
+
+  it('om tvisterna inte kan hämtas: 502, försök igen senare', async () => {
+    const { deps, session, stripe } = purchase({ disputed: true })
+    const realFetch = stripe.fetch
+    deps.fetch = async (input, init) => (String(input).includes('/disputes') ? Promise.reject(new TypeError('fetch failed')) : realFetch(input, init))
+    const res = await handleVerifyPurchase(post('verify-purchase', { sessionId: session.id }), deps)
+    expect(res.status).toBe(502)
   })
 })
 
@@ -532,6 +775,63 @@ describe('POST /api/stripe-webhook', () => {
   it('utan STRIPE_WEBHOOK_SECRET är webhooken avstängd', async () => {
     const { deps } = setup({ STRIPE_WEBHOOK_SECRET: '' })
     expect((await webhook(completed(), { deps })).status).toBe(503)
+  })
+
+  describe('återbetalningar och tvister markeras på betalningen', () => {
+    const event = (type: string, object: Record<string, unknown>, id = 'evt_r1') => ({ id, object: 'event', type, livemode: false, data: { object } })
+    const refunded = (overrides: Parameters<typeof charge>[1] = {}) => event('charge.refunded', { ...charge('ch_1', overrides) })
+    const dispute = (type: string, status: string) => event(type, { id: 'dp_1', object: 'dispute', status, charge: 'ch_1', payment_intent: 'pi_1' })
+    const marker = (stripe: FakeStripe) => stripe.intents.get('pi_1')?.metadata[REVOKED_METADATA_KEY]
+
+    it('full återbetalning → lagom_revoked = 1, och verify-purchase nekar sedan', async () => {
+      const { deps, stripe, log } = setup()
+      const res = await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })
+      expect(res.status).toBe(200)
+      expect(await read(res)).toEqual({ received: true })
+      expect(marker(stripe)).toBe('1')
+      expect(log.entries.find((e) => e.message.includes('spärrad'))?.data).toEqual({ event: 'evt_r1', type: 'charge.refunded', betalning: 'pi_1' })
+      const s = paidSession()
+      stripe.sessions.set(s.id, s)
+      expect((await handleVerifyPurchase(post('verify-purchase', { sessionId: s.id }), deps)).status).toBe(410)
+    })
+
+    it('delvis återbetalning ändrar ingenting', async () => {
+      const { deps, stripe } = setup()
+      expect(await read(await webhook(refunded({ amount_refunded: 10000 }), { deps }))).toEqual({ received: true, ignored: true })
+      expect(marker(stripe)).toBeUndefined()
+      expect(stripe.calls).toHaveLength(0)
+    })
+
+    it('tvist: skapad → spärrad, vunnen → spärren tas bort; förfrågningar spärrar inte', async () => {
+      const { deps, stripe } = setup()
+      await webhook(dispute('charge.dispute.created', 'warning_needs_response'), { deps })
+      expect(marker(stripe)).toBeUndefined()
+      expect((await webhook(dispute('charge.dispute.created', 'needs_response'), { deps })).status).toBe(200)
+      expect(marker(stripe)).toBe('1')
+      expect((await webhook(dispute('charge.dispute.closed', 'won'), { deps })).status).toBe(200)
+      expect(marker(stripe)).toBeUndefined()
+      await webhook(dispute('charge.dispute.closed', 'lost'), { deps })
+      expect(marker(stripe)).toBe('1')
+    })
+
+    it('supportens undantag (0) och andra produkter lämnas orörda', async () => {
+      const { deps, stripe } = setup()
+      stripe.intents.get('pi_1')!.metadata[REVOKED_METADATA_KEY] = '0'
+      await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })
+      expect(marker(stripe)).toBe('0')
+      stripe.intents.set('pi_2', intent('pi_2', { metadata: { produkt: 'annat' } }))
+      const other = await webhook(event('charge.refunded', { ...charge('ch_2', { refunded: true, amount_refunded: 69900, payment_intent: 'pi_2' }) }), { deps })
+      expect(await read(other)).toEqual({ received: true, ignored: true })
+      expect(stripe.intents.get('pi_2')?.metadata[REVOKED_METADATA_KEY]).toBeUndefined()
+    })
+
+    it('Stripe nere → 500 så att Stripe skickar händelsen igen', async () => {
+      const { deps, stripe } = setup()
+      stripe.failNext.push('network')
+      expect((await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })).status).toBe(500)
+      expect((await webhook(refunded({ refunded: true, amount_refunded: 69900 }), { deps })).status).toBe(200)
+      expect(marker(stripe)).toBe('1')
+    })
   })
 })
 

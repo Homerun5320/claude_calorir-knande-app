@@ -7,9 +7,11 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import {
   Button,
+  Chip,
   ConfirmDialog,
   DialogHost,
   EmptyState,
+  ExternalLink,
   NumberField,
   ProgressBar,
   SegmentedControl,
@@ -28,6 +30,13 @@ import {
 } from './index'
 import { pauseToast, resumeToast, toastDuration } from './toast'
 import { rangeMessage } from './NumberField'
+
+/** Webbläsare eller app – styr ExternalLinks skärmläsartext. */
+const platform = vi.hoisted(() => ({ inApp: false }))
+vi.mock('../../config/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../config/platform')>()),
+  isInApp: () => platform.inApp,
+}))
 
 function ControlledNumber({
   onValue,
@@ -652,5 +661,69 @@ describe('ConfirmDialog', () => {
     expect(dialog).toBeInTheDocument()
     await user.keyboard('{Escape}')
     await expect(second).resolves.toBe(false)
+  })
+})
+
+describe('ExternalLink', () => {
+  afterEach(() => {
+    platform.inApp = false
+  })
+
+  it('öppnar i ny flik utan att dela varifrån besökaren kom', () => {
+    render(<ExternalLink href="https://www.1177.se">1177 Vårdguiden</ExternalLink>)
+    const link = screen.getByRole('link', { name: '1177 Vårdguiden (öppnas i ny flik)' })
+    expect(link).toHaveAttribute('href', 'https://www.1177.se')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    // Ikonen är dekoration – skärmläsare hör texten i stället.
+    const icon = link.querySelector('svg')
+    expect(icon).not.toBeNull()
+    expect(icon).toHaveAttribute('aria-hidden', 'true')
+    expect(link.querySelector('.sr-only')).toHaveTextContent('(öppnas i ny flik)')
+    // Synlig fokus.
+    expect(link.className).toMatch(/focus-visible:outline/)
+  })
+
+  it('säger "öppnas utanför appen" i appen', () => {
+    platform.inApp = true
+    render(<ExternalLink href="https://www.livsmedelsverket.se">Livsmedelsverket</ExternalLink>)
+    expect(screen.getByRole('link', { name: 'Livsmedelsverket (öppnas utanför appen)' })).toHaveAttribute('target', '_blank')
+  })
+
+  it('mailto: och tel: får varken ikon, ny flik eller extra text', () => {
+    render(
+      <>
+        <ExternalLink href="mailto:support@example.invalid">Mejla supporten</ExternalLink>
+        <ExternalLink href="tel:+46700000000">Ring</ExternalLink>
+      </>,
+    )
+    for (const name of ['Mejla supporten', 'Ring']) {
+      const link = screen.getByRole('link', { name })
+      expect(link).not.toHaveAttribute('target')
+      expect(link).not.toHaveAttribute('rel')
+      expect(link.querySelector('svg')).toBeNull()
+    }
+  })
+
+  it('tar egen klass och kan dölja ikonen, men behåller skärmläsartexten', () => {
+    render(
+      <ExternalLink href="https://world.openfoodfacts.org" className="flex min-h-11 items-center" showIcon={false}>
+        Open Food Facts
+      </ExternalLink>,
+    )
+    const link = screen.getByRole('link', { name: 'Open Food Facts (öppnas i ny flik)' })
+    expect(link).toHaveClass('flex', 'min-h-11')
+    expect(link).not.toHaveClass('underline')
+    expect(link.querySelector('svg')).toBeNull()
+  })
+})
+
+describe('Chip – tryckyta', () => {
+  it('är minst 44 px bred även med en kort text ("g")', () => {
+    render(<Chip>g</Chip>)
+    const chip = screen.getByRole('button', { name: 'g' })
+    expect(chip).toHaveClass('min-w-11', 'justify-center')
+    // Osynlig utökning av höjden till 44 px.
+    expect(chip.className).toMatch(/after:-inset-y-1\.5/)
   })
 })

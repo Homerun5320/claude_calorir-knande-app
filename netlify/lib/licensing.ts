@@ -2,16 +2,27 @@
  * Utfärdande av licensnycklar på servern. Formatet och signeringen kommer från appens egen
  * src/lib/license.ts, så att servern och appen alltid är överens.
  */
-import { base64UrlDecode, decodeLicense, signLicense, verifyLicense, type LicensePayload } from '../../src/lib/license.ts'
+import {
+  base64UrlDecode,
+  decodeLicense,
+  keyId,
+  licenseKeyHash,
+  signLicense,
+  signRevocationList,
+  verifyLicense,
+  verifyRevocationList,
+  type LicensePayload,
+} from '../../src/lib/license.ts'
 import { SERVER_PLANS, type PlanId } from './plans.ts'
 
 const DAY_SEC = 86_400
 
 /**
- * Licensens innehåll för ett köp. Helt bestämt av köpet (id, plan och tidpunkt) – samma köp ger
- * alltid samma licens, hur många gånger det än verifieras.
+ * Licensens innehåll för ett köp. Helt bestämt av köpet (id, plan och tidpunkt) och av vilken
+ * nyckel som signerar (`kid`) – samma köp ger alltid samma innehåll, hur många gånger det än
+ * verifieras.
  */
-export function licensePayloadFor(id: string, plan: PlanId, issuedAtSec: number): LicensePayload {
+export function licensePayloadFor(id: string, plan: PlanId, issuedAtSec: number, kid?: string): LicensePayload {
   const days = SERVER_PLANS[plan].durationDays
   return {
     v: 1,
@@ -19,6 +30,7 @@ export function licensePayloadFor(id: string, plan: PlanId, issuedAtSec: number)
     plan,
     iat: issuedAtSec,
     ...(days ? { exp: issuedAtSec + days * DAY_SEC } : {}),
+    ...(kid ? { kid } : {}),
   }
 }
 
@@ -69,13 +81,34 @@ export function publicKeyFromPrivate(privateKeyPkcs8Base64: string): Promise<str
   return cached
 }
 
+/**
+ * Nyckel-id ("kid") för den publika nyckeln: de första 8 base64url-tecknen av SHA-256 över
+ * SPKI-byten. Samma regel som `keyId` i src/lib/license.ts – appen provar då rätt nyckel först
+ * när flera publika nycklar är inbyggda (nyckelbyte).
+ */
+export function licenseKid(publicKeySpkiBase64: string): Promise<string> {
+  return keyId(publicKeySpkiBase64)
+}
+
+/**
+ * Licensens id i spärrlistan, räknat ur själva nyckeln: SHA-256 (base64url) över hela den
+ * tvättade nyckelsträngen – samma som `licenseKeyHash` i appen. Fungerar för alla nycklar, även
+ * gamla och manuellt utfärdade. Spärrlistan använder i första hand köp-id:t (licensens `id`), som
+ * är detsamma för alla nycklar som har utfärdats för ett köp.
+ */
+export function licenseIdOf(licenseKey: string): Promise<string> {
+  return licenseKeyHash(licenseKey)
+}
+
+/** Samma köp, plan och datum. `kid` jämförs inte: signaturen kontrolleras ändå mot nuvarande nyckel. */
 function samePayload(a: LicensePayload, b: LicensePayload): boolean {
   return a.v === b.v && a.id === b.id && a.plan === b.plan && a.iat === b.iat && a.exp === b.exp && !a.test && !b.test
 }
 
 /**
  * true om en tidigare utfärdad nyckel (sparad hos Stripe) gäller för exakt det här köpet och är
- * signerad med den nuvarande nyckeln. Utgångsdatum kontrolleras inte här.
+ * signerad med den nuvarande nyckeln. Utgångsdatum kontrolleras inte här. Äldre nycklar utan
+ * `kid` godtas, så att samma köp fortsätter att ge samma nyckel.
  */
 export async function isIssuedLicenseValid(stored: string, expected: LicensePayload, publicKey: string): Promise<boolean> {
   const payload = decodeLicense(stored)
@@ -91,4 +124,16 @@ export async function issueLicense(payload: LicensePayload, privateKeyPkcs8Base6
   const sig = key.split('.')[2] ?? ''
   if (!decodeLicense(key) || base64UrlDecode(sig).byteLength !== 64) throw new Error('Licensen kunde inte signeras.')
   return key
+}
+
+/**
+ * Signera spärrlistan "LAGOMREV1.<payload>.<signatur>" med licensernas privata nyckel. Listan
+ * kontrolleras mot den publika nyckeln innan den lämnas ut.
+ */
+export async function signRevocations(ids: readonly string[], issuedAtSec: number, privateKeyPkcs8Base64: string): Promise<string> {
+  const list = { v: 1 as const, issuedAt: issuedAtSec, ids: [...ids] }
+  const token = await signRevocationList(list, privateKeyPkcs8Base64)
+  const publicKey = await publicKeyFromPrivate(privateKeyPkcs8Base64)
+  if (!(await verifyRevocationList(token, { publicKey }))) throw new Error('Spärrlistan kunde inte signeras.')
+  return token
 }

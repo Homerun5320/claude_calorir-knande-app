@@ -8,7 +8,7 @@ import { Car, Repeat } from 'lucide-react'
 import { BarChart, LineChart, type BarDatum } from '../../components/charts'
 import { CategoryIcon } from '../../components/domain'
 import { Badge, Card, Stat } from '../../components/ui'
-import { CAR_KG_CO2E_PER_KM, CLIMATE_REFERENCE, climateRating, co2eEquivalents, swapSuggestions } from '../../lib/climate'
+import { CAR_KG_CO2E_PER_KM, CLIMATE_REFERENCE, RISE_SOURCE, climateRating, co2eEquivalents, swapSuggestions } from '../../lib/climate'
 import { formatNumber } from '../../lib/format'
 import { percentText } from './fmt'
 import type { ISODate } from '../../types'
@@ -16,7 +16,15 @@ import { climateDays, summarizeClimate, topEmitters } from './aggregate'
 import { Callout, InfoNote, ShareBar, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
 
-const kg = (v: number | undefined, d = 1) => (v === undefined ? '–' : `${formatNumber(v, d)} kg`)
+/**
+ * kg CO₂e i läsbar form utan "0 kg": under 0,005 kg visas "<0,01 kg", under 0,1 kg två decimaler
+ * (0,03 kg), annars en decimal. Fast mellanslag mellan tal och enhet.
+ */
+export const kg = (v: number | undefined): string => (v === undefined || !Number.isFinite(v) ? '–' : `${kgNumber(v)} kg`)
+
+/** Bara talet i `kg` ("<0,01", "0,03", "2,4") – för när enheten står för sig. */
+export const kgNumber = (v: number | undefined): string =>
+  v === undefined || !Number.isFinite(v) ? '–' : v < 0.005 ? '<0,01' : formatNumber(v, v < 0.1 ? 2 : 1)
 
 /** Periodens klimatsammanfattning (delas med rapporten). */
 export function usePeriodClimate(data: InsightsData) {
@@ -73,7 +81,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
           {mindful ? (
             <p className="font-display text-2xl font-semibold tracking-tight">{rating.label}</p>
           ) : (
-            <Stat size="lg" label="Snitt per loggad dag" value={formatNumber(summary.avgKg, 1)} unit="kg CO₂e" />
+            <Stat size="lg" label="Snitt per loggad dag" value={kgNumber(summary.avgKg)} unit="kg CO₂e" />
           )}
           <Badge tone={rating.tone} size="md" dot>
             {rating.label}
@@ -148,7 +156,7 @@ export function ClimateTab({ data }: { data: InsightsData }) {
                     <span className="truncate font-medium text-ink">
                       <span className="sr-only">{i + 1}. </span>
                       {t.name}
-                    </span>
+                    </span>{' '}
                     <span className="shrink-0 text-xs text-ink-3 tabular-nums">
                       {mindful ? percentText(t.share * 100) : `${kg(t.kg)} · ${percentText(t.share * 100)}`}
                     </span>
@@ -188,15 +196,17 @@ export function ClimateTab({ data }: { data: InsightsData }) {
 
       <div className="md:col-span-2">
         <InfoNote>
-          Så räknar vi: varje livsmedel får ett ungefärligt värde i kg CO₂e per kg, från RISE Klimatdatabas för livsmedel (2022)
-          eller en schablon för kategorin. Värdena gäller från jord till industrins grind och kan skilja sig mycket mellan
+          Så räknar vi: varje livsmedel får ett ungefärligt värde i kg CO₂e per kg, från {RISE_SOURCE} eller en schablon för
+          kategorin. Värdena gäller från jord till industrins grind och kan skilja sig mycket mellan
           producenter – se dem som en fingervisning. Klimatsmart nivå: WWF One Planet Plate. Genomsnittlig svensk:
           Naturvårdsverket. Bil: {formatNumber(CAR_KG_CO2E_PER_KM * 1000)}{'\u00a0'}g CO₂ per km (Trafikverket).
           {summary.unknownEntries > 0 &&
             ` ${summary.unknownEntries} ${summary.unknownEntries === 1 ? 'snabbpost' : 'snabbposter'} utan vikt kunde inte räknas med.`}
         </InfoNote>
       </div>
-      <SourceNote>Klimatdata: RISE, Livsmedelsverket, Naturvårdsverket och WWF. Alla värden är ungefärliga.</SourceNote>
+      <SourceNote>
+        Klimatdata: {RISE_SOURCE}, Livsmedelsverket, Naturvårdsverket och WWF. Alla värden är ungefärliga.
+      </SourceNote>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { RouteError } from './components/layout/RouteError'
 import { useHydrated } from './stores/hydration'
 import { useProfileStore } from './stores/profileStore'
 import { AccessGate } from './features/premium/AccessGate'
+import { isInApp } from './config/platform'
 
 const TodayPage = lazy(() => import('./features/today/TodayPage'))
 const DiaryPage = lazy(() => import('./features/diary/DiaryPage'))
@@ -28,9 +29,18 @@ const SettingsPage = lazy(() => import('./features/settings/SettingsPage'))
 const OnboardingPage = lazy(() => import('./features/onboarding/OnboardingPage'))
 const PremiumPage = lazy(() => import('./features/premium/PremiumPage'))
 const ThankYouPage = lazy(() => import('./features/premium/ThankYouPage'))
+const PrivacyPage = lazy(() => import('./features/legal/PrivacyPage'))
+const TermsPage = lazy(() => import('./features/legal/TermsPage'))
+const ReportPrintPage = lazy(() => import('./features/insights/ReportPrintPage'))
+const RecipeImportPage = lazy(() => import('./features/recipes/RecipeImportPage'))
+const PlanningPage = lazy(() => import('./features/planning/PlanningPage'))
 
-/** Sidor som nås utan profil: välkomstflödet, Om Lagom, köpsidan och tacksidan efter betalning. */
-const OPEN_PATHS = ['/valkommen', '/om', '/premium', '/tack'] as const
+/**
+ * Sidor som nås utan profil: välkomstflödet, Om Lagom, köpsidan, integritetspolicyn, villkoren och
+ * tacksidan efter ett webbköp. Tacksidan bara på webben – i butiksapparna finns inga webbköp att
+ * hämta (sidan skickar själv vidare där).
+ */
+const OPEN_PATHS: readonly string[] = ['/valkommen', '/om', '/premium', '/integritet', '/villkor', ...(isInApp() ? [] : ['/tack'])]
 
 function isOpenPath(pathname: string): boolean {
   return OPEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -76,21 +86,27 @@ const router = createHashRouter([
           { path: 'livsmedel/:id/redigera', element: <CustomFoodPage /> },
           { path: 'recept', element: <RecipesPage /> },
           { path: 'recept/nytt', element: <AccessGate action="recept"><RecipeEditorPage /></AccessGate> },
+          // Före 'recept/:id' – annars tolkas "importera" som ett recept-id.
+          { path: 'recept/importera', element: <AccessGate action="recept"><RecipeImportPage /></AccessGate> },
           { path: 'recept/:id', element: <RecipeDetailPage /> },
           { path: 'recept/:id/redigera', element: <RecipeEditorPage /> },
           { path: 'vikt', element: <BodyPage /> },
           { path: 'insikter', element: <InsightsPage /> },
+          { path: 'rapport', element: <ReportPrintPage /> },
           { path: 'traning', element: <ExercisePage /> },
           { path: 'dryck', element: <DrinksPage /> },
           { path: 'fasta', element: <FastingPage /> },
           { path: 'mer', element: <MorePage /> },
           { path: 'om', element: <AboutPage /> },
           { path: 'matkalender', element: <FoodCalendarPage /> },
+          { path: 'planering', element: <PlanningPage /> },
           { path: 'installningar', element: <SettingsPage /> },
           { path: 'installningar/:section', element: <SettingsPage /> },
           { path: 'valkommen', element: <OnboardingPage /> },
           { path: 'premium', element: <PremiumPage /> },
           { path: 'tack', element: <ThankYouPage /> },
+          { path: 'integritet', element: <PrivacyPage /> },
+          { path: 'villkor', element: <TermsPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],
       },

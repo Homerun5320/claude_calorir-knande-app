@@ -3,7 +3,7 @@
  */
 import { useId } from 'react'
 import { HeartHandshake, Monitor, Moon, Sun } from 'lucide-react'
-import { Card, SegmentedControl, Switch } from '../../../components/ui'
+import { Card, ExternalLink, SegmentedControl, Switch } from '../../../components/ui'
 import { formatNumber } from '../../../lib/format'
 import { KJ_PER_KCAL } from '../../../lib/nutrients'
 import { useProfileStore } from '../../../stores/profileStore'
@@ -91,20 +91,20 @@ export function AppearanceSection() {
       <Card eyebrow="Må bra" title="Medvetet läge" tone={settings.mindfulMode ? 'vinbar' : undefined}>
         <Switch
           label="Dölj siffrorna"
-          description="Kalorier och vikt göms. I stället visar Lagom Tallriksmodellen, hur du mår och ord som ”lagom” och ”lite kvar”."
+          description="Kalorier och vikt göms i översikten, dagboken och insikterna. I stället visar Lagom Tallriksmodellen, hur du mår och ord som ”lagom” och ”lite kvar”. Siffrorna finns kvar under Inställningar – i Mål och makron och i Profil – om du behöver dem."
           checked={settings.mindfulMode}
           onChange={(mindfulMode) => set({ mindfulMode })}
         />
         <div className="mt-3">
           <Note tone="mossa" icon={HeartHandshake}>
             Känns det jobbigt att räkna eller tänker du mycket på mat och vikt? Du är inte ensam. Prata med{' '}
-            <a href="https://www.1177.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+            <ExternalLink href="https://www.1177.se" className="font-semibold text-gran underline underline-offset-2">
               1177 Vårdguiden
-            </a>{' '}
+            </ExternalLink>{' '}
             eller{' '}
-            <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+            <ExternalLink href="https://www.friskfri.se" className="font-semibold text-gran underline underline-offset-2">
               Frisk &amp; Fri
-            </a>
+            </ExternalLink>
             .
           </Note>
         </div>

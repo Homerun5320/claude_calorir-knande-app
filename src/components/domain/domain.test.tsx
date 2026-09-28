@@ -55,6 +55,23 @@ describe('foodEmoji / CategoryIcon', () => {
     expect(foodEmoji('Kaffe med mjölk (bryggkaffe med skvätt mellanmjölk)', 'dryck')).toBe('☕')
   })
 
+  it('förstår Livsmedelsverkets namn: "m." och "u." och huvudordet först', () => {
+    expect(foodEmoji('Pannkaka tunn m. vatten', 'fardigratt')).toBe('🥞')
+    expect(foodEmoji('Pannkaka tunn u. mjölk ägg', 'fardigratt')).toBe('🥞')
+    expect(foodEmoji('Ärtsoppa fläsk tillagad konserv. m. vatten', 'fardigratt')).toBe('🍲')
+    // Samma ikon som Lagoms kurerade köttbullar.
+    expect(foodEmoji('Köttbullar nöt stekta', 'fardigratt')).toBe(foodEmoji('Färdiga köttbullar', 'rott_kott'))
+    expect(foodEmoji('Köttbullar nöt stekta', 'fardigratt')).toBe('🧆')
+    expect(foodEmoji('Hårt bröd fullkorn råg vete majs m. surdeg fibrer 15 % typ spisbröd', 'brod')).toBe('🍞')
+    expect(foodEmoji('Paprika grön', 'gronsaker')).toBe('🫑')
+    expect(foodEmoji('Pirog m. kött ugnsstekt typ sambusa', 'snabbmat')).toBe('🥟')
+    // Beskrivningar längre in i namnet styr inte ikonen.
+    expect(foodEmoji('Yoghurt mild honung fett 2 % berikad', 'mejeri')).toBe('🥛')
+    expect(foodEmoji('Krabba vitt kött kokt', 'skaldjur')).toBe('🦐')
+    expect(foodEmoji('Wienerbröd m. vaniljkräm sylt florsocker', 'bakverk')).not.toBe('🥪')
+    expect(foodEmoji('Glassandwich', 'glass_dessert')).toBe('🍨')
+  })
+
   it('går inte på falska träffar och faller tillbaka på kategorin', () => {
     expect(foodEmoji('Knäckebröd Frukost', 'brod')).toBe('🍞') // inte ost
     expect(foodEmoji('Sidfläsk, färskt, stekt', 'rott_kott')).not.toBe('🥤') // inte läsk

@@ -22,6 +22,7 @@ import { useToastStore } from '../../components/ui/toast'
 import { loadBuiltinCatalog } from '../../lib/foodRepo'
 import { bulle, offBar } from './testFoods'
 import { NutriScoreBadge, nutriScoreTextClass } from './components'
+import type { Profile } from '../../types'
 
 function renderAt(path: string) {
   const router = createMemoryRouter(
@@ -63,7 +64,7 @@ describe('AddFoodPage', () => {
   it('visar sök, genvägar och tomma listor', () => {
     renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
     expect(screen.getByRole('heading', { level: 1, name: 'Lägg till' })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Sök livsmedel')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Frukost' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Skanna streckkod')).toBeInTheDocument()
     expect(screen.getByText('Här hamnar det du äter')).toBeInTheDocument()
@@ -71,7 +72,7 @@ describe('AddFoodPage', () => {
 
   it('söker lokalt, lägger i korgen och lägger till allt', async () => {
     const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-01-15')
-    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle' } })
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kanelbulle' } })
     const row = await screen.findByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ }, { timeout: 3000 })
     fireEvent.click(row)
     const dialog = await screen.findByRole('dialog')
@@ -87,7 +88,7 @@ describe('AddFoodPage', () => {
 
   it('lägger till ett enskilt livsmedel direkt – och korgen blir huvudvalet när den har innehåll', async () => {
     const { router } = renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
-    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kanelbulle bageri' } })
     fireEvent.click(await screen.findByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ }, { timeout: 3000 }))
     let dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg till i Fika' }))
@@ -108,7 +109,7 @@ describe('AddFoodPage', () => {
 
   it('berättar för skärmläsare hur många träffar sökningen gav', async () => {
     renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
-    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kanelbulle bageri' } })
     await waitFor(() => expect(screen.getByText(/träff(ar)? för ”kanelbulle bageri”/)).toHaveAttribute('role', 'status'), { timeout: 3000 })
     // Radens namn nämner inte längre en gest som bara finns på pekskärm.
     const row = screen.getByRole('button', { name: /^Kanelbulle, 1 st \(bageri/ })
@@ -118,7 +119,7 @@ describe('AddFoodPage', () => {
 
   it('snabbknappen lägger till direkt med förvald mängd', async () => {
     renderAt('/lagg-till?maltid=fika&datum=2026-09-26')
-    fireEvent.change(screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel'), { target: { value: 'kanelbulle bageri' } })
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kanelbulle bageri' } })
     const plus = await screen.findByRole('button', { name: /^Lägg till Kanelbulle direkt/ }, { timeout: 3000 })
     fireEvent.click(plus)
     const [entry] = useDiaryStore.getState().entries['2026-09-26']
@@ -342,5 +343,220 @@ describe('NutriScoreBadge', () => {
     rerender(<NutriScoreBadge score={{ grade: 'A', tone: 'mossa' }} />)
     expect(screen.getByText('Nutri-Score A')).toHaveClass('text-on-gran')
     expect(nutriScoreTextClass('lingon')).toBe('text-on-gran')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Fritext, tallrik, graviditetsråd och produktsidans licens
+// ---------------------------------------------------------------------------
+
+const PROFILE: Profile = {
+  name: 'Anna',
+  sex: 'kvinna',
+  birthYear: 1992,
+  heightCm: 168,
+  startWeightKg: 68,
+  activityLevel: 'latt',
+  goal: 'behalla',
+  weeklyRateKg: 0.25,
+  lifeStage: 'ingen',
+  diet: 'allatare',
+  macroPreset: 'nnr',
+  createdAt: 0,
+}
+
+function expireTrial() {
+  useProfileStore.setState((s) => ({ settings: { ...s.settings, onboardingDone: true } }))
+  useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * 86_400_000, licenseKey: null, activatedAt: null })
+}
+
+function resetAccess() {
+  useLicenseStore.getState().resetLicenseState()
+  useAccessGateStore.setState({ blocked: null })
+}
+
+describe('Fritextloggning', () => {
+  afterEach(resetAccess)
+
+  it('tolkar "två ägg och en smörgås med ost" och lägger allt i korgen', async () => {
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    const search = screen.getByPlaceholderText('Sök livsmedel')
+    fireEvent.change(search, { target: { value: 'två ägg och en smörgås med ost, ett knäckebröd med smör' } })
+    const card = (await screen.findByRole('heading', { name: 'Lägg till 4 saker' }, { timeout: 3000 })).closest('section')!
+    expect(within(card).getByRole('button', { name: /^Ägg, 2 ägg \(M, utan skal, 100 g\)\. Ändra mängd\./ })).toBeInTheDocument()
+    // Osten ingår redan i "Smörgås med ost" – ingen extra ostskiva.
+    expect(within(card).getByRole('button', { name: /^Smörgås med ost, 1 smörgås/ })).toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: /^Hushållsost/ })).not.toBeInTheDocument()
+    // Smöret på knäckebrödet är ett tillbehör med en standardmängd.
+    const butter = within(card).getByRole('button', { name: /^Smör, 1 tsk/ })
+    expect(butter).toHaveTextContent('tillbehör')
+    expect(within(card).getByText('Tips: använd mikrofonen på tangentbordet och säg vad du åt.')).toBeInTheDocument()
+    // Hela meningen ger inga vanliga träffar – men kortet är svaret, så ingen "Inga träffar".
+    await waitFor(() => expect(screen.getByText(/^Lagom tolkade texten som 4 saker/)).toBeInTheDocument(), { timeout: 3000 })
+    expect(screen.queryByText(/Inga träffar för/)).not.toBeInTheDocument()
+    fireEvent.click(within(card).getByRole('button', { name: 'Lägg alla 4 i korgen' }))
+    const items = useBasketStore.getState().items
+    expect(items.map((i) => i.food.id)).toEqual(['lagom:agg-ratt', 'lagom:smorgas-grovt-ost', 'lagom:knackebrod-wasa-husman', 'lagom:smor-normalsaltat-82'])
+    expect(items.every((i) => i.origin === 'text')).toBe(true)
+    expect(items[0]).toMatchObject({ amount: 2, unit: 'portion:st', grams: 100 })
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('4 livsmedel i korgen')
+    // Söktexten töms så att korgen syns.
+    await waitFor(() => expect(search).toHaveValue(''))
+  })
+
+  it('"Byt" visar andra tänkbara livsmedel och räknar om mängden', async () => {
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'två ägg och en banan' } })
+    const card = (await screen.findByRole('heading', { name: 'Lägg till 2 saker' }, { timeout: 3000 })).closest('section')!
+    fireEvent.click(within(card).getByRole('button', { name: 'Byt Ägg (två ägg)' }))
+    const dialog = await screen.findByRole('dialog', { name: /Byt ut ”två ägg”/ })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stekt ägg' }))
+    await waitFor(() => expect(within(card).getByRole('button', { name: /^Stekt ägg, 2 × stekt ägg \(M, 100 g\)/ })).toBeInTheDocument())
+  })
+
+  it('ett enda livsmedel ("kaffe med mjölk") ger inget fritextkort', async () => {
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'kaffe med mjölk' } })
+    await screen.findByRole('button', { name: /^Kaffe med mjölk, / }, { timeout: 3000 })
+    expect(screen.queryByRole('heading', { name: /^Lägg till \d+ saker?$/ })).not.toBeInTheDocument()
+  })
+
+  it('efter provperioden läggs inget i korgen', async () => {
+    expireTrial()
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    fireEvent.change(screen.getByPlaceholderText('Sök livsmedel'), { target: { value: 'ägg och banan' } })
+    const card = (await screen.findByRole('heading', { name: 'Lägg till 2 saker' }, { timeout: 3000 })).closest('section')!
+    fireEvent.click(within(card).getByRole('button', { name: 'Lägg alla 2 i korgen' }))
+    expect(useBasketStore.getState().items).toHaveLength(0)
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'mat' })
+  })
+})
+
+describe('Logga med tallriken', () => {
+  afterEach(resetAccess)
+
+  it('uppskattar energin och lägger delarna i korgen med anteckningen', async () => {
+    const { router } = renderAt('/lagg-till?maltid=middag&datum=2026-09-26')
+    fireEvent.click(screen.getByRole('button', { name: /^Tallrik/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Logga med tallriken' })
+    expect(await within(dialog).findByText(/^Ungefär \d+–\d+ kcal$/, undefined, { timeout: 3000 })).toBeInTheDocument()
+    // Tre segment för andelarna, tallrikstyp och fyllnadsgrad.
+    expect(within(dialog).getByRole('radio', { name: 'Grönsaker: Hälften' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Grönsaker: Hälften' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Pasta' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gräddsås' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
+    const items = useBasketStore.getState().items
+    expect(items.map((i) => i.food.id)).toEqual([
+      'lagom:gronsaker-frysta',
+      'lagom:pasta-vete-kokt',
+      'lagom:kycklingfile-stekt',
+      'lagom:gradsas-brunsas-tillagad',
+    ])
+    expect(items.every((i) => i.note === 'Uppskattat med tallriken' && i.origin === 'plate')).toBe(true)
+    expect(items[3]).toMatchObject({ amount: 1, unit: 'dl' })
+    // Anteckningen följer med till dagboken.
+    fireEvent.click(await screen.findByRole('button', { name: 'Lägg till' }))
+    const entries = useDiaryStore.getState().entries['2026-09-26']
+    expect(entries).toHaveLength(4)
+    expect(entries.every((e) => e.note === 'Uppskattat med tallriken')).toBe(true)
+    expect(router.state.location.pathname).toBe('/dagbok/2026-09-26')
+  })
+
+  it('visar bara balansen i medvetet läge', async () => {
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, mindfulMode: true } }))
+    renderAt('/lagg-till?maltid=middag&datum=2026-09-26')
+    fireEvent.click(screen.getByRole('button', { name: /^Tallrik/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Logga med tallriken' })
+    expect(await within(dialog).findByText(/^Balansen: grönsaker en tredjedel/, undefined, { timeout: 3000 })).toBeInTheDocument()
+    expect(within(dialog).queryByText(/kcal/)).not.toBeInTheDocument()
+  })
+
+  it('öppnas inte efter provperioden', () => {
+    expireTrial()
+    renderAt('/lagg-till?maltid=middag&datum=2026-09-26')
+    fireEvent.click(screen.getByRole('button', { name: /^Tallrik/ }))
+    expect(screen.queryByRole('dialog', { name: 'Logga med tallriken' })).not.toBeInTheDocument()
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'mat' })
+  })
+})
+
+describe('Bra att veta när du är gravid', () => {
+  afterEach(() => useProfileStore.setState({ profile: null }))
+
+  it('visas på detaljsidan och i portionsarket när profilen är gravid', async () => {
+    useProfileStore.setState({ profile: { ...PROFILE, lifeStage: 'gravid' } })
+    renderAt('/livsmedel/lagom%3Abrie?maltid=fika&datum=2026-09-26')
+    const note = await screen.findByRole('region', { name: 'Bra att veta när du är gravid' }, { timeout: 3000 })
+    expect(within(note).getByText(/Mögel- och kittostar/)).toBeInTheDocument()
+    expect(note).toHaveClass('bg-sol-soft')
+    expect(within(note).getByRole('link', { name: /Läs mer hos Livsmedelsverket/ })).toHaveAttribute(
+      'href',
+      'https://www.livsmedelsverket.se/matvanor-halsa--miljo/kostrad/gravida/mat-att-undvika/',
+    )
+
+    const brie = (await import('../../data/foods')).BUILTIN_FOODS.find((f) => f.id === 'lagom:brie')!
+    render(
+      <MemoryRouter>
+        <PortionSheet food={brie} onClose={() => {}} primary={{ label: 'Lägg till', onClick: () => {} }} />
+      </MemoryRouter>,
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('region', { name: 'Bra att veta när du är gravid' })).toBeInTheDocument()
+  })
+
+  it('säger "när du ammar" för ammande och visas inte utan graviditet', async () => {
+    useProfileStore.setState({ profile: { ...PROFILE, lifeStage: 'ammar' } })
+    const { unmount } = renderAt('/livsmedel/lagom%3Afarsk-tonfisk')
+    expect(await screen.findByRole('region', { name: 'Bra att veta när du ammar' }, { timeout: 3000 })).toBeInTheDocument()
+    unmount()
+    useProfileStore.setState({ profile: { ...PROFILE, lifeStage: 'ingen' } })
+    renderAt('/livsmedel/lagom%3Abrie')
+    await screen.findByRole('heading', { level: 1, name: /Vitmögelost/ }, { timeout: 3000 })
+    expect(screen.queryByText(/Bra att veta när du/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Produktsidan', () => {
+  it('anger bildlicensen och länkar till produkten hos Open Food Facts', async () => {
+    useFoodStore.setState({
+      cachedFoods: { [offBar.id]: { ...offBar, imageUrl: 'https://images.openfoodfacts.org/bar.jpg', extra: { nutriscore: 'c' } } },
+    })
+    renderAt(`/livsmedel/${encodeURIComponent(offBar.id)}`)
+    expect(
+      await screen.findByText(
+        'Produktdata från Open Food Facts (ODbL), produktbild under CC BY-SA 3.0 – en öppen databas som byggs av användare. Kontrollera mot förpackningen.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Visa produkten hos Open Food Facts/ })).toHaveAttribute(
+      'href',
+      'https://world.openfoodfacts.org/product/7310865000637',
+    )
+  })
+
+  it('har mellanslag mellan klimatvärdet och enheten', async () => {
+    renderAt('/livsmedel/lagom%3Akanelbulle-bageri?maltid=fika&datum=2026-09-26')
+    const card = (await screen.findByRole('heading', { name: 'Klimatavtryck' }, { timeout: 3000 })).closest('section, div')!.parentElement!
+    expect(card.textContent).toMatch(/\d kg CO₂e/)
+  })
+})
+
+describe('Streckkod utan kamera', () => {
+  it('ber om att kontrollera siffrorna och döljer "Skanna en annan vara"', async () => {
+    renderAt('/skanna?maltid=frukost&datum=2026-09-26')
+    const input = await screen.findByLabelText(/Streckkod \(EAN\)/)
+    fireEvent.change(input, { target: { value: '7310865000632' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sök produkten' }))
+    expect(await screen.findByText('Streckkoden ser inte ut att stämma. Kontrollera siffrorna under streckkoden och skriv in dem igen.')).toBeInTheDocument()
+    expect(screen.queryByText(/Skanna igen/)).not.toBeInTheDocument()
+
+    // En giltig kod som inte hittas (nätet är nere i testerna): inget "Skanna en annan vara".
+    fireEvent.change(input, { target: { value: '7310865000637' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sök produkten' }))
+    })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Skapa eget livsmedel' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Skanna en annan vara' })).not.toBeInTheDocument()
   })
 })

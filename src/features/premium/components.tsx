@@ -1,8 +1,13 @@
 /**
  * Byggstenar för Lagom Premium: status, planer, köpark med samtycke, aktivering av licensnyckel,
  * visning av nyckeln och köpvillkoren. Används av köpsidan, tacksidan och Inställningar → Licens.
+ *
+ * Stripe, kronpriser och webbens köpvillkor visas bara när `sellsOnWeb()`. I butiksapparna visas
+ * i stället `StorePurchasePanel` (köp i appen, priset från butiken) och butiksvarianten av
+ * villkoren; när webbförsäljningen är avstängd visas länkar till appbutikerna (`StoreLinksPanel`).
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   BadgeCheck,
   Check,
@@ -11,29 +16,66 @@ import {
   ChartNoAxesColumn,
   Copy,
   Download,
-  ExternalLink,
+  ExternalLink as ExternalLinkIcon,
   Eye,
   EyeOff,
   FlaskConical,
   KeyRound,
   Leaf,
+  LockOpen,
   Mail,
   MegaphoneOff,
   ScanBarcode,
   ShieldCheck,
+  Smartphone,
   Trash,
   Wheat,
   type LucideIcon,
 } from 'lucide-react'
-import { Badge, Button, Card, ProgressBar, Sheet, TextField, confirmDialog, cx, toast, toneVars, type Tone } from '../../components/ui'
+import { Badge, Button, Card, ExternalLink, ProgressBar, Sheet, Spinner, TextField, confirmDialog, cx, toast, toneVars, type Tone } from '../../components/ui'
 import { LogoMark } from '../../components/layout/Logo'
-import { COMMERCE_MODE, SELLER_NAME, SUPPORT_EMAIL, TERMS_URL, TRIAL_DAYS, type Plan } from '../../config/commerce'
+import {
+  APPSTORE_URL,
+  COMMERCE_MODE,
+  PLAY_URL,
+  SELLER_ADDRESS,
+  SELLER_NAME,
+  SELLER_ORGNR,
+  SELLER_PHONE,
+  SUPPORT_EMAIL,
+  TERMS_URL,
+  TRIAL_DAYS,
+  type Plan,
+  type PlanId,
+} from '../../config/commerce'
+import { IS_STORE_BUILD, isInApp, sellsOnWeb } from '../../config/platform'
 import { formatNumber } from '../../lib/format'
+import { getStorePurchases, type StoreProduct, type StoreProductId } from '../../lib/storePurchases'
 import type { AccessStatus } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
-import { activateLicense, copyText, formatKronor, formatPrice, licenseMailto, perMonthText, statusSummary, type ActivationResult } from './premiumLogic'
+import {
+  PurchaseError,
+  RECOVER_ERRORS,
+  activateLicense,
+  buyInStore,
+  copyText,
+  formatKronor,
+  formatPrice,
+  licenseMailto,
+  looksLikeEmail,
+  perMonthText,
+  recoverLicense,
+  statusSummary,
+  storeAccountName,
+  storeName,
+  type ActivationResult,
+} from './premiumLogic'
+import { RestorePurchasesButton } from './RestorePurchasesButton'
 
-/** Etiketten på det framlyfta alternativet. Ärlig: livstid blir billigare än årslicens efter två år. */
+/**
+ * Etiketten på det framlyfta alternativet. Ärlig: med 349 kr/år och 699 kr för livstid blir
+ * livstidslicensen billigare från det tredje året.
+ */
 export const FEATURED_LABEL = 'Bäst värde'
 
 // ---------------------------------------------------------------------------
@@ -41,7 +83,8 @@ export const FEATURED_LABEL = 'Bäst värde'
 // ---------------------------------------------------------------------------
 
 export function TestModeBanner({ className }: { className?: string }) {
-  if (COMMERCE_MODE !== 'test') return null
+  // Butiksappar verifierar alltid som i skarpt läge, och utan webbköp finns ingen köpknapp att testa.
+  if (COMMERCE_MODE !== 'test' || IS_STORE_BUILD || !sellsOnWeb()) return null
   return (
     <div role="note" className={cx('flex items-start gap-3 rounded-2xl bg-hjortron-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink', className)}>
       <FlaskConical className="mt-0.5 size-5 shrink-0 text-hjortron" aria-hidden />
@@ -174,63 +217,156 @@ export function PlanCard({ plan, onChoose, cta }: { plan: Plan; onChoose: (plan:
 }
 
 // ---------------------------------------------------------------------------
-// Köpvillkor
+// Säljare och köpvillkor
 // ---------------------------------------------------------------------------
 
-const TERMS: ReadonlyArray<{ title: string; text: string }> = [
-  { title: 'Säljare', text: `${SELLER_NAME}. Frågor om köp, kvitton och licenser: ${SUPPORT_EMAIL}.` },
-  {
-    title: 'Vad du köper',
-    text: 'En personlig licens till Lagom med alla funktioner – inga tillägg och ingen reklam. Årslicensen gäller i 365 dagar från köpet, livstidslicensen har ingen tidsgräns.',
-  },
-  {
-    title: 'Pris och betalning',
-    text: 'Priserna är i svenska kronor inklusive 25 % moms. Betalningen sköts av Stripe – Lagom ser eller sparar aldrig dina kortuppgifter. Kvitto skickas till den e-post du anger vid betalningen.',
-  },
-  {
-    title: 'Ingen automatisk förnyelse',
-    text: 'Årslicensen förnyas inte och inget dras automatiskt. När året är slut väljer du själv om du vill köpa en ny – din data finns kvar oavsett.',
-  },
-  {
-    title: 'Leverans och ångerrätt',
-    text: 'Licensen levereras direkt efter betalningen. Vid köp på distans har du normalt 14 dagars ångerrätt, men för digitalt innehåll som levereras direkt upphör den när leveransen har påbörjats – om du har samtyckt till det, vilket du gör i rutan före köpet (2 kap. 11 § lagen om distansavtal). Din rätt att reklamera fel enligt konsumentköplagen påverkas inte.',
-  },
-  {
-    title: 'Licensen',
-    text: 'Licensen är personlig och får användas på dina egna enheter. Den är en nyckel som du klistrar in på varje enhet – inget konto behövs. Spara nyckeln säkert. Tappar du bort den hjälper vi dig om du mejlar oss ditt kvitto.',
-  },
-  {
-    title: 'Provperiod',
-    text: `De första ${TRIAL_DAYS} dagarna är gratis och kräver inget kort. Efter provperioden kan du fortfarande se, exportera och radera all din data – bara ny loggning kräver en licens.`,
-  },
-  {
-    title: 'Integritet',
-    text: 'Din dagbok stannar på din enhet och skickas aldrig till oss. Vid köp hanterar Stripe betalningen och din e-postadress för kvittot. Licensnyckeln innehåller inga personuppgifter – bara licenstyp, datum och ett köp-id.',
-  },
-]
+/**
+ * Säljarens uppgifter på en rad (distansavtalslagen): "Namn, org.nr …, adress, tel. …, e-post".
+ * Tomma delar hoppas över, så att inga tomma etiketter visas innan uppgifterna finns.
+ */
+export function sellerLine(opts: { email?: boolean } = {}): string {
+  return [
+    SELLER_NAME,
+    SELLER_ORGNR && `org.nr ${SELLER_ORGNR}`,
+    SELLER_ADDRESS,
+    SELLER_PHONE && `tel. ${SELLER_PHONE}`,
+    (opts.email ?? true) && SUPPORT_EMAIL,
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
 
-export function TermsContent({ headingLevel = 3 }: { headingLevel?: 3 | 4 }) {
+interface TermItem {
+  title: string
+  text: string
+}
+
+/** Vad livstidslicensen innebär – samma formulering på webben och i butiksapparna. */
+const LIFETIME_TERMS =
+  'Livstidslicensen gäller utan tidsgräns. Lagom fortsätter att fungera lokalt på dina enheter och du kan alltid exportera din data. ' +
+  'Felrättningar tillhandahålls efter felanmälan i rimlig omfattning. Nya funktioner kan tillkomma men utlovas inte.'
+
+const PRIVACY_BASE = 'Din dagbok stannar på din enhet och skickas aldrig till oss.'
+
+/** Köpvillkoren på webben (köp med Stripe och licensnyckel). */
+function webTerms(): TermItem[] {
+  return [
+    { title: 'Säljare', text: `${sellerLine()}. Mejla oss om du har frågor om köp, kvitton eller licenser.` },
+    {
+      title: 'Vad du köper',
+      text: 'En personlig licens till Lagom med alla funktioner – inga tillägg och ingen reklam. Årslicensen gäller i 365 dagar från köpet.',
+    },
+    { title: 'Livstidslicensen', text: LIFETIME_TERMS },
+    {
+      title: 'Pris och betalning',
+      text: 'Priserna är i svenska kronor inklusive 25 % moms. Betalningen sköts av Stripe – Lagom ser eller sparar aldrig dina kortuppgifter. Kvitto skickas till den e-post du anger vid betalningen.',
+    },
+    {
+      title: 'Ingen automatisk förnyelse',
+      text: 'Årslicensen förnyas inte och inget dras automatiskt. När året är slut väljer du själv om du vill köpa en ny – din data finns kvar oavsett.',
+    },
+    {
+      title: 'Leverans och ångerrätt',
+      text: 'Licensen levereras direkt efter betalningen. Vid köp på distans har du normalt 14 dagars ångerrätt, men för digitalt innehåll som levereras direkt upphör den när leveransen har påbörjats – om du har samtyckt till det, vilket du gör i rutan före köpet (2 kap. 11 § lagen om distansavtal). Din rätt att reklamera fel enligt konsumentlagstiftningen påverkas inte.',
+    },
+    {
+      title: 'Licensen',
+      text: 'Licensen är personlig och får användas på dina egna enheter. Den är en nyckel som du klistrar in på varje enhet – inget konto behövs. Spara nyckeln säkert. Tappar du bort den hjälper vi dig om du mejlar oss ditt kvitto. Om köpet återbetalas slutar licensen att gälla – din data finns kvar och går att exportera.',
+    },
+    {
+      title: 'Provperiod',
+      text: `De första ${TRIAL_DAYS} dagarna är gratis och kräver inget kort. Efter provperioden kan du fortfarande se, exportera och radera all din data – bara ny loggning kräver en licens.`,
+    },
+    {
+      title: 'Funktion och kompatibilitet',
+      text: 'Lagom fungerar i moderna webbläsare och offline. Din data sparas i den webbläsare och på den enhet där du använder appen, och licensnyckeln klistras in på varje enhet.',
+    },
+    {
+      title: 'Integritet',
+      text: `${PRIVACY_BASE} Vid köp hanterar Stripe betalningen och din e-postadress för kvittot. Licensnyckeln innehåller inte ditt namn eller din e-post – bara licenstyp, datum och ett köp-id som vi kan koppla till betalningen om du behöver hjälp.`,
+    },
+    {
+      title: 'Tvister',
+      text: 'Vid en tvist kan du vända dig till Allmänna reklamationsnämnden (ARN), www.arn.se. Svensk lag gäller.',
+    },
+  ]
+}
+
+/**
+ * Köpvillkoren i butiksapparna (köp i appen). I en app nämns bara den egna butiken – Apple
+ * godkänner inte att en annan plattform nämns i iPhone-appen (riktlinje 2.3.10). På webben med
+ * webbförsäljningen avstängd nämns båda.
+ */
+function storeTerms(): TermItem[] {
+  const inApp = isInApp()
+  const store = inApp ? storeName() : 'App Store eller Google Play'
+  const refund = !inApp ? 'reportaproblem.apple.com respektive Google Play' : store === 'App Store' ? 'på reportaproblem.apple.com' : 'i Google Play'
+  const account = inApp ? storeAccountName() : 'Apple- eller Google-konto'
+  return [
+    { title: 'Säljare', text: `${sellerLine()}.` },
+    {
+      title: 'Köp och betalning',
+      text: `Köpet görs via ${store}, som sköter betalning, moms, kvitto och eventuell återbetalning (${refund}).`,
+    },
+    {
+      title: 'Vad du köper',
+      text: 'En personlig licens till Lagom med alla funktioner – inga tillägg och ingen reklam. Årslicensen gäller i ett år från köpet och förnyas inte automatiskt.',
+    },
+    { title: 'Livstidslicensen', text: LIFETIME_TERMS },
+    {
+      title: 'Dina enheter',
+      text: `Licensen gäller på dina enheter med samma ${account} – tryck på Återställ köp på en ny enhet.`,
+    },
+    {
+      title: 'Provperiod',
+      text: `De första ${TRIAL_DAYS} dagarna är gratis. Sedan spärras bara ny loggning – du kan fortfarande se, exportera och radera all din data.`,
+    },
+    { title: 'Integritet', text: `${PRIVACY_BASE} Betalningen sköts av butiken – vi får aldrig dina kortuppgifter.` },
+    { title: 'Reklamation', text: 'Din rätt att reklamera fel enligt konsumentlagstiftningen påverkas inte.' },
+  ]
+}
+
+const TEXT_LINK = 'inline-flex min-h-11 items-center gap-1.5 self-start text-[0.9375rem] font-semibold text-gran underline-offset-2 hover:underline'
+
+/**
+ * Köpvillkoren i korthet. `inSheet`: visas i köparket – länken till de fullständiga villkoren
+ * öppnas då i en ny flik, så att arket och samtycket finns kvar.
+ */
+export function TermsContent({ headingLevel = 3, inSheet = false }: { headingLevel?: 3 | 4; inSheet?: boolean }) {
   const H = headingLevel === 3 ? 'h3' : 'h4'
+  const web = sellsOnWeb()
+  const terms = web ? webTerms() : storeTerms()
   return (
     <div className="flex flex-col gap-4">
-      {TERMS.map((t) => (
+      {terms.map((t) => (
         <div key={t.title}>
           <H className="text-[0.9375rem] font-semibold text-ink">{t.title}</H>
           <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">{t.text}</p>
         </div>
       ))}
-      {TERMS_URL && (
-        <a
-          href={TERMS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-11 items-center gap-1.5 self-start text-[0.9375rem] font-semibold text-gran underline-offset-2 hover:underline"
-        >
-          Hela köpvillkoren
-          <ExternalLink aria-hidden className="size-4" />
-          <span className="sr-only">(öppnas i ny flik)</span>
-        </a>
-      )}
+      <div className="flex flex-col">
+        {inSheet ? (
+          <ExternalLink href="#/villkor" showIcon={false} className={TEXT_LINK}>
+            Fullständiga köpvillkor
+            <ExternalLinkIcon aria-hidden className="size-4" />
+          </ExternalLink>
+        ) : (
+          <Link to="/villkor" className={TEXT_LINK}>
+            Fullständiga köpvillkor
+          </Link>
+        )}
+        {!inSheet && (
+          <Link to="/integritet" className={TEXT_LINK}>
+            Integritetspolicy
+          </Link>
+        )}
+        {web && TERMS_URL && (
+          <ExternalLink href={TERMS_URL} showIcon={false} className={TEXT_LINK}>
+            Hela köpvillkoren på webbplatsen
+            <ExternalLinkIcon aria-hidden className="size-4" />
+          </ExternalLink>
+        )}
+      </div>
     </div>
   )
 }
@@ -247,6 +383,15 @@ export function vatOf(priceKr: number): number {
 export const CONSENT_TEXT =
   'Jag vill att licensen levereras direkt och samtycker till att min ångerrätt på 14 dagar därmed upphör när leveransen har påbörjats.'
 export const CONSENT_ERROR = 'Kryssa i rutan för att fortsätta – annars kan licensen inte levereras direkt.'
+
+function SellerRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-1 flex items-baseline justify-between gap-3 text-[0.8125rem] text-ink-2">
+      <dt>{label}</dt>
+      <dd className="min-w-0 text-right break-words">{value}</dd>
+    </div>
+  )
+}
 
 export function CheckoutSheet({
   plan,
@@ -306,9 +451,11 @@ export function CheckoutSheet({
             <Button fullWidth size="lg" onClick={buy} loading={busy} iconLeft={test ? FlaskConical : undefined}>
               {test ? 'Köp (testläge – ingen betalning)' : `Gå till betalning · ${formatPrice(plan.priceKr)}`}
             </Button>
-            <p className="text-center text-[0.75rem] leading-snug text-ink-3">
-              {test ? 'Ingen betalning görs i testläget.' : 'Du betalar säkert hos Stripe och kommer sedan tillbaka hit.'}
-            </p>
+            {(test || sellsOnWeb()) && (
+              <p className="text-center text-[0.75rem] leading-snug text-ink-3">
+                {test ? 'Ingen betalning görs i testläget.' : 'Du betalar säkert hos Stripe och kommer sedan tillbaka hit.'}
+              </p>
+            )}
           </div>
         )
       }
@@ -329,10 +476,11 @@ export function CheckoutSheet({
               <dt>Giltighet</dt>
               <dd className="text-right">{plan.durationDays ? `${formatNumber(plan.durationDays)} dagar · förnyas inte automatiskt` : 'Ingen tidsgräns · engångsköp'}</dd>
             </div>
-            <div className="mt-1 flex items-baseline justify-between gap-3 text-[0.8125rem] text-ink-2">
-              <dt>Säljare</dt>
-              <dd className="text-right">{SELLER_NAME}</dd>
-            </div>
+            <SellerRow label="Säljare" value={SELLER_NAME} />
+            {SELLER_ORGNR && <SellerRow label="Org.nr" value={SELLER_ORGNR} />}
+            {SELLER_ADDRESS && <SellerRow label="Adress" value={SELLER_ADDRESS} />}
+            {SELLER_PHONE && <SellerRow label="Telefon" value={SELLER_PHONE} />}
+            <SellerRow label="E-post" value={SUPPORT_EMAIL} />
           </dl>
 
           <div>
@@ -373,7 +521,7 @@ export function CheckoutSheet({
               </span>
             </summary>
             <div className="pb-4 pt-1">
-              <TermsContent headingLevel={3} />
+              <TermsContent headingLevel={3} inSheet />
             </div>
           </details>
         </div>
@@ -513,14 +661,15 @@ export function LicenseActivation({ onActivated, submitLabel = 'Aktivera license
   )
 }
 
-/** Liten rad med säljare, support och moms – längst ned på köpsidan. */
+/** Liten rad med säljare, support och moms – längst ned på köpsidan (bara när Lagom säljs på webben). */
 export function SellerFooter() {
   return (
     <footer className="flex flex-col items-center gap-1 px-2 pt-2 text-center text-[0.8125rem] leading-relaxed text-ink-3">
-      <span className="inline-flex items-center gap-1.5">
-        <BadgeCheck aria-hidden className="size-4" />
-        Säljare: {SELLER_NAME} · Alla priser inkl. 25 % moms
+      <span className="inline-flex items-start gap-1.5">
+        <BadgeCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
+        <span>Säljare: {sellerLine({ email: false })}</span>
       </span>
+      <span>Alla priser inkl. 25 % moms</span>
       <span>
         Frågor om köp:{' '}
         <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-gran underline-offset-2 hover:underline">
@@ -558,5 +707,312 @@ export function PurchaseSuccess({ licenseKey, planName, next }: { licenseKey: st
       </div>
       <div className="mt-5">{next}</div>
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Köp i appen (App Store, Google Play)
+// ---------------------------------------------------------------------------
+
+/** Planerna utan kronor – i butiksapparna visar butiken priset. */
+const STORE_PLAN_TEXT: Record<'ar' | 'livstid', { name: string; text: string }> = {
+  ar: { name: 'Årslicens', text: 'Ett år · förnyas inte automatiskt' },
+  livstid: { name: 'Livstidslicens', text: 'Engångsköp · för alltid på dina enheter' },
+}
+
+function isPlanProduct(p: StoreProduct): p is StoreProduct & { id: 'ar' | 'livstid' } {
+  return p.id === 'ar' || p.id === 'livstid'
+}
+
+/**
+ * Köp i butiksapparna: köpet görs i App Store eller Google Play och priset visas av butiken.
+ * Inga kronpriser, ingen Stripe. Tills IAP-tillägget finns (se src/lib/storePurchases.ts) är
+ * köpknappen avstängd – "Återställ köp" finns alltid.
+ */
+export function StorePurchasePanel({ headingId, planIds }: { headingId?: string; planIds?: readonly PlanId[] }) {
+  const autoId = useId()
+  const hid = headingId ?? autoId
+  const store = getStorePurchases()
+  const available = store.available()
+  const [products, setProducts] = useState<StoreProduct[] | null>(null)
+  const [busy, setBusy] = useState<StoreProductId | null>(null)
+
+  useEffect(() => {
+    if (!available) return
+    let alive = true
+    store
+      .getProducts()
+      .then((list) => alive && setProducts(list.filter(isPlanProduct)))
+      .catch(() => alive && setProducts([]))
+    return () => {
+      alive = false
+    }
+  }, [available, store])
+
+  const buy = async (id: StoreProductId) => {
+    if (busy) return
+    setBusy(id)
+    const result = await buyInStore(id)
+    setBusy(null)
+    if (result === 'purchased') toast('Tack! Lagom är upplåst.', { tone: 'success' })
+    else if (result === 'pending') toast('Köpet väntar på godkännande i butiken. Lagom låses upp när det är klart.')
+    else if (result === 'failed') toast('Köpet kunde inte genomföras. Försök igen om en stund.', { tone: 'error' })
+  }
+
+  // Bara det som är värt att erbjuda (t.ex. inte årslicensen till den som redan har en färsk).
+  const offered = (id: 'ar' | 'livstid') => !planIds || planIds.includes(id)
+  const planList = products && products.length > 0 ? products.filter(isPlanProduct).filter((p) => offered(p.id)) : null
+
+  return (
+    <Card as="section" aria-labelledby={hid} padding="lg">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gran-soft text-gran">
+          <LockOpen className="size-5" strokeWidth={2.1} />
+        </span>
+        <div className="min-w-0">
+          <h2 id={hid} className="font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-ink">
+            Lås upp Lagom
+          </h2>
+          <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">Köpet görs i {storeName()}.</p>
+          <p className="text-[0.9375rem] leading-relaxed text-ink-2">Priset visas av butiken.</p>
+        </div>
+      </div>
+
+      {planList ? (
+        <ul className="mt-5 flex flex-col gap-3">
+          {planList.map((p) => (
+            <li key={p.id} className="flex flex-col gap-3 rounded-2xl bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-semibold text-ink">{p.title || STORE_PLAN_TEXT[p.id].name}</p>
+                <p className="text-[0.8125rem] leading-snug text-ink-3">
+                  {STORE_PLAN_TEXT[p.id].text}
+                  {p.displayPrice ? ` · ${p.displayPrice}` : ''}
+                </p>
+              </div>
+              <Button onClick={() => void buy(p.id)} loading={busy === p.id} disabled={busy !== null && busy !== p.id}>
+                Köp {(p.title || STORE_PLAN_TEXT[p.id].name).toLocaleLowerCase('sv-SE')}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <>
+          <ul className="mt-5 flex flex-col gap-2">
+            {(['ar', 'livstid'] as const).filter(offered).map((id) => (
+              <li key={id} className="flex items-start gap-2.5 text-[0.9375rem] leading-snug text-ink-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-good" strokeWidth={2.6} aria-hidden />
+                <span>
+                  <span className="font-semibold text-ink">{STORE_PLAN_TEXT[id].name}</span> · {STORE_PLAN_TEXT[id].text}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-5">
+            {available && products === null ? (
+              <Button fullWidth disabled>
+                <Spinner />
+                Hämtar priser från butiken …
+              </Button>
+            ) : (
+              <Button fullWidth disabled>
+                {available ? 'Köp' : 'Köp i appen kommer i nästa version'}
+              </Button>
+            )}
+            {available && products !== null && <p className="mt-2 text-[0.8125rem] leading-snug text-ink-3">Butiken svarar inte just nu. Försök igen om en stund.</p>}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
+        <p className="text-[0.875rem] leading-relaxed text-ink-2">Har du redan köpt Lagom, t.ex. på en annan telefon med samma konto?</p>
+        <div>
+          <RestorePurchasesButton />
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * Webben när webbförsäljningen är avstängd (`VITE_WEB_SALES=off`): Lagom köps i appbutikerna.
+ * En länk som saknas visas inte. Licensnycklar från tidigare webbköp fungerar som vanligt.
+ */
+export function StoreLinksPanel({ headingId }: { headingId?: string }) {
+  const autoId = useId()
+  const hid = headingId ?? autoId
+  const links = [
+    { href: APPSTORE_URL, label: 'Lagom i App Store' },
+    { href: PLAY_URL, label: 'Lagom i Google Play' },
+  ].filter((l) => l.href)
+  return (
+    <Card as="section" aria-labelledby={hid} padding="lg">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gran-soft text-gran">
+          <Smartphone className="size-5" strokeWidth={2.1} />
+        </span>
+        <div className="min-w-0">
+          <h2 id={hid} className="font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-ink">
+            Lagom köps i appbutikerna
+          </h2>
+          <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
+            Ladda ned Lagom och köp licensen i appen – priset visas av butiken. Ett köp i appen gäller i appen, inte i den här webbläsaren.
+          </p>
+        </div>
+      </div>
+      {links.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {links.map((l) => (
+            <ExternalLink
+              key={l.href}
+              href={l.href}
+              showIcon={false}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-gran px-5 text-[0.9375rem] font-semibold text-on-gran shadow-card transition-colors hover:bg-gran-strong"
+            >
+              {l.label}
+              <ExternalLinkIcon aria-hidden className="size-4" />
+            </ExternalLink>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-3">Länkarna till appbutikerna kommer snart.</p>
+      )}
+      <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-2">Har du redan en licensnyckel från ett webbköp? Den fungerar som vanligt – aktivera den längre ned.</p>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// "Tappat nyckeln?"
+// ---------------------------------------------------------------------------
+
+/**
+ * Hämta licensnyckeln från ett webbköp igen med e-post och kvittonummer. Visas bara där
+ * webbköpen har gjorts (`offersLicenseRecovery()`), aldrig i butiksapparna.
+ */
+export function LicenseRecovery() {
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [receipt, setReceipt] = useState('')
+  const [errors, setErrors] = useState<{ email?: string; receipt?: string; form?: string }>({})
+  const [busy, setBusy] = useState(false)
+  const [key, setKey] = useState<string | null>(null)
+  const [activating, setActivating] = useState(false)
+  const [activationError, setActivationError] = useState<string | null>(null)
+  const savedKey = useLicenseStore((s) => s.licenseKey)
+  const panelId = useId()
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (busy) return
+    const next: typeof errors = {}
+    if (!looksLikeEmail(email)) next.email = RECOVER_ERRORS.email
+    if (!receipt.trim()) next.receipt = RECOVER_ERRORS.receipt
+    setErrors(next)
+    if (next.email || next.receipt) return
+    setBusy(true)
+    try {
+      setKey(await recoverLicense(email, receipt))
+    } catch (err) {
+      setErrors({ form: err instanceof PurchaseError ? err.message : RECOVER_ERRORS.server })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const activate = async () => {
+    if (!key || activating) return
+    setActivating(true)
+    setActivationError(null)
+    const result = await activateLicense(key)
+    setActivating(false)
+    if (!result.ok) {
+      setActivationError(result.message)
+      return
+    }
+    toast(`${result.payload.plan === 'livstid' ? 'Livstidslicensen' : 'Årslicensen'} är aktiverad – tack!`, { tone: 'success' })
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-xl text-[0.9375rem] font-semibold text-gran underline-offset-2 hover:underline"
+      >
+        <KeyRound aria-hidden className="size-4" />
+        Tappat nyckeln?
+      </button>
+      {open && (
+        <div id={panelId} className="flex flex-col gap-3">
+          {key ? (
+            <>
+              <LicenseKeyBox licenseKey={key} intro="Här är din licensnyckel. Spara den på ett säkert ställe, t.ex. i din lösenordshanterare." />
+              {savedKey === key ? (
+                <p className="text-[0.875rem] leading-relaxed text-ink-2">Nyckeln är aktiverad på den här enheten.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {activationError && (
+                    <p role="alert" className="rounded-xl bg-lingon-soft px-3 py-2 text-[0.875rem] leading-snug text-ink">
+                      {activationError}
+                    </p>
+                  )}
+                  <div>
+                    <Button iconLeft={KeyRound} loading={activating} onClick={() => void activate()}>
+                      Aktivera på den här enheten
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+              <p className="text-[0.875rem] leading-relaxed text-ink-2">
+                Skriv e-postadressen du använde vid köpet och kvittonumret (eller ordernumret) från kvittot från Stripe, så hämtar vi din licensnyckel igen.
+              </p>
+              <TextField
+                label="E-post"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="off"
+                spellCheck={false}
+                value={email}
+                onValueChange={(v) => {
+                  setEmail(v)
+                  if (errors.email || errors.form) setErrors((x) => ({ ...x, email: undefined, form: undefined }))
+                }}
+                error={errors.email}
+              />
+              <TextField
+                label="Kvittonummer eller ordernummer"
+                hint="Står på kvittot från Stripe, t.ex. 1234-5678."
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                value={receipt}
+                onValueChange={(v) => {
+                  setReceipt(v)
+                  if (errors.receipt || errors.form) setErrors((x) => ({ ...x, receipt: undefined, form: undefined }))
+                }}
+                error={errors.receipt}
+              />
+              {errors.form && (
+                <p role="alert" className="rounded-xl bg-lingon-soft px-3 py-2 text-[0.875rem] leading-snug text-ink">
+                  {errors.form}
+                </p>
+              )}
+              <div>
+                <Button type="submit" variant="secondary" iconLeft={Mail} loading={busy}>
+                  Hämta min licensnyckel
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

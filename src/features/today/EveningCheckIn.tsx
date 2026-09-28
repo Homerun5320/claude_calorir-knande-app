@@ -3,13 +3,15 @@
  * markera dagen som klar (används av den adaptiva energiberäkningen). Visas efter klockan 18,
  * i medvetet läge eller när dagen redan har reflekterats.
  */
-import { memo, useId, useRef, useState } from 'react'
-import { CircleCheck, RotateCcw } from 'lucide-react'
+import { memo, useId, useMemo, useRef, useState } from 'react'
+import { CircleCheck, RotateCcw, Sprout } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Confetti } from '../../components/signature'
 import { Button, Card, toast } from '../../components/ui'
 import { DAY_SCALES, type ScaleDef, type ScaleKey } from '../../lib/dayMeta'
+import { focusWeekSummary, isWeekSummaryDay } from '../../lib/focusGoals'
 import { useDiaryStore } from '../../stores/diaryStore'
+import { useProfileStore } from '../../stores/profileStore'
 import type { DayMeta, ISODate } from '../../types'
 import { focusAfterRender } from '../diary/focus'
 import { useClock } from './hooks'
@@ -62,6 +64,35 @@ function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | u
   )
 }
 
+/**
+ * Söndagens summering av veckans fokus – en lugn rad om hur veckan gick, aldrig skuld.
+ * Visas bara på söndagar när ett fokus är valt.
+ */
+function FocusWeekSummary({ today, mindful }: { today: ISODate; mindful: boolean }) {
+  const focusId = useProfileStore((s) => s.settings.weeklyFocus?.id)
+  const entries = useDiaryStore((s) => s.entries)
+  const exercise = useDiaryStore((s) => s.exercise)
+  const todayComplete = useDiaryStore((s) => s.days[today]?.complete === true)
+  const sunday = isWeekSummaryDay(today)
+  const summary = useMemo(
+    () =>
+      sunday && focusId
+        ? focusWeekSummary(focusId, { entriesByDate: entries, exerciseByDate: exercise, today, todayComplete }, mindful)
+        : undefined,
+    [sunday, focusId, entries, exercise, today, todayComplete, mindful],
+  )
+  if (!summary) return null
+  return (
+    <div className="mb-4 flex items-start gap-2.5 rounded-2xl bg-surface-2 px-3.5 py-3" role="note" aria-label="Veckans fokus">
+      <Sprout className="mt-0.5 size-4 shrink-0 text-mossa" strokeWidth={2.2} aria-hidden="true" />
+      <p className="text-sm leading-relaxed text-ink-2">
+        <span className="font-semibold text-ink">Veckans fokus – </span>
+        {summary}
+      </p>
+    </div>
+  )
+}
+
 export const EveningCheckIn = memo(function EveningCheckIn({ today, mindful }: { today: ISODate; mindful: boolean }) {
   const now = useClock(60_000)
   const meta = useDiaryStore((s) => s.days[today] ?? EMPTY_META)
@@ -93,6 +124,7 @@ export const EveningCheckIn = memo(function EveningCheckIn({ today, mindful }: {
   return (
     <Card title="Hur har dagen varit?" eyebrow="Kvällsreflektion">
       <p className="-mt-1 mb-4 text-sm leading-relaxed text-ink-2">Inga rätt eller fel – bara en liten stund för dig.</p>
+      <FocusWeekSummary today={today} mindful={mindful} />
       <div className="space-y-4">
         {SCALES.map((def) => (
           <EmojiScale key={def.key} def={def} value={meta[def.key]} onChange={(v) => setValue(def.key, v)} />

@@ -107,7 +107,7 @@ describe('BodyPage', () => {
     useProfileStore.setState({ profile: { ...PROFILE, startWeightKg: 55, targetWeightKg: 48 } })
     renderPage()
     const note = (await screen.findByText(/rekommenderar inte att gå ner mer/)).closest('section') as HTMLElement
-    expect(within(note).getByRole('link', { name: 'Frisk & Fri' })).toHaveAttribute('href', 'https://www.friskfri.se')
+    expect(within(note).getByRole('link', { name: /^Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
     // Inget "Mot målet"/prognos när viktnedgången är pausad.
     expect(screen.queryByText('Mot målet')).not.toBeInTheDocument()
     fireEvent.click(within(note).getByRole('button', { name: 'Byt till att behålla vikten' }))

@@ -53,6 +53,7 @@ import { DEFAULT_MEALS, DEFAULT_SETTINGS } from '../stores/profileStore'
 import { NUTRIENT_KEYS } from './nutrients'
 import { VOLUME_ML, gramsFor } from './units'
 import { fromISODate, isValidISODate } from './dates'
+import { sanitizePlanData, type PlanData } from './planning'
 import { uid } from './id'
 import { plural } from './format'
 import { decodeLicense, normalizeLicenseKey } from './license'
@@ -78,6 +79,7 @@ export type BackupPart =
   | 'weights'
   | 'measurements'
   | 'fasts'
+  | 'plan'
 
 /** Vad som rättades eller hoppades över när säkerhetskopian lästes in. */
 export interface BackupRepairs {
@@ -106,6 +108,7 @@ const PART_NOUNS: Record<BackupPart, readonly [one: string, many: string]> = {
   weights: ['vägning', 'vägningar'],
   measurements: ['mätning', 'mätningar'],
   fasts: ['fasta', 'fastor'],
+  plan: ['planerad rad', 'planerade rader'],
 }
 
 /** Avsnittens namn när hela avsnittet var oläsbart. */
@@ -125,6 +128,7 @@ const SECTION_NAMES: Record<BackupPart, string> = {
   weights: 'vikterna',
   measurements: 'måtten',
   fasts: 'fastan',
+  plan: 'veckoplaneringen',
 }
 
 /** Läsbara rader om det som hoppas över, t.ex. ["2 dagboksposter", "vikterna (fel format)"]. */
@@ -1001,6 +1005,8 @@ export interface SanitizedBackupData {
   fasting: { active: { start: number; targetHours: number; protocol: string } | null; history: FastRecord[] }
   /** Licens och provperiod – saknas i säkerhetskopior från äldre versioner. */
   license?: { licenseKey: string | null; trialStartedAt: number | null }
+  /** Veckoplaneringen och inköpslistan – saknas i säkerhetskopior från äldre versioner. */
+  plan?: PlanData
 }
 
 /**
@@ -1167,6 +1173,25 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
     if (h) history.push(h)
   }
 
+  // Veckoplanering (saknas i äldre säkerhetskopior). Livsmedlen i planen kontrolleras som de
+  // egna livsmedlen.
+  let plan: PlanData | undefined
+  if (isObj(data.plan)) {
+    const checkFood = (raw: unknown): Food | null => {
+      try {
+        return sanitizeFood(raw, { fixed: false })
+      } catch {
+        return null
+      }
+    }
+    const result = sanitizePlanData(data.plan, { food: checkFood, now })
+    plan = result.data
+    skip(ctx, 'plan', result.skipped)
+    repairs.repaired += result.repaired
+  } else if (data.plan !== undefined && data.plan !== null) {
+    broken(ctx, 'plan')
+  }
+
   return {
     data: {
       profile: { profile, settings },
@@ -1175,6 +1200,7 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
       body: { weights, measurements },
       fasting: { active, history },
       ...(license ? { license } : {}),
+      ...(plan ? { plan } : {}),
     },
     repairs,
   }

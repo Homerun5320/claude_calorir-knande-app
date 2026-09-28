@@ -13,7 +13,7 @@
  * hämtar näringsvärden för varje livsmedel med högst 4 samtidiga anrop, gör omförsök med
  * exponentiell backoff (och respekterar Retry-After) och skriver en kompakt JSON-fil:
  *
- *   { "meta": { source, attribution, version, generatedAt, count, … }, "foods": [Food, …] }
+ *   { "meta": { source, attribution, license, licenseUrl, version, generatedAt, count, … }, "foods": [Food, …] }
  *
  * Appen läser filen lazy via src/lib/foodRepo.ts (livsmedlen får källan "livsmedelsverket").
  *
@@ -26,7 +26,10 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export const API_BASE = 'https://dataportal.livsmedelsverket.se/livsmedel/api/v1'
-export const ATTRIBUTION = 'Källa: Livsmedelsverkets livsmedelsdatabas'
+// Livsmedelsverket publicerar databasen under CC BY 4.0 – källan och licensen ska anges.
+export const ATTRIBUTION = 'Källa: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0)'
+export const LICENSE = 'CC BY 4.0'
+export const LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/deed.sv'
 const USER_AGENT = 'Lagom-livsmedelsimport/1.0 (Node.js; engångsimport av öppna data)'
 const KJ_PER_KCAL = 4.184
 
@@ -694,6 +697,8 @@ export async function run(opts = {}) {
   const meta = {
     source: 'Livsmedelsverkets livsmedelsdatabas',
     attribution: ATTRIBUTION,
+    license: LICENSE,
+    licenseUrl: LICENSE_URL,
     url: 'https://soknaringsinnehall.livsmedelsverket.se/',
     api: baseUrl,
     version: localDate(),

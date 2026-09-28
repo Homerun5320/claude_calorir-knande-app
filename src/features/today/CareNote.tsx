@@ -4,13 +4,10 @@
  */
 import type { ReactNode } from 'react'
 import { HeartHandshake } from 'lucide-react'
+import { ExternalLink } from '../../components/ui'
 
 function SupportLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
-      {children}
-    </a>
-  )
+  return <ExternalLink href={href}>{children}</ExternalLink>
 }
 
 export function CareNote({ children, className = '' }: { children: ReactNode; className?: string }) {

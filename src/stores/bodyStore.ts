@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ISODate, MeasurementEntry, WeightEntry } from '../types'
 import { uid } from '../lib/id'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 interface BodyState {
   /** Sorterad stigande på datum. Högst en vikt per dag (senaste ersätter). */
@@ -37,7 +37,13 @@ export const useBodyStore = create<BodyState>()(
       removeMeasurement: (id) => set({ measurements: get().measurements.filter((m) => m.id !== id) }),
       clearBody: () => set({ weights: [], measurements: [] }),
     }),
-    { name: STORE_KEYS.body, storage: idbStorage, version: 1 },
+    {
+      name: STORE_KEYS.body,
+      storage: idbStorage,
+      version: PERSIST_VERSIONS[STORE_KEYS.body],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as BodyState,
+    },
   ),
 )
 

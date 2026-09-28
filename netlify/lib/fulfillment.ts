@@ -5,20 +5,44 @@
  * sätta, med den hemliga nyckeln) och kontrolleras mot det som faktiskt betalades.
  * Den utfärdade nyckeln sparas på betalningen i Stripe (metadata "lagom_license"), så att samma
  * köp alltid ger exakt samma nyckel och supporten kan hitta den i Stripes dashboard.
+ *
+ * Återbetalda och bestridda köp ger ingen licens (koden 'aterbetald'). Se `revocationOf`.
  */
-import type { LicensePayload } from '../../src/lib/license.ts'
+import { decodeLicense, type LicensePayload } from '../../src/lib/license.ts'
 import type { ServerConfig } from './config.ts'
-import { isIssuedLicenseValid, issueLicense, licensePayloadFor, publicKeyFromPrivate } from './licensing.ts'
+import { isIssuedLicenseValid, issueLicense, licenseKid, licensePayloadFor, publicKeyFromPrivate } from './licensing.ts'
 import { CURRENCY, SERVER_PLANS, isPlanId, priceInOre, type PlanId } from './plans.ts'
-import { StripeError, stripeRequest, type FetchLike, type StripeCheckoutSession, type StripePaymentIntent } from './stripe.ts'
+import {
+  StripeError,
+  stripeRequest,
+  type FetchLike,
+  type StripeCharge,
+  type StripeCheckoutSession,
+  type StripeDispute,
+  type StripeDisputeStatus,
+  type StripeList,
+  type StripePaymentIntent,
+} from './stripe.ts'
 
 /** Markering i metadata som skiljer Lagoms köp från annat som säljs på samma Stripe-konto. */
 export const APP_MARKER = 'lagom'
 /** Metadata-nyckeln på betalningen (PaymentIntent) där licensnyckeln sparas. */
 export const LICENSE_METADATA_KEY = 'lagom_license'
+/**
+ * Metadata-nyckeln på betalningen som spärrar eller släpper licensen: '1' = spärrad (sätts av
+ * webhooken vid full återbetalning eller tvist, eller av supporten), '0' = gäller ändå (supportens
+ * undantag, t.ex. en återbetalning av goodwill där kunden får behålla licensen).
+ */
+export const REVOKED_METADATA_KEY = 'lagom_revoked'
 
 /** Stripes Checkout-id: cs_test_… eller cs_live_… */
 export const SESSION_ID_RE = /^cs_(test|live)_[A-Za-z0-9]{8,250}$/
+
+/**
+ * Tvister där pengarna har dragits tillbaka från oss (eller återbetalats direkt, "prevented").
+ * Förfrågningar (warning_*) och tvister som vi har vunnit spärrar inte licensen.
+ */
+export const REVOKING_DISPUTES: ReadonlySet<StripeDisputeStatus> = new Set<StripeDisputeStatus>(['needs_response', 'under_review', 'lost', 'prevented'])
 
 export interface Logger {
   info(message: string, data?: Record<string, unknown>): void
@@ -58,7 +82,69 @@ export function validatePaidSession(session: StripeCheckoutSession, cfg: Pick<Se
   return { ok: true, plan: plan.id }
 }
 
-export type FulfillCode = 'hittades-inte' | SessionProblem | 'utgangen' | 'ej-konfigurerad' | 'betaltjanst-fel'
+// ---------------------------------------------------------------------------
+// Återbetalda och bestridda köp
+// ---------------------------------------------------------------------------
+
+/** true när hela beloppet har betalats tillbaka. En delvis återbetalning (prisavdrag) räknas inte. */
+export function isFullyRefunded(charge: Pick<StripeCharge, 'refunded' | 'amount' | 'amount_refunded'>): boolean {
+  return charge.refunded === true || (charge.amount > 0 && charge.amount_refunded >= charge.amount)
+}
+
+/** true om betalningen tillhör Lagom (metadata app=lagom, satt när köpet skapades). */
+export function isLagomIntent(intent: Pick<StripePaymentIntent, 'metadata'> | null | undefined): boolean {
+  return intent?.metadata?.app === APP_MARKER
+}
+
+export type RevocationReason = 'markerad' | 'aterbetald' | 'bestriden'
+
+/**
+ * Varför licensen för ett köp inte gäller, eller null om den gäller. Kräver att
+ * `latest_charge` är expanderad på betalningen. Ordning:
+ * 1. `lagom_revoked` = '0' → gäller alltid (supportens undantag), '1' → spärrad.
+ * 2. Hela beloppet återbetalt → spärrad.
+ * 3. Bestriden: tvisterna för debiteringen hämtas från Stripe. Spärrad om någon av dem har
+ *    dragit tillbaka pengarna (se `REVOKING_DISPUTES`) – inte vid förfrågningar eller vunna tvister.
+ * Kastar StripeError om tvisterna inte kunde hämtas.
+ */
+export async function revocationOf(
+  intent: StripePaymentIntent,
+  opts: { secretKey: string; fetch?: FetchLike },
+): Promise<RevocationReason | null> {
+  const marker = intent.metadata?.[REVOKED_METADATA_KEY]
+  if (marker === '0') return null
+  if (marker === '1') return 'markerad'
+  const charge = typeof intent.latest_charge === 'object' && intent.latest_charge !== null ? intent.latest_charge : null
+  if (!charge) return null
+  if (isFullyRefunded(charge)) return 'aterbetald'
+  if (charge.disputed === true) {
+    const disputes = await stripeRequest<StripeList<StripeDispute>>({
+      method: 'GET',
+      path: '/disputes',
+      params: { charge: charge.id, limit: 10 },
+      secretKey: opts.secretKey,
+      fetch: opts.fetch,
+    })
+    if ((disputes.data ?? []).some((d) => REVOKING_DISPUTES.has(d.status))) return 'bestriden'
+  }
+  return null
+}
+
+/**
+ * Köp-id (Checkout-sessionens id) för en betalning, ur licensen som sparats på den. null om
+ * ingen licens har sparats.
+ */
+export function sessionIdFromIntent(intent: Pick<StripePaymentIntent, 'metadata'>): string | null {
+  const stored = intent.metadata?.[LICENSE_METADATA_KEY]
+  const id = stored ? decodeLicense(stored)?.id : undefined
+  return id && SESSION_ID_RE.test(id) ? id : null
+}
+
+// ---------------------------------------------------------------------------
+// Utfärdande
+// ---------------------------------------------------------------------------
+
+export type FulfillCode = 'hittades-inte' | SessionProblem | 'aterbetald' | 'utgangen' | 'ej-konfigurerad' | 'betaltjanst-fel'
 
 export type FulfillResult =
   | { ok: true; licenseKey: string; payload: LicensePayload; reused: boolean; livemode: boolean }
@@ -72,6 +158,9 @@ export interface FulfillContext {
   log: Logger
 }
 
+/** Expansionerna som `fulfillSession` behöver (rader, betalning och senaste debiteringen). */
+export const SESSION_EXPAND = ['line_items', 'payment_intent', 'payment_intent.latest_charge']
+
 /**
  * Hämta sessionen från Stripe, kontrollera köpet och lämna ut licensnyckeln. Idempotent: en
  * nyckel som redan har sparats på betalningen återanvänds så länge den är giltig.
@@ -83,7 +172,7 @@ export async function fulfillSession(sessionId: string, ctx: FulfillContext): Pr
     session = await stripeRequest<StripeCheckoutSession>({
       method: 'GET',
       path: `/checkout/sessions/${encodeURIComponent(sessionId)}`,
-      params: { expand: ['line_items', 'payment_intent'] },
+      params: { expand: SESSION_EXPAND },
       secretKey: cfg.stripeSecretKey,
       fetch: ctx.fetch,
     })
@@ -103,22 +192,41 @@ export async function fulfillSession(sessionId: string, ctx: FulfillContext): Pr
     return { ok: false, code: check.code }
   }
 
-  const payload = licensePayloadFor(session.id, check.plan, session.created)
-  if (payload.exp !== undefined && payload.exp * 1000 <= ctx.now) return { ok: false, code: 'utgangen' }
+  const intent = typeof session.payment_intent === 'object' && session.payment_intent !== null ? session.payment_intent : null
+  const intentId = typeof session.payment_intent === 'string' ? session.payment_intent : intent?.id
+
+  // Återbetalt eller bestritt köp: ingen licens. Bara id:n loggas, inga personuppgifter.
+  if (intent) {
+    let reason: RevocationReason | null
+    try {
+      reason = await revocationOf(intent, { secretKey: cfg.stripeSecretKey, fetch: ctx.fetch })
+    } catch (e) {
+      log.error('Kunde inte kontrollera tvister för köpet', { session: session.id, betalning: intent.id, fel: errorText(e) })
+      return { ok: false, code: 'betaltjanst-fel' }
+    }
+    if (reason) {
+      log.warn('Köpet är återbetalt eller bestritt – ingen licens lämnas ut', { session: session.id, betalning: intent.id, orsak: reason })
+      return { ok: false, code: 'aterbetald' }
+    }
+  }
+
+  const base = licensePayloadFor(session.id, check.plan, session.created)
+  if (base.exp !== undefined && base.exp * 1000 <= ctx.now) return { ok: false, code: 'utgangen' }
 
   let publicKey: string
+  let kid: string
   try {
     publicKey = await publicKeyFromPrivate(cfg.licensePrivateKey)
+    kid = await licenseKid(publicKey)
   } catch {
     log.error('LICENSE_PRIVATE_KEY är ingen giltig ECDSA P-256-nyckel (PKCS#8, base64)')
     return { ok: false, code: 'ej-konfigurerad' }
   }
+  const payload = licensePayloadFor(session.id, check.plan, session.created, kid)
 
-  const intent = typeof session.payment_intent === 'object' && session.payment_intent !== null ? session.payment_intent : null
-  const intentId = typeof session.payment_intent === 'string' ? session.payment_intent : intent?.id
   const stored = intent?.metadata?.[LICENSE_METADATA_KEY]
   if (stored && (await isIssuedLicenseValid(stored, payload, publicKey))) {
-    return { ok: true, licenseKey: stored, payload, reused: true, livemode: session.livemode }
+    return { ok: true, licenseKey: stored, payload: decodeLicense(stored) ?? payload, reused: true, livemode: session.livemode }
   }
 
   let licenseKey: string

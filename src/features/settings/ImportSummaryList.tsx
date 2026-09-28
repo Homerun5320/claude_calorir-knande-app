@@ -1,17 +1,29 @@
 /**
- * Vad en säkerhetskopia innehåller – visas innan man importerar (Inställningar → Data och
- * välkomstflödet). Skadade delar som hoppas över (se `parseBackup`) nämns lugnt under listan.
+ * Vad en import innehåller – visas innan man importerar (Inställningar → Data och
+ * välkomstflödet).
+ *
+ * - `kind="backup"` (standard): en säkerhetskopia från Lagom. Skadade delar som hoppas över
+ *   (se `parseBackup`) nämns lugnt under listan.
+ * - `kind="annan-app"`: en export från en annan app (CSV eller zip) – dagar med mat, vägningar och
+ *   kroppsmått, och hur många rader som inte gick att läsa.
  */
 import type { ImportSummary } from '../../lib/backup'
 import { formatNumber, plural } from '../../lib/format'
 
-export function ImportSummaryList({ summary }: { summary: ImportSummary }) {
-  const rows: Array<[string, string]> = [
-    ['Dagbok', `${plural(summary.days, 'dag', 'dagar')} · ${plural(summary.entries, 'post', 'poster')}`],
-    ['Vikt', plural(summary.weights, 'vägning', 'vägningar')],
-    ['Egna livsmedel', formatNumber(summary.customFoods)],
-    ['Recept', formatNumber(summary.recipes)],
-  ]
+export function ImportSummaryList({ summary, kind = 'backup' }: { summary: ImportSummary; kind?: 'backup' | 'annan-app' }) {
+  const rows: Array<[string, string]> =
+    kind === 'annan-app'
+      ? [
+          ['Mat', `${plural(summary.days, 'dag', 'dagar')} · ${plural(summary.entries, 'måltid', 'måltider')}`],
+          ['Vikt', plural(summary.weights, 'vägning', 'vägningar')],
+          ['Kroppsmått', plural(summary.measurements ?? 0, 'mätning', 'mätningar')],
+        ]
+      : [
+          ['Dagbok', `${plural(summary.days, 'dag', 'dagar')} · ${plural(summary.entries, 'post', 'poster')}`],
+          ['Vikt', plural(summary.weights, 'vägning', 'vägningar')],
+          ['Egna livsmedel', formatNumber(summary.customFoods)],
+          ['Recept', formatNumber(summary.recipes)],
+        ]
   const skipped = summary.skippedDetails ?? []
   return (
     <>
@@ -23,12 +35,18 @@ export function ImportSummaryList({ summary }: { summary: ImportSummary }) {
           </div>
         ))}
       </dl>
-      {(skipped.length > 0 || summary.repaired > 0) && (
-        <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
-          {skipped.length > 0 && <>En del av filen är skadad och hoppas över: {skipped.join(', ')}. Resten går att importera. </>}
-          {summary.repaired > 0 && <>{plural(summary.repaired, 'post', 'poster')} med småfel rättas automatiskt.</>}
-        </p>
-      )}
+      {kind === 'annan-app'
+        ? summary.skipped > 0 && (
+            <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
+              {plural(summary.skipped, 'rad', 'rader')} gick inte att läsa (t.ex. utan datum eller med orimliga värden) och hoppas över.
+            </p>
+          )
+        : (skipped.length > 0 || summary.repaired > 0) && (
+            <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">
+              {skipped.length > 0 && <>En del av filen är skadad och hoppas över: {skipped.join(', ')}. Resten går att importera. </>}
+              {summary.repaired > 0 && <>{plural(summary.repaired, 'post', 'poster')} med småfel rättas automatiskt.</>}
+            </p>
+          )}
     </>
   )
 }

@@ -10,8 +10,13 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Download, Sprout } from 'lucide-react'
 import { Button, Card, cx } from '../../components/ui'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
-import { daysText, formatLongDate, priceSummary, trialBannerLevel } from './premiumLogic'
+import { daysText, formatLongDate, priceSummaryText, trialBannerLevel } from './premiumLogic'
 import { TRIAL_DAYS } from '../../config/commerce'
+
+function expiredTitle(status: AccessStatus): string {
+  if (status.kind === 'utgangen' && status.revoked) return 'Licensen har återkallats'
+  return status.kind === 'utgangen' && status.licenseExpired ? 'Årslicensen har gått ut' : 'Provperioden är slut'
+}
 
 export const TrialBanner = memo(function TrialBanner({ className }: { className?: string }) {
   const { status, checking } = useAccess()
@@ -48,7 +53,7 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
             <div className="min-w-0">
               <p className="font-semibold text-ink">{daysText(status.daysLeft)} kvar av provperioden</p>
               <p className="mt-0.5 text-[0.875rem] leading-snug text-ink-2">
-                All din data finns kvar efter provperioden. Vill du fortsätta logga: {priceSummary()}.
+                All din data finns kvar efter provperioden. Vill du fortsätta logga: {priceSummaryText()}.
               </p>
             </div>
           </div>
@@ -64,10 +69,11 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
   return (
     <Card tone="sol" padding="md" className={className} as="section" aria-labelledby={headingId}>
       <h2 id={headingId} className="font-display text-[1.1875rem] font-semibold leading-snug tracking-tight text-ink">
-        {status.kind === 'utgangen' && status.licenseExpired ? 'Årslicensen har gått ut' : 'Provperioden är slut'} – din data finns kvar
+        {expiredTitle(status)} – din data finns kvar
       </h2>
       <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        Du kan se, exportera och radera allt som vanligt. För att logga nytt behöver du en licens: {priceSummary()}, utan automatisk förnyelse.
+        {status.kind === 'utgangen' && status.revoked ? 'Köpet återbetalades, så licensen gäller inte längre. Kontakta support om det är fel. ' : ''}
+        Du kan se, exportera och radera allt som vanligt. För att logga nytt behöver du en licens: {priceSummaryText()}, utan automatisk förnyelse.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button to="/premium" size="sm" iconLeft={Sprout}>
@@ -89,6 +95,7 @@ export function premiumStatusLine(status: AccessStatus): string {
     case 'prov':
       return `Provperiod · ${daysText(status.daysLeft)} kvar`
     case 'utgangen':
+      if (status.revoked) return 'Licensen har återkallats · din data finns kvar'
       return status.licenseExpired ? 'Licensen har gått ut · din data finns kvar' : 'Provperioden är slut · din data finns kvar'
     case 'licensierad':
       return status.expiresAt === undefined

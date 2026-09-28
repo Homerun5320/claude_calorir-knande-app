@@ -43,8 +43,18 @@ describe('energyRows', () => {
     const { parts, total, rows } = sum(energy, 'kcal')
     expect(total).toBe(1670)
     expect(parts).toBe(total)
-    // Avrundningen läggs på justeringen: 2 223 − 553 = 1 670.
-    expect(rows.find((r) => r.label === 'Justering för ditt mål')?.value).toBe('−553 kcal')
+    // Den valda justeringen visas som den är, och avrundningen läggs på förbrukningen: ca 2 220 − 550 = 1 670.
+    expect(rows.find((r) => r.label === 'Justering för ditt mål')?.value).toBe('−550 kcal')
+    expect(rows.find((r) => r.label === 'Förbrukning per dag')?.value).toBe('ca 2\u00a0220 kcal')
+  })
+
+  it('i kJ: den valda justeringen räknas om, förbrukningen tar avrundningen', () => {
+    const energy: EnergyBreakdown = { ...computeEnergy(base, 70, { today: TODAY }), tdee: 2223, adjustment: -550, kcal: 1670, atFloor: false, lifeStageKcal: 0 }
+    const { parts, total, rows } = sum(energy, 'kJ')
+    expect(parts).toBe(total)
+    // −550 kcal = −2 301 kJ; 1 670 kcal = 6 987 kJ.
+    expect(rows.find((r) => r.label === 'Justering för ditt mål')?.value).toBe('−2\u00a0301 kJ')
+    expect(rows.find((r) => r.label === 'Förbrukning per dag')?.value).toBe('ca 9\u00a0288 kJ')
   })
 
   it('går jämnt upp för många profiler, i både kcal och kJ', () => {

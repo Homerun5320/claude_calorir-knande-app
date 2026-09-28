@@ -62,6 +62,8 @@ export function Stat({ label, value, unit, sublabel, trend, size = 'md', align =
         >
           {value}
         </span>
+        {/* Mellanslaget syns inte i flexlayouten, men skärmläsare och kopiering får "2,4 kg" i stället för "2,4kg". */}
+        {unit !== undefined && ' '}
         {unit !== undefined && <span className="text-sm font-medium text-ink-3">{unit}</span>}
       </div>
       {(sublabel !== undefined || trend !== undefined) && (

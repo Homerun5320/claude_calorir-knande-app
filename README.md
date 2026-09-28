@@ -1,16 +1,16 @@
 # Lagom – kaloriräknaren
 
-> *Lagom är bäst.* En svensk kalori- och näringsdagbok som är vacker, komplett, gratis och privat.
+> *Lagom är bäst.* En svensk kalori- och näringsdagbok som är vacker, komplett och privat – gratis att prova i 14 dagar.
 
-Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för den svenska marknaden och har svenska livsmedel, svenska köksmått (dl, msk, tsk, krm), Livsmedelsverkets kostråd, Tallriksmodellen och de nordiska näringsrekommendationerna (NNR 2023). Allt fungerar offline, och ingen data lämnar telefonen.
+Lagom är en installerbar webbapp (PWA) för mobil och dator, och förbereds för App Store (iPhone) och Google Play. Den är byggd för den svenska marknaden och vuxna (18+), och har svenska livsmedel, svenska köksmått (dl, msk, tsk, krm), Livsmedelsverkets kostråd, Tallriksmodellen och de nordiska näringsrekommendationerna (NNR 2023). Allt fungerar offline, och dagboken lämnar aldrig enheten.
 
 ## Så löser Lagom problemen med andra kaloriappar
 
 | Problem i vanliga kaloriappar | Så gör Lagom |
 | --- | --- |
-| Crowdsourcade databaser med dubbletter och 15–30 % fel | Kurerad svensk databas med 855 livsmedel baserad på Livsmedelsverkets värden – en rad per vardagsbegrepp (Kycklingbröst, Pasta, Havredryck) i stället för sex nästan likadana varianter. Varje fil är oberoende faktagranskad, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
+| Crowdsourcade databaser med dubbletter och felaktiga värden | Kurerad svensk databas med 855 livsmedel baserad på Livsmedelsverkets värden – en rad per vardagsbegrepp (Kycklingbröst, Pasta, Havredryck) i stället för sex nästan likadana varianter. Varje fil är oberoende faktagranskad, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
 | Okända näringsvärden visas som 0 | Okänt visas som "–", och appen visar hur fullständiga näringsdata är. |
-| Betalvägg för streckkoder, makromål och export – och prenumerationer som är svåra att säga upp | 14 dagar gratis, sedan engångsköp 599 kr eller årslicens 299 kr utan automatisk förnyelse – ingen reklam, inga dolda avgifter. Allt ingår: streckkodsläsaren, alla näringsämnen, recept, export och insikter. Din data låses aldrig – efter provperioden kan du alltid se, exportera och radera den. |
+| Betalvägg för streckkoder, makromål och export – och prenumerationer som är svåra att säga upp | 14 dagar gratis att prova, sedan Årslicens 349 kr eller Livstidslicens 699 kr (engångsköp) utan automatisk förnyelse – ingen reklam, inga dolda avgifter. Allt ingår: streckkodsläsaren, alla näringsämnen, recept, export och insikter. Din data låses aldrig – efter provperioden kan du alltid se, exportera och radera den. |
 | Reklam och uppsäljning | Ingen reklam, inga konton, inga prenumerationer. |
 | Krascher, synkfel och dataförlust | Allt lagras lokalt och appen fungerar offline. Säkerhetskopiering till fil (JSON) och export till Excel (CSV). |
 | Engelska mått och utländska livsmedel | Svenska livsmedel och klassiker (knäckebröd, falukorv, kanelbulle, ärtsoppa …) och svenska köksmått omräknade med densitet ("2 dl havregryn" blir rätt vikt). Kött, fisk, pasta och ris kan vägas råa eller okokta ("150 g rå", "1 dl okokt") – Lagom räknar om till tillagad vikt. |
@@ -19,18 +19,19 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator. Den är byggd för
 | Överskattade träningskalorier | Nettokalorier (MET − vila). Du väljer själv hur stor andel som läggs till dagens budget. |
 | Recept blir fel efter tillagning | Recept räknas på tillagad vikt ("väg grytan när den är klar"). |
 | Dömande ton som kan skada vid ätstörningar | Varm och icke-dömande ton, ett medvetet läge utan siffror, säkerhetsgolv för kalorier, ingen viktnedgång vid graviditet, amning eller under 18 år, och hänvisning till 1177 och Frisk & Fri. |
-| Integritet | Ingen server och inget konto. Datan stannar i din telefon (GDPR), och du kan exportera eller radera allt när som helst. |
+| Integritet | Inget konto och ingen server med dagböcker. Datan stannar på din enhet, och du kan exportera eller radera allt när som helst. |
 
 ## Funktioner
 
 - **Idag**: dagsringen (kcal kvar med makrofärger), makron, måltider, vatten, dagens tallrik, veckoöversikt, tips och svensk matkalender (t.ex. Kanelbullens dag).
 - **Dagbok**: måltider (frukost, lunch, fika, middag, kvällsmat, mellanmål) med redigering, flytta/kopiera, mallar, anteckningar och mående.
 - **Lägg till**: sök, streckkodsläsare (Open Food Facts), snabbregistrering, egna livsmedel och portionsväljare med svenska mått, "g rå" och "dl okokt". Samlingsvärden för produkttyper med många märken och Livsmedelsverkets övriga livsmedel i en egen sektion (se [Livsmedelsdatabasen](#livsmedelsdatabasen)).
-- **Recept**: egna recept med tillagad vikt och 35 svenska klassiker.
+- **Recept**: egna recept med tillagad vikt, 35 svenska klassiker och import från en receptlänk (`/recept/importera`).
+- **Veckoplanering** (`/planering`): planera veckans måltider och få en inköpslista. Recept planeras med portioner att laga och portioner du äter. Listan grupperas per butiksavdelning, kött, pasta och ris står i rå eller okokt vikt, och den kan delas eller kopieras. Allt sparas lokalt (`lagom-plan`) och följer med i säkerhetskopian.
 - **Vikt & mått**: trendvikt, prognos för måldatum, BMI och midja/längd-kvot samt adaptiv förbrukning.
-- **Insikter**: näring mot NNR 2023, Livsmedelsverkets kostråd, Tallriksmodellen, klimatavtryck (kg CO2e) och mönster.
+- **Insikter**: näring mot NNR 2023, Livsmedelsverkets kostråd, Tallriksmodellen, klimatavtryck (kg CO2e) och mönster – och en rapport att skriva ut (`/rapport`, bara på webben).
 - **Träning, dryck och fasta**: aktiviteter med MET-värden (längdskidor, innebandy, padel …), vatten, koffein, alkohol i standardglas och en fastetimer.
-- **Inställningar**: mål, måltider, tema, medvetet läge samt export/import och radering.
+- **Inställningar**: mål, måltider, tema, medvetet läge samt export/import och radering. Integritetspolicyn (`/integritet`) och köp- och användarvillkoren (`/villkor`) finns i appen och som fristående sidor.
 
 ## Livsmedelsdatabasen
 
@@ -44,19 +45,88 @@ Lagoms egen databas (`src/data/foods/`) har 855 kurerade livsmedel med svenska n
 
 ## Kvalitet
 
-- 1 383 automatiska tester (vitest), bland annat en säkerhetsmatris som prövar 40 000 slumpade profiler mot reglerna för kalorimål.
+- Drygt 2 200 automatiska tester (vitest), bland annat en säkerhetsmatris som prövar 40 000 slumpade profiler mot reglerna för kalorimål. CI (`.github/workflows/ci.yml`) kör typkontroll, lint, tester och bygge på varje ändring.
 - Granskad ur fem perspektiv: funktionstest i webbläsare, kodgranskning, design och svensk text, tillgänglighet (WCAG 2.2 AA) samt näringslära och säkerhet.
 - Fungerar från 320 px mobilbredd till stor skärm, i ljust och mörkt läge.
 
 ## Prova utan att mata in något
 
-Välj **Utforska med exempeldata** på välkomstskärmen. Då fylls appen med två veckor av en påhittad användares svenska vardagsmat. Exempeldata kan rensas under Inställningar → Data.
+Välj **Utforska med exempeldata** på välkomstskärmen. Då fylls appen med två veckor av en påhittad användares svenska vardagsmat. Exemplet är skrivskyddat och startar ingen provperiod – den startar först när du skapar din egen profil. Exempeldata kan rensas under Inställningar → Data.
 
 ## Betalning och licenser
 
-Lagom är gratis att prova i 14 dagar. Sedan köper man en **Livstidslicens (599 kr)** eller en **Årslicens (299 kr, 365 dagar, förnyas inte automatiskt)**. Priserna är inklusive moms. Köpet görs via Stripe Checkout (kort, Klarna, Swish) och ger en signerad licensnyckel som appen kontrollerar offline – inget konto behövs. Serverdelen är tre små Netlify Functions utan databas.
+Lagom är gratis att prova i 14 dagar. Sedan köper man en **Årslicens (349 kr, 365 dagar, förnyas inte automatiskt)** eller en **Livstidslicens (699 kr, engångsköp)**. Livstid betyder för alltid, och felrättningar ingår – men inte ett löfte om alla framtida funktioner. Priserna på webben är inklusive moms (se [Moms](#moms) nedan).
+
+- **På webben** görs köpet via Stripe Checkout (kort, Klarna, Swish) och ger en signerad licensnyckel som appen kontrollerar offline – inget konto behövs. Återbetalda köp spärras med en signerad spärrlista, och den som tappat nyckeln kan hämta den igen med e-post och kvittonummer.
+- **I App Store och Google Play** görs köpet bara i appen (Apple IAP respektive Google Play Billing), och priset kommer från butiken. I App Store-bygget går det inte att klistra in licensnycklar – köp återställs via Apple-ID med "Återställ köp", och den som köpt på webben får en erbjudandekod via supporten. Köp i appen är ännu inte inkopplat (se [Plattformar och butiker](#plattformar-och-butiker)).
+
+Serverdelen är sex små Netlify Functions utan databas: `create-checkout`, `verify-purchase`, `stripe-webhook`, `recover-license`, `license-revocations` och `recipe-fetch` (receptimporten). De publika adresserna har anropsbegränsning i `netlify.toml`.
 
 Så sätter du upp Stripe och Netlify, testar köpflödet och går live: [`docs/BETALNING.md`](docs/BETALNING.md). Alla miljövariabler finns i [`.env.example`](.env.example).
+
+### Säljarens uppgifter
+
+Lagom säljs av en enskild firma. Köparen måste få säljarens uppgifter före köpet (distansavtalslagen), så skarpa byggen (`VITE_COMMERCE_MODE=live`) och butiksbyggen **stoppas** tills de här variablerna är ifyllda. De visas i appen, på fakturan och på de fristående sidorna `integritet/`, `villkor/`, `support/` och `radera-konto/`, där platshållarna (`[Företagsnamn]` …) fylls i vid bygget:
+
+| Variabel | Vad |
+| --- | --- |
+| `VITE_SELLER_NAME` | Ditt namn eller firmanamnet |
+| `VITE_SELLER_ORGNR` | Organisationsnummer – för enskild firma ditt personnummer |
+| `VITE_SELLER_ADDRESS` | Postadress |
+| `VITE_SELLER_PHONE` | Telefonnummer |
+| `VITE_SUPPORT_EMAIL` | En riktig e-postadress (inte `example.invalid` eller `example.se`) |
+| `VITE_SELLER_VAT` | Frivillig: momsregistreringsnummer, bara om firman är momsregistrerad |
+
+Ett **produktionsbygge på Netlify i testläge** stoppas också. Förhandsvisningar och grenbyggen får testläget via `netlify.toml`; för _Production_ sätter du `LAGOM_ALLOW_TEST_COMMERCE=1` i Netlify tills skarpt läge är klart, och tar bort den när du börjar sälja.
+
+### Moms
+
+Priserna och kvittot utgår i dag från 25 % moms. **Beslut som saknas:** är den enskilda firman inte momsregistrerad (momsbefrielse vid omsättning under 120 000 kr per år) får "inkl. 25 % moms" och "varav moms" inte visas, och Stripe ska inte ta ut moms. Det kräver ändringar i köpsidan, kvittot, villkoren (`src/features/legal/legalContent.ts`) och Stripe-priserna – kontrollera med Skatteverket innan försäljningen börjar.
+
+## Plattformar och butiker
+
+Samma kod körs på webben, i Google Play-appen och i iPhone-appen. Bygget styrs av `VITE_DISTRIBUTION` (`web`, `appstore` eller `play`) och körmiljön avgörs i `src/config/platform.ts` (`sellsOnWeb`, `isInApp`, `allowsLicenseKeyEntry` …). Play-appen är ett TWA-skal runt webbversionen och använder webbygget; `play` är reserverat för ett eventuellt inbyggt Android-bygge.
+
+| Bygge | Kommando | Hamnar i | Köp |
+| --- | --- | --- | --- |
+| Webben (och Google Play-appen, som är ett TWA-skal runt webben) | `npx vite build` | `dist/` | Stripe på webben; i Play-appen Google Play Billing |
+| iPhone (App Store, Capacitor) | `VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> npx vite build` | `dist-native/` | Bara köp i appen |
+
+Butiksbygget kräver dessutom säljarvariablerna ovan, till exempel:
+
+```bash
+VITE_DISTRIBUTION=appstore VITE_API_BASE=https://<webbplatsen> \
+VITE_SELLER_NAME="…" VITE_SELLER_ORGNR="…" VITE_SELLER_ADDRESS="…" VITE_SELLER_PHONE="…" \
+VITE_SUPPORT_EMAIL="…" npx vite build
+```
+
+I butiksbygget finns ingen service worker (uppdateringar kommer via butiken), CSP:n läggs som meta-tagg i `index.html` (samma regler som `netlify.toml`, plus `VITE_API_BASE`), och varken Stripe-köp, kronpriser eller licensnyckelaktivering visas. Capacitor och ett IAP-tillägg (t.ex. `@capacitor/core` med `cordova-plugin-purchase` eller `@revenuecat/purchases-capacitor`) är **inte installerade** ännu – `src/lib/storePurchases.ts` är en stubbe tills dess, och Apple godkänner inte appen utan fungerande köp i appen. Play-appen startar `https://<domän>/?plattform=play`, så att Lagom vet att den körs där.
+
+Steg för steg: [`docs/APP-STORE.md`](docs/APP-STORE.md), [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md) och [`docs/IOS-BYGGE-I-MOLNET.md`](docs/IOS-BYGGE-I-MOLNET.md) (iPhone-bygget i molnet, utan egen Mac).
+
+### Butiksmaterial
+
+```bash
+node scripts/generate-icons.mjs --only=store     # appikonen 1024 × 1024 m.fl. till store-assets/
+node scripts/generate-store-graphics.mjs         # Google Plays funktionsgrafik (1024 × 500)
+node scripts/app-store-screenshots.mjs [--dist=dist-native] [--only=apple|play] [--scheme=ljust|morkt]
+ANDROID_PACKAGE=… ANDROID_SHA256="…,…" node scripts/generate-assetlinks.mjs   # public/.well-known/assetlinks.json
+```
+
+Skärmdumparna kräver ett färdigt bygge och Playwright, och de checkas inte in (`store-assets/screenshots/` är gitignorerad).
+
+### Lagom Moln (avstängt)
+
+Lagom 1.0 har ingen egen databas. Den frivilliga, krypterade molnkopian **Lagom Moln** finns i koden men är avstängd tills `VITE_SUPABASE_URL` och `VITE_SUPABASE_PUBLISHABLE_KEY` sätts vid bygget. Läs [`docs/BACKEND.md`](docs/BACKEND.md) och [`docs/DPIA-SYNK.md`](docs/DPIA-SYNK.md) innan den slås på.
+
+## Juridik och integritet
+
+Texterna finns på ett ställe, `src/features/legal/legalContent.ts`, och de fristående sidorna och dokumenten skapas ur dem (`npx vitest run src/features/legal -u`):
+
+- [`docs/INTEGRITETSPOLICY.md`](docs/INTEGRITETSPOLICY.md), [`docs/KOPVILLKOR.md`](docs/KOPVILLKOR.md) och [`docs/ANVANDARVILLKOR.md`](docs/ANVANDARVILLKOR.md)
+- [`docs/BEHANDLINGSREGISTER.md`](docs/BEHANDLINGSREGISTER.md) och [`docs/AVSETT-ANDAMAL.md`](docs/AVSETT-ANDAMAL.md)
+
+Allt är utkast skrivna utan jurist – läs dem noga och fyll i det som står inom hakparentes innan lanseringen.
 
 ## Utveckling
 
@@ -66,7 +136,10 @@ npm run dev        # utvecklingsserver
 npm run build      # typkontroll + produktionsbygge (dist/)
 npm test           # vitest
 npm run typecheck  # tsc -b
+npx oxlint src netlify scripts   # lint
 ```
+
+Om Lagom → Felsökning visar versionen (`package.json`) och bygget (Netlifys `COMMIT_REF`), och där finns en lokal fellogg som användaren själv kan mejla. Licenserna för alla inbyggda paket skrivs till `licenses.txt` vid bygget.
 
 ### Livsmedelsverkets fullständiga databas
 

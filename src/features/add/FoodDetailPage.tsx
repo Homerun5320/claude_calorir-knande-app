@@ -33,6 +33,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ExternalLink,
   IconButton,
   PageHeader,
   ProgressBar,
@@ -61,7 +62,7 @@ import { mealName } from '../../lib/meals'
 import { foodPlate, PLATE_PART_LABELS, type PlatePart } from '../../lib/plate'
 import { co2eEquivalents, foodClimateFactor } from '../../lib/climate'
 import { gramsFor, unitLabel } from '../../lib/units'
-import { hasUsableNutrition } from '../../lib/openFoodFacts'
+import { hasUsableNutrition, offAttributionText, offProductUrl } from '../../lib/openFoodFacts'
 import {
   TAG_LABELS,
   decodeFoodId,
@@ -77,6 +78,7 @@ import {
 } from './addLogic'
 import { useAddFood } from './useAddFood'
 import { FoodSourceBadge, MealChips, nutriScoreTextClass, useLeave } from './components'
+import { PregnancyNote } from './PregnancyNote'
 
 type Basis = 'portion' | '100g'
 
@@ -277,6 +279,7 @@ function FoodDetail({ food }: { food: Food }) {
             </div>
           )}
           {food.rawWeight && <RawWeightNote food={food} />}
+          <PregnancyNote food={food} />
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs text-ink-2">
               <span>Näringsdata</span>
@@ -681,8 +684,9 @@ function ClimateCard({ food, grams, caption }: { food: Food; grams: number; capt
     <Card title="Klimatavtryck" eyebrow={caption}>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <span className="display-num text-4xl font-semibold text-ink">{formatNumber(kg, kg < 0.1 ? 2 : 1)}</span>
-          <span className="ml-1.5 text-sm font-medium text-ink-3">kg CO₂e</span>
+          {/* Två decimaler under 0,1 kg; väldigt små mängder visas som "< 0,01". */}
+          <span className="display-num text-4xl font-semibold text-ink">{kg > 0 && kg < 0.005 ? `< ${formatNumber(0.01, 2)}` : formatNumber(kg, kg < 0.1 ? 2 : 1)}</span>{' '}
+          <span className="text-sm font-medium text-ink-3">kg CO₂e</span>
         </div>
         <Badge tone={level.tone} icon={Leaf} size="md">
           {level.label}
@@ -800,10 +804,20 @@ function ProductCard({ food }: { food: Food }) {
           </dl>
         )}
         {food.source === 'openfoodfacts' && (
-          <p className="flex items-start gap-2 text-xs text-ink-3">
+          <div className="flex items-start gap-2 text-xs text-ink-3">
             <UtensilsCrossed className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            Produktdata från Open Food Facts (ODbL) – en öppen databas som byggs av användare. Kontrollera mot förpackningen.
-          </p>
+            <div>
+              <p>{offAttributionText(Boolean(food.imageUrl))}</p>
+              {food.barcode && (
+                <ExternalLink
+                  href={offProductUrl(food.barcode)}
+                  className="inline-flex min-h-11 items-center gap-1 font-semibold text-gran underline-offset-4 hover:underline"
+                >
+                  Visa produkten hos Open Food Facts
+                </ExternalLink>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </Card>

@@ -281,7 +281,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: 24 }}
             transition={{ type: 'spring', stiffness: 420, damping: 36 }}
-            className="sticky bottom-[calc(6rem+env(safe-area-inset-bottom))] z-20 lg:bottom-6"
+            className="sticky bottom-[calc(6rem+var(--sa-bottom))] z-20 lg:bottom-6"
           >
             <div className="flex gap-2 rounded-[1.5rem] border border-line/70 bg-surface/90 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl">
               <Button

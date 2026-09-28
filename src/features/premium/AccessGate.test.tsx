@@ -1,14 +1,17 @@
 /**
  * Spärren efter provperioden: ny loggning stoppas lugnt (med vägar till priser och export),
  * men att titta, ändra och ta bort fungerar alltid. Under provperioden och med licens är allt öppet.
+ * Exempeldata är skrivskyddad och startar ingen provperiod. I App Store-bygget finns ingen
+ * inklistring av licensnycklar och inga kronpriser.
  */
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppShell } from '../../components/layout/AppShell'
 import { currentAccess, resetLicenseChecks, useAccess } from '../../hooks/useAccess'
 import { todayISO } from '../../lib/dates'
+import { clearDemoFlag, isDemoData, setDemoFlag } from '../../lib/demoFlag'
 import { createTestLicense } from '../../lib/license'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
@@ -23,7 +26,7 @@ import { copyPreviousDay } from '../diary/DayCards'
 import { StartFastCard } from '../activity/fasting/StartFastCard'
 import { addDays } from '../../lib/dates'
 import { MemoryRouter } from 'react-router-dom'
-import { AccessGate } from './AccessGate'
+import { AccessGate, blockedText } from './AccessGate'
 import { activateLicense } from './premiumLogic'
 import { hasLoggingAccess, requireAccess, useAccessGateStore } from './requireAccess'
 
@@ -57,8 +60,13 @@ function expireTrial() {
   useLicenseStore.setState({ trialStartedAt: Date.now() - 20 * DAY, licenseKey: null, activatedAt: null })
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 beforeEach(() => {
   resetLicenseChecks()
+  clearDemoFlag()
   useLicenseStore.getState().resetLicenseState()
   useAccessGateStore.setState({ blocked: null })
   useDiaryStore.getState().clearDiary()
@@ -188,6 +196,7 @@ function renderApp(path: string) {
           { path: 'premium', element: <h1>Priser</h1> },
           { path: 'installningar/data', element: <h1>Data</h1> },
           { path: 'installningar/licens', element: <h1>Licens</h1> },
+          { path: 'valkommen', element: <h1>Välkommen</h1> },
         ],
       },
     ],
@@ -234,7 +243,9 @@ describe('AccessGate och dialogen', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Lägg till mat' })[0])
     const dialog = await screen.findByRole('dialog', { name: 'Provperioden är slut' })
     expect(dialog).toHaveTextContent('För att logga mat behöver du en licens')
-    expect(dialog).toHaveTextContent('299 kr/år eller 599 kr för alltid')
+    expect(dialog).toHaveTextContent('349 kr/år eller 699 kr för alltid')
+    expect(dialog).toHaveTextContent('inkl. moms')
+    expect(screen.getByRole('button', { name: 'Jag har redan en licensnyckel' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
     fireEvent.click(screen.getByRole('button', { name: 'Se priser' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/premium'))
@@ -253,5 +264,117 @@ describe('AccessGate och dialogen', () => {
       requireAccess('traning')
     })
     expect(await screen.findByRole('dialog', { name: 'Årslicensen har gått ut' })).toHaveTextContent('För att logga träning behöver du en licens')
+  })
+})
+
+describe('dryck', () => {
+  it('egen spärrtext för dryck', async () => {
+    expect(blockedText('dryck')).toBe(
+      'För att logga dryck behöver du en licens. Allt du redan har loggat finns kvar – du kan se, exportera och radera din data precis som vanligt.',
+    )
+    expireTrial()
+    renderApp('/')
+    await screen.findByRole('heading', { name: 'Idag' })
+    act(() => {
+      expect(requireAccess('dryck')).toBe(false)
+    })
+    expect(await screen.findByRole('dialog', { name: 'Provperioden är slut' })).toHaveTextContent('För att logga dryck behöver du en licens')
+  })
+})
+
+describe('exempeldata är skrivskyddad', () => {
+  beforeEach(() => {
+    setDemoFlag()
+    useLicenseStore.setState({ trialStartedAt: null })
+  })
+
+  it('provperioden startar inte och inget går att logga – mat, vatten, vikt och träning', async () => {
+    const { result } = renderHook(() => useAccess())
+    // Ge effekterna en chans att köra: provstarten ska inte sättas.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20))
+    })
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+    expect(result.current).toMatchObject({ demo: true, canLog: false, status: { kind: 'ny' } })
+
+    const { result: add } = renderHook(() => useAddFood())
+    expect(add.current.addFood(havregryn, 40, 'g', { date: today, meal: 'frukost' })).toBeNull()
+    expect(useDiaryStore.getState().entries[today]).toBeUndefined()
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'mat', demo: true })
+
+    render(<WaterCard today={today} targetMl={2000} glassMl={250} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^Lägg till ett glas/ })[0])
+    expect(useDiaryStore.getState().water[today]).toBeUndefined()
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'vatten', demo: true })
+
+    expect(requireAccess('vikt')).toBe(false)
+    expect(requireAccess('traning')).toBe(false)
+    expect(useAccessGateStore.getState().blocked).toEqual({ action: 'traning', demo: true })
+    // Även med licens är exemplet skrivskyddat.
+    await activateLicense(createTestLicense('livstid', undefined))
+    expect(requireAccess('mat')).toBe(false)
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+  })
+
+  it('en vänlig förklaring i stället för köpspärren – och vägen till den egna profilen', async () => {
+    const router = renderApp('/')
+    await screen.findByRole('heading', { name: 'Idag' })
+    act(() => {
+      requireAccess('mat')
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Det här är exempeldata' })
+    expect(dialog).toHaveTextContent('Det här är exempeldata. Skapa din egen profil för att börja logga – provperioden på 14 dagar startar då.')
+    expect(dialog).not.toHaveTextContent('Provperioden är slut')
+    expect(dialog).not.toHaveTextContent('kr/år')
+    fireEvent.click(screen.getByRole('button', { name: 'Skapa min egen profil' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/valkommen'))
+    // Exempeldatan är rensad (samma funktion som markeringen för exempeldata använder).
+    expect(isDemoData()).toBe(false)
+    expect(useProfileStore.getState().profile).toBeNull()
+    expect(useProfileStore.getState().settings.onboardingDone).toBe(false)
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+  })
+
+  it('sidor som bara skapar nytt visar förklaringen i stället för köpspärren', async () => {
+    renderApp('/lagg-till')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Det här är exempeldata' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Sök mat' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Skapa min egen profil' })).toBeInTheDocument()
+  })
+
+  it('när den egna profilen har skapats startar provperioden', async () => {
+    const { result } = renderHook(() => useAccess())
+    expect(result.current.demo).toBe(true)
+    // "Skapa min egen profil": exempeldatan rensas och välkomstflödet slutförs.
+    act(() => {
+      clearDemoFlag()
+      useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: false } })
+    })
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+    act(() => {
+      useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true } })
+    })
+    await waitFor(() => expect(useLicenseStore.getState().trialStartedAt).not.toBeNull())
+    expect(Date.now() - (useLicenseStore.getState().trialStartedAt as number)).toBeLessThan(60_000)
+    expect(result.current).toMatchObject({ demo: false, canLog: true, status: { kind: 'prov', daysLeft: 14 } })
+    expect(requireAccess('mat')).toBe(true)
+  })
+})
+
+describe('App Store-bygget', () => {
+  it('spärren visar ingen inklistring av licensnycklar och inga kronor – men Återställ köp', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const { AccessBlockedPage } = await import('./AccessGate')
+    render(
+      <MemoryRouter>
+        <AccessBlockedPage action="mat" status={{ kind: 'utgangen', endedAt: Date.now(), licenseExpired: false }} />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { level: 1, name: 'Provperioden är slut' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Jag har redan en licensnyckel' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Återställ köp' })).toBeInTheDocument()
+    expect(screen.getByText('Årslicens eller livstidslicens som köp i appen · ingen automatisk förnyelse')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\skr(?![a-zåäö])|moms|Stripe/)
   })
 })

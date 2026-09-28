@@ -8,6 +8,9 @@
  *   poster från Livsmedelsverkets fullständiga databas ligger i en hopfälld sektion under dem
  *   (utfälld när huvudträffarna är få). Är översta träffen ett samlingsvärde föreslås streckkoden
  *   för det exakta märket.
+ * - Skriv flera saker på en gång ("två ägg och en smörgås med ost") – kortet "Lägg till 3 saker"
+ *   tolkar texten (se `lib/freeText`) och lägger allt i korgen med ett tryck.
+ * - "Tallrik" uppskattar mat som inte går att väga (se `PlateLogSheet`).
  * - Utan sökning: "Brukar du äta till frukost" (ett tryck lägger i korgen), kopiera från igår,
  *   senaste, favoriter, egna livsmedel/recept och sparade måltider.
  * - Tryck på en rad → välj mängd → "Lägg till i Frukost" (eller "Lägg i korgen"). "+" på raden
@@ -33,6 +36,7 @@ import {
   ShoppingBasket,
   Sparkles,
   Trash2,
+  UtensilsCrossed,
   X,
   Zap,
   type LucideIcon,
@@ -84,6 +88,9 @@ import { PortionSheet, type SheetAction } from './PortionSheet'
 import { QuickAddSheet } from './QuickAddSheet'
 import { BasketBar, BasketSheet } from './Basket'
 import { OnlineSearch } from './OnlineSearch'
+import { FreeTextCard, type FreeTextRow } from './FreeTextCard'
+import { PlateLogSheet } from './PlateLogSheet'
+import { useFreeTextItems } from './useFreeText'
 import { requireAccess } from '../premium/requireAccess'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
@@ -190,6 +197,23 @@ export default function AddFoodPage() {
   const { addFood, addMany, addTemplate } = useAddFood()
   const [picked, setPicked] = useState<Picked | null>(null)
   const [quickOpen, setQuickOpen] = useState(false)
+  const [plateOpen, setPlateOpen] = useState(false)
+  const openPlate = () => {
+    if (requireAccess('mat')) setPlateOpen(true)
+  }
+
+  // --- Fritext: "två ägg och en smörgås med ost" ---------------------------------
+  const freeItems = useFreeTextItems(q, meal)
+  const addFreeText = (rows: FreeTextRow[]) => {
+    if (rows.length === 0 || !requireAccess('mat')) return
+    let n = 0
+    for (const r of rows) if (r.food && basketAdd(r.food, r.amount, r.unit, 'text')) n++
+    if (n === 0) return
+    toast(`${countLabel(n)} i korgen`, { tone: 'success' })
+    setQuery('')
+    // På dator: skriv nästa sak direkt. På mobil skulle tangentbordet skymma korgen.
+    if (desktop) searchRef.current?.focus()
+  }
 
   const pick = useCallback((food: Food) => setPicked({ food, basketFirst: useBasketStore.getState().items.length > 0 }), [])
   const details = useCallback(
@@ -233,7 +257,13 @@ export default function AddFoodPage() {
 
   // Skärmläsare: berätta hur många träffar det blev när sökningen har landat.
   const settled = q !== '' && !loading && !pending
-  const announcement = settled ? searchAnnouncement(q, results.length, lmvResults.length) : ''
+  // Fritext ("två ägg och en banan"): kortet ovanför träffarna är huvudsaken.
+  const multi = freeItems.length > 1
+  const announcement = !settled
+    ? ''
+    : multi
+      ? `Lagom tolkade texten som ${freeItems.length} saker – kontrollera dem och lägg dem i korgen.${results.length > 0 ? ` ${searchAnnouncement(q, results.length, lmvResults.length)}.` : ''}`
+      : searchAnnouncement(q, results.length, lmvResults.length)
   const [announced, setAnnounced] = useState('')
   useEffect(() => {
     const t = window.setTimeout(() => setAnnounced(announcement), 500)
@@ -308,7 +338,7 @@ export default function AddFoodPage() {
         <MealChips value={meal} onChange={(m) => setParam('maltid', m)} />
       </PageHeader>
 
-      <div className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
+      <div className="sticky top-[calc(3.5rem_+_var(--sa-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
         <TextField
           ref={searchRef}
           label="Sök livsmedel"
@@ -318,7 +348,7 @@ export default function AddFoodPage() {
           value={query}
           onValueChange={setQuery}
           onKeyDown={onSearchKey}
-          placeholder="Sök bland 1 000+ svenska livsmedel"
+          placeholder="Sök livsmedel"
           autoFocus={desktop}
           autoComplete="off"
           autoCorrect="off"
@@ -336,6 +366,7 @@ export default function AddFoodPage() {
               <Spinner className="size-4" /> Läser in livsmedelsdatabasen …
             </p>
           )}
+          {multi && <FreeTextCard key={q} items={freeItems} mindful={mindful} onAdd={addFreeText} onSearch={(text) => setQuery(text)} />}
           {results.length > 0 ? (
             <div>
               <h2 className="eyebrow mb-2 px-1">Livsmedel</h2>
@@ -377,7 +408,7 @@ export default function AddFoodPage() {
                 </li>
               ))}
             </RowList>
-          ) : lmvResults.length === 0 ? (
+          ) : lmvResults.length === 0 && !multi ? (
             <EmptyState
               compact
               illustration="search"
@@ -441,6 +472,9 @@ export default function AddFoodPage() {
               <Button variant="outline" size="sm" iconLeft={Zap} onClick={() => setQuickOpen(true)}>
                 Snabbregistrera
               </Button>
+              <Button variant="outline" size="sm" iconLeft={UtensilsCrossed} onClick={openPlate}>
+                Tallrik
+              </Button>
             </div>
           </div>
         </section>
@@ -458,6 +492,7 @@ export default function AddFoodPage() {
           onDetails={details}
           onScan={goScan}
           onQuick={() => setQuickOpen(true)}
+          onPlate={openPlate}
           basketCount={basketCount}
           onToggleSuggestion={(food) => {
             const existing = useBasketStore.getState().items.find((i) => i.food.id === food.id && i.origin === 'suggestion')
@@ -505,6 +540,8 @@ export default function AddFoodPage() {
       />
 
       <QuickAddSheet open={quickOpen} onClose={() => setQuickOpen(false)} date={date} meal={meal} initialName={q} onAdded={() => setQuery('')} />
+
+      <PlateLogSheet open={plateOpen} onClose={() => setPlateOpen(false)} />
 
       {/* Liten bekräftelse när korgen fylls på (för skärmläsare). */}
       <span className="sr-only" aria-live="polite">
@@ -572,6 +609,7 @@ interface BrowseProps {
   onDetails: (food: Food) => void
   onScan: () => void
   onQuick: () => void
+  onPlate: () => void
   basketCount: (id: string) => number
   onToggleSuggestion: (food: Food) => void
   onAddTemplate: (t: MealTemplate) => void
@@ -619,12 +657,24 @@ function Browse(props: BrowseProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Stora genvägar */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Stora genvägar – skanna överst på mobil, snabbregistrering och tallrik bredvid varandra. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {/* Mjuka bindestreck (\u00AD) låter de långa orden brytas snyggt i smala rutor (320–390 px). */}
-        <ActionTile icon={ScanBarcode} title="Skanna streckkod" text={'Snabbast för förpack\u00ADningar'} tone="gran" onClick={props.onScan} />
+        <ActionTile
+          icon={ScanBarcode}
+          title="Skanna streckkod"
+          text={'Snabbast för förpack\u00ADningar'}
+          tone="gran"
+          onClick={props.onScan}
+          className="col-span-2 sm:col-span-1"
+        />
         <ActionTile icon={Zap} title={'Snabb\u00ADregistrera'} text="Bara energin, ungefär" tone="sol" onClick={props.onQuick} />
+        <ActionTile icon={UtensilsCrossed} title="Tallrik" text={'Uppskatta utan att väga'} tone="gran" onClick={props.onPlate} />
       </div>
+      <p className="-mt-3 flex items-start gap-1.5 px-1 text-xs text-ink-3">
+        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-sol" aria-hidden />
+        <span>Skriv gärna flera saker i sökfältet, t.ex. ”två ägg och en smörgås med ost”.</span>
+      </p>
 
       <CopyYesterday date={date} today={today} meal={meal} mealLabel={mealLabel} mindful={mindful} onCopied={props.onCopied} />
 
@@ -771,7 +821,21 @@ function Browse(props: BrowseProps) {
   )
 }
 
-function ActionTile({ icon: Icon, title, text, tone, onClick }: { icon: LucideIcon; title: string; text: string; tone: 'gran' | 'sol'; onClick: () => void }) {
+function ActionTile({
+  icon: Icon,
+  title,
+  text,
+  tone,
+  onClick,
+  className,
+}: {
+  icon: LucideIcon
+  title: string
+  text: string
+  tone: 'gran' | 'sol'
+  onClick: () => void
+  className?: string
+}) {
   const reduce = useReducedMotion()
   return (
     <motion.button
@@ -779,7 +843,10 @@ function ActionTile({ icon: Icon, title, text, tone, onClick }: { icon: LucideIc
       onClick={onClick}
       whileTap={reduce ? undefined : { scale: 0.97 }}
       // Under 360 px blir textkolumnen bredvid ikonen för smal – då står ikonen ovanför texten.
-      className="card flex min-h-[4.5rem] min-w-0 items-center gap-3 p-3 text-left transition-colors hover:bg-surface-2 max-[359px]:flex-col max-[359px]:items-start max-[359px]:gap-2"
+      className={cx(
+        'card flex min-h-[4.5rem] min-w-0 items-center gap-3 p-3 text-left transition-colors hover:bg-surface-2 max-[359px]:flex-col max-[359px]:items-start max-[359px]:gap-2',
+        className,
+      )}
     >
       <span className={cx('grid size-11 shrink-0 place-items-center rounded-2xl', tone === 'gran' ? 'bg-gran-soft text-gran' : 'bg-sol-soft text-hjortron')}>
         <Icon className="size-5" strokeWidth={2.2} aria-hidden />

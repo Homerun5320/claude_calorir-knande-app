@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { MealConfig, Profile, Settings } from '../types'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 export const DEFAULT_MEALS: MealConfig[] = [
   { id: 'frukost', name: 'Frukost', enabled: true },
@@ -69,14 +69,16 @@ export const useProfileStore = create<ProfileState>()(
     {
       name: STORE_KEYS.profile,
       storage: idbStorage,
-      version: 1,
+      version: PERSIST_VERSIONS[STORE_KEYS.profile],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as ProfileState,
       // Nya inställningsfält får standardvärden även för befintliga användare.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<ProfileState>
         return {
           ...current,
           ...p,
-          settings: { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) },
+          settings: { ...DEFAULT_SETTINGS, ...p.settings },
         }
       },
     },

@@ -18,11 +18,21 @@ export const PERIOD_LABELS: Record<PeriodKind, string> = {
   '90': '90 dagar',
 }
 
+/**
+ * Rullande period som inte går att välja i Insikter, t.ex. rapportens "senaste 7/14/30 dagarna"
+ * (`makeRollingPeriod`).
+ */
+export type RollingKind = 'dagar'
+
+/** Antal dagar som rapporten kan visa. */
+export const REPORT_DAYS = [7, 14, 30] as const
+export type ReportDays = (typeof REPORT_DAYS)[number]
+
 /** Hur långt bakåt man kan bläddra i veckor (ca fem år). */
 export const MAX_WEEKS_BACK = 260
 
 export interface Period {
-  kind: PeriodKind
+  kind: PeriodKind | RollingKind
   /** Veckoförskjutning: 0 = innevarande vecka, −1 = förra veckan … (bara för 'vecka'). */
   offset: number
   start: ISODate
@@ -78,7 +88,7 @@ function daysOf(kind: PeriodKind): number {
   return kind === '30' ? 30 : kind === '90' ? 90 : 7
 }
 
-function build(kind: PeriodKind, offset: number, start: ISODate, end: ISODate, today: ISODate): Period {
+function build(kind: PeriodKind | RollingKind, offset: number, start: ISODate, end: ISODate, today: ISODate): Period {
   const dates = dateRange(start, end)
   const elapsed = dates.filter((d) => d <= today)
   const isCurrent = start <= today && today <= end
@@ -99,7 +109,7 @@ function build(kind: PeriodKind, offset: number, start: ISODate, end: ISODate, t
       isCurrent,
     }
   }
-  const n = daysOf(kind)
+  const n = kind === 'dagar' ? dates.length : daysOf(kind)
   return {
     kind,
     offset: 0,
@@ -139,6 +149,12 @@ export function makePeriod(kind: PeriodKind, offset: number, today: ISODate): Pe
   return build(kind, 0, addDays(today, -(n - 1)), today, today)
 }
 
+/** De senaste `days` dagarna till och med idag (t.ex. rapportens 7, 14 eller 30 dagar). */
+export function makeRollingPeriod(days: number, today: ISODate): Period {
+  const n = Math.max(1, Math.min(366, Math.round(Number.isFinite(days) ? days : 7)))
+  return build('dagar', 0, addDays(today, -(n - 1)), today, today)
+}
+
 /**
  * Perioden närmast före (för jämförelser, t.ex. "+120 kcal mot förra veckan").
  * För innevarande vecka jämförs bara lika många dagar (mån–idag mot mån–samma veckodag förra veckan).
@@ -150,7 +166,7 @@ export function previousPeriod(p: Period, today: ISODate): Period {
     const sameLength = prev.dates.slice(0, p.elapsed.length)
     return { ...prev, elapsed: sameLength }
   }
-  const n = daysOf(p.kind)
+  const n = p.kind === 'dagar' ? p.dates.length : daysOf(p.kind)
   const end = addDays(p.start, -1)
   return build(p.kind, 0, addDays(end, -(n - 1)), end, today)
 }

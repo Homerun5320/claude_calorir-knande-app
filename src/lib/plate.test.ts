@@ -54,6 +54,14 @@ describe('PLATE_IDEAL', () => {
     expect(PLATE_VARIANT_LABELS.aktiv.label).toMatch(/rör dig mycket/)
     expect(PLATE_PART_LABELS.protein.label).toMatch(/baljväxter/)
   })
+
+  it('upprepar inte varianten i beskrivningen (inget dubbelt kolon i "etikett: beskrivning")', () => {
+    for (const v of Object.values(PLATE_VARIANT_LABELS)) {
+      expect(v.description).not.toMatch(/^För dig som/)
+      expect(`${v.label}: ${v.description}`.split(':')).toHaveLength(2)
+    }
+    expect(PLATE_VARIANT_LABELS.vanlig.description).toBe('Låt grönsaker och rotfrukter fylla halva tallriken.')
+  })
 })
 
 describe('foodPlate', () => {

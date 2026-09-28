@@ -54,14 +54,28 @@ describe('validering av Om dig', () => {
 
   it('födelseår: fyra siffror, inte i framtiden och minst 13 år', () => {
     expect(validateBirthYear(undefined, TODAY)).toMatch(/Fyll i/)
-    expect(validateBirthYear(90, TODAY)).toMatch(/fyra siffror/)
-    expect(validateBirthYear(2030, TODAY)).toMatch(/fyra siffror/)
-    expect(validateBirthYear(2015, TODAY)).toMatch(/13 år eller äldre/)
+    expect(validateBirthYear(2015, TODAY)).toMatch(/kan användas från 13 år/)
     // Född 2013 kan vara 12 år i september 2026 – släpps inte igenom för tidigt.
-    expect(validateBirthYear(2013, TODAY)).toMatch(/13 år eller äldre/)
+    expect(validateBirthYear(2013, TODAY)).toMatch(/kan användas från 13 år/)
     expect(validateBirthYear(2013, '2026-12-31')).toBeUndefined()
     expect(validateBirthYear(2012, TODAY)).toBeUndefined()
     expect(validateBirthYear(1950, TODAY)).toBeUndefined()
+  })
+
+  it('födelseår: rätt felmeddelande för rätt fel', () => {
+    // Fel format: inte ett heltal, för få eller för många siffror.
+    for (const bad of [90, 199, 1990.5, 19900]) expect(validateBirthYear(bad, TODAY)).toBe('Skriv födelseåret med fyra siffror, t.ex. 1991.')
+    // I framtiden.
+    expect(validateBirthYear(2027, TODAY)).toBe('Födelseåret kan inte ligga i framtiden.')
+    expect(validateBirthYear(2030, TODAY)).toBe('Födelseåret kan inte ligga i framtiden.')
+    // Orimligt gammalt (mer än 110 år).
+    expect(validateBirthYear(1850, TODAY)).toBe('Ange ett födelseår mellan 1916 och 2026.')
+    expect(validateBirthYear(1915, TODAY)).toBe('Ange ett födelseår mellan 1916 och 2026.')
+    expect(validateBirthYear(1916, TODAY)).toBeUndefined()
+    // Vänlig text för de yngsta – Lagom är gjord för vuxna.
+    expect(validateBirthYear(2016, TODAY)).toBe(
+      'Lagom är gjord för vuxna och kan användas från 13 år. Funderar du på mat och hälsa – prata gärna med en vuxen eller skolsköterskan.',
+    )
   })
 
   it('räknar lägsta möjliga ålder när bara födelseåret är känt', () => {

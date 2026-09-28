@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
+  CalendarDays,
   CalendarHeart,
   ChartNoAxesColumn,
   ChefHat,
@@ -30,7 +31,10 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import { useFastingStore } from '../../stores/fastingStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
-import { backupDue, useLastBackup } from '../settings/backupStatus'
+import { usePlanStore } from '../../stores/planStore'
+import { weekItemCount, weekStartOf } from '../../lib/planning'
+import { storagePlace } from '../../config/platform'
+import { useBackupDue, useLastBackup } from '../settings/backupStatus'
 import { dayNumberSince, formatElapsed, loggedDaysInLast } from './moreLogic'
 import { SupportSheet } from './SupportSheet'
 import { PremiumHubCard } from '../premium/TrialBanner'
@@ -45,8 +49,9 @@ interface HubItem {
   to?: string
   onClick?: () => void
   /**
-   * Brett kort från `sm` och uppåt: spänner över hela raden (ikonen till vänster). Används för
-   * sista kortet så att rutnätet (3 kolumner) går jämnt ut i stället för att lämna det ensamt.
+   * Brett kort (ikonen till vänster): hela raden på mobil (2 kolumner) och två kolumner från `sm`
+   * (3 kolumner). Används för sista kortet, så att rutnätet går jämnt ut i båda lägena i stället
+   * för att lämna ett kort ensamt.
    */
   wide?: boolean
 }
@@ -69,18 +74,18 @@ function HubCard({ item, index }: { item: HubItem; index: number }) {
       initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: reduce ? 0 : Math.min(index, 10) * 0.035, type: 'spring', stiffness: 320, damping: 32 }}
-      className={cx('flex', item.wide && 'sm:col-span-full')}
+      className={cx('flex', item.wide && 'col-span-full sm:col-span-2')}
     >
       <Card
         to={item.to}
         onClick={item.onClick}
         padding="none"
-        className={cx('flex min-h-[8.75rem] flex-col p-4', item.wide && 'sm:min-h-0 sm:flex-row sm:items-center sm:gap-4')}
+        className={cx('flex p-4', item.wide ? 'flex-row items-center gap-4' : 'min-h-[8.75rem] flex-col')}
       >
         <span style={toneVars(item.tone)} aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-(--tone-soft) text-(--tone)">
           <item.icon className="size-[1.3rem]" strokeWidth={2.1} />
         </span>
-        <span className={cx('mt-auto block min-w-0 pt-3', item.wide && 'sm:mt-0 sm:pt-0')}>
+        <span className={cx('block min-w-0', !item.wide && 'mt-auto pt-3')}>
           <span className="block font-display text-[1.0625rem] font-semibold leading-snug tracking-tight text-ink">{item.title}</span>
           <span className="mt-0.5 line-clamp-2 block text-[0.8125rem] leading-snug text-ink-3">{item.stat}</span>
         </span>
@@ -101,12 +106,14 @@ export default function MorePage() {
   const exercise = useDiaryStore((s) => s.exercise[today])
   const waterMl = useDiaryStore((s) => s.water[today] ?? 0)
   const fast = useFastingStore((s) => s.active)
+  const planItems = usePlanStore((s) => s.items)
   const lastBackup = useLastBackup()
   const now = useMinuteNow(fast !== null)
 
   const latest = latestWeight(weights)
   const logged = useMemo(() => loggedDaysInLast(entries, today, 7), [entries, today])
   const hasData = useMemo(() => Object.values(entries).some((l) => l.length > 0) || weights.length > 0, [entries, weights])
+  const planned = useMemo(() => weekItemCount(planItems, weekStartOf(today)), [planItems, today])
   const exerciseMin = useMemo(() => (exercise ?? []).reduce((s, e) => s + e.minutes, 0), [exercise])
   const foodDay = useMemo(() => {
     const todays = foodDayFor(today).find((d) => !d.weekly)
@@ -147,6 +154,14 @@ export default function MorePage() {
     },
     { id: 'dryck', title: 'Dryck', to: '/dryck', icon: GlassWater, tone: 'fjall', stat: waterMl > 0 ? `${formatLiters(waterMl)} vatten idag` : 'Vatten, kaffe och alkohol' },
     { id: 'fasta', title: 'Fasta', to: '/fasta', icon: Timer, tone: 'vinbar', stat: fast ? `Pågår · ${formatElapsed(now - fast.start)}` : 'Ingen fasta pågår' },
+    {
+      id: 'planering',
+      title: 'Veckoplanering',
+      to: '/planering',
+      icon: CalendarDays,
+      tone: 'mossa',
+      stat: planned > 0 ? `${plural(planned, 'måltid', 'måltider')} planerade i veckan` : 'Planera veckan – få inköpslistan',
+    },
     { id: 'matkalender', title: 'Matkalender', to: '/matkalender', icon: CalendarHeart, tone: 'sol', stat: foodDay },
     { id: 'installningar', title: 'Inställningar', to: '/installningar', icon: Settings, tone: 'gran', stat: 'Mål, tema och data' },
     { id: 'om', title: 'Om Lagom', to: '/om', icon: Info, tone: 'neutral', stat: 'Källor och integritet' },
@@ -157,12 +172,14 @@ export default function MorePage() {
       icon: HeartHandshake,
       tone: 'vinbar',
       stat: '1177, Frisk & Fri och Alkoholhjälpen',
-      // 10 kort: två kolumner går jämnt ut på mobil; i tre kolumner blir stödkortet en egen, bred rad.
+      // 11 kort: tio fyller fem rader à två på mobil, där stödkortet blir en egen rad. I tre kolumner
+      // blir det tre rader à tre plus en rad med ett kort och stödkortet över två kolumner.
       wide: true,
     },
   ]
 
-  const showBackup = backupDue(lastBackup, Date.now(), hasData)
+  // Var 30:e dag – var 7:e i Safari i webbläsaren när lagringen inte är beständig.
+  const showBackup = useBackupDue(hasData)
 
   return (
     <div className="px-4 pb-8">
@@ -193,7 +210,7 @@ export default function MorePage() {
               <CloudUpload aria-hidden className="size-5 shrink-0 text-(--tone-ink)" />
               <span className="min-w-0 flex-1">
                 <span className="block text-[0.9375rem] font-semibold text-ink">{lastBackup === null ? 'Gör din första säkerhetskopia' : 'Dags för en ny säkerhetskopia?'}</span>
-                <span className="block text-[0.8125rem] leading-snug text-ink-2">Din data finns bara i den här webbläsaren – en fil tar tio sekunder.</span>
+                <span className="block text-[0.8125rem] leading-snug text-ink-2">Din data finns bara {storagePlace()} – en fil tar tio sekunder.</span>
               </span>
             </div>
           </Card>

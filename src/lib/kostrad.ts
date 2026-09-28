@@ -76,7 +76,7 @@ export const RAW_TO_COOKED_MEAT = 0.75
 export function foodKostrad(food: Food): KostradContribFull {
   if (food.kostrad) return { ...food.kostrad }
   const name = norm(typeof food.name === 'string' ? food.name : '')
-  const base: KostradContribFull = { ...(CATEGORY_KOSTRAD[food.category] ?? {}) }
+  const base: KostradContribFull = { ...CATEGORY_KOSTRAD[food.category] }
 
   if ((food.category === 'rott_kott' || food.category === 'chark') && RAW_WORDS.test(name)) {
     base.rottKott = (base.rottKott ?? 0) * RAW_TO_COOKED_MEAT
@@ -349,7 +349,7 @@ export function evaluateKostrad(input: KostradInput): KostradResult[] {
       const coverage = coverageOf('wholegrain')
       const ratio = actual / target
       const status = minStatus(ratio)
-      const uncertain = coverage < 0.5 && status !== 'bra'
+      const uncertain = coverage < KOSTRAD_MIN_COVERAGE && status !== 'bra'
       results.push({
         id: 'fullkorn',
         title: 'Fullkorn',
@@ -573,7 +573,7 @@ export function evaluateKostrad(input: KostradInput): KostradResult[] {
             : status === 'nastan'
               ? 'Strax över – vatten eller mineralvatten till maten i stället för läsk gör skillnad.'
               : 'Njut av fikat, men låt läsk och godis vara något för ibland. Frukt, bär och osötad yoghurt är goda vardagsval.') +
-          (coverage < 0.5 ? ' Tillsatt socker saknas för en del livsmedel, så siffran kan vara för låg.' : ''),
+          (coverage < KOSTRAD_MIN_COVERAGE ? ' Tillsatt socker saknas för en del livsmedel, så siffran kan vara för låg.' : ''),
         emoji: '🍬',
         periodDays: nFood,
         coverage,
@@ -647,12 +647,24 @@ export function evaluateKostrad(input: KostradInput): KostradResult[] {
   return results
 }
 
+/** Lägsta täckningsgrad (andel av energin med känt värde) för att ett näringsbaserat råd ska bedömas. */
+export const KOSTRAD_MIN_COVERAGE = 0.5
+
 /**
- * Sammanfattande poäng 0–100 (medelvärdet av alla råds poäng). Råd med låg täckningsgrad
- * (< 50 %) räknas inte, eftersom resultatet då är osäkert.
+ * true om rådet går att bedöma: råd utan täckningsgrad (t.ex. grönt, fisk och rörelse) alltid,
+ * näringsbaserade råd (fullkorn, salt, mättat fett, socker) bara när värdet är känt för minst
+ * hälften av energin. Övriga är osäkra och räknas varken in i poängen eller som uppfyllda.
+ */
+export function isUsable(r: Pick<KostradResult, 'coverage'>): boolean {
+  return r.coverage === undefined || r.coverage >= KOSTRAD_MIN_COVERAGE
+}
+
+/**
+ * Sammanfattande poäng 0–100 (medelvärdet av de bedömda rådens poäng). Råd med låg täckningsgrad
+ * (< 50 %) räknas inte, eftersom resultatet då är osäkert (se `isUsable`).
  */
 export function kostradScore(results: readonly KostradResult[]): number {
-  const usable = results.filter((r) => r.coverage === undefined || r.coverage >= 0.5)
+  const usable = results.filter(isUsable)
   if (usable.length === 0) return 0
   return Math.round((usable.reduce((s, r) => s + r.score, 0) / usable.length) * 100)
 }

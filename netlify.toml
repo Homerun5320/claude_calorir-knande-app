@@ -12,7 +12,61 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Appen anropar /api/create-checkout, /api/verify-purchase och Stripe anropar /api/stripe-webhook.
+# Testläget (gratis testlicenser) är tillåtet i förhandsvisningar och grenbyggen. Ett
+# produktionsbygge i testläge stoppas av byggkontrollen (scripts/commerce-guard.ts) – sätt
+# LAGOM_ALLOW_TEST_COMMERCE=1 för Production i Netlify om det är avsiktligt före lanseringen.
+[context.deploy-preview.environment]
+  LAGOM_ALLOW_TEST_COMMERCE = "1"
+
+[context.branch-deploy.environment]
+  LAGOM_ALLOW_TEST_COMMERCE = "1"
+
+# Appen anropar /api/create-checkout, /api/verify-purchase, /api/recover-license, /api/license-revocations och /api/recipe-fetch; Stripe anropar /api/stripe-webhook.
+
+# Anropsbegränsning (Netlify rate limiting) för de publika funktionerna. Reglerna måste stå före
+# den allmänna /api/*-regeln – Netlify använder den första regeln som matchar. Över gränsen svarar
+# Netlify 429. Fönstret (window_size) får vara 1–180 sekunder. Se docs/BETALNING.md.
+[[redirects]]
+  from = "/api/create-checkout"
+  to = "/.netlify/functions/create-checkout"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 10
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/api/verify-purchase"
+  to = "/.netlify/functions/verify-purchase"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 30
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/api/recover-license"
+  to = "/.netlify/functions/recover-license"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 5
+    window_size = 180
+    aggregate_by = ["ip", "domain"]
+
+[[redirects]]
+  from = "/api/recipe-fetch"
+  to = "/.netlify/functions/recipe-fetch"
+  status = 200
+  force = true
+  [redirects.rate_limit]
+    window_limit = 10
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+# Övriga funktioner (/api/license-revocations, /api/stripe-webhook) utan särskild gräns.
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -25,6 +79,9 @@
 # för skript eller ramar; form-action tillåter ändå checkout.stripe.com om ett formulär används.
 # Hashen i script-src är temaskriptet i index.html – ändras skriptet måste hashen uppdateras
 # (testet netlify/tests/netlify-toml.test.ts säger till och skriver ut den nya hashen).
+# payment=(self): Google Play Billing i Play-appen (TWA) använder Payment Request API (Digital Goods) och kräver det.
+# Butiksbygget (VITE_DISTRIBUTION=appstore) får samma CSP som meta-tagg i index.html (vite.config.ts),
+# utan frame-ancestors och Stripe men med VITE_API_BASE i connect-src.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -32,7 +89,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(self), usb=(), bluetooth=()"
     Cross-Origin-Opener-Policy = "same-origin"
     Strict-Transport-Security = "max-age=31536000"
 
@@ -68,3 +125,10 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
     Content-Type = "application/manifest+json; charset=utf-8"
+
+# Digital Asset Links för Google Play (TWA): måste skickas som JSON.
+[[headers]]
+  for = "/.well-known/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
+    Cache-Control = "public, max-age=300"

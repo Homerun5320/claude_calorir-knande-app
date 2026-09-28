@@ -6,23 +6,21 @@
  * - "Ladda om", "Till Idag" och "Spara en säkerhetskopia" – datan ligger kvar på enheten.
  * - En sida som inte kunde hämtas efter en uppdatering (gammal flik, nya filnamn) laddas om
  *   automatiskt en gång.
+ * - Felet sparas i den lokala felloggen (utan livsmedel och värden), så att användaren kan skicka
+ *   en felrapport från Om Lagom → Felsökning.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { isRouteErrorResponse, useLocation, useNavigate, useRouteError } from 'react-router-dom'
 import { Download, House, RotateCw, Settings } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { LogoMark } from './Logo'
-import { downloadBackup } from '../../lib/backup'
+import { saveBackup } from '../../lib/backup'
+import { hasNewerData } from '../../stores/storage'
+import { markBackupNow } from '../../features/settings/backupStatus'
+import { logError } from '../../lib/errorLog'
+import { isChunkLoadError, reloadOnce } from './chunkReload'
 
-const RELOAD_KEY = 'lagom-chunk-reload'
-/** Ladda inte om automatiskt oftare än så här (skydd mot omladdningsslinga). */
-const RELOAD_GUARD_MS = 30_000
-
-/** Felet beror på att en koddel inte kunde hämtas (vanligt direkt efter en uppdatering). */
-export function isChunkLoadError(error: unknown): boolean {
-  const message = error instanceof Error ? `${error.name} ${error.message}` : String(error ?? '')
-  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError|Unable to preload CSS/i.test(message)
-}
+export { isChunkLoadError } from './chunkReload'
 
 function errorText(error: unknown): string {
   if (isRouteErrorResponse(error)) return `${error.status} ${error.statusText}`
@@ -34,32 +32,30 @@ function errorText(error: unknown): string {
   }
 }
 
-/** Ladda om en gång vid ett chunkfel. Returnerar true om en omladdning startades. */
-function reloadOnceForChunkError(error: unknown): boolean {
-  if (!isChunkLoadError(error)) return false
-  try {
-    const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0)
-    if (Date.now() - last < RELOAD_GUARD_MS) return false
-    sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
-  } catch {
-    return false
-  }
-  window.location.reload()
-  return true
-}
-
 export function RouteError({ inShell = false }: { inShell?: boolean }) {
   const error = useRouteError()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const chunk = isChunkLoadError(error)
+  const [saveFailed, setSaveFailed] = useState(false)
   // Inuti appens ram finns redan ett <main>.
   const Root = inShell ? 'section' : 'main'
 
   useEffect(() => {
-    reloadOnceForChunkError(error)
+    // Routerns felsvar (t.ex. 404) har inget Error-objekt – spara en kort beskrivning i stället.
+    logError(error instanceof Error ? error : new Error(errorText(error)), 'route')
+    if (chunk) reloadOnce()
     if (import.meta.env.DEV) console.error(error)
-  }, [error])
+  }, [error, chunk])
+
+  const save = () => {
+    setSaveFailed(false)
+    // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
+    void saveBackup().then((outcome) => {
+      if ((outcome === 'saved' || outcome === 'shared') && !hasNewerData()) markBackupNow()
+      else if (outcome === 'failed') setSaveFailed(true)
+    })
+  }
 
   return (
     <Root
@@ -89,9 +85,14 @@ export function RouteError({ inShell = false }: { inShell?: boolean }) {
           )}
           {!chunk && (
             <>
-              <Button variant="ghost" iconLeft={Download} onClick={() => downloadBackup()} fullWidth>
+              <Button variant="ghost" iconLeft={Download} onClick={save} fullWidth>
                 Spara en säkerhetskopia
               </Button>
+              {saveFailed && (
+                <p role="alert" className="text-[0.875rem] leading-relaxed text-ink-2">
+                  Säkerhetskopian kunde inte sparas. Försök igen, eller spara den från Inställningar för data.
+                </p>
+              )}
               <Button variant="ghost" iconLeft={Settings} to="/installningar/data" fullWidth>
                 Inställningar för data
               </Button>

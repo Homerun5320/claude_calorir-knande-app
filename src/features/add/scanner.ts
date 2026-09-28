@@ -1,50 +1,69 @@
 /**
  * Kamera och streckkodsläsning.
  *
- * - Webbläsarens inbyggda `BarcodeDetector` används när den finns och klarar EAN (Chrome på
- *   Android, Safari 17+ m.fl.) – snabbt och batterisnålt.
+ * - Webbläsarens inbyggda `BarcodeDetector` används när den finns och klarar EAN – snabbt och
+ *   batterisnålt. BarcodeDetector finns i Chrome/Android; i Safari bara bakom en flagga, så iOS
+ *   använder ZXing.
  * - Annars laddas ZXing (`@zxing/browser`) in först när den behövs, så att huvudpaketet hålls litet.
+ *   ZXing läser var 250:e ms (`ZXING_INTERVAL_MS`) för att spara batteri, och dess brusiga
+ *   konsolvarningar ("MultiFormatReader: non-ReaderException") filtreras bort medan den är igång.
  * - Lagom styr själv kameraströmmen (samma väg för båda motorerna) så att ficklampan fungerar och
  *   kameran alltid släpps när sidan lämnas.
+ * - Feltexterna följer plattformen: i appen hänvisar de till telefonens Inställningar, i
+ *   webbläsaren till webbläsarens inställningar.
  */
+import { cameraSettingsHint, isInApp } from '../../config/platform'
 
 /** Streckkodsformat för livsmedel. */
 export const SCAN_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'] as const
 
 export type CameraErrorKind = 'denied' | 'nocamera' | 'unsupported' | 'insecure' | 'busy' | 'error'
 
-export const CAMERA_ERROR_TEXT: Record<CameraErrorKind, { title: string; text: string }> = {
-  denied: {
-    title: 'Kameran är inte tillåten',
-    text: 'Tillåt kameran för Lagom i webbläsarens inställningar och försök igen – eller skriv in siffrorna under streckkoden.',
-  },
-  nocamera: {
-    title: 'Ingen kamera hittades',
-    text: 'Den här enheten verkar sakna en kamera. Skriv in siffrorna under streckkoden i stället.',
-  },
-  unsupported: {
+/** Feltexter för kameran – anpassade efter om Lagom körs som app eller i en webbläsare. */
+export function cameraErrorTexts(): Record<CameraErrorKind, { title: string; text: string }> {
+  const inApp = isInApp()
+  const unsupported = {
     title: 'Kameran stöds inte här',
-    text: 'Webbläsaren kan inte använda kameran. Skriv in siffrorna under streckkoden i stället.',
-  },
-  insecure: {
-    title: 'Kameran kräver en säker anslutning',
-    text: 'Öppna Lagom via https för att kunna skanna. Tills dess går det bra att skriva in streckkoden.',
-  },
-  busy: {
-    title: 'Kameran används redan',
-    text: 'En annan app eller flik använder kameran. Stäng den och försök igen.',
-  },
-  error: {
-    title: 'Kameran gick inte att starta',
-    text: 'Något gick snett när kameran skulle startas. Försök igen – eller skriv in streckkoden.',
-  },
+    text: inApp
+      ? 'Kameran kan inte användas i appen just nu. Skriv in siffrorna under streckkoden i stället.'
+      : 'Webbläsaren kan inte använda kameran. Skriv in siffrorna under streckkoden i stället.',
+  }
+  return {
+    denied: {
+      title: 'Kameran är inte tillåten',
+      text: `${cameraSettingsHint()} Försök sedan igen – eller skriv in siffrorna under streckkoden.`,
+    },
+    nocamera: {
+      title: 'Ingen kamera hittades',
+      text: 'Den här enheten verkar sakna en kamera. Skriv in siffrorna under streckkoden i stället.',
+    },
+    unsupported,
+    // I appen finns ingen osäker anslutning – där visas samma text som när kameran inte stöds.
+    insecure: inApp
+      ? unsupported
+      : {
+          title: 'Kameran kräver en säker anslutning',
+          text: 'Öppna Lagom via https i webbläsaren för att kunna skanna. Tills dess går det bra att skriva in streckkoden.',
+        },
+    busy: {
+      title: 'Kameran används redan',
+      text: inApp ? 'En annan app använder kameran. Stäng den och försök igen.' : 'En annan app eller flik använder kameran. Stäng den och försök igen.',
+    },
+    error: {
+      title: 'Kameran gick inte att starta',
+      text: 'Något gick snett när kameran skulle startas. Försök igen – eller skriv in streckkoden.',
+    },
+  }
 }
+
+/** Feltexterna för plattformen Lagom körs på (avgörs när appen startar). */
+export const CAMERA_ERROR_TEXT: Record<CameraErrorKind, { title: string; text: string }> = cameraErrorTexts()
 
 /** Översätt ett fel från getUserMedia till en användarvänlig kategori. */
 export function classifyCameraError(err: unknown): CameraErrorKind {
   const name = typeof err === 'object' && err !== null ? String((err as { name?: unknown }).name ?? '') : ''
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return 'denied'
-  if (name === 'SecurityError') return typeof window !== 'undefined' && window.isSecureContext === false ? 'insecure' : 'denied'
+  if (name === 'SecurityError') return !isInApp() && typeof window !== 'undefined' && window.isSecureContext === false ? 'insecure' : 'denied'
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') return 'nocamera'
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'busy'
   if (name === 'NotSupportedError' || name === 'TypeError') return 'unsupported'
@@ -53,7 +72,7 @@ export function classifyCameraError(err: unknown): CameraErrorKind {
 
 /** Kan webbläsaren alls använda kameran? */
 export function cameraAvailability(): 'ok' | 'insecure' | 'unsupported' {
-  if (typeof window !== 'undefined' && window.isSecureContext === false) return 'insecure'
+  if (!isInApp() && typeof window !== 'undefined' && window.isSecureContext === false) return 'insecure'
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return 'unsupported'
   return 'ok'
 }
@@ -152,7 +171,40 @@ export interface BarcodeScanner {
   stop: () => void
 }
 
+/** Hur ofta webbläsarens BarcodeDetector läser en bildruta. */
 const SCAN_INTERVAL_MS = 120
+/** Hur ofta ZXing-reserven läser – mer CPU-krävande, så lite glesare. */
+export const ZXING_INTERVAL_MS = 250
+
+/** ZXing loggar en varning för varje bildruta utan streckkod – bara brus för oss. */
+const ZXING_NOISE = 'MultiFormatReader: non-ReaderException'
+let mutedWarn: { original: typeof console.warn; users: number } | null = null
+
+/**
+ * Filtrera bort ZXings brusiga `console.warn` medan läsaren är igång. Returnerar en funktion som
+ * återställer originalet (kan anropas flera gånger). Flera samtidiga läsare delar på filtret.
+ */
+export function muteZxingWarnings(): () => void {
+  if (!mutedWarn) {
+    const original = console.warn
+    mutedWarn = { original, users: 0 }
+    console.warn = (...args: unknown[]) => {
+      if (typeof args[0] === 'string' && args[0].startsWith(ZXING_NOISE)) return
+      original.apply(console, args)
+    }
+  }
+  mutedWarn.users++
+  let done = false
+  return () => {
+    if (done || !mutedWarn) return
+    done = true
+    mutedWarn.users--
+    if (mutedWarn.users <= 0) {
+      console.warn = mutedWarn.original
+      mutedWarn = null
+    }
+  }
+}
 
 /**
  * Läs streckkoder kontinuerligt från en video med en redan startad kameraström.
@@ -195,13 +247,20 @@ export async function startBarcodeScanner(video: HTMLVideoElement, stream: Media
   const hints = new Map<number, unknown>()
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E])
   const reader = new BrowserMultiFormatReader(hints as Map<never, unknown>, {
-    delayBetweenScanAttempts: SCAN_INTERVAL_MS,
+    delayBetweenScanAttempts: ZXING_INTERVAL_MS,
     delayBetweenScanSuccess: 500,
   })
   let stopped = false
-  const controls = await reader.decodeFromStream(stream, video, (result) => {
-    if (!stopped && result) onCode(result.getText())
-  })
+  const unmute = muteZxingWarnings()
+  let controls: { stop: () => void }
+  try {
+    controls = await reader.decodeFromStream(stream, video, (result) => {
+      if (!stopped && result) onCode(result.getText())
+    })
+  } catch (err) {
+    unmute()
+    throw err
+  }
   return {
     engine: 'zxing',
     stop: () => {
@@ -210,6 +269,8 @@ export async function startBarcodeScanner(video: HTMLVideoElement, stream: Media
         controls.stop()
       } catch {
         /* redan stoppad */
+      } finally {
+        unmute()
       }
     },
   }

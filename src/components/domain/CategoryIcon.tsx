@@ -102,7 +102,7 @@ const LEAD_DISH = /^(pizza|sushi|tacos?|burrito|hamburgare|cheeseburgare|lasagne
 const BREAD = /(bröd|knäckebröd|fralla|frallor|baguette|ciabatta|tunnbröd|pitabröd)$/
 
 const NAME_EMOJI: readonly EmojiRule[] = [
-  [/(smörgås|smörgåsar|smörgåstårta|macka|mackor|toast)$/, '🥪'],
+  [/(smörgås|smörgåsar|smörgåstårta|macka|mackor|toast|(?<!glas)sandwich|landgång)$/, '🥪'],
   [/(pizza|pizzor)$/, '🍕'],
   [/(hamburgare|burgare)$/, '🍔'],
   [/(pommes frites|pommes)$/, '🍟'],
@@ -110,7 +110,8 @@ const NAME_EMOJI: readonly EmojiRule[] = [
   [/(tacos?|nachos)$/, '🌮'],
   [/(burritos?|wrap|wraps)$/, '🌯'],
   [/kebab$/, '🥙'],
-  [/(piroger?|dumplings|dumpling)$/, '🥟'],
+  [/(pirog|piroger|dumplings|dumpling)$/, '🥟'],
+  [/falafel$/, '🧆'],
   [/sushi$/, '🍣'],
   [/(nudlar|ramen|nudelsoppa|pad thai)$/, '🍜'],
   [/(gröt|välling|müsli|granola)$/, '🥣'],
@@ -121,12 +122,12 @@ const NAME_EMOJI: readonly EmojiRule[] = [
   [/(pannkaka|pannkakor|plättar|crêpe|crêpes)$/, '🥞'],
   [/(våffla|våfflor)$/, '🧇'],
   // "Kaka" är tårta i bakverk men bröd i Hönökaka och en rätt i äggakaka/kroppkakor.
-  [/(tårta|tårtor|bakelse|cheesecake|kaka)$/, '🍰', ['brod', 'spannmal', 'snacks', 'fardigratt']],
-  [/(kakor|kex|cookie|cookies)$/, '🍪', ['brod', 'spannmal', 'fardigratt']],
+  [/(tårta|tårtor|bakelse|cheesecake|(?<!peppar|små)kaka)$/, '🍰', ['brod', 'spannmal', 'snacks', 'fardigratt']],
+  [/(kakor|kex|cookie|cookies|pepparkaka|småkaka)$/, '🍪', ['brod', 'spannmal', 'fardigratt']],
   [/(choklad|praliner)$/, '🍫'],
   [/(glass|sorbet)$/, '🍨'],
   [/(lasagne|spaghetti|pasta|makaroner|penne|tagliatelle|gnocchi)$/, '🍝', ['sas_krydda']],
-  [/(risotto|(?:^|\s|jasmin|basmati|fullkorns|parboiled|rå|vit)ris)$/, '🍚', ['spannmal']],
+  [/(risotto|(?:^|\s|jasmin|basmati|fullkorns|parboiled|rå|vit)ris)$/, '🍚', ['spannmal', 'glass_dessert']],
   [/(omelett|äggröra|stekt ägg|pocherat ägg)$/, '🍳'],
   [/(?<![lr])ägg$/, '🥚'],
   [/(bacon|fläsk)$/, '🥓'],
@@ -182,22 +183,43 @@ const NAME_EMOJI: readonly EmojiRule[] = [
 ]
 
 /**
+ * Ord som skiljer huvudordet från tillbehör och beskrivning – även Livsmedelsverkets förkortningar
+ * "m." (med), "u." (utan) och "el." (eller): "Pannkaka tunn m. vatten" → "pannkaka tunn".
+ */
+const FILLING_SPLIT = /\s+(?:med|m\.|i|och|på|utan|u\.|el\.|till)\s+/i
+
+function nameRule(subject: string, category: FoodCategory | undefined): string | undefined {
+  for (const [re, emoji, not] of NAME_EMOJI) {
+    if (re.test(subject) && !(category && not?.includes(category))) return emoji
+  }
+  return undefined
+}
+
+/**
  * Emoji för ett livsmedel: efter namnet om det känns igen, annars kategorins.
  * `foodEmoji('Smörgås, grovt bröd med smör och ost', 'fardigratt')` → '🥪'.
+ *
+ * Huvudordet står först i Livsmedelsverkets namn utan kommatecken ("Köttbullar nöt stekta",
+ * "Ärtsoppa fläsk tillagad konserv.") men ofta sist i Lagoms ("Grovt bröd", "Stekt ägg"). Därför
+ * provas först det första ordet och de två första ("Hårt bröd …", "Mörk choklad …") och till sist
+ * hela namnet. Längre början provas inte – där kommer beskrivningar ("Yoghurt mild honung").
  */
 export function foodEmoji(name: string | undefined, category: FoodCategory | undefined): string {
   const meta = CATEGORY_META[category ?? 'ovrigt'] ?? CATEGORY_META.ovrigt
   if (!name) return meta.emoji
   const head = name.split(/[,(]/)[0].trim().toLocaleLowerCase('sv-SE')
   // "Pizza vesuvio" → "pizza"; "Smulpaj med äpple" → "smulpaj".
-  const [subject, filling] = (LEAD_DISH.exec(head)?.[1] ?? head).split(/\s+(?:med|i|och|på|utan)\s+/)
+  const [subject, filling] = (LEAD_DISH.exec(head)?.[1] ?? head).split(FILLING_SPLIT)
   // Bröd med pålägg är en smörgås ("Fralla med ost", "Baguette med kyckling") – men "Grovt bröd
-  // med frön" i brödhyllan är fortfarande bröd.
-  if (filling !== undefined && category !== 'brod' && BREAD.test(subject)) return '🥪'
-  for (const [re, emoji, not] of NAME_EMOJI) {
-    if (re.test(subject) && !(category && not?.includes(category))) return emoji
+  // med frön" i brödhyllan är fortfarande bröd, och "Wienerbröd m. vaniljkräm" ett bakverk.
+  if (filling !== undefined && category !== 'brod' && category !== 'bakverk' && BREAD.test(subject)) return '🥪'
+  // "köttbullar" → "köttbullar nöt" → hela "köttbullar nöt stekta".
+  const words = subject.split(/\s+/)
+  for (let n = 1; n < Math.min(3, words.length); n++) {
+    const hit = nameRule(words.slice(0, n).join(' ').replace(/[.]+$/, ''), category)
+    if (hit) return hit
   }
-  return meta.emoji
+  return nameRule(subject.replace(/[.]+$/, ''), category) ?? meta.emoji
 }
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'

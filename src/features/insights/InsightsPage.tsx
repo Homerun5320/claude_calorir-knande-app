@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   Leaf,
   Plus,
+  Printer,
   Salad,
   Share2,
   UtensilsCrossed,
@@ -34,6 +35,7 @@ import {
   toast,
   type TabItem,
 } from '../../components/ui'
+import { isNativeApp } from '../../config/platform'
 import { useToday } from '../../hooks/useToday'
 import { evaluateKostrad, kostradScore } from '../../lib/kostrad'
 import { NUTRIENTS } from '../../lib/nutrients'
@@ -164,6 +166,7 @@ function InsightsContent() {
       ) : (
         <>
           <PeriodPicker
+            kind={kind}
             period={period}
             loggedDays={data.summary.loggedDays}
             onKind={(k) => update({ kind: k, offset: 0 })}
@@ -190,6 +193,14 @@ function InsightsContent() {
               </motion.div>
             </AnimatePresence>
           </div>
+          {/* Utskrift finns inte i den inbyggda appen – där delas rapporten som text i stället. */}
+          {!isNativeApp() && (
+            <div className="mt-4 flex justify-center">
+              <Button variant="ghost" size="sm" iconLeft={Printer} to="/rapport">
+                Rapport att skriva ut
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -230,11 +241,13 @@ function TabContent({
 // ---------------------------------------------------------------------------
 
 function PeriodPicker({
+  kind,
   period,
   loggedDays,
   onKind,
   onOffset,
 }: {
+  kind: PeriodKind
   period: Period
   loggedDays: number
   onKind: (k: PeriodKind) => void
@@ -246,7 +259,7 @@ function PeriodPicker({
     loggedDays === 0 ? 'Inga loggade dagar' : `Baserat på ${loggedDays} ${loggedDays === 1 ? 'loggad dag' : 'loggade dagar'}`
   return (
     <section aria-label="Period" className="mt-1">
-      <SegmentedControl<PeriodKind> value={period.kind} onChange={onKind} options={PERIOD_OPTIONS} fullWidth aria-label="Välj period" />
+      <SegmentedControl<PeriodKind> value={kind} onChange={onKind} options={PERIOD_OPTIONS} fullWidth aria-label="Välj period" />
       <div className="mt-3 flex min-h-11 items-center justify-between gap-2">
         {weekly ? (
           <IconButton

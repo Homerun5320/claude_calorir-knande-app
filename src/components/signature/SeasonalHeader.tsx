@@ -1251,7 +1251,7 @@ export function SeasonalHeader({ date, now: nowProp, season: seasonProp, phase: 
             ...(night ? NIGHT_INK : null),
             // En mjuk skugga håller texten skarp mot norrsken och stjärnor.
             textShadow: night ? '0 1px 14px var(--lg-shadow-c)' : undefined,
-            paddingTop: contentClassName ? undefined : 'calc(env(safe-area-inset-top) + 1rem)',
+            paddingTop: contentClassName ? undefined : 'calc(var(--sa-top) + 1rem)',
           }}
         >
           {children}

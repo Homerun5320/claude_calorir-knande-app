@@ -6,9 +6,14 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import OnboardingPage from './OnboardingPage'
+import { TargetsSummary } from './TargetsSummary'
+import { trialNote } from './OnboardingSteps'
 import { DialogHost } from '../../components/ui'
 import { createBackup } from '../../lib/backup'
 import { todayISO } from '../../lib/dates'
+import { computeEnergy, computeTargets } from '../../lib/energy'
+import { priceSummary } from '../premium/premiumLogic'
+import type { Profile } from '../../types'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFastingStore } from '../../stores/fastingStore'
@@ -60,6 +65,10 @@ beforeAll(async () => {
   await waitFor(() => expect(STORES.every((s) => s.persist.hasHydrated())).toBe(true))
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 beforeEach(() => {
   sessionStorage.clear()
   useBodyStore.getState().clearBody()
@@ -74,7 +83,14 @@ describe('OnboardingPage', () => {
     expect(screen.getByText('Svenska livsmedel och mått')).toBeInTheDocument()
     // Affärsmodellen: provperiod utan kort, sedan ett tydligt pris utan automatisk förnyelse.
     expect(screen.getByText('Prova gratis i 14 dagar – inget kort behövs')).toBeInTheDocument()
-    expect(screen.getByText('Sedan 299 kr/år eller 599 kr för alltid. Ingen reklam, ingen automatisk förnyelse.')).toBeInTheDocument()
+    // Webbpriserna (349 kr/år eller 699 kr för alltid) och vad som gäller efter provperioden.
+    expect(priceSummary()).toBe('349\u00a0kr/år eller 699\u00a0kr för alltid')
+    expect(
+      screen.getByText(
+        // Testing Library jämför med vanliga mellanslag (fast mellanslag i priset blir vanligt).
+        `Sedan väljer du ${priceSummary()} – ingen reklam och ingen automatisk förnyelse. Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.`.replace(/\s+/g, ' '),
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/Gratis, utan reklam|ingen betalvägg|inga prenumerationer/i)).not.toBeInTheDocument()
     expect(screen.getByText('Din data stannar på din enhet')).toBeInTheDocument()
 
@@ -111,7 +127,16 @@ describe('OnboardingPage', () => {
     expect(screen.getByText('Ändra när som helst i Inställningar.')).toBeInTheDocument()
     // Sammanfattningen berättar om provperioden – som inte har startat ännu.
     expect(screen.getByText(/Din provperiod på 14 dagar startar nu – allt är öppet och inget kort behövs/)).toBeInTheDocument()
+    expect(screen.getByText(/Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp\./)).toBeInTheDocument()
     expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+    // Var datan sparas, ansvarsfriskrivningen och vägar till stöd.
+    expect(screen.getByText(/Allt du fyllt i sparas bara i den här webbläsaren\./)).toBeInTheDocument()
+    expect(screen.getByText(/ersätter inte råd från vården/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /1177 Vårdguiden/ })).toHaveAttribute('href', 'https://www.1177.se')
+    expect(screen.getByRole('link', { name: /Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
+    // Påminnelsen står en gång – inte också under målet.
+    expect(screen.queryByText(/Målen är uppskattningar/)).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Kolhydrater' })).toBeInTheDocument()
 
     const before = Date.now()
     fireEvent.click(screen.getByRole('button', { name: /Börja använda Lagom/ }))
@@ -146,6 +171,20 @@ describe('OnboardingPage', () => {
     expect(await screen.findByRole('heading', { name: 'Hur äter du?' })).toBeInTheDocument()
   })
 
+  it('födelseåret får ett felmeddelande som säger vad som är fel', async () => {
+    renderFlow()
+    fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Behålla min vikt/ }))
+    next()
+    await fillAboutYou({ year: '2030' })
+    next()
+    expect(await screen.findByText('Födelseåret kan inte ligga i framtiden.')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Födelseår/ }), { target: { value: '1850' } })
+    expect(await screen.findByText(/^Ange ett födelseår mellan \d{4} och \d{4}\.$/)).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Födelseår/ }), { target: { value: '2020' } })
+    expect(await screen.findByText(/Lagom är gjord för vuxna och kan användas från 13 år/)).toBeInTheDocument()
+  })
+
   it('medvetet läge: inga siffror i fokus och mindfulMode sparas', async () => {
     renderFlow()
     fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
@@ -178,6 +217,18 @@ describe('OnboardingPage', () => {
     // Omladdning: adressen bär steget, sessionStorage bär utkastet.
     renderFlow('/valkommen?steg=mal')
     expect(await screen.findByRole('radio', { name: /Behålla min vikt/ })).toBeChecked()
+  })
+
+  it('exempeldata startar ingen provperiod', async () => {
+    renderFlow()
+    fireEvent.click(screen.getByRole('button', { name: /Utforska med exempeldata/ }))
+    expect(await screen.findByText('Startsidan', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(useLicenseStore.getState().trialStartedAt).toBeNull()
+    // Städa undan exempeldatan till nästa test.
+    useDiaryStore.getState().clearDiary()
+    useFoodStore.getState().clearFoods()
+    useFastingStore.getState().clearFasting()
+    localStorage.clear()
   })
 
   it('webbläsarens bakåt går ett steg tillbaka i stället för att lämna flödet', async () => {
@@ -270,5 +321,67 @@ describe('OnboardingPage', () => {
     })
     renderFlow()
     expect(await screen.findByText('Startsidan')).toBeInTheDocument()
+  })
+})
+
+describe('TargetsSummary', () => {
+  it('påminner under målet om att målen är uppskattningar och länkar till 1177', () => {
+    const profile: Profile = {
+      sex: 'kvinna',
+      birthYear: 1990,
+      heightCm: 168,
+      startWeightKg: 70,
+      activityLevel: 'latt',
+      goal: 'ga_ner',
+      weeklyRateKg: 0.5,
+      lifeStage: 'ingen',
+      diet: 'allatare',
+      macroPreset: 'nnr',
+      createdAt: 0,
+    }
+    render(<TargetsSummary energy={computeEnergy(profile, 70)} targets={computeTargets(profile, 70)} />)
+    expect(
+      screen.getByText(/Målen är uppskattningar\. Rådgör med vården om du har en sjukdom, är gravid eller ammar, eller funderar på att ändra din vikt\./),
+    ).toHaveClass('text-ink-3')
+    expect(screen.getByRole('link', { name: /1177\.se/ })).toHaveAttribute('href', 'https://www.1177.se')
+    // Kort etikett under 360 px, men rutan heter alltid Kolhydrater för skärmläsare.
+    const carbs = screen.getByRole('group', { name: 'Kolhydrater' })
+    expect(within(carbs).getByText('Kolhydr.')).toHaveClass('min-[360px]:hidden')
+    expect(within(carbs).getByText('Kolhydrater')).toHaveClass('hidden', 'min-[360px]:inline')
+    expect(screen.getByText(/^ca /)).toBeInTheDocument()
+  })
+})
+
+describe('trialNote', () => {
+  it('säger vad som gäller efter provperioden och vad som faktiskt har gått ut', () => {
+    const after = 'Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.'
+    expect(trialNote({ kind: 'ny' })).toContain(after)
+    expect(trialNote({ kind: 'prov', daysLeft: 3, endsAt: 0 })).toContain(after)
+    expect(trialNote({ kind: 'utgangen', endedAt: 0, licenseExpired: false })).toMatch(/^Provperioden är slut\. Du kan se, exportera och radera din data/)
+    expect(trialNote({ kind: 'utgangen', endedAt: 0, licenseExpired: true })).toMatch(/^Årslicensen har gått ut\./)
+    expect(trialNote({ kind: 'utgangen', endedAt: 0, licenseExpired: false, revoked: true })).toMatch(/^Licensen gäller inte längre\./)
+  })
+})
+
+describe('OnboardingPage i App Store-bygget', () => {
+  it('visar inga kronor och ingen Stripe – och förklarar flytten från webben', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const { default: FreshPage } = await import('./OnboardingPage')
+    const router = createMemoryRouter([{ path: '/valkommen', element: <FreshPage /> }], { initialEntries: ['/valkommen'] })
+    const { container } = render(<RouterProvider router={router} />)
+    expect(await screen.findByRole('heading', { name: 'Har du använt Lagom på webben?' })).toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/\d\s?kr\b/)
+    expect(container).not.toHaveTextContent(/Stripe/)
+    expect(screen.getByText(/årslicens eller livstidslicens som köp i appen/)).toBeInTheDocument()
+    const steps = screen.getAllByRole('listitem').filter((li) => li.closest('section[aria-labelledby="flytta-fran-webben"]'))
+    expect(steps.map((li) => li.textContent)).toEqual([
+      'Öppna Lagom i webbläsaren och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
+      'Spara filen i Filer eller skicka den till dig själv.',
+      'Välj Återställ från säkerhetskopia här.',
+    ])
+    expect(screen.getByRole('button', { name: /Återställ från säkerhetskopia/ })).toBeInTheDocument()
+    // Bara ett sätt att återställa – den lilla knappen längst ned visas inte i appen.
+    expect(screen.queryByRole('button', { name: /^Återställ säkerhetskopia$/ })).not.toBeInTheDocument()
   })
 })

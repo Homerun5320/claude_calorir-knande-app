@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { uid } from '../lib/id'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 export interface FastRecord {
   id: string
@@ -39,6 +39,12 @@ export const useFastingStore = create<FastingState>()(
       removeFast: (id) => set({ history: get().history.filter((h) => h.id !== id) }),
       clearFasting: () => set({ active: null, history: [] }),
     }),
-    { name: STORE_KEYS.fasting, storage: idbStorage, version: 1 },
+    {
+      name: STORE_KEYS.fasting,
+      storage: idbStorage,
+      version: PERSIST_VERSIONS[STORE_KEYS.fasting],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as FastingState,
+    },
   ),
 )

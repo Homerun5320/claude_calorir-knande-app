@@ -203,8 +203,8 @@ export function ToastViewport() {
     <div
       data-toast-viewport=""
       onFocus={rememberFocusOrigin}
-      className="pointer-events-none fixed inset-x-0 z-[70] flex flex-col items-center gap-2 px-4"
-      style={{ bottom: 'calc(6.25rem + env(safe-area-inset-bottom))' }}
+      className="pointer-events-none fixed inset-x-0 z-[70] flex flex-col items-center gap-2 px-4 print:hidden"
+      style={{ bottom: 'calc(6.25rem + var(--sa-bottom))' }}
     >
       {/* Två beständiga levande regioner: fel läses upp direkt, övrigt när skärmläsaren är ledig. */}
       <div role="alert" className="flex flex-col items-center gap-2">

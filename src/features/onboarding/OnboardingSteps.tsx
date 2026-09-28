@@ -15,12 +15,13 @@ import {
   Scale,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   TrendingDown,
   TrendingUp,
   Wheat,
   type LucideIcon,
 } from 'lucide-react'
-import { Card, NumberField, toneVars, type IconLike, type Tone } from '../../components/ui'
+import { Card, ExternalLink, NumberField, toneVars, type IconLike, type Tone } from '../../components/ui'
 import { EnergyValue, useEnergyFormatter } from '../../components/domain/EnergyValue'
 import { PlateModel } from '../../components/signature/PlateModel'
 import { SeasonalHeader } from '../../components/signature/SeasonalHeader'
@@ -34,8 +35,9 @@ import { ChoiceCard, ChoiceGroup } from './ChoiceCard'
 import { MacroSplitBar } from './MacroSplitBar'
 import { TargetsSummary } from './TargetsSummary'
 import { TRIAL_DAYS } from '../../config/commerce'
+import { storagePlace } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
-import { daysText, priceSummary } from '../premium/premiumLogic'
+import { daysText, priceSummaryText } from '../premium/premiumLogic'
 import {
   DIET_OPTIONS,
   GOAL_CHOICES,
@@ -97,13 +99,17 @@ export function StepHeading({
 // 0 Välkommen
 // ---------------------------------------------------------------------------
 
+/** Vad som gäller efter provperioden – samma mening i välkomststeget och sammanfattningen. */
+export const AFTER_TRIAL_TEXT = 'Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.'
+
 const PROMISES: ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
   { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
   {
     icon: Gift,
     tone: 'lingon',
     title: `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
-    text: `Sedan ${priceSummary()}. Ingen reklam, ingen automatisk förnyelse.`,
+    // Kronpriser bara där Lagom säljs på webben – i butiksapparna kommer priset från butiken.
+    text: `Sedan väljer du ${priceSummaryText()} – ingen reklam och ingen automatisk förnyelse. ${AFTER_TRIAL_TEXT}`,
   },
   { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Inget konto och ingen spårning. Exportera eller radera allt när du vill.' },
 ]
@@ -112,7 +118,7 @@ export function WelcomeStep({ today }: { today: ISODate }) {
   const reduce = useReducedMotion()
   return (
     <div>
-      <SeasonalHeader date={today} height={224} className="lg:rounded-b-[2rem]" contentClassName="absolute inset-x-0 top-0 px-5 pt-[calc(env(safe-area-inset-top)+1.25rem)]">
+      <SeasonalHeader date={today} height={224} className="lg:rounded-b-[2rem]" contentClassName="absolute inset-x-0 top-0 px-5 pt-[calc(var(--sa-top)+1.25rem)]">
         <div className="flex items-center gap-2.5">
           <LogoMark size={40} />
           <Wordmark className="text-[1.75rem]" />
@@ -461,14 +467,31 @@ export function DietStep({ draft, onChange, focusOnMount, eyebrow }: StepProps) 
 export function trialNote(status: AccessStatus): string {
   switch (status.kind) {
     case 'ny':
-      return `Din provperiod på ${TRIAL_DAYS} dagar startar nu – allt är öppet och inget kort behövs. Sedan väljer du själv: ${priceSummary()}, utan automatisk förnyelse.`
+      return `Din provperiod på ${TRIAL_DAYS} dagar startar nu – allt är öppet och inget kort behövs. Sedan väljer du själv: ${priceSummaryText()}, utan automatisk förnyelse. ${AFTER_TRIAL_TEXT}`
     case 'prov':
-      return `Du har ${daysText(status.daysLeft)} kvar av provperioden – allt är öppet. Sedan väljer du själv: ${priceSummary()}, utan automatisk förnyelse.`
+      return `Du har ${daysText(status.daysLeft)} kvar av provperioden – allt är öppet. Sedan väljer du själv: ${priceSummaryText()}, utan automatisk förnyelse. ${AFTER_TRIAL_TEXT}`
     case 'licensierad':
       return 'Du har en licens – allt i Lagom är öppet.'
-    case 'utgangen':
-      return `Provperioden är slut. Du kan se, exportera och radera din data – för att logga nytt behöver du en licens (${priceSummary()}).`
+    case 'utgangen': {
+      // Säg vad som faktiskt har hänt: provperioden, årslicensen eller en återkallad licens.
+      const what = status.revoked ? 'Licensen gäller inte längre.' : status.licenseExpired ? 'Årslicensen har gått ut.' : 'Provperioden är slut.'
+      return `${what} Du kan se, exportera och radera din data – för att logga nytt behöver du en licens (${priceSummaryText()}).`
+    }
+    default:
+      // Nya lägen i AccessStatus – en neutral text hellre än ingen.
+      return `Allt du har loggat kan du alltid se, exportera och radera. ${AFTER_TRIAL_TEXT}`
   }
+}
+
+/** Kort ansvarsfriskrivning i sammanfattningen – samma text som på Om Lagom. */
+export function CareNote() {
+  return (
+    <Note tone="blabar" icon={Stethoscope}>
+      Lagom ger allmän information om mat och näring och ersätter inte råd från vården. Mål och beräkningar är uppskattningar. Har du en sjukdom, är
+      gravid eller ammar, eller funderar på att ändra din vikt – rådgör gärna med vården. Kontakta <ExternalLink href="https://www.1177.se">1177 Vårdguiden</ExternalLink>{' '}
+      vid frågor om hälsa. Tänker du mycket på mat och vikt finns stöd hos <ExternalLink href="https://www.friskfri.se">Frisk &amp; Fri</ExternalLink>.
+    </Note>
+  )
 }
 
 export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) {
@@ -530,7 +553,7 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
                 +
               </span>
             </summary>
-            <TargetsSummary energy={energy} targets={targets} extraNotes={extraNotes} className="mt-3" />
+            <TargetsSummary energy={energy} targets={targets} extraNotes={extraNotes} careNote={false} className="mt-3" />
           </details>
         </div>
       ) : (
@@ -543,7 +566,8 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
               </div>
               <MacroSplitBar split={macroPct(profile.macroPreset)} className="mb-2 w-28" />
             </div>
-            <TargetsSummary energy={energy} targets={targets} extraNotes={extraNotes} />
+            {/* Påminnelsen om vården står i CareNote nedan i stället för under målet. */}
+            <TargetsSummary energy={energy} targets={targets} extraNotes={extraNotes} careNote={false} />
           </Card>
           {projection && (
             <Card tone="sol" padding="sm">
@@ -563,8 +587,9 @@ export function SummaryStep({ draft, today, focusOnMount, eyebrow }: StepProps) 
           {trialNote(status)}
         </Note>
         <Note tone="mossa" icon={ShieldCheck}>
-          Allt du fyllt i sparas bara i den här webbläsaren. Inget konto och ingen reklam.
+          Allt du fyllt i sparas bara {storagePlace()}. Inget konto och ingen reklam.
         </Note>
+        <CareNote />
         <p className="flex items-center gap-2 px-1 text-[0.875rem] text-ink-3">
           <Sparkles aria-hidden className="size-4 shrink-0" />
           Ändra när som helst i Inställningar.

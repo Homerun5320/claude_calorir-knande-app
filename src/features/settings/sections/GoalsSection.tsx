@@ -1,10 +1,11 @@
 /**
  * Inställningar → Mål och makron: hur dagsmålet räknas fram, adaptiv förbrukning,
- * makrofördelning (förinställningar eller egen) och egna mål som skriver över de beräknade.
+ * makrofördelning (förinställningar eller egen), egna mål som skriver över de beräknade,
+ * veckans fokus (ett litet mål byggt på kostråden) och kosttillskott med en daglig bock på Idag.
  */
 import { useMemo, useState } from 'react'
-import { Activity, EyeOff, RotateCcw, SlidersHorizontal } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, NumberField, Slider, Switch, toast } from '../../../components/ui'
+import { Activity, EyeOff, Pill, Plus, RotateCcw, SlidersHorizontal, Sprout, Trash2 } from 'lucide-react'
+import { Badge, Button, Card, Chip, EmptyState, IconButton, NumberField, Select, Sheet, Slider, Switch, toast } from '../../../components/ui'
 import { useEnergyUnit } from '../../../components/domain/EnergyValue'
 import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
@@ -12,11 +13,27 @@ import { addDays } from '../../../lib/dates'
 import { totals } from '../../../lib/diary'
 import { MACRO_PRESETS, macroPercents, type EnergyBreakdown } from '../../../lib/energy'
 import { formatEnergy, formatNumber, parseSwedishNumber } from '../../../lib/format'
-import { KJ_PER_KCAL } from '../../../lib/nutrients'
+import { KJ_PER_KCAL, NUTRIENTS, type NutrientKey } from '../../../lib/nutrients'
+import { FOCUS_GOALS, focusGoal, focusSince } from '../../../lib/focusGoals'
+import {
+  SUPPLEMENT_LIMIT_NOTE,
+  SUPPLEMENT_TEMPLATES,
+  isSupplementFood,
+  nutrientListText,
+  overUpperLimit,
+  supplementAmounts,
+  supplementFood,
+  supplementName,
+  supplementTemplate,
+  type SupplementTemplate,
+  type SupplementTemplateId,
+} from '../../../data/supplements'
 import { useBodyStore } from '../../../stores/bodyStore'
 import { useDiaryStore } from '../../../stores/diaryStore'
+import { useFoodStore } from '../../../stores/foodStore'
 import { useProfileStore } from '../../../stores/profileStore'
 import type { MacroPreset, Profile, Targets } from '../../../types'
+import { requireAccess } from '../../premium/requireAccess'
 import { Note } from '../../onboarding/AboutFields'
 import { ChoiceCard, ChoiceGroup } from '../../onboarding/ChoiceCard'
 import { MacroSplitBar } from '../../onboarding/MacroSplitBar'
@@ -76,7 +93,183 @@ export function GoalsSection() {
       <AdaptiveCard />
       <MacroCard profile={profile} kcal={targets.kcal} />
       <OverridesCard profile={profile} weightKg={weightKg} energy={energy} targets={targets} />
+      <WeeklyFocusCard />
+      <SupplementsSettingsCard />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Veckans fokus
+// ---------------------------------------------------------------------------
+
+const NO_FOCUS = 'inget'
+
+function WeeklyFocusCard() {
+  const today = useToday()
+  const focusId = useProfileStore((s) => s.settings.weeklyFocus?.id)
+  const updateSettings = useProfileStore((s) => s.updateSettings)
+  const current = focusGoal(focusId)
+  const options = useMemo(
+    () => [{ value: NO_FOCUS, label: 'Inget fokus' }, ...FOCUS_GOALS.map((g) => ({ value: g.id as string, label: `${g.emoji} ${g.title}` }))],
+    [],
+  )
+
+  const choose = (value: string) => {
+    if (value === NO_FOCUS) updateSettings({ weeklyFocus: undefined })
+    // Fokuset gäller från veckans måndag, så att hela veckan räknas.
+    else updateSettings({ weeklyFocus: { id: value, since: focusSince(today) } })
+  }
+
+  return (
+    <Card eyebrow="Kostråden" title="Veckans fokus" action={<Sprout aria-hidden className="size-5 text-mossa" />}>
+      <p className="-mt-1 mb-3 text-[0.875rem] leading-relaxed text-ink-2">
+        Välj ett litet mål för veckan, byggt på Livsmedelsverkets kostråd. Det visas på Idag, och på söndagen får du en kort
+        summering. Byt när du vill – det finns inget att tappa.
+      </p>
+      <Select label="Veckans fokus" value={current ? current.id : NO_FOCUS} onChange={choose} options={options} />
+      {current && <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">{current.description}</p>}
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Kosttillskott
+// ---------------------------------------------------------------------------
+
+function SupplementsSettingsCard() {
+  const customFoods = useFoodStore((s) => s.customFoods)
+  const [open, setOpen] = useState(false)
+  const supplements = useMemo(
+    () => Object.values(customFoods).filter(isSupplementFood).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    [customFoods],
+  )
+
+  const remove = (id: string) => {
+    const food = useFoodStore.getState().customFoods[id]
+    if (!food) return
+    useFoodStore.getState().removeCustomFood(id)
+    toast(`${food.name} är borttaget`, {
+      action: { label: 'Ångra', onClick: () => useFoodStore.getState().addCustomFood(food) },
+    })
+  }
+
+  return (
+    <Card eyebrow="Idag" title="Kosttillskott" action={<Pill aria-hidden className="size-5 text-ink-3" />}>
+      <p className="-mt-1 mb-3 text-[0.875rem] leading-relaxed text-ink-2">
+        Lägg till de tillskott du tar, så får du en bock per tillskott på Idag. Det du redan loggat finns kvar i dagboken om du tar bort ett
+        tillskott här.
+      </p>
+      {supplements.length > 0 && (
+        <ul className="mb-3 flex flex-col divide-y divide-line" aria-label="Dina kosttillskott">
+          {supplements.map((f) => (
+            <li key={f.id} className="flex min-h-12 items-center gap-3 py-1">
+              <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-medium text-ink">{f.name}</span>
+              <IconButton icon={Trash2} size="sm" variant="ghost" aria-label={`Ta bort ${f.name}`} onClick={() => remove(f.id)} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button variant="soft" iconLeft={Plus} onClick={() => setOpen(true)}>
+        Lägg till kosttillskott
+      </Button>
+      <AddSupplementSheet open={open} onClose={() => setOpen(false)} />
+    </Card>
+  )
+}
+
+type Strengths = Partial<Record<NutrientKey, number | undefined>>
+
+function defaultStrengths(template: SupplementTemplate): Strengths {
+  const out: Strengths = {}
+  for (const n of template.nutrients) out[n.key] = n.amount
+  return out
+}
+
+/** Arket där man väljer mall och styrka. Värdena sparas som ett eget livsmedel i kategorin 'kosttillskott'. */
+function AddSupplementSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [templateId, setTemplateId] = useState<SupplementTemplateId>('d-vitamin')
+  const template = supplementTemplate(templateId) ?? SUPPLEMENT_TEMPLATES[0]
+  const [strengths, setStrengths] = useState<Strengths>(() => defaultStrengths(template))
+  const options = useMemo(() => SUPPLEMENT_TEMPLATES.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}` })), [])
+
+  const chooseTemplate = (id: SupplementTemplateId) => {
+    const next = supplementTemplate(id)
+    if (!next) return
+    setTemplateId(id)
+    setStrengths(defaultStrengths(next))
+  }
+
+  const cleanStrengths = useMemo(() => {
+    const out: Partial<Record<NutrientKey, number>> = {}
+    for (const [k, v] of Object.entries(strengths) as Array<[NutrientKey, number | undefined]>) if (v !== undefined) out[k] = v
+    return out
+  }, [strengths])
+  const amounts = useMemo(() => supplementAmounts(template, cleanStrengths), [template, cleanStrengths])
+  const over = overUpperLimit(amounts)
+  const missing = template.nutrients.some((n) => !(strengths[n.key] !== undefined && (strengths[n.key] as number) >= 0))
+  const primary = template.nutrients[0]
+
+  const save = () => {
+    if (missing || !requireAccess('livsmedel')) return
+    const food = supplementFood(template, cleanStrengths)
+    useFoodStore.getState().addCustomFood(food)
+    toast(`${food.name} är tillagt – bocka av det på Idag`, {
+      tone: 'success',
+      action: { label: 'Ångra', onClick: () => useFoodStore.getState().removeCustomFood(food.id) },
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Lägg till kosttillskott"
+      description="Välj tillskott och ange styrkan från din förpackning."
+      width="sm"
+      footer={
+        <Button fullWidth size="lg" iconLeft={Plus} onClick={save} disabled={missing}>
+          Lägg till {supplementName(template, cleanStrengths)}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Select<SupplementTemplateId> label="Tillskott" value={templateId} onChange={chooseTemplate} options={options} />
+        <p className="rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2">{template.note}</p>
+        {template.nutrients.map((n) => {
+          const meta = NUTRIENTS[n.key]
+          return (
+            <NumberField
+              key={`${template.id}-${n.key}`}
+              label={`${meta.name} per ${template.portionLabel.replace(/^1 /, '')}`}
+              value={strengths[n.key]}
+              onChange={(v) => setStrengths((prev) => ({ ...prev, [n.key]: v }))}
+              min={0}
+              step={meta.unit === 'g' ? 0.05 : 1}
+              decimals={meta.unit === 'g' ? 2 : 1}
+              suffix={meta.unit}
+              error={strengths[n.key] === undefined ? 'Ange mängden – står på förpackningen.' : undefined}
+            />
+          )
+        })}
+        {template.presets && template.presets.length > 1 && (
+          <div role="group" aria-label="Vanliga styrkor" className="-mt-2 flex flex-wrap gap-2">
+            {template.presets.map((v) => (
+              <Chip key={v} size="sm" selected={strengths[primary.key] === v} onClick={() => setStrengths((prev) => ({ ...prev, [primary.key]: v }))}>
+                {formatNumber(v, 2)} {NUTRIENTS[primary.key].unit}
+              </Chip>
+            ))}
+          </div>
+        )}
+        {over.length > 0 && (
+          <p className="rounded-2xl bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-ink-2" role="note">
+            Styrkan är högre än den övre gränsen i NNR för {nutrientListText(over)}.{' '}
+            {SUPPLEMENT_LIMIT_NOTE}
+          </p>
+        )}
+      </div>
+    </Sheet>
   )
 }
 

@@ -36,7 +36,7 @@ export function BasketBar({ meal, onOpen, onCommit }: { meal: MealId; onOpen: ()
           animate={{ y: 0, opacity: 1 }}
           exit={reduce ? { opacity: 0 } : { y: 96, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 420, damping: 36 }}
-          className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,var(--sa-bottom))]"
         >
           <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-[1.75rem] bg-surface/95 p-2 shadow-[var(--shadow-float)] ring-1 ring-line/70 backdrop-blur-xl">
             <button
@@ -148,7 +148,7 @@ export function BasketSheet({ open, onClose, date, meal, today, onCommit, onEdit
                     brand={item.food.brand}
                     category={item.food.category}
                     imageUrl={item.food.imageUrl}
-                    amountText={describeAmount(item.food, item.amount, item.unit)}
+                    amountText={item.note ? `${describeAmount(item.food, item.amount, item.unit)} · ${item.note.toLocaleLowerCase('sv-SE')}` : describeAmount(item.food, item.amount, item.unit)}
                     kcal={mindful ? undefined : n.kcal}
                     macros={{ protein: n.protein, carbs: n.carbs, fat: n.fat }}
                     showMacros={!mindful}

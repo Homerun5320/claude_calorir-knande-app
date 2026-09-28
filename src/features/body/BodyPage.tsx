@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react'
 import { HeartHandshake, Target } from 'lucide-react'
-import { Button, Card, EmptyState, PageHeader, Skeleton } from '../../components/ui'
+import { Button, Card, EmptyState, ExternalLink, PageHeader, Skeleton } from '../../components/ui'
 import { useToday } from '../../hooks/useToday'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useHydrated } from '../../stores/hydration'
@@ -152,13 +152,13 @@ function SupportNote() {
       <p>
         Din vikt är bara en del av hälsan – sömn, rörelse, glädje och gemenskap räknas lika mycket. Känns tankar kring mat,
         vikt eller kropp tunga? Du är inte ensam. Läs mer och få stöd hos{' '}
-        <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+        <ExternalLink href="https://www.1177.se/" className="font-semibold text-gran underline underline-offset-2">
           1177
-        </a>{' '}
+        </ExternalLink>{' '}
         eller{' '}
-        <a href="https://www.friskfri.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
+        <ExternalLink href="https://www.friskfri.se" className="font-semibold text-gran underline underline-offset-2">
           Frisk &amp; Fri
-        </a>
+        </ExternalLink>
         .
       </p>
     </aside>

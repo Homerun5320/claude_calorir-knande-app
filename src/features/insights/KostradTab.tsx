@@ -4,9 +4,8 @@
  */
 import { useMemo } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { ExternalLink } from 'lucide-react'
-import { Badge, Card, ProgressBar, ProgressRing } from '../../components/ui'
-import { evaluateKostrad, kostradScore, type KostradResult } from '../../lib/kostrad'
+import { Badge, Card, ExternalLink, ProgressBar, ProgressRing } from '../../components/ui'
+import { evaluateKostrad, isUsable, kostradScore, type KostradResult } from '../../lib/kostrad'
 import { KOSTRAD_STATUS, kostradProgressText, kostradScoreLabel } from './advice'
 import { InfoNote, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
@@ -33,7 +32,10 @@ export function KostradTab({ data }: { data: InsightsData }) {
   const reduce = useReducedMotion()
   const { mindful } = data
   const label = kostradScoreLabel(score)
-  const met = results.filter((r) => r.status === 'bra').length
+  // Bara bedömda råd räknas: ett osäkert råd (för få kända värden) är varken uppfyllt eller inte.
+  const usable = results.filter(isUsable)
+  const met = usable.filter((r) => r.status === 'bra').length
+  const uncertainCount = results.length - usable.length
   const days = results[0]?.periodDays ?? 0
 
   if (results.length === 0) {
@@ -75,7 +77,7 @@ export function KostradTab({ data }: { data: InsightsData }) {
             <p className="mt-1 font-display text-2xl leading-tight font-semibold tracking-tight">{label.title}</p>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{label.text}</p>
             <p className="mt-2 text-xs text-ink-3">
-              {met} av {results.length} råd uppfyllda · baserat på {days} {days === 1 ? 'dag' : 'dagar'}
+              {kostradMetText(met, usable.length, uncertainCount)} · baserat på {days} {days === 1 ? 'dag' : 'dagar'}
             </p>
           </div>
         </div>
@@ -101,23 +103,21 @@ export function KostradTab({ data }: { data: InsightsData }) {
       <SourceNote>
         Källa: Livsmedelsverkets kostråd för vuxna (2025), baserade på Nordiska näringsrekommendationer 2023. Rörelse:
         Folkhälsomyndighetens riktlinjer (2021).{' '}
-        <a
-          href="https://www.livsmedelsverket.se"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-0.5 font-semibold text-gran underline-offset-2 hover:underline"
-        >
-          livsmedelsverket.se
-          <ExternalLink className="size-3" aria-hidden="true" />
-        </a>
+        <ExternalLink href="https://www.livsmedelsverket.se">livsmedelsverket.se</ExternalLink>
       </SourceNote>
     </div>
   )
 }
 
+/** "2 av 9 bedömda råd uppfyllda · 3 osäkra" – osäkra råd räknas inte in i totalen. */
+export function kostradMetText(met: number, assessed: number, uncertain: number): string {
+  const base = `${met} av ${assessed} bedömda råd uppfyllda`
+  return uncertain > 0 ? `${base} · ${uncertain} ${uncertain === 1 ? 'osäkert' : 'osäkra'}` : base
+}
+
 function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: boolean }) {
   const status = KOSTRAD_STATUS[r.status]
-  const uncertain = r.coverage !== undefined && r.coverage < 0.5
+  const uncertain = !isUsable(r)
   return (
     <article className="card h-full p-4" aria-label={r.title}>
       <div className="flex items-start gap-3">

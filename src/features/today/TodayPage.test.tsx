@@ -5,8 +5,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import TodayPage from './TodayPage'
+import { EveningCheckIn } from './EveningCheckIn'
+import { supplementFood, supplementTemplate } from '../../data/supplements'
 import { useToastStore } from '../../components/ui'
-import { addDays, todayISO } from '../../lib/dates'
+import { addDays, startOfWeek, todayISO, weekdayIndex } from '../../lib/dates'
 import { useBodyStore } from '../../stores/bodyStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFastingStore } from '../../stores/fastingStore'
@@ -121,7 +123,7 @@ describe('TodayPage', () => {
     useProfileStore.setState({ profile: { ...PROFILE, goal: 'ga_ner' } })
     renderPage()
     expect(await screen.findByText(/snabbare än vi rekommenderar/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Frisk & Fri' })).toHaveAttribute('href', 'https://www.friskfri.se')
+    expect(screen.getByRole('link', { name: /^Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
   })
 
   it('kopierar gårdagens måltid och kan ångra', async () => {
@@ -202,7 +204,7 @@ describe('TodayPage', () => {
     useProfileStore.setState({ profile: { ...PROFILE, birthYear, goal: 'ga_ner' }, settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
     renderPage()
     expect(await screen.findByText(/under det som räknas som hälsosamt för din längd och ålder/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '1177' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^1177/ })).toBeInTheDocument()
     // Inga siffror i medvetet läge.
     expect(screen.queryByRole('button', { name: /Väg dig/ })).not.toBeInTheDocument()
   })
@@ -232,5 +234,106 @@ describe('TodayPage', () => {
     expect(await screen.findByText('Fasta · 16:8')).toBeInTheDocument()
     expect(screen.getByText('Träning idag')).toBeInTheDocument()
     expect(screen.getByText('Promenad')).toBeInTheDocument()
+  })
+})
+
+describe('Veckans fokus och kosttillskott', () => {
+  beforeEach(() => {
+    useFoodStore.setState({ customFoods: {} })
+  })
+
+  it('visar veckans fokus med en uppmuntrande rad – och inget kort utan fokus', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'lunch' })
+    const { unmount } = renderPage()
+    await screen.findByText('Lax, ugnsbakad')
+    expect(screen.queryByRole('heading', { name: 'Veckans fokus' })).not.toBeInTheDocument()
+    unmount()
+
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, weeklyFocus: { id: 'fisk', since: startOfWeek(today) } } })
+    renderPage()
+    const card = (await screen.findByRole('heading', { name: 'Veckans fokus' })).closest('section')!
+    expect(within(card).getByText('Fisk två gånger')).toBeInTheDocument()
+    expect(within(card).getByText(/^1 av 2 fiskmåltider – en bit på väg/)).toBeInTheDocument()
+    expect(within(card).getByRole('progressbar')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Ändra veckans fokus' })).toHaveAttribute('href', '/installningar/mal')
+  })
+
+  it('bockar av ett kosttillskott, visar "Taget idag" och kan bocka av igen', async () => {
+    const today = todayISO()
+    const template = supplementTemplate('d-vitamin')!
+    const food = supplementFood(template, 10, { id: 'custom:dvit' })
+    useFoodStore.setState({ customFoods: { [food.id]: food } })
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    renderPage()
+    const box = await screen.findByRole('checkbox', { name: /D-vitamin 10 µg/ })
+    expect(box).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(box)
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /D-vitamin 10 µg/ })).toHaveAttribute('aria-checked', 'true'))
+    expect(screen.getByText('Taget idag')).toBeInTheDocument()
+    const logged = (useDiaryStore.getState().entries[today] ?? []).filter((e) => e.kind === 'food' && e.food.id === 'custom:dvit')
+    expect(logged).toHaveLength(1)
+    expect(logged[0].kind === 'food' && logged[0].unit).toBe('portion:tablett')
+    // Ingen varning under den övre gränsen.
+    expect(screen.queryByText(/Stäm av doseringen/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /D-vitamin 10 µg/ }))
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /D-vitamin 10 µg/ })).toHaveAttribute('aria-checked', 'false'))
+    expect((useDiaryStore.getState().entries[today] ?? []).some((e) => e.kind === 'food' && e.food.id === 'custom:dvit')).toBe(false)
+  })
+
+  it('säger lugnt till när tillskotten passerar den övre gränsen – utan röd färg', async () => {
+    const food = supplementFood(supplementTemplate('d-vitamin')!, 125, { id: 'custom:dvit125' })
+    useFoodStore.setState({ customFoods: { [food.id]: food } })
+    renderPage()
+    fireEvent.click(await screen.findByRole('checkbox', { name: /D-vitamin 125 µg/ }))
+    const note = await screen.findByText(/Stäm av doseringen med apoteket eller vården\./)
+    expect(note).toHaveTextContent('Dagens tillskott ger mer vitamin D än den övre gränsen i NNR.')
+    expect(note.className).not.toMatch(/lingon|bad|red/)
+  })
+
+  it('visar inget tillskottskort utan egna tillskott', async () => {
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: todayISO(), meal: 'frukost' })
+    renderPage()
+    await screen.findByText('Havregrynsgröt')
+    expect(screen.queryByRole('heading', { name: 'Kosttillskott' })).not.toBeInTheDocument()
+  })
+
+  it('summerar veckans fokus i kvällsreflektionen på söndagen', async () => {
+    // Söndagen i förra veckan – kvällsreflektionen visas alltid i medvetet läge.
+    const today = todayISO()
+    const sunday = addDays(startOfWeek(today), -1)
+    expect(weekdayIndex(sunday)).toBe(6)
+    const monday = addDays(sunday, -6)
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: monday, meal: 'middag' })
+    useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: sunday, meal: 'lunch' })
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, weeklyFocus: { id: 'fisk', since: monday } } })
+    // Reflektionen syns efter kl. 18 – eller när dagen redan har reflekterats.
+    useDiaryStore.getState().setDayMeta(sunday, { mood: 4 })
+    render(<EveningCheckIn today={sunday} mindful={false} />)
+    expect(await screen.findByText(/Fisk två gånger: 2 av 2 fiskmåltider – snyggt jobbat den här veckan!/)).toBeInTheDocument()
+
+    // Ingen summering andra dagar.
+    const { container } = render(<EveningCheckIn today={monday} mindful />)
+    expect(within(container).queryByRole('note', { name: 'Veckans fokus' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Vikt i korthet – skärmläsartext', () => {
+  it('säger "Trenden är stabil" när vikten står still', async () => {
+    const today = todayISO()
+    for (let k = 0; k <= 10; k++) useBodyStore.getState().logWeight(addDays(today, -k), 68)
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    renderPage()
+    expect(await screen.findByText('Trenden är stabil')).toBeInTheDocument()
+    expect(screen.queryByText(/Trenden går oförändrad/)).not.toBeInTheDocument()
+  })
+
+  it('säger "Trenden går uppåt:" före förändringen', async () => {
+    const today = todayISO()
+    for (let k = 0; k <= 14; k++) useBodyStore.getState().logWeight(addDays(today, k - 14), 66 + k * 0.1)
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    renderPage()
+    expect(await screen.findByText('Trenden går uppåt:')).toBeInTheDocument()
   })
 })

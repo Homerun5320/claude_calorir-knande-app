@@ -353,12 +353,20 @@ describe('kroppsmått', () => {
     expect(hasAnyMeasure({ armCm: 31 })).toBe(true)
   })
 
-  it('räknar midja/längd och tolkar kvoten ödmjukt', () => {
+  it('räknar midja/längd och visar kvoten som neutrala intervall – inga riskbedömningar', () => {
     expect(waistToHeight(84, 168)).toBeCloseTo(0.5)
     expect(waistToHeight(84, 0)).toBeUndefined()
-    expect(whtrCategory(0.45).label).toBe('Lägre risk')
-    expect(whtrCategory(0.55).label).toBe('Något förhöjd risk')
+    expect(whtrCategory(0.38)).toEqual({ label: 'Under 0,4', tone: 'neutral' })
+    expect(whtrCategory(0.45)).toEqual({ label: 'Under 0,5', tone: 'mossa' })
+    expect(whtrCategory(0.5)).toEqual({ label: '0,5–0,6', tone: 'hjortron' })
+    expect(whtrCategory(0.55)).toEqual({ label: '0,5–0,6', tone: 'hjortron' })
+    // Gränserna följer det visade värdet (två decimaler): 0,60 ligger i 0,5–0,6, 0,499 visas som 0,50.
+    expect(whtrCategory(0.6)).toEqual({ label: '0,5–0,6', tone: 'hjortron' })
+    expect(whtrCategory(0.603)).toEqual({ label: '0,5–0,6', tone: 'hjortron' })
+    expect(whtrCategory(0.499)).toEqual({ label: '0,5–0,6', tone: 'hjortron' })
+    expect(whtrCategory(0.61)).toEqual({ label: 'Över 0,6', tone: 'hjortron' })
     expect(whtrCategory(0.65).tone).toBe('hjortron')
+    for (const r of [0.3, 0.45, 0.55, 0.7]) expect(whtrCategory(r).label).not.toMatch(/risk/i)
   })
 })
 

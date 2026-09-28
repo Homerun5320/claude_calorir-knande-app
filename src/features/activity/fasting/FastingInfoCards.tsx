@@ -5,16 +5,14 @@
  * Evidensläget beskrivs försiktigt: periodisk fasta fungerar ungefär som annan kaloriminskning.
  */
 import { memo, type ReactNode } from 'react'
-import { Droplet, ExternalLink, HeartHandshake, Scale, ShieldCheck, type LucideIcon } from 'lucide-react'
-import { Button, Card } from '../../../components/ui'
+import { Droplet, HeartHandshake, Scale, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { Button, Card, ExternalLink } from '../../../components/ui'
 
 function ExtLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-gran underline-offset-4 hover:underline">
+    <ExternalLink href={href} className="font-semibold text-gran underline-offset-4 hover:underline">
       {children}
-      <ExternalLink aria-hidden className="size-3.5" strokeWidth={2.2} />
-      <span className="sr-only"> (öppnas i ny flik)</span>
-    </a>
+    </ExternalLink>
   )
 }
 

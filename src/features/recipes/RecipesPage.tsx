@@ -7,7 +7,7 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
-import { BookOpen, ChefHat, Plus, Scale, Search, Sparkles } from 'lucide-react'
+import { BookOpen, ChefHat, Link2, Plus, Scale, Search, Sparkles } from 'lucide-react'
 import type { FoodTag, Recipe } from '../../types'
 import { Button, Chip, EmptyState, PageHeader, Tabs, TextField, tabPanelProps } from '../../components/ui'
 import { useFoodStore } from '../../stores/foodStore'
@@ -78,6 +78,11 @@ export default function RecipesPage() {
         eyebrow="Kokbok"
         title="Recept"
         subtitle="Dina egna rätter och svenska klassiker – med näring per portion."
+        actions={
+          <Button size="sm" variant="soft" iconLeft={Link2} to="/recept/importera">
+            Importera recept
+          </Button>
+        }
       >
         <Tabs<Tab>
           id={TABS_ID}
@@ -163,7 +168,7 @@ export default function RecipesPage() {
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 420, damping: 30, delay: 0.1 }}
-          className="fixed right-4 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-40 lg:right-8 lg:bottom-8"
+          className="fixed right-4 bottom-[calc(6.25rem+var(--sa-bottom))] z-40 lg:right-8 lg:bottom-8"
         >
           <Button to="/recept/nytt" size="lg" iconLeft={Plus} className="!rounded-full shadow-[var(--shadow-float)]">
             Nytt recept
@@ -219,6 +224,9 @@ function OwnRecipes({
             <>
               <Button to="/recept/nytt" iconLeft={ChefHat}>
                 Skapa recept
+              </Button>
+              <Button variant="soft" iconLeft={Link2} to="/recept/importera">
+                Importera från länk
               </Button>
               <Button variant="soft" iconLeft={Sparkles} onClick={onExplore}>
                 Utforska klassiker

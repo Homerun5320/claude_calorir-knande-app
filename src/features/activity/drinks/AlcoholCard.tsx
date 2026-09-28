@@ -5,8 +5,8 @@
  * Tonen är saklig och vänlig: inga röda varningar, ingen skuld – bara information och en väg till stöd.
  */
 import { memo, useMemo } from 'react'
-import { ExternalLink, Info } from 'lucide-react'
-import { Card, Stat } from '../../../components/ui'
+import { Info } from 'lucide-react'
+import { Card, ExternalLink, Stat } from '../../../components/ui'
 import { BarChart, type BarDatum } from '../../../components/charts'
 import { formatNumber, plural } from '../../../lib/format'
 import { useDiaryStore } from '../../../stores/diaryStore'
@@ -73,9 +73,9 @@ export const AlcoholCard = memo(function AlcoholCard({ today, mindful, pregnantO
         <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-2">
           Under 18 år är rådet att avstå från alkohol helt – kroppen och hjärnan utvecklas fortfarande. Har du frågor eller funderingar
           kan du prata med skolsköterskan eller läsa mer på{' '}
-          <a href="https://www.1177.se/" target="_blank" rel="noreferrer" className="font-semibold text-vinbar underline underline-offset-2">
+          <ExternalLink href="https://www.1177.se/" className="font-semibold text-vinbar underline underline-offset-2">
             1177
-          </a>
+          </ExternalLink>
           .
         </p>
       ) : (
@@ -119,16 +119,12 @@ function AdultAlcoholInfo({ today, mindful }: { today: ISODate; mindful: boolean
       <h3 className="eyebrow mb-2 mt-5">Lägg till</h3>
       <QuickDrinks options={ALCOHOL_OPTIONS} kind="alcohol" date={today} mindful={mindful} label="Snabbval öl, vin, cider och snaps" />
 
-      <a
+      <ExternalLink
         href="https://alkoholhjalpen.se"
-        target="_blank"
-        rel="noopener noreferrer"
         className="mt-4 flex min-h-11 items-center gap-2 rounded-2xl px-1 text-[0.875rem] font-semibold text-vinbar underline-offset-4 hover:underline"
       >
         Alkoholhjälpen – anonymt stöd och självtest
-        <ExternalLink aria-hidden className="size-4" strokeWidth={2.2} />
-        <span className="sr-only">(öppnas i ny flik)</span>
-      </a>
+      </ExternalLink>
     </>
   )
 }

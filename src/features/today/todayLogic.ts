@@ -11,7 +11,7 @@ import { dailyBudget, entryKcal, totals } from '../../lib/diary'
 import { bmi, minHealthyBmi, weightTrend } from '../../lib/energy'
 import { goodDirection } from '../body/bodyLogic'
 import { formatEnergy, formatNumber, plural } from '../../lib/format'
-import type { KostradId, KostradResult, KostradStatus } from '../../lib/kostrad'
+import { isUsable, type KostradId, type KostradResult, type KostradStatus } from '../../lib/kostrad'
 import { standardDrinks } from '../../lib/nutrients'
 import { foodDayCountdown, foodDayFor, upcomingFoodDays, type FoodDay } from '../../lib/swedishCalendar'
 import type { RingStatus } from '../../components/signature'
@@ -267,7 +267,7 @@ export const KOSTRAD_SHORT_TITLE: Partial<Record<KostradId, string>> = {
 export function pickKostradHighlights(results: readonly KostradResult[], count = 3): KostradResult[] {
   const rank = (r: KostradResult) => KOSTRAD_HIGHLIGHT_ORDER.indexOf(r.id)
   const candidates = results
-    .filter((r) => r.direction === 'minst' && rank(r) >= 0 && (r.coverage === undefined || r.coverage >= 0.5))
+    .filter((r) => r.direction === 'minst' && rank(r) >= 0 && isUsable(r))
     .sort((a, b) => rank(a) - rank(b))
   if (candidates.length <= count) return candidates
 

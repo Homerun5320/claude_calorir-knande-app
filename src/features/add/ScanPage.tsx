@@ -20,7 +20,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useToday } from '../../hooks/useToday'
 import { findFoodByBarcode, rememberFoods } from '../../lib/foodRepo'
-import { OFF_MESSAGES, OpenFoodFactsError, fetchProductByBarcode, isAbortError, isValidEan, normalizeBarcode } from '../../lib/openFoodFacts'
+import { OFF_MESSAGES, OpenFoodFactsError, fetchProductByBarcode, invalidBarcodeMessage, isAbortError, isValidEan, normalizeBarcode } from '../../lib/openFoodFacts'
 import { mealName } from '../../lib/meals'
 import { relativeDayLabel } from '../../lib/dates'
 import { addPageHref, countLabel, findByBarcode, foodDetailHref, newFoodHref, nutriScoreInfo, parseAddParams } from './addLogic'
@@ -322,7 +322,7 @@ export default function ScanPage() {
       </div>
 
       {/* Nedre list */}
-      <footer className="relative z-10 flex flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <footer className="relative z-10 flex flex-col gap-3 px-4 pb-[max(1rem,var(--sa-bottom))]">
         <AnimatePresence>
           {busy && (
             <motion.div
@@ -427,6 +427,7 @@ export default function ScanPage() {
           onCreate={(code) => navigate(newFoodHref({ barcode: code, meal, date }), { replace: true })}
           onRetry={(code) => void runLookup(code)}
           onScanAgain={closeLookup}
+          canScan={cameraOk}
         />
       </Sheet>
 
@@ -438,7 +439,7 @@ export default function ScanPage() {
         description="Siffrorna står under streckkoden på förpackningen."
         initialFocusRef={manualInput}
       >
-        <ManualEntry onSubmit={submitManual} inputRef={manualInput} busy={busy} />
+        <ManualEntry onSubmit={submitManual} inputRef={manualInput} busy={busy} cameraAvailable={cameraOk} />
       </Sheet>
     </div>
   )
@@ -481,14 +482,25 @@ function ProductHeader({ food }: { food: Food }) {
   )
 }
 
-function ManualEntry({ onSubmit, inputRef, busy }: { onSubmit: (code: string) => void; inputRef: RefObject<HTMLInputElement | null>; busy: boolean }) {
+function ManualEntry({
+  onSubmit,
+  inputRef,
+  busy,
+  cameraAvailable,
+}: {
+  onSubmit: (code: string) => void
+  inputRef: RefObject<HTMLInputElement | null>
+  busy: boolean
+  /** Utan kamera kan man inte "skanna igen" – felet ber då om att kontrollera siffrorna. */
+  cameraAvailable: boolean
+}) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string>()
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const code = cleanManualCode(value)
     if (!isValidEan(code)) {
-      setError(OFF_MESSAGES.invalid_barcode)
+      setError(invalidBarcodeMessage(cameraAvailable))
       return
     }
     onSubmit(code)
@@ -545,7 +557,7 @@ function CameraFallback({
           <p className="mt-1 text-sm leading-relaxed text-ink-2">{text.text}</p>
         </div>
       </div>
-      <ManualEntry onSubmit={onSubmit} inputRef={inputRef} busy={busy} />
+      <ManualEntry onSubmit={onSubmit} inputRef={inputRef} busy={busy} cameraAvailable={false} />
       {canRetry && (
         <Button variant="ghost" size="sm" iconLeft={RefreshCw} onClick={onRetry} fullWidth className="mt-1">
           Försök starta kameran igen
@@ -560,11 +572,14 @@ function LookupProblem({
   onCreate,
   onRetry,
   onScanAgain,
+  canScan,
 }: {
   lookup: Lookup
   onCreate: (code: string) => void
   onRetry: (code: string) => void
   onScanAgain: () => void
+  /** Kameran fungerar – annars döljs "Skanna en annan vara". */
+  canScan: boolean
 }) {
   if (lookup.kind !== 'notfound' && lookup.kind !== 'offline' && lookup.kind !== 'error') return null
   const code = lookup.code
@@ -599,9 +614,11 @@ function LookupProblem({
             Försök igen
           </Button>
         )}
-        <Button variant="ghost" fullWidth onClick={onScanAgain}>
-          Skanna en annan vara
-        </Button>
+        {canScan && (
+          <Button variant="ghost" fullWidth onClick={onScanAgain}>
+            Skanna en annan vara
+          </Button>
+        )}
       </div>
     </div>
   )

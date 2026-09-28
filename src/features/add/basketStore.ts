@@ -17,13 +17,15 @@ export interface BasketItem {
   unit: UnitKey
   grams: number
   /** Hur varan hamnade i korgen – förslag kan tas bort med ett nytt tryck. */
-  origin?: 'suggestion' | 'search' | 'scan' | 'template'
+  origin?: 'suggestion' | 'search' | 'scan' | 'template' | 'text' | 'plate'
+  /** Anteckning som följer med till dagboken, t.ex. "Uppskattat med tallriken". */
+  note?: string
 }
 
 interface BasketState {
   items: BasketItem[]
   /** Lägg till en vara. Returnerar null om mängden inte kan räknas om till gram. */
-  add: (food: Food, amount: number, unit: UnitKey, origin?: BasketItem['origin']) => BasketItem | null
+  add: (food: Food, amount: number, unit: UnitKey, origin?: BasketItem['origin'], note?: string) => BasketItem | null
   /** Ändra mängd/enhet för en vara. */
   update: (key: string, amount: number, unit: UnitKey) => void
   remove: (key: string) => void
@@ -56,10 +58,10 @@ export const useBasketStore = create<BasketState>()(
   persist(
     (set, get) => ({
       items: [],
-      add: (food, amount, unit, origin) => {
+      add: (food, amount, unit, origin, note) => {
         const grams = gramsFor(food, amount, unit)
         if (!Number.isFinite(grams) || grams <= 0) return null
-        const item: BasketItem = { key: uid('k_'), food, amount, unit, grams, origin }
+        const item: BasketItem = { key: uid('k_'), food, amount, unit, grams, origin, ...(note ? { note } : {}) }
         set({ items: [...get().items, item] })
         return item
       },

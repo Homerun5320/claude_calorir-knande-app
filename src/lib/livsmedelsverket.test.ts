@@ -7,6 +7,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   LMV_API_BASE,
+  LMV_ATTRIBUTION,
+  LMV_LICENSE,
+  LMV_LICENSE_URL,
   LMV_MAPPING_TABLES,
   categorizeLmv,
   fetchLmvFoodList,
@@ -497,6 +500,9 @@ interface ScriptModule {
   mapFood: (item: LmvListItem, rows: unknown[], classes?: unknown[]) => unknown
   categorize: (name: string, classes?: unknown[], nutrients?: Record<string, number>) => unknown
   MAPPING_TABLES: unknown
+  ATTRIBUTION: string
+  LICENSE: string
+  LICENSE_URL: string
   LMV_CODES: Record<string, string>
   NUTRIENT_UNITS: Record<string, string>
   run: (opts: Record<string, unknown>) => Promise<{ count: number; failed: number[]; out: string }>
@@ -524,6 +530,26 @@ describe('scripts/import-livsmedelsverket.mjs', () => {
     }
     expect(script.LMV_CODES).toEqual(codes)
     expect(script.NUTRIENT_UNITS).toEqual(units)
+  })
+
+  it('anger samma källa och licens (CC BY 4.0) som appen', async () => {
+    const script = await loadScript()
+    expect(LMV_ATTRIBUTION).toBe('Källa: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0)')
+    expect(LMV_LICENSE).toBe('CC BY 4.0')
+    expect(LMV_LICENSE_URL).toBe('https://creativecommons.org/licenses/by/4.0/deed.sv')
+    expect(script.ATTRIBUTION).toBe(LMV_ATTRIBUTION)
+    expect(script.LICENSE).toBe(LMV_LICENSE)
+    expect(script.LICENSE_URL).toBe(LMV_LICENSE_URL)
+  })
+
+  it('den medföljande databasfilen anger licensen i metadatan', async () => {
+    const { readFile } = await nodeModule('node:fs/promises')
+    const { fileURLToPath } = await nodeModule('node:url')
+    const text: string = await readFile(fileURLToPath(new URL('../../public/data/livsmedelsverket.json', import.meta.url)), 'utf8')
+    // Metadatan står på första raden (en rad per livsmedel därefter).
+    const firstLine = text.slice(0, text.indexOf('\n'))
+    const meta = JSON.parse(`${firstLine.replace(/,\s*$/, '')}}`).meta as Record<string, unknown>
+    expect(meta).toMatchObject({ license: LMV_LICENSE, licenseUrl: LMV_LICENSE_URL, attribution: LMV_ATTRIBUTION })
   })
 
   it('normaliserar text som appen', async () => {
@@ -597,7 +623,9 @@ describe('scripts/import-livsmedelsverket.mjs', () => {
       const parsed = JSON.parse(text) as { meta: Record<string, unknown>; foods: Array<{ id: string }> }
       expect(parsed.meta).toMatchObject({
         source: 'Livsmedelsverkets livsmedelsdatabas',
-        attribution: 'Källa: Livsmedelsverkets livsmedelsdatabas',
+        attribution: 'Källa: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0)',
+        license: 'CC BY 4.0',
+        licenseUrl: 'https://creativecommons.org/licenses/by/4.0/deed.sv',
         count: 6,
         total: 7,
         partial: true,
@@ -607,7 +635,7 @@ describe('scripts/import-livsmedelsverket.mjs', () => {
       expect(parsed.meta.version).toMatch(/^\d{4}-\d{2}-\d{2}$/)
       expect(parsed.foods.map((f) => f.id)).toEqual(['lmv:1', 'lmv:2', 'lmv:3', 'lmv:4', 'lmv:5', 'lmv:6'])
       expect(parsed.foods[0]).toEqual(mapLmvFood(MJOLK, MJOLK_ROWS))
-      expect(logs.some((l) => l.includes('Källa: Livsmedelsverkets livsmedelsdatabas'))).toBe(true)
+      expect(logs.some((l) => l.includes('Källa: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0)'))).toBe(true)
       // Appen accepterar filen.
       const dataset = parseLmvDataset(parsed)
       expect(dataset.foods).toHaveLength(6)

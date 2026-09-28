@@ -3,15 +3,39 @@
  * fetch, klocka, loggning) skickas in, så att funktionerna kan testas utan nätverk.
  *
  * API (se docs/BETALNING.md):
- *   POST /api/create-checkout  { plan: 'ar' | 'livstid', consent: true }  → { url }
- *                              (400 'samtycke-saknas' utan samtycket om omedelbar leverans)
- *   POST /api/verify-purchase  { sessionId: 'cs_…' }                       → { licenseKey, plan, issuedAt, expiresAt }
- *                              (202 { status: 'pending', pending: true } medan betalningen pågår)
- *   POST /api/stripe-webhook   (anropas av Stripe)                         → { received: true }
+ *   POST /api/create-checkout      { plan: 'ar' | 'livstid', consent: true }  → { url }
+ *                                  (400 'samtycke-saknas' utan samtycket om omedelbar leverans)
+ *   POST /api/verify-purchase      { sessionId: 'cs_…' }                       → { licenseKey, plan, issuedAt, expiresAt }
+ *                                  (202 { status: 'pending', pending: true } medan betalningen pågår,
+ *                                  410 'aterbetald' för återbetalda och bestridda köp)
+ *   POST /api/stripe-webhook       (anropas av Stripe)                         → { received: true }
+ *   GET  /api/license-revocations  spärrlistan, se revocations.ts
+ *   POST /api/recover-license      { email, receipt }, se recover.ts
+ *   POST /api/recipe-fetch         { url }, se recipeFetch.ts
  * Fel: { code, error } där `error` är ett svenskt meddelande som kan visas direkt.
  */
-import { missingConfig, readConfig, type Env, type Requirement, type ServerConfig } from './config.ts'
-import { APP_MARKER, SESSION_ID_RE, errorText, fulfillSession, type FulfillCode, type Logger } from './fulfillment.ts'
+import {
+  DEFAULT_TERMS_VERSION,
+  missingConfig,
+  readConfig,
+  sellerForDisplay,
+  type Env,
+  type Requirement,
+  type SellerInfo,
+  type ServerConfig,
+} from './config.ts'
+import {
+  APP_MARKER,
+  REVOKED_METADATA_KEY,
+  REVOKING_DISPUTES,
+  SESSION_ID_RE,
+  errorText,
+  fulfillSession,
+  isFullyRefunded,
+  isLagomIntent,
+  type FulfillCode,
+  type Logger,
+} from './fulfillment.ts'
 import { RateLimiter, checkOrigin, clientIp, errorResponse, json, readBody, readJsonObject, type OriginCheck } from './http.ts'
 import { CURRENCY, SERVER_PLANS, isPlanId, priceInOre, type PlanId, type ServerPlan } from './plans.ts'
 import {
@@ -20,8 +44,11 @@ import {
   verifyStripeSignature,
   type FetchLike,
   type FormValue,
+  type StripeCharge,
   type StripeCheckoutSession,
+  type StripeDispute,
   type StripeEvent,
+  type StripePaymentIntent,
   type StripePrice,
 } from './stripe.ts'
 
@@ -39,6 +66,10 @@ export interface HandlerDeps {
   log?: Logger
   context?: NetlifyContext
   rateLimiter?: RateLimiter
+  /** Extra begränsning per nyckel i stället för per IP (recover-license: per e-postadress). */
+  keyRateLimiter?: RateLimiter
+  /** Vänta (ms). Används för jämn svarstid i recover-license; testerna byter ut den. */
+  sleep?: (ms: number) => Promise<void>
 }
 
 /** Loggar utan personuppgifter – bara sessions-id, plan och tekniska detaljer. */
@@ -72,34 +103,54 @@ export async function withErrorBoundary(what: string, run: () => Promise<Respons
   }
 }
 
-type Prepared =
+export type Prepared =
   | { ok: true; cfg: ServerConfig; origin: OriginCheck; now: number; log: Logger }
   | { ok: false; response: Response }
 
-/** Metod, ursprung, anropsgräns och konfiguration – samma för appens två anrop. */
-function prepare(req: Request, deps: HandlerDeps, limiter: RateLimiter, needs: Requirement[], notConfigured: string): Prepared {
+export interface PrepareOptions {
+  /** Anropsbegränsningen (per IP-adress) om testet inte skickar in en egen. */
+  limiter: RateLimiter
+  needs: Requirement[]
+  /** Meddelandet (503) när inställningar saknas. */
+  notConfigured: string
+  /** Metoden som funktionen tar emot (standard POST). */
+  method?: 'GET' | 'POST'
+  /** Meddelandet (403) när anropet kommer från en annan webbplats. */
+  forbidden?: string
+}
+
+const FORBIDDEN_PAYMENT = 'Den här webbplatsen får inte använda Lagoms betalning.'
+
+/** Metod, ursprung, anropsgräns och konfiguration – samma för alla anrop från appen. */
+export function prepareRequest(req: Request, deps: HandlerDeps, opts: PrepareOptions): Prepared {
   const cfg = readConfig(deps.env, deps.context?.site?.url)
   const log = deps.log ?? consoleLogger
   const now = (deps.now ?? Date.now)()
-  const origin = checkOrigin(req, [cfg.appUrl, ...cfg.allowedOrigins].filter(Boolean))
+  const method = opts.method ?? 'POST'
+  const origin = checkOrigin(req, [cfg.appUrl, ...cfg.allowedOrigins].filter(Boolean), cfg.nativeOrigins, `${method}, OPTIONS`)
 
   if (!origin.allowed) {
-    return { ok: false, response: errorResponse(403, 'fel-ursprung', 'Den här webbplatsen får inte använda Lagoms betalning.', origin.headers) }
+    return { ok: false, response: errorResponse(403, 'fel-ursprung', opts.forbidden ?? FORBIDDEN_PAYMENT, origin.headers) }
   }
   if (req.method === 'OPTIONS') return { ok: false, response: new Response(null, { status: 204, headers: origin.headers }) }
-  if (req.method !== 'POST') {
-    return { ok: false, response: errorResponse(405, 'fel-metod', 'Använd POST.', { ...origin.headers, Allow: 'POST, OPTIONS' }) }
+  if (req.method !== method) {
+    return { ok: false, response: errorResponse(405, 'fel-metod', `Använd ${method}.`, { ...origin.headers, Allow: `${method}, OPTIONS` }) }
   }
-  if (!(deps.rateLimiter ?? limiter).take(clientIp(req, deps.context?.ip), now)) {
+  if (!(deps.rateLimiter ?? opts.limiter).take(clientIp(req, deps.context?.ip), now)) {
     return {
       ok: false,
       response: errorResponse(429, 'for-manga', 'Många försök på kort tid. Vänta en minut och försök igen.', { ...origin.headers, 'Retry-After': '60' }),
     }
   }
-  const missing = missingConfig(cfg, needs)
+  const missing = missingConfig(cfg, opts.needs)
   if (missing.length > 0) {
     log.error('Miljövariabler saknas eller är felaktiga', { saknas: missing })
-    return { ok: false, response: errorResponse(503, 'ej-konfigurerad', notConfigured, origin.headers) }
+    if (missing.some((name) => name.startsWith('VITE_'))) {
+      log.error(
+        'Skarpa köp kräver säljarens uppgifter även i serverfunktionerna – ge VITE_SELLER_*-variablerna och VITE_SUPPORT_EMAIL scope "Functions" (eller alla) i Netlify.',
+      )
+    }
+    return { ok: false, response: errorResponse(503, 'ej-konfigurerad', opts.notConfigured, origin.headers) }
   }
   return { ok: true, cfg, origin, now, log }
 }
@@ -143,6 +194,53 @@ export async function checkStripePrice(
   return problem
 }
 
+/** Stripes gräns för fakturans sidfot (invoice_data.footer, enligt Stripes OpenAPI-specifikation). */
+export const INVOICE_FOOTER_MAX = 5000
+/** Stripes gränser för egna fält på fakturan: högst 4 fält, namn ≤ 40 och värde ≤ 140 tecken. */
+export const INVOICE_FIELD_NAME_MAX = 40
+export const INVOICE_FIELD_VALUE_MAX = 140
+
+/** Kort text utan radbrytningar (uppgifterna kommer från miljövariabler). */
+function oneLine(value: string, max = 120): string {
+  return value.replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+/**
+ * Sidfoten på fakturan/kvittot från Stripe – bekräftelsen på varaktigt medium
+ * (distansavtalslagen 2 kap. 12 §): säljaren, vad licensen är, samtycket till omedelbar leverans
+ * och vart kunden vänder sig vid fel och tvister.
+ */
+export function invoiceFooter(seller: SellerInfo, plan: ServerPlan): string {
+  const s = sellerForDisplay(seller)
+  const sellerLine = [
+    `Säljare: ${oneLine(s.name)}`,
+    `Org.nr ${oneLine(s.orgnr, 40)}`,
+    oneLine(s.address, 200),
+    `Tel. ${oneLine(s.phone, 40)}`,
+    oneLine(s.email, 120),
+    s.vat ? `Momsreg.nr ${oneLine(s.vat, 40)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const licenseLine = plan.durationDays
+    ? `Licensen är personlig. Årslicensen gäller ${plan.durationDays} dagar och förnyas inte.`
+    : 'Licensen är personlig. Livstidslicensen är ett engångsköp som gäller för alltid.'
+  const footer = [
+    sellerLine,
+    licenseLine,
+    'Du samtyckte till omedelbar leverans och att ångerrätten därmed upphörde (2 kap. 11 § distansavtalslagen).',
+    'Reklamation enligt konsumentköplagen. Tvister: Allmänna reklamationsnämnden, www.arn.se.',
+  ].join('\n')
+  return footer.slice(0, INVOICE_FOOTER_MAX)
+}
+
+/** Produktens beskrivning i Stripe Checkout och på kvittot. */
+export function productDescription(plan: ServerPlan): string {
+  return plan.durationDays
+    ? `Full tillgång till Lagom i ${plan.durationDays} dagar. Förnyas inte automatiskt.`
+    : 'Full tillgång till Lagom för alltid, utan årsavgift. Engångsköp – felrättningar ingår.'
+}
+
 /** Parametrar till Stripe för en ny Checkout-session. Ren funktion – testas separat. */
 export function checkoutParams(input: {
   plan: ServerPlan
@@ -151,8 +249,14 @@ export function checkoutParams(input: {
   consentAt?: string
   termsUrl?: string
   automaticTax?: boolean
+  /** Säljarens uppgifter till fakturan (saknade uppgifter blir platshållare). */
+  seller?: SellerInfo
+  /** Köpvillkorens version (TERMS_VERSION). */
+  termsVersion?: string
 }): Record<string, FormValue> {
   const { plan, priceId, returnBase, consentAt, termsUrl } = input
+  const termsVersion = input.termsVersion || DEFAULT_TERMS_VERSION
+  const seller = input.seller ?? { name: '', orgnr: '', address: '', phone: '', email: '', vat: '' }
   const productName = `Lagom ${plan.name}`
   const lineItem: Record<string, FormValue> = priceId
     ? { price: priceId, quantity: 1 }
@@ -162,15 +266,10 @@ export function checkoutParams(input: {
           currency: CURRENCY,
           unit_amount: priceInOre(plan),
           tax_behavior: 'inclusive',
-          product_data: {
-            name: productName,
-            description: plan.durationDays
-              ? `Full tillgång till Lagom i ${plan.durationDays} dagar. Förnyas inte automatiskt.`
-              : 'Full tillgång till Lagom för alltid. Engångsköp.',
-          },
+          product_data: { name: productName, description: productDescription(plan) },
         },
       }
-  const metadata: Record<string, string> = { app: APP_MARKER, plan: plan.id }
+  const metadata: Record<string, string> = { app: APP_MARKER, plan: plan.id, villkor_version: termsVersion }
   if (consentAt) {
     // Kunden kryssade i appen i att leveransen får börja direkt och att ångerrätten då upphör.
     metadata.samtycke = 'omedelbar-leverans'
@@ -191,8 +290,25 @@ export function checkoutParams(input: {
     metadata,
     payment_intent_data: { description, metadata: { app: APP_MARKER, plan: plan.id } },
     customer_creation: 'if_required',
-    billing_address_collection: 'auto',
+    // Adressen (med land) står på fakturan och visar var kunden bor – webbförsäljningen riktar sig
+    // till kunder i Sverige.
+    billing_address_collection: 'required',
     submit_type: 'pay',
+    // Bekräftelse på varaktigt medium: Stripe skapar en faktura/ett kvitto efter betalningen och
+    // mejlar det (kräver "Successful payments" under Customer emails i Stripe).
+    invoice_creation: {
+      enabled: true,
+      invoice_data: {
+        description: `${productName}. Digital licens som levereras direkt efter betalningen.`,
+        footer: invoiceFooter(seller, plan),
+        custom_fields: [
+          { name: 'Licens', value: plan.name.slice(0, INVOICE_FIELD_VALUE_MAX) },
+          { name: 'Villkor', value: `Köpvillkor version ${termsVersion}`.slice(0, INVOICE_FIELD_VALUE_MAX) },
+        ],
+        metadata: { app: APP_MARKER, plan: plan.id, villkor_version: termsVersion },
+        rendering_options: input.automaticTax ? { amount_tax_display: 'include_inclusive_tax' } : undefined,
+      },
+    },
     custom_text: {
       submit: { message: plan.checkoutNote },
       ...(termsUrl
@@ -209,10 +325,15 @@ export function checkoutParams(input: {
 }
 
 export async function handleCreateCheckout(req: Request, deps: HandlerDeps): Promise<Response> {
-  const prep = prepare(req, deps, createLimiter, ['stripe'], CHECKOUT_NOT_CONFIGURED)
+  const prep = prepareRequest(req, deps, { limiter: createLimiter, needs: ['stripe', 'seller'], notConfigured: CHECKOUT_NOT_CONFIGURED })
   if (!prep.ok) return prep.response
   const { cfg, origin, now, log } = prep
   const h = origin.headers
+
+  // Butiksapparna säljer bara via App Store/Google Play – aldrig via Stripe.
+  if (origin.native) {
+    return errorResponse(403, 'ej-i-appen', 'Köp i appen görs via App Store eller Google Play. Inga pengar har dragits.', h)
+  }
 
   const body = await readJsonObject(req, MAX_BODY_BYTES, h)
   if (!body.ok) return body.response
@@ -256,6 +377,8 @@ export async function handleCreateCheckout(req: Request, deps: HandlerDeps): Pro
     consentAt: new Date(now).toISOString(),
     termsUrl: cfg.termsUrl,
     automaticTax: cfg.automaticTax,
+    seller: cfg.seller,
+    termsVersion: cfg.termsVersion,
   })
   try {
     const session = await stripeRequest<StripeCheckoutSession>({
@@ -266,7 +389,7 @@ export async function handleCreateCheckout(req: Request, deps: HandlerDeps): Pro
       fetch: deps.fetch,
     })
     if (!session.url) throw new StripeError('Stripe returnerade ingen betalningslänk', 502)
-    log.info('Checkout skapad', { session: session.id, plan: plan.id })
+    log.info('Checkout skapad', { session: session.id, plan: plan.id, villkor: cfg.termsVersion })
     return json(200, { url: session.url }, h)
   } catch (e) {
     return stripeFailure(e, log, h, 'Kunde inte skapa Checkout-session')
@@ -287,12 +410,13 @@ function stripeFailure(e: unknown, log: Logger, headers: Record<string, string>,
 // POST /api/verify-purchase
 // ---------------------------------------------------------------------------
 
-const VERIFY_ERRORS: Record<FulfillCode, { status: number; message: string }> = {
+export const VERIFY_ERRORS: Record<FulfillCode, { status: number; message: string }> = {
   'hittades-inte': { status: 404, message: 'Vi hittade inget köp med det id:t. Har du betalat? Kontakta supporten så hjälper vi dig.' },
   // 202 + pending: appen väntar en stund och frågar igen (t.ex. Klarna eller Swish som dröjer).
   'ej-betald': { status: 202, message: 'Betalningen är inte klar ännu. Vänta en liten stund och försök igen.' },
   avbruten: { status: 410, message: 'Köpet avbröts eller hann gå ut. Inga pengar har dragits.' },
   'okant-kop': { status: 422, message: 'Köpet gäller inte en Lagom-licens. Kontakta supporten om du tror att det är fel.' },
+  aterbetald: { status: 410, message: 'Köpet har återbetalats och licensen gäller inte längre. Hör av dig om det är fel.' },
   utgangen: { status: 410, message: 'Licensen från det här köpet har gått ut. Du kan köpa en ny på köpsidan.' },
   'ej-konfigurerad': {
     status: 503,
@@ -310,8 +434,18 @@ export interface VerifyPurchaseResponse {
   expiresAt: string | null
 }
 
+/** Svaret med licensen (samma form för verify-purchase och recover-license). */
+export function licenseResponseBody(result: { licenseKey: string; payload: { plan: PlanId; iat: number; exp?: number } }): VerifyPurchaseResponse {
+  return {
+    licenseKey: result.licenseKey,
+    plan: result.payload.plan,
+    issuedAt: new Date(result.payload.iat * 1000).toISOString(),
+    expiresAt: result.payload.exp !== undefined ? new Date(result.payload.exp * 1000).toISOString() : null,
+  }
+}
+
 export async function handleVerifyPurchase(req: Request, deps: HandlerDeps): Promise<Response> {
-  const prep = prepare(req, deps, verifyLimiter, ['stripe', 'license'], VERIFY_ERRORS['ej-konfigurerad'].message)
+  const prep = prepareRequest(req, deps, { limiter: verifyLimiter, needs: ['stripe', 'license'], notConfigured: VERIFY_ERRORS['ej-konfigurerad'].message })
   if (!prep.ok) return prep.response
   const { cfg, origin, now, log } = prep
   const h = origin.headers
@@ -329,13 +463,7 @@ export async function handleVerifyPurchase(req: Request, deps: HandlerDeps): Pro
     if (result.code === 'ej-betald') return json(e.status, { code: result.code, error: e.message, status: 'pending', pending: true }, h)
     return errorResponse(e.status, result.code, e.message, h)
   }
-  const out: VerifyPurchaseResponse = {
-    licenseKey: result.licenseKey,
-    plan: result.payload.plan,
-    issuedAt: new Date(result.payload.iat * 1000).toISOString(),
-    expiresAt: result.payload.exp !== undefined ? new Date(result.payload.exp * 1000).toISOString() : null,
-  }
-  return json(200, out, h)
+  return json(200, licenseResponseBody(result), h)
 }
 
 // ---------------------------------------------------------------------------
@@ -345,9 +473,81 @@ export async function handleVerifyPurchase(req: Request, deps: HandlerDeps): Pro
 const FULFILL_EVENTS = new Set(['checkout.session.completed', 'checkout.session.async_payment_succeeded'])
 
 /**
+ * Händelser som spärrar eller släpper licensen för ett köp (metadata `lagom_revoked` på
+ * betalningen). Spärren gäller också utan webhook – verify-purchase och spärrlistan läser
+ * återbetalningar och tvister direkt från Stripe – men markeringen syns i Stripes dashboard.
+ */
+const REVOCATION_EVENTS = new Set(['charge.refunded', 'charge.dispute.created', 'charge.dispute.funds_withdrawn', 'charge.dispute.closed'])
+
+/** '1' = spärra, '' = ta bort spärren, null = ingen ändring. */
+function revocationMarkerFor(type: string, obj: Record<string, unknown>): '1' | '' | null {
+  if (type === 'charge.refunded') {
+    // Bara full återbetalning – en delvis återbetalning (prisavdrag) behåller licensen.
+    return obj.object === 'charge' && isFullyRefunded(obj as unknown as StripeCharge) ? '1' : null
+  }
+  if (obj.object !== 'dispute') return null
+  const status = (obj as unknown as StripeDispute).status
+  if (type === 'charge.dispute.closed') {
+    if (status === 'won' || status === 'warning_closed') return ''
+    return status === 'lost' ? '1' : null
+  }
+  // Förfrågningar (warning_*) spärrar inte – bara tvister där pengarna har dragits tillbaka.
+  return REVOKING_DISPUTES.has(status) ? '1' : null
+}
+
+function idOf(value: unknown): string | null {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string') return (value as { id: string }).id
+  return null
+}
+
+async function handleRevocationEvent(event: StripeEvent, cfg: ServerConfig, deps: HandlerDeps, log: Logger): Promise<Response> {
+  const obj = event.data.object
+  const marker = revocationMarkerFor(event.type, obj)
+  const intentId = idOf(obj.payment_intent)
+  if (marker === null || !intentId || !/^pi_[A-Za-z0-9_]+$/.test(intentId)) return json(200, { received: true, ignored: true })
+
+  const needs = missingConfig(cfg, ['stripe'])
+  if (needs.length > 0) {
+    log.error('Kan inte markera återbetalningen – miljövariabler saknas', { saknas: needs })
+    return errorResponse(500, 'ej-konfigurerad', 'Händelsen kunde inte hanteras just nu.')
+  }
+  try {
+    const intent = await stripeRequest<StripePaymentIntent>({
+      method: 'GET',
+      path: `/payment_intents/${encodeURIComponent(intentId)}`,
+      secretKey: cfg.stripeSecretKey,
+      fetch: deps.fetch,
+    })
+    if (!isLagomIntent(intent)) return json(200, { received: true, ignored: true })
+    const current = intent.metadata?.[REVOKED_METADATA_KEY] ?? ''
+    // '0' är supportens undantag och ändras aldrig automatiskt.
+    if (current === '0' || current === marker) return json(200, { received: true })
+    await stripeRequest<StripePaymentIntent>({
+      method: 'POST',
+      path: `/payment_intents/${encodeURIComponent(intentId)}`,
+      params: { metadata: { [REVOKED_METADATA_KEY]: marker } },
+      secretKey: cfg.stripeSecretKey,
+      fetch: deps.fetch,
+    })
+    log.info(marker === '1' ? 'Licensen spärrad (återbetalning eller tvist)' : 'Spärren hävd (tvisten avgjord till vår fördel)', {
+      event: event.id,
+      type: event.type,
+      betalning: intentId,
+    })
+    return json(200, { received: true })
+  } catch (e) {
+    if (e instanceof StripeError && e.status === 404) return json(200, { received: true, ignored: true })
+    log.error('Kunde inte markera betalningen', { event: event.id, betalning: intentId, fel: errorText(e) })
+    // 500 → Stripe försöker igen senare.
+    return errorResponse(500, 'betaltjanst-fel', 'Händelsen kunde inte hanteras just nu.')
+  }
+}
+
+/**
  * Tar emot händelser från Stripe. Signaturen kontrolleras alltid. För betalda Lagom-köp utfärdas
  * licensen direkt och sparas på betalningen – även om kunden stängde fliken innan tacksidan
- * hann laddas. Inga personuppgifter loggas.
+ * hann laddas. Återbetalningar och tvister markeras på betalningen. Inga personuppgifter loggas.
  */
 export async function handleStripeWebhook(req: Request, deps: HandlerDeps): Promise<Response> {
   const cfg = readConfig(deps.env, deps.context?.site?.url)
@@ -380,6 +580,8 @@ export async function handleStripeWebhook(req: Request, deps: HandlerDeps): Prom
   } catch {
     return errorResponse(400, 'ogiltig-begaran', 'Händelsen kunde inte tolkas.')
   }
+
+  if (REVOCATION_EVENTS.has(event.type)) return handleRevocationEvent(event, cfg, deps, log)
 
   const obj = event.data.object as Partial<StripeCheckoutSession>
   const isLagom = obj.object === 'checkout.session' && obj.metadata?.app === APP_MARKER

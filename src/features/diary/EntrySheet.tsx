@@ -118,7 +118,7 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
   const factor = energyUnit === 'kJ' ? KJ_PER_KCAL : 1
   const isToday = entry.date === today
 
-  const selectionValid = (s: PortionSelection | null) => s !== null && Number.isFinite(s.grams) && s.grams > 0
+  const selectionValid = (s: PortionSelection | null) => s !== null && Number.isFinite(s.grams) && s.grams > 0 && !s.needsConfirmation
   const canSave = entry.kind === 'food' ? selectionValid(selection) : name.trim().length > 0
 
   /**
@@ -171,7 +171,8 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
   }
 
   const copyToToday = () => {
-    if (!requireAccess('kopiera')) {
+    // "Lägg till igen" (samma dag) är ny loggning av mat; "Kopiera till idag" kopierar.
+    if (!requireAccess(isToday ? 'mat' : 'kopiera')) {
       onClose()
       return
     }
@@ -237,6 +238,7 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
               onChange={setSelection}
               onConfirm={(amount, unit, grams) => save({ amount, unit, grams })}
               confirmLabel="Spara"
+              largeConfirmLabel="Ja, spara"
               hideActions
             />
           ) : (

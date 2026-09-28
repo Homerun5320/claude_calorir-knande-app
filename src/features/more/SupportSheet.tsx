@@ -1,8 +1,8 @@
 /**
  * Stöd & hjälp – varma, tydliga vägar till hjälp för den som mår dåligt kring mat, vikt eller alkohol.
  */
-import { ExternalLink, HeartHandshake, Phone } from 'lucide-react'
-import { Sheet, toneVars, type Tone } from '../../components/ui'
+import { ExternalLink as ExternalLinkIcon, HeartHandshake, Phone } from 'lucide-react'
+import { ExternalLink, Sheet, toneVars, type Tone } from '../../components/ui'
 
 export interface SupportResource {
   id: string
@@ -63,16 +63,14 @@ export function SupportResourceList({ className = '' }: { className?: string }) 
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <a
+            <ExternalLink
               href={r.href}
-              target="_blank"
-              rel="noreferrer"
+              showIcon={false}
               className="inline-flex h-11 items-center gap-2 rounded-2xl bg-surface px-4 text-[0.875rem] font-semibold text-ink shadow-card transition-colors hover:bg-surface-2"
             >
               {r.linkLabel}
-              <ExternalLink aria-hidden className="size-4 text-ink-3" />
-              <span className="sr-only">(öppnas i ny flik)</span>
-            </a>
+              <ExternalLinkIcon aria-hidden className="size-4 text-ink-3" />
+            </ExternalLink>
             {r.phone && (
               <a
                 href={`tel:${r.phone.tel}`}

@@ -1,6 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { missingConfig, normalizeAppUrl, readConfig } from '../lib/config.ts'
+import { isExampleEmail } from '../../scripts/commerce-guard.ts'
+import {
+  DEFAULT_NATIVE_ORIGINS,
+  DEFAULT_TERMS_VERSION,
+  isPlaceholderEmail,
+  missingConfig,
+  normalizeAppUrl,
+  readConfig,
+  readNativeOrigins,
+  sellerForDisplay,
+} from '../lib/config.ts'
 
 describe('inställningar från miljövariabler', () => {
   it('läser och städar värdena', () => {
@@ -40,5 +50,103 @@ describe('inställningar från miljövariabler', () => {
     expect(normalizeAppUrl('javascript:alert(1)')).toBe('')
     expect(normalizeAppUrl('http://localhost:8888/')).toBe('http://localhost:8888')
     expect(normalizeAppUrl(undefined)).toBe('')
+  })
+})
+
+describe('den inbyggda appens ursprung (ALLOWED_NATIVE_ORIGINS)', () => {
+  it('standard: capacitor://localhost och https://localhost', () => {
+    expect(readConfig({}).nativeOrigins).toEqual([...DEFAULT_NATIVE_ORIGINS])
+    expect(readNativeOrigins('  ')).toEqual(['capacitor://localhost', 'https://localhost'])
+  })
+
+  it('kan begränsas eller stängas av', () => {
+    expect(readNativeOrigins('capacitor://localhost')).toEqual(['capacitor://localhost'])
+    expect(readNativeOrigins('off')).toEqual([])
+    expect(readNativeOrigins('av')).toEqual([])
+  })
+
+  it('bara exakt capacitor://localhost eller https://localhost godtas', () => {
+    expect(
+      readNativeOrigins(
+        'capacitor://localhost/, https://localhost:8443, http://localhost, ionic://localhost, capacitor://evil.example, https://lagom.example, CAPACITOR://localhost, https://localhost',
+      ),
+    ).toEqual(['https://localhost'])
+  })
+})
+
+describe('säljarens uppgifter och villkorsversion', () => {
+  const seller = {
+    VITE_SELLER_NAME: ' Anna Andersson ',
+    VITE_SELLER_ORGNR: '900101-1234',
+    VITE_SELLER_ADDRESS: 'Storgatan 1, 123 45 Småstad',
+    VITE_SELLER_PHONE: '070-123 45 67',
+    VITE_SUPPORT_EMAIL: 'hej@lagom-appen.se',
+  }
+
+  it('läses ur samma VITE_-variabler som appen', () => {
+    const cfg = readConfig({ ...seller, VITE_SELLER_VAT: 'SE900101123401' })
+    expect(cfg.seller).toEqual({
+      name: 'Anna Andersson',
+      orgnr: '900101-1234',
+      address: 'Storgatan 1, 123 45 Småstad',
+      phone: '070-123 45 67',
+      email: 'hej@lagom-appen.se',
+      vat: 'SE900101123401',
+    })
+  })
+
+  it('en exempeladress räknas som saknad och saknade uppgifter blir platshållare', () => {
+    const cfg = readConfig({ VITE_SUPPORT_EMAIL: 'support@example.invalid' })
+    expect(cfg.seller.email).toBe('')
+    expect(sellerForDisplay(cfg.seller)).toMatchObject({ name: '[Företagsnamn]', orgnr: '[Org.nr]', email: '[E-post]', vat: '' })
+  })
+
+  it('platshållare från mallar räknas som saknade – samma regel som byggkontrollen', () => {
+    const cfg = readConfig({
+      STRIPE_SECRET_KEY: 'rk_live_abc123',
+      VITE_SELLER_NAME: '[Företagsnamn]',
+      VITE_SELLER_ORGNR: '900101-1234',
+      VITE_SELLER_ADDRESS: '<din adress>',
+      VITE_SELLER_PHONE: '070-123 45 67',
+      VITE_SUPPORT_EMAIL: 'hej@<din domän>',
+    })
+    expect(cfg.seller).toMatchObject({ name: '', address: '', email: '', orgnr: '900101-1234' })
+    expect(missingConfig(cfg, ['seller'])).toEqual(['VITE_SELLER_NAME', 'VITE_SELLER_ADDRESS', 'VITE_SUPPORT_EMAIL'])
+    for (const email of [
+      'support@example.invalid',
+      'hej@example.se',
+      'hej@example.com',
+      'hej@mail.example.org',
+      'hej@lagom.test',
+      'hej@lagom.localhost',
+      'hej@lagom-appen.se',
+      'hej@exempel.se',
+      '',
+    ]) {
+      expect(isPlaceholderEmail(email), email).toBe(email === '' || isExampleEmail(email))
+    }
+  })
+
+  it('krävs bara med en skarp Stripe-nyckel', () => {
+    expect(missingConfig(readConfig({ STRIPE_SECRET_KEY: 'sk_test_abc' }), ['stripe', 'seller'])).toEqual([])
+    expect(missingConfig(readConfig({ STRIPE_SECRET_KEY: 'rk_live_abc' }), ['stripe', 'seller'])).toEqual([
+      'VITE_SELLER_NAME',
+      'VITE_SELLER_ORGNR',
+      'VITE_SELLER_ADDRESS',
+      'VITE_SELLER_PHONE',
+      'VITE_SUPPORT_EMAIL',
+    ])
+    expect(missingConfig(readConfig({ STRIPE_SECRET_KEY: 'rk_live_abc', ...seller }), ['stripe', 'seller'])).toEqual([])
+  })
+
+  it('TERMS_VERSION har ett standardvärde och godtar bara korta, enkla versioner', () => {
+    expect(readConfig({}).termsVersion).toBe(DEFAULT_TERMS_VERSION)
+    expect(DEFAULT_TERMS_VERSION).toBe('2026-10-01')
+    expect(readConfig({ TERMS_VERSION: ' 2027-01-15 ' }).termsVersion).toBe('2027-01-15')
+    expect(readConfig({ TERMS_VERSION: '<script>' }).termsVersion).toBe(DEFAULT_TERMS_VERSION)
+  })
+
+  it('LICENSE_REVOKED_IDS: bara rimliga id:n, utan dubbletter', () => {
+    expect(readConfig({ LICENSE_REVOKED_IDS: 'lic_abc123, cs_live_x1y2z3, lic_abc123, <x>, a' }).revokedIds).toEqual(['lic_abc123', 'cs_live_x1y2z3'])
   })
 })

@@ -6,6 +6,7 @@ import {
   RAW_TO_COOKED_MEAT,
   evaluateKostrad,
   foodKostrad,
+  isUsable,
   kostradScore,
   type KostradId,
   type KostradInput,
@@ -381,5 +382,25 @@ describe('kostradScore', () => {
     ]
     expect(kostradScore(results)).toBe(75)
     expect(kostradScore([])).toBe(0)
+  })
+
+  it('räknar inte osäkra råd som uppfyllda – bara bedömda råd (isUsable)', () => {
+    const base = { title: 't', advice: 'a', unit: 'g', target: 1, actual: 1, direction: 'minst', tip: 't', emoji: 'x', periodDays: 1, source: 's' } as const
+    const results: KostradResult[] = [
+      { ...base, id: 'frukt_gront', score: 1, status: 'bra' },
+      // "Bra" men med för lite kända värden – osäkert, räknas varken i poängen eller som uppfyllt.
+      { ...base, id: 'salt', score: 1, status: 'bra', coverage: 0.3 },
+      { ...base, id: 'socker', score: 1, status: 'bra', coverage: 0.5 },
+    ]
+    expect(results.map(isUsable)).toEqual([true, false, true])
+    expect(results.filter(isUsable).filter((r) => r.status === 'bra')).toHaveLength(2)
+    expect(kostradScore(results)).toBe(100)
+    expect(kostradScore([results[1]])).toBe(0)
+  })
+})
+
+describe('foodKostrad utan schablon', () => {
+  it('ger ett tomt bidrag för kategorier utan kostråd', () => {
+    expect(foodKostrad(food('Kaffe', 'dryck'))).toEqual({})
   })
 })

@@ -8,6 +8,9 @@
  * - Snabbval ½ · 1 · 1½ · 2 (portioner/mått) eller 50–200 g.
  * - Direkt förhandsvisning av energi och makron för den valda mängden, med energifördelning.
  * - Varnar om mängden inte kan räknas om till gram (t.ex. volym utan densitet).
+ * - Orimliga mängder: portioner och mått går upp till 50 (gram och ml till 10 000), och över
+ *   3 kg frågar väljaren "Det blir 3,5 kg – stämmer det?" – bekräftelsen fungerar först efter
+ *   ett extra tryck på "Ja, lägg till" (`PortionSelection.needsConfirmation` för egna knappar).
  * - Kommer ihåg senast använda mängd och enhet för livsmedlet (`useFoodStore().usage`).
  * - Respekterar medvetet läge (inga siffror, bara ord) och vald energienhet (kcal/kJ).
  *
@@ -29,7 +32,7 @@
  * återanvändning och tester.
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type Ref } from 'react'
-import { AlertTriangle, Scale } from 'lucide-react'
+import { AlertTriangle, Check, Scale } from 'lucide-react'
 import type { Food, Nutrients, UnitKey } from '../../types'
 import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -48,7 +51,7 @@ import {
   type UnitFood,
 } from '../../lib/units'
 import { energyDistribution, nutrientsForGrams } from '../../lib/nutrients'
-import { formatNumber } from '../../lib/format'
+import { formatGrams, formatNumber } from '../../lib/format'
 import { Button, cx, type IconLike } from '../ui/Button'
 import { Chip } from '../ui/Chip'
 import { NumberField } from '../ui/NumberField'
@@ -65,6 +68,26 @@ export interface PortionSelection {
   amount: number
   unit: UnitKey
   grams: number
+  /**
+   * Mängden är ovanligt stor (över `LARGE_AMOUNT_GRAMS`) och har inte bekräftats med "Ja, lägg
+   * till" – egna bekräftelseknappar (t.ex. i ett arks sidfot) ska då inte fungera.
+   */
+  needsConfirmation?: boolean
+}
+
+/** Över så här många gram frågar väljaren om mängden stämmer innan den kan bekräftas. */
+export const LARGE_AMOUNT_GRAMS = 3000
+
+/** Största mängd per enhet: gram och ml 10 000, portioner 50, övriga mått 1 000. */
+export function maxAmount(unit: UnitKey): number {
+  if (isExactUnit(unit)) return 10000
+  if (isPortionUnit(unit)) return 50
+  return 1000
+}
+
+/** "Det blir 35 kg – stämmer det?" */
+export function largeAmountText(grams: number): string {
+  return `Det blir ${formatGrams(grams)} – stämmer det?`
 }
 
 /** Snabbvalens multiplar. */
@@ -83,6 +106,11 @@ export function safeDefaultUnit(food: PortionFood): UnitKey {
 }
 
 const validAmount = (v: number | undefined): v is number => v !== undefined && Number.isFinite(v) && v > 0
+
+/** Enheter där mängden anges exakt (inte i jämna portioner): gram, gram rå och ml. */
+function isExactUnit(unit: UnitKey): boolean {
+  return unit === 'g' || unit === 'g-ra' || unit === 'ml'
+}
 
 /**
  * Startvärde för väljaren:
@@ -114,9 +142,6 @@ export function initialSelection(
 }
 
 const round = (v: number, decimals: number) => Number(v.toFixed(decimals))
-
-/** Enheter där mängden anges exakt (inte i jämna portioner): gram, gram rå och ml. */
-const isExactUnit = (unit: UnitKey) => unit === 'g' || unit === 'g-ra' || unit === 'ml'
 
 /**
  * Ny mängd när enheten byts. Gram (även rå vikt) och ml behåller vikten ("1 st (60 g)" → 60 g,
@@ -227,7 +252,9 @@ export function mindfulPortionLabel(kcal: number | undefined): string {
 
 /**
  * Liten hjälprad under siffran: "≈ 60 g", "1 stor kafébulle (ca 110 g)" eller – i gram –
- * "≈ 1½ × 1 st (medel)" när vikten motsvarar ett jämnt antal portioner.
+ * "≈ 1½ × 1 st (medel)" när vikten motsvarar ett jämnt antal portioner. För långa portionsnamn
+ * och fler än en portion står antalet med, så att vikten inte ser ut att gälla en portion:
+ * "3 × 1 portion gröt (1 dl) ≈ 105 g".
  */
 export function amountHint(food: PortionFood, amount: number, unit: UnitKey): string {
   if (!(amount > 0)) return ''
@@ -244,7 +271,8 @@ export function amountHint(food: PortionFood, amount: number, unit: UnitKey): st
   if (isRawUnit(unit)) return `${g} tillagat`
   if (isPortionUnit(unit) && amountSuffix(food as Pick<Food, 'portions'>, unit) === '×') {
     const label = unitLabel(food as Pick<Food, 'portions'>, unit)
-    return amount === 1 && /\d\s*(g|ml)\b/i.test(label) ? label : `${label} · ${g}`
+    if (Math.abs(amount - 1) > 1e-9) return `${formatFraction(amount)} × ${label} ${g}`
+    return /\d\s*(g|ml)\b/i.test(label) ? label : `${label} · ${g}`
   }
   return g
 }
@@ -282,6 +310,8 @@ export interface PortionPickerProps {
   hideActions?: boolean
   /** Visar laddning på bekräftelseknappen. */
   busy?: boolean
+  /** Knappen som bekräftar en ovanligt stor mängd (standard "Ja, lägg till"). */
+  largeConfirmLabel?: string
   /** Fokusera siffran direkt (bra på desktop, undvik på mobil där tangentbordet fälls upp). */
   autoFocus?: boolean
   /**
@@ -314,6 +344,7 @@ export function PortionPicker({
   onChange,
   hideActions = false,
   busy = false,
+  largeConfirmLabel = 'Ja, lägg till',
   autoFocus = false,
   amountRef,
   children,
@@ -343,14 +374,21 @@ export function PortionPicker({
   const dist = useMemo(() => energyDistribution(n), [n])
   const kcalKnown = n.kcal !== undefined
   const liquid = food.liquid === true
+  // Orimligt stor mängd: kräver ett extra tryck. Bekräftelsen gäller just den vikten.
+  const [confirmedGrams, setConfirmedGrams] = useState<number | null>(null)
+  const large = valid && grams > LARGE_AMOUNT_GRAMS
+  const needsConfirmation = large && confirmedGrams !== grams
+  const largeRef = useRef<HTMLButtonElement>(null)
 
   const onChangeRef = useRef(onChange)
   useEffect(() => {
     onChangeRef.current = onChange
   })
   useEffect(() => {
-    onChangeRef.current?.({ amount: amount ?? 0, unit, grams })
-  }, [amount, unit, grams])
+    const selection: PortionSelection = { amount: amount ?? 0, unit, grams }
+    if (needsConfirmation) selection.needsConfirmation = true
+    onChangeRef.current?.(selection)
+  }, [amount, unit, grams, needsConfirmation])
 
   const changeUnit = (next: UnitKey) => {
     if (next === unit) return
@@ -361,6 +399,17 @@ export function PortionPicker({
   const confirm = (e?: FormEvent) => {
     e?.preventDefault()
     if (!valid || amount === undefined || busy) return
+    if (needsConfirmation) {
+      // Enter i fältet: visa frågan i stället för att lägga till.
+      largeRef.current?.focus()
+      return
+    }
+    onConfirm(amount, unit, grams)
+  }
+
+  const confirmLarge = () => {
+    if (!valid || amount === undefined || busy) return
+    setConfirmedGrams(grams)
     onConfirm(amount, unit, grams)
   }
 
@@ -387,7 +436,7 @@ export function PortionPicker({
           value={amount}
           onChange={setAmount}
           min={0}
-          max={isExactUnit(unit) ? 10000 : 1000}
+          max={maxAmount(unit)}
           step={unitStep(unit)}
           decimals={2}
           suffix={suffix}
@@ -445,6 +494,18 @@ export function PortionPicker({
           <Scale className="mt-0.5 size-4 shrink-0 text-gran" aria-hidden />
           <span>{rawHint}</span>
         </p>
+      )}
+
+      {large && needsConfirmation && (
+        <div className="flex flex-col items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-sm text-ink">
+          <p className="flex items-start gap-2.5" role="status">
+            <Scale className="mt-0.5 size-4 shrink-0 text-hjortron" aria-hidden />
+            <span>{largeAmountText(grams)}</span>
+          </p>
+          <Button ref={largeRef} size="sm" variant="soft" iconLeft={Check} onClick={confirmLarge} disabled={busy}>
+            {largeConfirmLabel}
+          </Button>
+        </div>
       )}
 
       {amount !== undefined && !gramsKnown && (
@@ -516,7 +577,7 @@ export function PortionPicker({
 
       {!hideActions && (
         <div className="flex flex-col gap-2">
-          <Button type="submit" size="lg" fullWidth disabled={!valid} loading={busy} iconLeft={confirmIcon}>
+          <Button type="submit" size="lg" fullWidth disabled={!valid || needsConfirmation} loading={busy} iconLeft={confirmIcon}>
             {confirmLabel}
           </Button>
           {secondaryLabel && onSecondary && (
@@ -524,10 +585,10 @@ export function PortionPicker({
               variant="soft"
               size="lg"
               fullWidth
-              disabled={!valid || busy}
+              disabled={!valid || busy || needsConfirmation}
               iconLeft={secondaryIcon}
               onClick={() => {
-                if (valid && amount !== undefined) onSecondary(amount, unit, grams)
+                if (valid && amount !== undefined && !needsConfirmation) onSecondary(amount, unit, grams)
               }}
             >
               {secondaryLabel}

@@ -6,9 +6,9 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { Lightbulb, MapPin, Search, Sunrise, Sunset } from 'lucide-react'
-import { Badge, Card, PageHeader, Sheet, cx } from '../../components/ui'
+import { Badge, Card, ExternalLink, PageHeader, Sheet, cx } from '../../components/ui'
 import { useToday } from '../../hooks/useToday'
-import { MONTHS, WEEKDAYS, capitalize, diffDays, formatDayLong, formatDayShort, fromISODate } from '../../lib/dates'
+import { MONTHS, WEEKDAYS, WEEKDAYS_SHORT, capitalize, diffDays, formatDayLong, formatDayShort, fromISODate, weekdayIndex } from '../../lib/dates'
 import { seasonalProduce, sunTimes, SEASONS, swedishSeason } from '../../lib/season'
 import { FOOD_DAY_KIND_LABELS, WEEKLY_FOOD_TRADITIONS, foodDayCountdown, foodDayFor, upcomingFoodDays, type FoodDay } from '../../lib/swedishCalendar'
 import {
@@ -33,6 +33,13 @@ function dateText(day: FoodDay, today: string): string {
   const start = day.approximate ? `ca ${formatDayShort(day.date)}` : formatDayLong(day.date, today)
   if (day.endDate && day.endDate !== day.date) return `${formatDayShort(day.date)} – ${formatDayShort(day.endDate)}`
   return start
+}
+
+/** Kort datum för listan: "tis 29 sep", "ca 12 okt" eller "5 okt – 11 okt". */
+function shortDateText(day: FoodDay): string {
+  if (day.endDate && day.endDate !== day.date) return `${formatDayShort(day.date)} – ${formatDayShort(day.endDate)}`
+  const short = `${WEEKDAYS_SHORT[weekdayIndex(day.date)]} ${formatDayShort(day.date)}`
+  return day.approximate ? `ca ${formatDayShort(day.date)}` : short
 }
 
 function SectionHeading({ id, children, sub }: { id: string; children: ReactNode; sub?: ReactNode }) {
@@ -143,15 +150,20 @@ export default function FoodCalendarPage() {
                     <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.375rem] leading-none">
                       {d.emoji}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[0.9375rem] font-medium text-ink">{d.name}</span>
-                      <span className="block truncate text-[0.8125rem] text-ink-3">
-                        {capitalize(dateText(d, today))} · {FOOD_DAY_KIND_LABELS[d.kind]}
+                    {/* Under 360 px hamnar nedräkningen under texten i stället för att klämma ihop namnet – och
+                        bredare än så när ett långt ord i namnet ("Världslivsmedelsdagen") inte får plats bredvid. */}
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1.5 min-[360px]:flex-row min-[360px]:flex-wrap min-[360px]:items-center min-[360px]:gap-x-3">
+                      <span className="min-w-0 self-stretch min-[360px]:min-w-auto min-[360px]:flex-[1_1_9rem]">
+                        <span className="line-clamp-2 text-[0.9375rem] leading-snug font-medium break-words text-ink">{d.name}</span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-ink-3">
+                          <span className="whitespace-nowrap">{capitalize(shortDateText(d))}</span>
+                          <Badge tone="neutral" variant="outline">{FOOD_DAY_KIND_LABELS[d.kind]}</Badge>
+                        </span>
                       </span>
+                      <Badge tone={days <= 7 ? 'sol' : 'neutral'} className="shrink-0">
+                        {countdown}
+                      </Badge>
                     </span>
-                    <Badge tone={days <= 7 ? 'sol' : 'neutral'} className="shrink-0">
-                      {countdown}
-                    </Badge>
                   </button>
                 </li>
               )
@@ -283,9 +295,7 @@ function DaylightCard({ today }: { today: string }) {
             <p className="text-[0.875rem] leading-relaxed text-ink">
               Från oktober till mars står solen så lågt i Sverige att huden knappt bildar något D-vitamin. Fet fisk, ägg och berikade mejeriprodukter och
               matfetter hjälper. Undrar du över tillskott – fråga{' '}
-              <a href="https://www.1177.se" target="_blank" rel="noreferrer" className="font-semibold text-gran underline underline-offset-2">
-                1177
-              </a>
+              <ExternalLink href="https://www.1177.se">1177</ExternalLink>
               .
             </p>
           </div>

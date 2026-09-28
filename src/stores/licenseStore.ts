@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { idbStorage, STORE_KEYS } from './storage'
+import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 interface LicenseState {
   /** När provperioden började (epoch-ms). Sätts när profilen skapas första gången. */
@@ -33,6 +33,12 @@ export const useLicenseStore = create<LicenseState>()(
       clearLicense: () => set({ licenseKey: null, activatedAt: null }),
       resetLicenseState: () => set({ trialStartedAt: null, licenseKey: null, activatedAt: null }),
     }),
-    { name: STORE_KEYS.license, storage: idbStorage, version: 1 },
+    {
+      name: STORE_KEYS.license,
+      storage: idbStorage,
+      version: PERSIST_VERSIONS[STORE_KEYS.license],
+      // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
+      migrate: (persisted) => persisted as LicenseState,
+    },
   ),
 )

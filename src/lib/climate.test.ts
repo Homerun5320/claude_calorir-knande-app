@@ -7,6 +7,7 @@ import {
   CLIMATE_REFERENCE,
   CLIMATE_THRESHOLDS,
   MIN_SWAP_SAVING_KG,
+  RISE_SOURCE,
   climateRating,
   co2eEquivalents,
   dayClimate,
@@ -58,6 +59,23 @@ describe('CATEGORY_CO2E', () => {
     expect(CATEGORY_CO2E.fagel.kgPerKg).toBe(3.3)
     expect(CATEGORY_CO2E.rott_kott.kgPerKg).toBeGreaterThan(CATEGORY_CO2E.fagel.kgPerKg)
     expect(CATEGORY_CO2E.fagel.kgPerKg).toBeGreaterThan(CATEGORY_CO2E.baljvaxter.kgPerKg)
+  })
+})
+
+describe('källhänvisningar', () => {
+  it('anger RISE-källan med sitt fullständiga namn', () => {
+    expect(RISE_SOURCE).toBe('Öppna listan – ett utdrag från RISE klimatdatabas för livsmedel v 2.1 (2022)')
+    expect(CATEGORY_CO2E.potatis.source).toBe(RISE_SOURCE)
+    expect(foodClimateFactor(notfars).source).toBe(`${RISE_SOURCE}: nötkött`)
+    // Inga kvarvarande förkortade namn.
+    for (const c of FOOD_CATEGORIES) expect(CATEGORY_CO2E[c].source).not.toMatch(/RISE Klimatdatabas/)
+  })
+
+  it('redovisar lammkött som Lagoms uppskattning (värdet finns inte i Öppna listan v 2.1)', () => {
+    const lamm = foodClimateFactor(food('Lammfärs', 'rott_kott'))
+    expect(lamm.kgPerKg).toBe(21)
+    expect(lamm.source).toMatch(/^Lagoms uppskattning/)
+    expect(lamm.source).not.toMatch(/RISE/)
   })
 })
 

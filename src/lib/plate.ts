@@ -30,7 +30,7 @@ export const PLATE_IDEAL: Record<PlateVariant, PlateSplit> = {
 export const PLATE_VARIANT_LABELS: Record<PlateVariant, { label: string; description: string }> = {
   vanlig: {
     label: 'Tallriksmodellen',
-    description: 'För dig som rör dig lite: låt grönsaker och rotfrukter fylla halva tallriken.',
+    description: 'Låt grönsaker och rotfrukter fylla halva tallriken.',
   },
   aktiv: {
     label: 'Tallriksmodellen – för dig som rör dig mycket',

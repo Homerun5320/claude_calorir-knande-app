@@ -173,14 +173,20 @@ export function minimumAge(birthYear: number, today: ISODate = todayISO()): numb
   return youngestAge(birthYear, today)
 }
 
+/**
+ * Felmeddelandet för födelseåret – ett som faktiskt säger vad som är fel: fel format, ett år i
+ * framtiden eller ett orimligt gammalt år. Lagom riktar sig till vuxna men kan användas från
+ * MIN_AGE år (med extra skydd under 18); texten för de yngsta är vänlig, inte dömande.
+ */
 export function validateBirthYear(birthYear: number | undefined, today: ISODate = todayISO()): string | undefined {
   const year = currentYear(today)
   if (birthYear === undefined) return 'Fyll i ditt födelseår.'
-  if (!Number.isInteger(birthYear) || birthYear > year || birthYear < year - MAX_AGE) {
-    return `Skriv födelseåret med fyra siffror, t.ex. ${year - 35}.`
-  }
+  // Fler än fyra siffror är ett skrivfel snarare än ett år i framtiden.
+  if (!Number.isInteger(birthYear) || birthYear < 1000 || birthYear > 9999) return `Skriv födelseåret med fyra siffror, t.ex. ${year - 35}.`
+  if (birthYear > year) return 'Födelseåret kan inte ligga i framtiden.'
+  if (birthYear < year - MAX_AGE) return `Ange ett födelseår mellan ${year - MAX_AGE} och ${year}.`
   if (minimumAge(birthYear, today) < MIN_AGE) {
-    return `Lagom är gjord för dig som är ${MIN_AGE} år eller äldre. Prata gärna med en vuxen eller skolsköterskan om mat och hälsa.`
+    return `Lagom är gjord för vuxna och kan användas från ${MIN_AGE} år. Funderar du på mat och hälsa – prata gärna med en vuxen eller skolsköterskan.`
   }
   return undefined
 }

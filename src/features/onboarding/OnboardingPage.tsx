@@ -6,7 +6,9 @@
  * webbläsarens och Androids bakåt går ett steg bakåt i stället för att stänga appen. Utkastet
  * sparas i sessionStorage så att inget försvinner om sidan laddas om. Enter går vidare.
  *
- * Från välkomststeget kan man också återställa en säkerhetskopia (t.ex. vid byte av telefon).
+ * Från välkomststeget kan man också återställa en säkerhetskopia (t.ex. vid byte av telefon). I
+ * apparna från App Store och Google Play förklaras flytten från webben steg för steg – datan i
+ * webbläsaren följer inte med till appen av sig själv.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom'
@@ -22,6 +24,7 @@ import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
 import { useLicenseStore } from '../../stores/licenseStore'
+import { isInApp } from '../../config/platform'
 import { backupDateLabel, restoreBackupSafely } from '../settings/backupImport'
 import { ImportSummaryList } from '../settings/ImportSummaryList'
 import { focusFirstInvalid } from './focusFirstInvalid'
@@ -116,6 +119,34 @@ function ProgressDots({ steps, current }: { steps: readonly OnboardingStep[]; cu
         />
       ))}
     </div>
+  )
+}
+
+/** Stegen för att flytta från webben till appen (visas i apparna). */
+export const WEB_MOVE_STEPS = [
+  // Samma namn som i appen: avsnittet "Data och säkerhetskopia" och knappen "Spara säkerhetskopia".
+  'Öppna Lagom i webbläsaren och välj Inställningar → Data och säkerhetskopia → Spara säkerhetskopia.',
+  'Spara filen i Filer eller skicka den till dig själv.',
+  'Välj Återställ från säkerhetskopia här.',
+] as const
+
+/** I apparna: så flyttar man sin data från webbversionen. */
+function WebMoveCard({ onRestore }: { onRestore: () => void }) {
+  return (
+    <section aria-labelledby="flytta-fran-webben" className="card mx-auto mt-5 w-[calc(100%-2rem)] max-w-[30rem] p-4">
+      <h2 id="flytta-fran-webben" className="font-display text-[1.125rem] font-semibold tracking-tight text-ink">
+        Har du använt Lagom på webben?
+      </h2>
+      <p className="mt-1 text-[0.875rem] leading-relaxed text-ink-2">Datan i webbläsaren följer inte med till appen av sig själv. Så flyttar du den:</p>
+      <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-[0.875rem] leading-relaxed text-ink-2 marker:font-semibold marker:text-gran">
+        {WEB_MOVE_STEPS.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      <Button type="button" variant="secondary" size="sm" iconLeft={ArchiveRestore} className="mt-3" onClick={onRestore}>
+        Återställ från säkerhetskopia
+      </Button>
+    </section>
   )
 }
 
@@ -237,11 +268,13 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
     setDemoLoading(true)
     try {
       const { seedDemoData } = await import('../../lib/demo')
-      // Provperioden räknas från nu – aldrig från exempelprofilens bakdaterade start.
-      useLicenseStore.getState().ensureTrialStarted()
+      // Exempeldata startar ingen provperiod – den startar först när den egna profilen skapas
+      // (`finish`). Exempeldatan går att titta på men inte att logga i.
       await seedDemoData()
       save(null)
-      toast('Exempeldata är inlagd – tryck på ”Börja med min egen profil” när du vill börja på riktigt.', { tone: 'success' })
+      toast('Exempeldata är inlagd – titta runt så mycket du vill. Tryck på ”Börja med min egen profil” när du vill börja logga; då startar provperioden.', {
+        tone: 'success',
+      })
       navigate('/', { replace: true })
     } catch {
       setDemoLoading(false)
@@ -318,10 +351,17 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
   }
 
   const common = { draft, onChange, today, focusOnMount: focus, eyebrow }
+  // I apparna visas flytten från webben som ett eget kort med steg (se WebMoveCard).
+  const inApp = isInApp()
   let body: ReactNode
   switch (current) {
     case 'valkommen':
-      body = <WelcomeStep today={today} />
+      body = (
+        <>
+          <WelcomeStep today={today} />
+          {inApp && <WebMoveCard onRestore={() => fileRef.current?.click()} />}
+        </>
+      )
       break
     case 'mal':
       body = <GoalStep {...common} />
@@ -378,7 +418,7 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
         </div>
 
         <div className="sticky bottom-0 z-20 bg-linear-to-t from-bg from-70% to-transparent pt-6">
-          <div className="mx-auto w-full max-w-lg px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto w-full max-w-lg px-4 pb-[max(1rem,var(--sa-bottom))]">
             {attempted && blockedContinue && current !== 'om-dig' && (
               <p role="alert" className="mb-2 text-center text-[0.875rem] text-ink-2">
                 {current === 'mal' || current === 'aktivitet' ? 'Välj ett alternativ för att gå vidare.' : 'Kontrollera uppgifterna ovan.'}
@@ -399,9 +439,11 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
                 <Button type="button" variant="ghost" size="sm" iconLeft={Sparkles} loading={demoLoading} onClick={exploreDemo}>
                   Utforska med exempeldata
                 </Button>
-                <Button type="button" variant="ghost" size="sm" iconLeft={ArchiveRestore} onClick={() => fileRef.current?.click()}>
-                  Återställ säkerhetskopia
-                </Button>
+                {!inApp && (
+                  <Button type="button" variant="ghost" size="sm" iconLeft={ArchiveRestore} onClick={() => fileRef.current?.click()}>
+                    Återställ säkerhetskopia
+                  </Button>
+                )}
                 <Link to="/om" className="inline-flex min-h-11 items-center px-2 text-[0.8125rem] font-semibold text-ink-3 underline-offset-2 hover:text-ink-2 hover:underline">
                   Om Lagom
                 </Link>

@@ -20,6 +20,7 @@ import {
   recipeFavoriteId,
   recipeFromDraft,
   roundAmount,
+  safeSourceUrl,
   scaleFactor,
   scaleIngredient,
   servingClimate,
@@ -27,6 +28,7 @@ import {
   showPlateFor,
   sortOwnRecipes,
   sortedTags,
+  sourceHost,
   validateDraft,
   weightInfo,
 } from './recipeLogic'
@@ -196,6 +198,26 @@ describe('utkast', () => {
     expect(edited.id).toBe(fresh.id)
     expect(edited.createdAt).toBe(1000)
     expect(edited.updatedAt).toBe(2000)
+  })
+
+  it('behåller länken till originalreceptet när receptet redigeras', () => {
+    const draft = { ...emptyDraft(), name: 'Kladdkaka', ingredients: recipe().ingredients, sourceUrl: 'https://recept.example.se/kladdkaka' }
+    const saved = recipeFromDraft(draft, undefined, 1000)
+    expect(saved.sourceUrl).toBe('https://recept.example.se/kladdkaka')
+    expect(draftFromRecipe(saved).sourceUrl).toBe('https://recept.example.se/kladdkaka')
+    expect(recipeFromDraft(draftFromRecipe(saved), saved, 2000).sourceUrl).toBe('https://recept.example.se/kladdkaka')
+    // Utan länk finns inget fält alls.
+    expect('sourceUrl' in recipeFromDraft({ ...draft, sourceUrl: undefined })).toBe(false)
+    expect('sourceUrl' in draftFromRecipe(recipe())).toBe(false)
+  })
+
+  it('godtar bara http(s)-länkar som källa', () => {
+    expect(safeSourceUrl(' https://www.ica.se/recept/kladdkaka ')).toBe('https://www.ica.se/recept/kladdkaka')
+    expect(safeSourceUrl('javascript:alert(1)')).toBeUndefined()
+    expect(safeSourceUrl('ftp://example.se/x')).toBeUndefined()
+    expect(safeSourceUrl('inte en länk')).toBeUndefined()
+    expect(safeSourceUrl(`https://example.se/${'a'.repeat(2000)}`)).toBeUndefined()
+    expect(sourceHost('https://www.ica.se/recept/kladdkaka')).toBe('ica.se')
   })
 
   it('märker ändringar', () => {

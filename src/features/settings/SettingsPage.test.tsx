@@ -98,6 +98,22 @@ describe('SettingsPage – index', () => {
     renderAt('/installningar/finns-inte')
     expect(await screen.findByRole('heading', { level: 1, name: 'Inställningar' })).toBeInTheDocument()
   })
+
+  it('länkar till integritetspolicyn och villkoren', () => {
+    renderAt('/installningar')
+    expect(screen.getByRole('link', { name: /^Integritetspolicy/ })).toHaveAttribute('href', '/integritet')
+    expect(screen.getByRole('link', { name: /^Köp- och användarvillkor/ })).toHaveAttribute('href', '/villkor')
+    expect(screen.getByText(/Sökningar och streckkoder skickas till Open Food Facts/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'integritetspolicyn' })).toHaveAttribute('href', '/integritet')
+  })
+
+  it('Lagom Moln syns inte när det är avstängt (ingen VITE_SUPABASE_URL)', async () => {
+    renderAt('/installningar')
+    expect(screen.queryByRole('link', { name: /Lagom Moln/ })).not.toBeInTheDocument()
+    renderAt('/installningar/moln')
+    expect(await screen.findAllByRole('heading', { level: 1, name: 'Inställningar' })).not.toHaveLength(0)
+    expect(screen.queryByRole('heading', { level: 1, name: 'Lagom Moln' })).not.toBeInTheDocument()
+  })
 })
 
 describe('SettingsPage – sektioner', () => {

@@ -38,35 +38,42 @@ export interface OriginCheck {
   /**
    * Adressen dit kunden skickas tillbaka efter betalningen: APP_URL (eller en adress i
    * ALLOWED_ORIGINS) om anropet kom därifrån, annars funktionens eget ursprung (t.ex. en
-   * förhandsversion på Netlify), annars APP_URL.
+   * förhandsversion på Netlify), annars APP_URL. För den inbyggda appen alltid APP_URL – aldrig
+   * capacitor:// eller https://localhost.
    */
   returnBase: string
+  /** true när anropet kommer från den inbyggda appen (ALLOWED_NATIVE_ORIGINS). */
+  native: boolean
 }
 
 /**
- * Kontrollera Origin-headern. Samma ursprung som funktionen godtas alltid, liksom APP_URL och
- * ALLOWED_ORIGINS. Anrop utan Origin (curl, server till server) godtas men får inga CORS-headers.
+ * Kontrollera Origin-headern. Samma ursprung som funktionen godtas alltid, liksom APP_URL,
+ * ALLOWED_ORIGINS och – med exakt strängjämförelse – den inbyggda appens ursprung
+ * (`nativeOrigins`, t.ex. capacitor://localhost). Anrop utan Origin (curl, server till server)
+ * godtas men får inga CORS-headers. `methods` är de metoder som funktionen tar emot.
  */
-export function checkOrigin(req: Request, appUrls: string[]): OriginCheck {
+export function checkOrigin(req: Request, appUrls: string[], nativeOrigins: readonly string[] = [], methods = 'POST, OPTIONS'): OriginCheck {
   const origin = req.headers.get('origin')
   const selfOrigin = safeOrigin(req.url)
   const fallback = appUrls[0] || selfOrigin || ''
-  if (origin === null) return { allowed: true, headers: {}, returnBase: fallback }
+  if (origin === null) return { allowed: true, headers: {}, returnBase: fallback, native: false }
+
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': methods,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  }
+  // Den inbyggda appen: bara exakt de konfigurerade strängarna, ingen tolkning som adress.
+  if (nativeOrigins.some((n) => n === origin)) {
+    return { allowed: true, headers: corsHeaders, returnBase: appUrls[0] ?? '', native: true }
+  }
 
   const match = appUrls.find((u) => safeOrigin(u) === origin)
   const allowed = Boolean(match) || (selfOrigin !== '' && origin === selfOrigin)
-  if (!allowed) return { allowed: false, headers: { Vary: 'Origin' }, returnBase: fallback }
-  return {
-    allowed: true,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-      Vary: 'Origin',
-    },
-    returnBase: match ?? origin,
-  }
+  if (!allowed) return { allowed: false, headers: { Vary: 'Origin' }, returnBase: fallback, native: false }
+  return { allowed: true, headers: corsHeaders, returnBase: match ?? origin, native: false }
 }
 
 function safeOrigin(url: string): string {

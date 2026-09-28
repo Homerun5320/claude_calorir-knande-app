@@ -214,6 +214,8 @@ export interface RecipeDraft {
   cookedWeightG?: number
   instructions: string
   tags: FoodTag[]
+  /** Länk till originalreceptet (importerade recept) – följer med när receptet sparas. */
+  sourceUrl?: string
 }
 
 export function emptyDraft(): RecipeDraft {
@@ -230,6 +232,7 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
     cookedWeightG: recipe.cookedWeightG,
     instructions: recipe.instructions ?? '',
     tags: recipe.tags ?? [],
+    ...(recipe.sourceUrl ? { sourceUrl: recipe.sourceUrl } : {}),
   }
 }
 
@@ -295,7 +298,34 @@ export function recipeFromDraft(draft: RecipeDraft, base?: Pick<Recipe, 'id' | '
   if (cooked !== undefined) recipe.cookedWeightG = cooked
   if (prep !== undefined) recipe.prepMinutes = prep
   if (instructions) recipe.instructions = instructions
+  const source = safeSourceUrl(draft.sourceUrl)
+  if (source) recipe.sourceUrl = source
   return recipe
+}
+
+/**
+ * En länk som går att spara som receptets källa: http(s), högst 2 000 tecken (samma regel som när
+ * en säkerhetskopia läses in). undefined annars.
+ */
+export function safeSourceUrl(url: string | undefined): string | undefined {
+  const trimmed = url?.trim()
+  if (!trimmed || trimmed.length > 2000) return undefined
+  try {
+    const u = new URL(trimmed)
+    const out = u.toString()
+    return (u.protocol === 'https:' || u.protocol === 'http:') && out.length <= 2000 ? out : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Kort visning av en källänk: "ica.se" eller "recept.example.se". */
+export function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }
 
 /** Kopiera ett recept (t.ex. en svensk klassiker) till ett nytt eget recept. */

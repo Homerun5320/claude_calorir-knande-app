@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest'
-import { base64UrlDecode, base64UrlEncode, createTestLicense, decodeLicense, signLicense, verifyLicense, type LicensePayload } from './license'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  base64UrlDecode,
+  base64UrlEncode,
+  createTestLicense,
+  decodeLicense,
+  keyId,
+  licenseKeyHash,
+  signLicense,
+  signRevocationList,
+  verifyLicense,
+  verifyRevocationList,
+  type LicensePayload,
+} from './license'
 import { accessStatus, canLog } from '../hooks/useAccess'
 
 async function keyPair() {
@@ -11,6 +23,10 @@ async function keyPair() {
 }
 
 const NOW = Date.UTC(2026, 8, 27, 12)
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 describe('licensnycklar', () => {
   it('base64url tur och retur', () => {
@@ -74,6 +90,128 @@ describe('licensnycklar', () => {
   it('skräp underkänns som format', async () => {
     expect(await verifyLicense('hej', { publicKey: '', mode: 'test' })).toEqual({ ok: false, reason: 'format' })
     expect(decodeLicense('LAGOM1.@@@.x')).toBeNull()
+  })
+})
+
+describe('flera publika nycklar (nyckelbyte med kid)', () => {
+  it('keyId är de första 8 base64url-tecknen av SHA-256 över SPKI-byten', async () => {
+    const { pub } = await keyPair()
+    const id = await keyId(pub)
+    expect(id).toMatch(/^[A-Za-z0-9_-]{8}$/)
+    const spki = Uint8Array.from(atob(pub), (c) => c.charCodeAt(0))
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', spki))
+    expect(id).toBe(base64UrlEncode(digest).slice(0, 8))
+    expect(await keyId(pub)).toBe(id)
+  })
+
+  it('en licens signerad med nyckel 2 verifieras när appen har båda nycklarna', async () => {
+    const k1 = await keyPair()
+    const k2 = await keyPair()
+    const payload: LicensePayload = { v: 1, id: 'cs_live_2', plan: 'ar', iat: Math.floor(NOW / 1000), exp: Math.floor(NOW / 1000) + 365 * 86_400, kid: await keyId(k2.pub) }
+    const key = await signLicense(payload, k2.priv)
+    expect(await verifyLicense(key, { publicKey: [k1.pub, k2.pub], mode: 'live', now: NOW })).toEqual({ ok: true, payload })
+    // Bara den gamla nyckeln räcker inte.
+    expect(await verifyLicense(key, { publicKey: [k1.pub], mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'signatur' })
+  })
+
+  it('fel kid men giltig signatur verifieras via reserven (alla nycklar provas)', async () => {
+    const k1 = await keyPair()
+    const k2 = await keyPair()
+    const payload: LicensePayload = { v: 1, id: 'cs_live_3', plan: 'livstid', iat: 1, kid: await keyId(k2.pub) }
+    // Signerad med nyckel 1 trots att kid pekar på nyckel 2.
+    const key = await signLicense(payload, k1.priv)
+    expect((await verifyLicense(key, { publicKey: [k2.pub, k1.pub], mode: 'live', now: NOW })).ok).toBe(true)
+    // Okänt kid fungerar också.
+    const unknown = await signLicense({ ...payload, kid: 'okänt12' }, k1.priv)
+    expect((await verifyLicense(unknown, { publicKey: [k2.pub, k1.pub], mode: 'live', now: NOW })).ok).toBe(true)
+  })
+
+  it('en manipulerad payload avvisas med alla nycklar', async () => {
+    const k1 = await keyPair()
+    const k2 = await keyPair()
+    const key = await signLicense({ v: 1, id: 'x', plan: 'ar', iat: 1, exp: 4_000_000_000, kid: await keyId(k2.pub) }, k2.priv)
+    const [p, body, sig] = key.split('.')
+    const forged = JSON.parse(new TextDecoder().decode(base64UrlDecode(body)))
+    forged.plan = 'livstid'
+    delete forged.exp
+    const forgedKey = `${p}.${base64UrlEncode(new TextEncoder().encode(JSON.stringify(forged)))}.${sig}`
+    expect(await verifyLicense(forgedKey, { publicKey: [k1.pub, k2.pub], mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'signatur' })
+  })
+
+  it('utan kid fungerar som förut – med en nyckel som text eller i en lista', async () => {
+    const k1 = await keyPair()
+    const k2 = await keyPair()
+    const payload: LicensePayload = { v: 1, id: 'cs_old', plan: 'livstid', iat: 1 }
+    const key = await signLicense(payload, k1.priv)
+    expect(await verifyLicense(key, { publicKey: k1.pub, mode: 'live', now: NOW })).toEqual({ ok: true, payload })
+    expect(await verifyLicense(key, { publicKey: [k2.pub, k1.pub], mode: 'live', now: NOW })).toEqual({ ok: true, payload })
+    expect(await verifyLicense(key, { publicKey: [], mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'ingen-nyckel' })
+    expect(await verifyLicense(key, { publicKey: ['  ', ''], mode: 'live', now: NOW })).toEqual({ ok: false, reason: 'ingen-nyckel' })
+    // En trasig nyckel i listan stoppar inte de andra.
+    expect((await verifyLicense(key, { publicKey: ['inte-en-nyckel', k1.pub], mode: 'live', now: NOW })).ok).toBe(true)
+  })
+
+  it('ett kid som inte är text gör nyckeln ogiltig', () => {
+    const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ v: 1, id: 'x', plan: 'ar', iat: 1, kid: 5 })))
+    expect(decodeLicense(`LAGOM1.${body}.sig`)).toBeNull()
+  })
+})
+
+describe('butiksbyggen verifierar alltid som skarpt läge', () => {
+  it('osignerade testnycklar godtas inte ens om appen är byggd i testläge', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const fresh = await import('./license')
+    const key = fresh.createTestLicense('livstid', undefined, NOW)
+    expect(await fresh.verifyLicense(key, { publicKey: '', mode: 'test', now: NOW })).toEqual({ ok: false, reason: 'testlicens' })
+    // Signerade licenser fungerar som vanligt.
+    const { priv, pub } = await keyPair()
+    const signed = await fresh.signLicense({ v: 1, id: 'cs_1', plan: 'ar', iat: 1, exp: 4_000_000_000 }, priv)
+    expect((await fresh.verifyLicense(signed, { publicKey: pub, mode: 'test', now: NOW })).ok).toBe(true)
+  })
+})
+
+describe('spärrlistan', () => {
+  it('en signerad lista verifieras och läses', async () => {
+    const { priv, pub } = await keyPair()
+    const token = await signRevocationList({ v: 1, issuedAt: 1_790_000_000, ids: ['cs_live_1', 'cs_live_2'] }, priv)
+    expect(token.startsWith('LAGOMREV1.')).toBe(true)
+    expect(await verifyRevocationList(token, { publicKey: [pub] })).toEqual({ v: 1, issuedAt: 1_790_000_000, ids: ['cs_live_1', 'cs_live_2'] })
+  })
+
+  it('en signatur över "LAGOMREV1.<payload>" (som licenserna) godtas också', async () => {
+    const { priv, pub } = await keyPair()
+    const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ v: 1, issuedAt: 5, ids: ['a'] })))
+    const key = await crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(priv), (c) => c.charCodeAt(0)), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(`LAGOMREV1.${body}`)))
+    expect(await verifyRevocationList(`LAGOMREV1.${body}.${base64UrlEncode(sig)}`, { publicKey: pub })).toEqual({ v: 1, issuedAt: 5, ids: ['a'] })
+  })
+
+  it('manipulerade, felsignerade och trasiga listor godtas aldrig', async () => {
+    const a = await keyPair()
+    const b = await keyPair()
+    const token = await signRevocationList({ v: 1, issuedAt: 10, ids: ['cs_1'] }, a.priv)
+    // Fel nyckel.
+    expect(await verifyRevocationList(token, { publicKey: b.pub })).toBeNull()
+    // Utan nyckel.
+    expect(await verifyRevocationList(token, { publicKey: [] })).toBeNull()
+    // Någon tar bort sitt eget id ur listan.
+    const [p, , sig] = token.split('.')
+    const emptied = `${p}.${base64UrlEncode(new TextEncoder().encode(JSON.stringify({ v: 1, issuedAt: 10, ids: [] })))}.${sig}`
+    expect(await verifyRevocationList(emptied, { publicKey: a.pub })).toBeNull()
+    // En licensnyckel är ingen spärrlista (och tvärtom).
+    const license = await signLicense({ v: 1, id: 'x', plan: 'ar', iat: 1 }, a.priv)
+    expect(await verifyRevocationList(license, { publicKey: a.pub })).toBeNull()
+    expect((await verifyLicense(token, { publicKey: a.pub, mode: 'live', now: NOW })).ok).toBe(false)
+    for (const junk of ['', 'LAGOMREV1', 'LAGOMREV1.x.y', 'LAGOMREV1.@@@.sig']) {
+      expect(await verifyRevocationList(junk, { publicKey: a.pub })).toBeNull()
+    }
+  })
+
+  it('nyckelns hash är SHA-256 över hela den tvättade nyckeln', async () => {
+    const key = createTestLicense('ar', 365, NOW)
+    const expected = base64UrlEncode(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))))
+    expect(await licenseKeyHash(`  "${key}"\n`)).toBe(expected)
   })
 })
 

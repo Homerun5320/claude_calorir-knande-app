@@ -71,7 +71,7 @@ function renderAt(path: string) {
   return { router, ...render(<RouterProvider router={router} />) }
 }
 
-const search = () => screen.getByPlaceholderText('Sök bland 1 000+ svenska livsmedel')
+const search = () => screen.getByPlaceholderText('Sök livsmedel')
 
 beforeAll(async () => {
   vi.spyOn(globalThis, 'fetch').mockImplementation(
