@@ -14,6 +14,11 @@
  *
  * Ord som "rå" och "okokt" behöver inte matcha i huvudsökningen (Lagoms rader anges tillagade och
  * kan vägas råa): "nötfärs rå" hittar Nötfärs.
+ *
+ * Det mest grundläggande kommer först: för vardagliga sökord ("kyckling", "kött", "gris" …) visas
+ * basvarorna i `data/foods/staples` överst i angiven ordning, och i övrigt går grundläggande
+ * livsmedel före sammansatta rätter och recept – den personliga boosten avgör bara ordningen inom
+ * varje grupp (se `lib/search`).
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { Food, FoodCategory, MealId } from '../types'
@@ -21,6 +26,7 @@ import { useFoodStore, type FoodUsage } from '../stores/foodStore'
 import { createSearchIndex, foldSv, normalizeSv, searchFoods, type SearchIndex, type SearchResult } from '../lib/search'
 import { userFoodCatalog, type BuiltinCatalog } from '../lib/foodRepo'
 import { useBuiltinCatalog, useFoodResolver } from './useFood'
+import { STAPLE_FOODS } from '../data/foods/staples'
 
 /** Fördröjning innan sökningen körs medan användaren skriver. */
 export const SEARCH_DEBOUNCE_MS = 120
@@ -297,7 +303,7 @@ export function useFoodSearch(query: string, opts: UseFoodSearchOptions = {}): U
     if (!effective && !catKey) return EMPTY_RESULTS
     const indexes = [userIndex, builtinIndex, recipeIndex, usedIndex].filter((ix): ix is SearchIndex => ix !== null)
     const cats = catKey ? (catKey.split(',') as FoodCategory[]) : undefined
-    return searchFoods(indexes, effective, { limit, categories: cats, boost, optionalWords: OPTIONAL_QUERY_WORDS })
+    return searchFoods(indexes, effective, { limit, categories: cats, boost, optionalWords: OPTIONAL_QUERY_WORDS, staples: STAPLE_FOODS })
   }, [effective, catKey, userIndex, builtinIndex, recipeIndex, usedIndex, limit, boost])
 
   const lmvResults = useMemo(() => {

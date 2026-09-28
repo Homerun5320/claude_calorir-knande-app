@@ -27,6 +27,16 @@
  * träff på namnets första ord, svenska källor (Lagom/Livsmedelsverket) före Open Food Facts samt
  * en valfri boost (användning, favoriter, måltid) som läggs till poängen.
  *
+ * Grundläggande först – en sorteringsnyckel ovanpå poängen (band → basnivå → poäng):
+ *   1. exakt namn ("kycklinggryta med ris" → rätten),
+ *   2. basvaror för vardagliga sökord (`SearchOptions.staples`, t.ex. "kyckling" → Kycklingbröst,
+ *      Kycklinglårfilé …) i angiven ordning – även om namnet inte innehåller ordet,
+ *   3. namnbaserade nivåer (namnet börjar med sökningen, huvudord, exakt synonym): grundläggande
+ *      livsmedel före sammansatta rätter och recept (se `isCompositeFood`),
+ *   4. övriga träffar.
+ * Poängen (inklusive boost) avgör ordningen inom varje band, så en personlig boost lyfter aldrig
+ * en rätt förbi basvarorna.
+ *
  * Prestanda: ett inverterat index över unika ord gör att en sökning bland ~3 000 livsmedel tar
  * någon millisekund. Indexet är oföränderligt – bygg ett nytt när listan ändras.
  */
@@ -68,6 +78,14 @@ export interface SearchOptions {
    * alla rader anges tillagade. Består sökningen bara av sådana ord söks de ändå.
    */
   optionalWords?: ReadonlySet<string>
+  /**
+   * Basvaror per vardagligt sökord (se `data/foods/staples`): sökord → livsmedels-id i
+   * prioritetsordning. När hela sökningen är ett av orden (även utan å/ä/ö för ord med minst fyra
+   * tecken, i böjd form eller entydig början medan man skriver: "kyck") kommer livsmedlen först i
+   * angiven ordning – även de som inte matchar sökningen i sig. Behandla objektet som oföränderligt
+   * (uppslaget byggs en gång per objekt).
+   */
+  staples?: Readonly<Record<string, readonly string[]>>
 }
 
 /** Oföränderligt sökindex. Skapas med `createSearchIndex`. */
@@ -324,6 +342,8 @@ interface Doc {
   synF: string[]
   lenCompact: number
   sourceBonus: number
+  /** Sammansatt rätt eller recept (`isCompositeFood`) – efter grundläggande livsmedel. */
+  composite: boolean
 }
 
 interface Hit {
@@ -349,6 +369,10 @@ interface IndexData {
   firstHit: Uint8Array | null
   mark: Uint32Array | null
   epoch: number
+  /** Dokument per livsmedels-id (för basvaror) – byggs vid första behov. */
+  byId: Map<string, number> | null
+  /** Indexets ord med och utan å/ä/ö (för basvaror) – byggs vid första behov. */
+  words: Set<string> | null
 }
 
 const INTERNAL = new WeakMap<SearchIndex, IndexData>()
@@ -402,6 +426,7 @@ export function createSearchIndex(foods: readonly Food[]): SearchIndex {
       synF: syn.map(foldNormalized),
       lenCompact: Math.max(1, name.replace(/ /g, '').length),
       sourceBonus: SOURCE_BONUS[food.source] ?? 0,
+      composite: isCompositeFood(food),
     })
   }
 
@@ -431,8 +456,21 @@ export function createSearchIndex(foods: readonly Food[]): SearchIndex {
     firstHit: null,
     mark: null,
     epoch: 0,
+    byId: null,
+    words: null,
   })
   return index
+}
+
+/** Kategorier för sammansatta rätter – de kommer efter grundläggande livsmedel i sökningen. */
+const COMPOSITE_CATEGORIES: ReadonlySet<FoodCategory> = new Set<FoodCategory>(['fardigratt', 'snabbmat'])
+
+/**
+ * true för sammansatta rätter och recept: kategorierna färdigrätt och snabbmat samt recept (egna och
+ * de inbyggda klassikerna). Allt annat räknas som grundläggande livsmedel.
+ */
+export function isCompositeFood(food: Pick<Food, 'category' | 'source'>): boolean {
+  return food.source === 'recipe' || COMPOSITE_CATEGORIES.has(food.category)
 }
 
 // ---------------------------------------------------------------------------
@@ -483,14 +521,95 @@ function parseQuery(query: string, optionalWords?: ReadonlySet<string>): ParsedQ
   }
 }
 
+// ---------------------------------------------------------------------------
+// Basvaror per sökord
+// ---------------------------------------------------------------------------
+
+interface StapleLookup {
+  /** Normaliserat sökord – och ASCII-vikt variant för ord med minst `STAPLE_FOLD_MIN` tecken. */
+  exact: Map<string, readonly string[]>
+  /** Stammade former ("kycklingar" → "kyckling") – används bara när inget exakt ord finns. */
+  stems: Map<string, readonly string[]>
+}
+
+/**
+ * Korta sökord viks inte till ASCII och stammas inte: "bär" → "bar" och "öl" → "ol" är andra ord,
+ * och "file" (filé) är ingen böjning av "fil". Behövs formen ändå läggs den in som eget sökord.
+ */
+const STAPLE_FOLD_MIN = 4
+
+const stapleCache = new WeakMap<object, StapleLookup>()
+
+function stapleLookup(map: Readonly<Record<string, readonly string[]>>): StapleLookup {
+  const cached = stapleCache.get(map)
+  if (cached) return cached
+  const exact = new Map<string, readonly string[]>()
+  const words: Array<[string, readonly string[]]> = []
+  for (const [word, ids] of Object.entries(map)) {
+    const norm = normalizeSv(word)
+    if (!norm || ids.length === 0) continue
+    words.push([norm, ids])
+    exact.set(norm, ids)
+  }
+  // ASCII-vikta varianter efter de riktiga orden, så att ett uttryckligt ord alltid vinner.
+  for (const [norm, ids] of words) {
+    const fold = foldNormalized(norm)
+    if (fold !== norm && fold.length >= STAPLE_FOLD_MIN && !exact.has(fold)) exact.set(fold, ids)
+  }
+  const stems = new Map<string, readonly string[]>()
+  for (const [word, ids] of exact) {
+    const st = stemSv(word)
+    if (st.length >= STAPLE_FOLD_MIN && !stems.has(st)) stems.set(st, ids)
+  }
+  const lookup: StapleLookup = { exact, stems }
+  stapleCache.set(map, lookup)
+  return lookup
+}
+
+/** true om ordet (med eller utan å/ä/ö) finns som eget ord i indexet – namn, synonym eller märke. */
+function isIndexWord(data: IndexData, word: string): boolean {
+  if (!data.words) {
+    const words = new Set<string>()
+    for (const e of data.vocab) {
+      words.add(e.t)
+      words.add(e.f)
+    }
+    data.words = words
+  }
+  return data.words.has(word)
+}
+
+/**
+ * Basvarornas id för en normaliserad sökning, eller undefined om sökningen inte är ett sökord:
+ * exakt ord ("kyckling", "kott"), böjning ("kycklingar") eller – medan användaren skriver – början
+ * av ett enda sökord ("kyck") som inte själv är ett ord i databasen ("mjöl" är mjöl, inte "mjölk").
+ */
+function stapleIdsFor(map: Readonly<Record<string, readonly string[]>>, norm: string, data: IndexData): readonly string[] | undefined {
+  const lookup = stapleLookup(map)
+  const hit = lookup.exact.get(norm)
+  if (hit || norm.includes(' ') || norm.length < STAPLE_FOLD_MIN) return hit
+  const st = stemSv(norm)
+  const stemHit = st.length >= STAPLE_FOLD_MIN ? lookup.stems.get(st) : undefined
+  if (stemHit || isIndexWord(data, norm)) return stemHit
+  let found: readonly string[] | undefined
+  for (const [word, ids] of lookup.exact) {
+    if (word.length > norm.length && word.startsWith(norm)) {
+      // Flera sökord med olika listor ("havr" → havregryn, havredryck): ingen gissning.
+      if (found && found !== ids) return undefined
+      found = ids
+    }
+  }
+  return found
+}
+
 /**
  * Ord som slutar som ett kort livsmedelsord utan att vara en sammansättning med det: "bröst" och
  * "kost" slutar på "ost", "pålägg", "fläsklägg" och "skägg" på "ägg", "gris", "kapris" och
- * "sparris" på "ris", "svin" på "vin". Ett sökord räknas inte som huvudord i ett ord som slutar så
- * – "Ankbröst" och "Råkost" är ingen ost, "Kycklingpålägg" inget ägg och "Polkagris" inget ris
- * (men "Vaktelägg" är ett ägg och "Fullkornsris" ett ris).
+ * "sparris" på "ris", "svin" på "vin", "polkagris" på "gris". Ett sökord räknas inte som huvudord i
+ * ett ord som slutar så – "Ankbröst" och "Råkost" är ingen ost, "Kycklingpålägg" inget ägg och
+ * "Polkagris" varken ris eller gris (men "Vaktelägg" är ett ägg och "Fullkornsris" ett ris).
  */
-const FALSE_HEADS = ['bröst', 'kost', 'frost', 'pålägg', 'fläsklägg', 'lammlägg', 'kalvlägg', 'skägg', 'gris', 'kapris', 'sparris', 'svin']
+const FALSE_HEADS = ['bröst', 'kost', 'frost', 'pålägg', 'fläsklägg', 'lammlägg', 'kalvlägg', 'skägg', 'polkagris', 'gris', 'kapris', 'sparris', 'svin']
 const FALSE_HEADS_FOLDED = FALSE_HEADS.map(foldNormalized)
 
 function isFalseHead(word: string, q: string, sv: boolean): boolean {
@@ -615,11 +734,41 @@ function prefixTier(name: string, query: string, last: QueryToken): number {
   return wordEnd - query.length >= 4 ? SEARCH_TIERS.prefixInWord : SEARCH_TIERS.prefixShort
 }
 
+/**
+ * Sorteringsband (lägre först), före poängen: exakt namn, basvaror (i listans ordning), namnbaserade
+ * nivåer med grundläggande livsmedel före rätter och recept, sedan övriga träffar.
+ */
+const RANK_EXACT = 0
+const RANK_STAPLE = 1
+const RANK_NAME_BASIC = 10_000
+const RANK_NAME_COMPOSITE = 10_001
+const RANK_OTHER = 10_002
+
+/** Lägsta nivå som räknas som namnbaserad: namnet börjar med sökningen, huvudord eller exakt synonym. */
+const NAME_LEVEL_MIN = Math.min(SEARCH_TIERS.prefixShort, SEARCH_TIERS.synonymExact)
+
+/** En träff med sitt sorteringsband. */
+interface Ranked {
+  r: SearchResult
+  rank: number
+}
+
 interface OneSearch {
-  full: SearchResult[]
-  partial: SearchResult[]
-  /** Hela sökningen är exakt namnet eller en synonym för något livsmedel ("red bull"). */
+  full: Ranked[]
+  partial: Ranked[]
+  /** Hela sökningen är exakt namnet eller en synonym för något livsmedel ("red bull"), eller ett sökord med basvaror. */
   whole: boolean
+}
+
+function docIndexById(data: IndexData): Map<string, number> {
+  if (!data.byId) {
+    const byId = new Map<string, number>()
+    data.docs.forEach((doc, i) => {
+      if (!byId.has(doc.food.id)) byId.set(doc.food.id, i)
+    })
+    data.byId = byId
+  }
+  return data.byId
 }
 
 function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit: number): OneSearch {
@@ -673,14 +822,27 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
 
   const catSet = opts.categories && opts.categories.length > 0 ? new Set<FoodCategory>(opts.categories) : null
   const qStr = pq.sv ? pq.norm : pq.fold
-  const full: SearchResult[] = []
-  const partial: SearchResult[] = []
+  const full: Ranked[] = []
+  const partial: Ranked[] = []
   let whole = false
+  const accepts = (food: Food) => (!catSet || catSet.has(food.category)) && (!opts.filter || opts.filter(food))
+
+  // Basvaror för vardagliga sökord: dokument → plats i listan. De som inte matchar läggs till efteråt.
+  let staples: Map<number, number> | null = null
+  const stapleIds = opts.staples ? stapleIdsFor(opts.staples, pq.norm, data) : undefined
+  if (stapleIds) {
+    const byId = docIndexById(data)
+    for (let i = 0; i < stapleIds.length; i++) {
+      const d = byId.get(stapleIds[i])
+      if (d === undefined) continue
+      staples ??= new Map()
+      if (!staples.has(d)) staples.set(d, i)
+    }
+  }
 
   for (const d of touched) {
     const doc = data.docs[d]
-    if (catSet && !catSet.has(doc.food.category)) continue
-    if (opts.filter && !opts.filter(doc.food)) continue
+    if (!accepts(doc.food)) continue
     const base = d * MAX_Q
     let nameAll = true
     let anyAll = true
@@ -751,13 +913,38 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
       const b = opts.boost(doc.food)
       if (Number.isFinite(b)) score += b
     }
-    const result: SearchResult = { food: doc.food, score, matched: kind }
-    if (tier === SEARCH_TIERS.partial) partial.push(result)
-    else full.push(result)
+    const staplePos = staples?.get(d)
+    let rank: number
+    if (tier === SEARCH_TIERS.exact) rank = RANK_EXACT
+    else if (staplePos !== undefined) rank = RANK_STAPLE + staplePos
+    else if (tier >= NAME_LEVEL_MIN || synExact) rank = doc.composite ? RANK_NAME_COMPOSITE : RANK_NAME_BASIC
+    else rank = RANK_OTHER
+    if (staplePos !== undefined) {
+      staples!.delete(d)
+      whole = true
+    }
+    const entry: Ranked = { r: { food: doc.food, score, matched: kind }, rank }
+    if (tier === SEARCH_TIERS.partial && staplePos === undefined) partial.push(entry)
+    else full.push(entry)
   }
 
-  full.sort(compareResults)
-  partial.sort(compareResults)
+  // Basvaror som sökningen inte hittade på egen hand ("kött" → Nötfärs).
+  if (staples) {
+    for (const [d, pos] of staples) {
+      const doc = data.docs[d]
+      if (!accepts(doc.food)) continue
+      let score = SEARCH_TIERS.synonym + doc.sourceBonus
+      if (opts.boost) {
+        const b = opts.boost(doc.food)
+        if (Number.isFinite(b)) score += b
+      }
+      full.push({ r: { food: doc.food, score, matched: 'synonym' }, rank: RANK_STAPLE + pos })
+      whole = true
+    }
+  }
+
+  full.sort(compareRanked)
+  partial.sort(compareRanked)
   return { full: full.length > limit ? full.slice(0, limit) : full, partial: partial.length > limit ? partial.slice(0, limit) : partial, whole }
 }
 
@@ -768,12 +955,19 @@ function searchOne(data: IndexData, pq: ParsedQuery, opts: SearchOptions, limit:
  */
 function withPartial(one: OneSearch, limit: number): SearchResult[] {
   const { full, partial } = one
-  if (!one.whole && full.length < Math.min(limit, 8) && partial.length > 0) return [...full, ...partial.slice(0, limit - full.length)]
-  return full.length > limit ? full.slice(0, limit) : full
+  const list = !one.whole && full.length < Math.min(limit, 8) && partial.length > 0 ? [...full, ...partial.slice(0, limit - full.length)] : full
+  const out: SearchResult[] = []
+  for (let i = 0; i < list.length && i < limit; i++) out.push(list[i].r)
+  return out
 }
 
 function compareResults(a: SearchResult, b: SearchResult): number {
   return b.score - a.score || a.food.name.length - b.food.name.length || (a.food.name < b.food.name ? -1 : a.food.name > b.food.name ? 1 : 0)
+}
+
+/** Sorteringsband först, sedan poäng (se `RANK_*`). */
+function compareRanked(a: Ranked, b: Ranked): number {
+  return a.rank - b.rank || compareResults(a.r, b.r)
 }
 
 const collator = new Intl.Collator('sv-SE', { sensitivity: 'base', numeric: true })
@@ -831,10 +1025,10 @@ export function searchFoods(
 
   // Flera index: slå ihop fullständiga och delvisa träffar var för sig.
   const runs = indexes.map((ix) => searchOne(dataOf(ix), pq, opts, limit))
-  const full = mergeBest(runs.map((r) => r.full))
-  const fullIds = new Set(full.map((r) => r.food.id))
-  const partial = mergeBest(runs.map((r) => r.partial)).filter((r) => !fullIds.has(r.food.id))
-  return withPartial({ full: full.sort(compareResults), partial: partial.sort(compareResults), whole: runs.some((r) => r.whole) }, limit)
+  const full = mergeBestRanked(runs.map((r) => r.full))
+  const fullIds = new Set(full.map((x) => x.r.food.id))
+  const partial = mergeBestRanked(runs.map((r) => r.partial)).filter((x) => !fullIds.has(x.r.food.id))
+  return withPartial({ full: full.sort(compareRanked), partial: partial.sort(compareRanked), whole: runs.some((r) => r.whole) }, limit)
 }
 
 /** Slå ihop träfflistor – dubbletter (samma id) behåller bästa poängen. */
@@ -844,6 +1038,18 @@ function mergeBest(lists: readonly SearchResult[][]): SearchResult[] {
     for (const r of list) {
       const prev = best.get(r.food.id)
       if (!prev || r.score > prev.score) best.set(r.food.id, r)
+    }
+  }
+  return [...best.values()]
+}
+
+/** Som `mergeBest` men för rangordnade träffar – dubbletter behåller den som sorteras först. */
+function mergeBestRanked(lists: readonly Ranked[][]): Ranked[] {
+  const best = new Map<string, Ranked>()
+  for (const list of lists) {
+    for (const x of list) {
+      const prev = best.get(x.r.food.id)
+      if (!prev || compareRanked(x, prev) < 0) best.set(x.r.food.id, x)
     }
   }
   return [...best.values()]

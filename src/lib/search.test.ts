@@ -2,8 +2,15 @@
  * Tester för Lagoms livsmedelssök. Kör: npx vitest run src/lib/search.test.ts
  */
 import { describe, expect, it } from 'vitest'
-import type { Food, FoodCategory, FoodSource } from '../types'
-import { createSearchIndex, foldSv, highlightSv, normalizeSv, searchFoods, stemSv } from './search'
+import type { Food, FoodCategory, FoodSource, MealId } from '../types'
+import type { FoodUsage } from '../stores/foodStore'
+import { createSearchIndex, foldSv, highlightSv, isCompositeFood, normalizeSv, searchFoods, stemSv, type SearchOptions } from './search'
+import { BUILTIN_FOODS } from '../data/foods'
+import { STAPLE_FOODS } from '../data/foods/staples'
+import { loadBuiltinRecipes } from '../data/recipes'
+import { recipeFood } from './foodRepo'
+import { DEMO_FAVORITES, demoFoodIds } from './demo'
+import { createUsageBoost } from '../hooks/useFoodSearch'
 
 let seq = 0
 function food(
@@ -354,6 +361,186 @@ describe('searchFoods', () => {
     for (const q of queries) searchFoods(bigIndex, q, { limit: 40 })
     const avg = (performance.now() - t1) / queries.length
     expect(avg).toBeLessThan(5)
+  })
+})
+
+describe('grundläggande först', () => {
+  const dishes = [
+    food('Kycklinggryta med ris', 'fardigratt', { id: 'x:gryta' }),
+    food('Kycklingtallrik', 'fardigratt', { id: 'x:tallrik' }),
+    food('Kycklingsoppa', 'fardigratt', { id: 'recipe:soppa', source: 'recipe' }),
+    food('Kycklingburgare', 'snabbmat', { id: 'x:burgare' }),
+  ]
+  const basics = [
+    food('Kycklingbröst', 'fagel', { id: 'x:brost', synonyms: ['kyckling', 'kycklingfilé'] }),
+    food('Kycklingkorv', 'chark', { id: 'x:korv' }),
+    food('Grillkyckling', 'fagel', { id: 'x:grill' }),
+    food('Pulled chicken', 'fagel', { id: 'x:pulled', synonyms: ['dragen kyckling'] }),
+    food('Nötfärs', 'rott_kott', { id: 'x:notfars', synonyms: ['köttfärs'] }),
+    food('Biff', 'rott_kott', { id: 'x:biff', synonyms: ['ryggbiff'] }),
+    food('Köttbullar med potatismos', 'fardigratt', { id: 'x:kottbullar' }),
+    food('Vetemjöl', 'spannmal', { id: 'x:mjol', synonyms: ['mjöl'] }),
+    food('Mjölk 3 %', 'mejeri', { id: 'x:mjolk' }),
+  ]
+  const idx = createSearchIndex([...dishes, ...basics])
+  const staples = {
+    kyckling: ['x:brost', 'x:grill', 'x:pulled', 'x:korv'],
+    kött: ['x:notfars', 'x:biff'],
+    mjölk: ['x:mjolk'],
+  }
+  /** Rätterna används ofta – maximal personlig boost. */
+  const dishBoost = (f: Food) => (isCompositeFood(f) ? 250 : 0)
+  const run = (query: string, opts: SearchOptions = {}) => searchFoods(idx, query, { boost: dishBoost, ...opts }).map((r) => r.food.id)
+
+  it('klassar färdigrätter, snabbmat och recept som sammansatta', () => {
+    expect(isCompositeFood({ category: 'fardigratt', source: 'lagom' })).toBe(true)
+    expect(isCompositeFood({ category: 'snabbmat', source: 'lagom' })).toBe(true)
+    expect(isCompositeFood({ category: 'bakverk', source: 'recipe' })).toBe(true)
+    expect(isCompositeFood({ category: 'fagel', source: 'lagom' })).toBe(false)
+    expect(isCompositeFood({ category: 'chark', source: 'custom' })).toBe(false)
+  })
+
+  it('sätter grundläggande livsmedel före rätter bland namnträffar – trots boost för rätterna', () => {
+    const firstDishIn = (list: string[]) => Math.min(...dishes.map((d) => list.indexOf(d.id)))
+    const typing = run('kyckl')
+    for (const id of ['x:brost', 'x:korv']) expect(typing.indexOf(id)).toBeLessThan(firstDishIn(typing))
+    // "Grillkyckling" har "kyckling" som huvudord – en namnträff för hela ordet.
+    const word = run('kyckling')
+    for (const id of ['x:brost', 'x:korv', 'x:grill']) expect(word.indexOf(id)).toBeLessThan(firstDishIn(word))
+    // Boosten avgör ordningen inom gruppen.
+    expect(run('kyckl', { boost: (f) => (f.id === 'x:korv' ? 100 : 0) })[0]).toBe('x:korv')
+    // Utan basvaror hamnar en ren synonymträff ("Pulled chicken") efter namnträffarna.
+    expect(word.indexOf('x:pulled')).toBeGreaterThan(firstDishIn(word))
+  })
+
+  it('låter en exakt namnträff gå först, även för en rätt', () => {
+    expect(run('kycklinggryta med ris')[0]).toBe('x:gryta')
+    expect(run('kycklingtallrik', { staples })[0]).toBe('x:tallrik')
+  })
+
+  it('visar basvarorna först i angiven ordning, oavsett boost', () => {
+    const list = run('kyckling', { staples, boost: (f) => (f.id === 'x:korv' ? 400 : dishBoost(f)) })
+    expect(list.slice(0, 4)).toEqual(['x:brost', 'x:grill', 'x:pulled', 'x:korv'])
+    expect(list).toEqual(expect.arrayContaining(dishes.map((d) => d.id)))
+  })
+
+  it('lägger till basvaror som inte matchar sökningen i sig: "kött" → Nötfärs', () => {
+    const r = searchFoods(idx, 'kött', { staples, boost: dishBoost })
+    expect(r.slice(0, 2).map((x) => x.food.id)).toEqual(['x:notfars', 'x:biff'])
+    expect(r.map((x) => x.food.id)).toContain('x:kottbullar')
+    // Biff matchar inte "kött" alls – den finns med ändå.
+    expect(searchFoods(idx, 'kött').map((x) => x.food.id)).not.toContain('x:biff')
+  })
+
+  it('hittar sökordet i böjd form, utan å/ä/ö och medan man skriver', () => {
+    for (const q of ['kycklingar', 'Kyckling', 'kyckling rå', 'kyck', 'kyckli']) {
+      expect(run(q, { staples, optionalWords: new Set(['rå']) })[0], q).toBe('x:brost')
+    }
+    expect(run('kott', { staples })[0]).toBe('x:notfars')
+    // "mjöl" är ett eget ord – inte början av "mjölk".
+    expect(run('mjöl', { staples })[0]).toBe('x:mjol')
+    // För korta eller flertydiga början ger ingen gissning.
+    expect(run('ky', { staples })[0]).not.toBe('x:brost')
+  })
+
+  it('respekterar kategorifilter och filter', () => {
+    expect(run('kyckling', { staples, categories: ['chark'] })).toEqual(['x:korv'])
+    expect(run('kött', { staples, filter: (f) => f.id !== 'x:notfars' })[0]).toBe('x:biff')
+  })
+
+  it('fungerar över flera index', () => {
+    const user = createSearchIndex([food('Mammas kycklinggryta', 'fardigratt', { id: 'recipe:mamma', source: 'recipe' })])
+    const list = searchFoods([user, idx], 'kyckling', { staples, boost: () => 300 }).map((r) => r.food.id)
+    expect(list.slice(0, 4)).toEqual(['x:brost', 'x:grill', 'x:pulled', 'x:korv'])
+    expect(list).toContain('recipe:mamma')
+    expect(new Set(list).size).toBe(list.length)
+  })
+})
+
+describe('grundläggande först i Lagoms databas (med användning som gynnar rätter)', () => {
+  const recipes = loadBuiltinRecipes(BUILTIN_FOODS).map(recipeFood)
+  const indexes = [createSearchIndex(BUILTIN_FOODS), createSearchIndex(recipes)]
+  const now = Date.UTC(2026, 8, 28, 12)
+  // Exempeldatans livsmedel och alla rätter/recept används ofta och nyligen, till lunch och middag.
+  const usage: Record<string, FoodUsage> = {}
+  const used = (id: string, count: number, meal: MealId) => {
+    const meals: Partial<Record<MealId, number>> = { [meal]: count }
+    usage[id] = { count, lastUsed: now - 3_600_000, meals } as FoodUsage
+  }
+  for (const id of demoFoodIds()) used(id, 8, 'middag')
+  for (const f of [...BUILTIN_FOODS, ...recipes]) if (isCompositeFood(f)) used(f.id, 12, 'lunch')
+  const favorites = [...DEMO_FAVORITES, 'lagom:kycklinggryta-gradde-ris', 'lagom:kycklingfile-klyftpotatis-tzatziki', 'lagom:lax-potatis-hollandaise']
+  const boost = createUsageBoost(usage, favorites, 'lunch', now)
+  const search = (q: string, staples: SearchOptions['staples'] = STAPLE_FOODS) =>
+    searchFoods(indexes, q, { limit: 40, boost, staples, optionalWords: new Set(['rå']) })
+  const idsOf = (q: string) => search(q).map((r) => r.food.id)
+
+  it('ger rätterna en stor boost (annars prövar testet inget)', () => {
+    const dish = BUILTIN_FOODS.find((f) => f.id === 'lagom:kycklinggryta-gradde-ris')!
+    expect(boost(dish)).toBeGreaterThan(200)
+  })
+
+  it('"kyckling" → Kycklingbröst först och alla kycklingbasvaror före alla kycklingrätter', () => {
+    const r = search('kyckling')
+    expect(r[0].food.id).toBe('lagom:kycklingfile-stekt')
+    const lastBasic = Math.max(...r.map((x, i) => (!isCompositeFood(x.food) && /kyckling|chicken/i.test(x.food.name) ? i : -1)))
+    const firstDish = r.findIndex((x) => isCompositeFood(x.food))
+    expect(firstDish).toBeGreaterThan(0)
+    expect(lastBasic).toBeLessThan(firstDish)
+    for (const id of STAPLE_FOODS.kyckling) expect(r.findIndex((x) => x.food.id === id)).toBeLessThan(firstDish)
+  })
+
+  it('"kött" → Nötfärs först', () => {
+    expect(idsOf('kött')[0]).toBe('lagom:notfars-12-stekt')
+    expect(idsOf('kott')[0]).toBe('lagom:notfars-12-stekt')
+  })
+
+  it('"gris" och "fläsk" → en fläskbasvara först', () => {
+    for (const q of ['gris', 'fläsk', 'flask']) {
+      const first = search(q)[0].food
+      expect(first.id, q).toBe('lagom:flaskfile-stekt')
+      expect(['rott_kott', 'chark'], q).toContain(first.category)
+    }
+  })
+
+  it('"fisk" → Torsk och Lax före fiskrätterna', () => {
+    const list = idsOf('fisk')
+    expect(list[0]).toBe('lagom:torsk-kokt')
+    const firstDish = search('fisk').findIndex((x) => isCompositeFood(x.food))
+    expect(list.indexOf('lagom:lax-odlad-ugnsbakad')).toBeLessThan(firstDish)
+  })
+
+  it('sätter basvaran först för vardagliga sökord', () => {
+    const expected: Record<string, string> = {
+      ägg: 'lagom:agg-ratt',
+      agg: 'lagom:agg-ratt',
+      mjölk: 'lagom:mjolk-standard-3',
+      pasta: 'lagom:pasta-vete-kokt',
+      ris: 'lagom:ris-langkornigt-kokt',
+      potatis: 'lagom:potatis-kokt-skalad',
+      bröd: 'lagom:fullkornsbrod',
+      ost: 'lagom:hushallsost-26',
+      äpple: 'lagom:apple-med-skal',
+      lax: 'lagom:lax-odlad-ugnsbakad',
+      korv: 'lagom:falukorv',
+      kycklingar: 'lagom:kycklingfile-stekt',
+      kyck: 'lagom:kycklingfile-stekt',
+    }
+    for (const [q, id] of Object.entries(expected)) expect(idsOf(q)[0], q).toBe(id)
+    // Varje sökord ger sin första basvara först.
+    for (const [word, ids] of Object.entries(STAPLE_FOODS)) expect(idsOf(word)[0], word).toBe(ids[0])
+  })
+
+  it('en exakt namnsökning på en rätt ger rätten först', () => {
+    expect(idsOf('kycklinggryta med ris')[0]).toBe('lagom:kycklinggryta-gradde-ris')
+    expect(idsOf('Kycklingtallrik')[0]).toBe('lagom:kycklingfile-klyftpotatis-tzatziki')
+  })
+
+  it('låter andra ord vara: "file", "bar", "mjöl" och "havr" ger inga basvaror', () => {
+    const plain = (q: string) => search(q, undefined).map((r) => r.food.id)
+    for (const q of ['file', 'bar', 'mjöl', 'mjol', 'havr', 'kycklinggryta']) expect(idsOf(q), q).toEqual(plain(q))
+    expect(STAPLE_FOODS.fil).not.toContain(idsOf('file')[0])
+    expect(STAPLE_FOODS.mjölk).not.toContain(idsOf('mjöl')[0])
   })
 })
 
