@@ -99,6 +99,9 @@ function ThankYouContent() {
     if (!offline) return
     const retry = () => void check()
     window.addEventListener('online', retry)
+    // Uppkopplingen kan ha kommit tillbaka innan lyssnaren hann registreras – då kommer inget
+    // 'online'-event, så kontrollera direkt.
+    if (typeof navigator !== 'undefined' && navigator.onLine) retry()
     return () => window.removeEventListener('online', retry)
   }, [offline, check])
 

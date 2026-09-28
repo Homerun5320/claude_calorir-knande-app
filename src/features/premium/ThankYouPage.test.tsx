@@ -107,6 +107,7 @@ describe('ThankYouPage', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     onLine.mockReturnValue(true)
     window.dispatchEvent(new Event('online'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     // Nytt anrop + verifiering med WebCrypto – ge lite marginal när hela testsviten körs parallellt.
     expect(await screen.findByRole('heading', { name: 'Tack! Lagom är ditt.' }, { timeout: 5000 })).toBeInTheDocument()
     // Testets egen tidsgräns måste vara längre än väntan ovan (standard 5 s) – annars kan testet
