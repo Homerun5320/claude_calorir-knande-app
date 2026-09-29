@@ -9,10 +9,12 @@ import { migrateFoodRefs, useFoodStore } from '../stores/foodStore'
 import { useProfileStore, DEFAULT_SETTINGS } from '../stores/profileStore'
 import { useLicenseStore } from '../stores/licenseStore'
 import { usePlanStore } from '../stores/planStore'
+import { reminderSettingsOf, useReminderStore, type ReminderSettings } from '../stores/reminderStore'
 import { releaseNewerData, STORE_KEYS } from '../stores/storage'
 import { COMMERCE_MODE } from '../config/commerce'
 import { allowsLicenseKeyEntry, isInApp, isIosDevice, isNativeApp } from '../config/platform'
 import { isAbort } from '../features/diary/share'
+import { isNative, loadNative } from '../native'
 import { decodeLicense } from './license'
 import type { DiaryEntry, ISODate, MealConfig } from '../types'
 import { entryNutrients } from './diary'
@@ -44,6 +46,11 @@ export interface BackupFile {
     license?: BackupLicense
     /** Veckoplaneringen och inköpslistan (saknas i äldre säkerhetskopior). */
     plan?: PlanData
+    /**
+     * Påminnelserna i apparna (saknas i äldre säkerhetskopior). Följer med vid "Ersätt allt";
+     * vid sammanfogning behålls enhetens egna val.
+     */
+    reminders?: ReminderSettings
   }
   /**
    * Vad som rättades eller hoppades över när filen lästes in (sätts av `parseBackup`, sparas
@@ -94,6 +101,7 @@ export function createBackup(): BackupFile {
       fasting: { active: fa.active, history: fa.history },
       license: { licenseKey: allowsLicenseKeyEntry() ? li.licenseKey : null, trialStartedAt: li.trialStartedAt },
       plan: { items: pl.items, shopping: pl.shopping },
+      reminders: reminderSettingsOf(useReminderStore.getState()),
     },
   }
 }
@@ -172,7 +180,7 @@ export function summarizeBackup(b: BackupFile): ImportSummary {
  * - 'merge': slår ihop – poster med samma id skrivs inte dubbelt; importerad profil används bara om ingen finns.
  */
 export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
-  const { profile, diary, food, body, fasting, plan } = b.data
+  const { profile, diary, food, body, fasting, plan, reminders } = b.data
   // Licens och provperiod: samma regler för båda lägena (förläng aldrig en provperiod).
   restoreLicense(b.data.license)
   if (mode === 'replace') {
@@ -192,6 +200,8 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
     useBodyStore.setState({ weights: body.weights ?? [], measurements: body.measurements ?? [] })
     useFastingStore.setState({ active: fasting?.active ?? null, history: fasting?.history ?? [] })
     usePlanStore.setState({ items: plan?.items ?? {}, shopping: plan?.shopping ?? {} })
+    if (reminders) useReminderStore.getState().replaceSettings(reminders)
+    else useReminderStore.getState().clearReminders()
     return
   }
 
@@ -325,6 +335,7 @@ export function wipeAllData(opts: { removeLicense?: boolean } = {}): void {
   useBodyStore.getState().clearBody()
   useFastingStore.getState().clearFasting()
   usePlanStore.getState().clearPlan()
+  useReminderStore.getState().clearReminders()
   useProfileStore.getState().resetProfile()
   if (opts.removeLicense) useLicenseStore.getState().clearLicense()
 }
@@ -418,15 +429,21 @@ function canShareFile(file: File): boolean {
  *   laddas en nedladdad fil annars lätt ned "ingenstans". Avbryter användaren dialogen blir
  *   utfallet 'cancelled'; misslyckas delningen av annat skäl laddas filen ned i stället.
  * - Annars laddas filen ned som vanligt (`<a download>`).
- * - I den inbyggda appen (Capacitor) gör en nedladdning med `<a download>` ingenting i webbvyn.
- *   Där blir utfallet 'failed' om delningen inte går – aldrig 'saved' – så att påminnelsen om
- *   säkerhetskopia inte tystnar för en fil som aldrig sparades. (När Capacitor installeras kan
- *   Filesystem- och Share-tilläggen användas här.)
+ * - I de inbyggda apparna (Capacitor) skrivs filen till appens cache och delas med systemets
+ *   delningsblad (`src/native/files.ts`: "Spara i Filer" på iPhone, vanlig delning på Android).
+ *   En nedladdning med `<a download>` gör ingenting i webbvyn, så där blir utfallet 'failed' om
+ *   delningen inte går – aldrig 'saved' – så att påminnelsen om säkerhetskopia inte tystnar för en
+ *   fil som aldrig sparades.
  *
  * OBS: delningen måste starta i samma klick som användaren gjorde. Anropa därför `saveFile`
- * direkt från klickhanteraren, utan `await` före anropet.
+ * direkt från klickhanteraren, utan `await` före anropet. (Webbens väg har ingen `await` före
+ * `navigator.share` – kontrollen av appen nedan är synkron.)
  */
 export async function saveFile(filename: string, content: string, mime = 'application/json'): Promise<SaveOutcome> {
+  if (isNative()) {
+    const files = await loadNative('files')
+    return files ? files.saveFile(filename, content, mime) : 'failed'
+  }
   try {
     const file = new File([content], filename, { type: mime })
     if ((isInApp() || hasCoarsePointer()) && canShareFile(file)) {

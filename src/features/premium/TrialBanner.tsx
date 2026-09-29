@@ -2,7 +2,8 @@
  * Provperioden i vardagen – diskret, aldrig stressande.
  *
  * - `TrialBanner` (Idag): ett litet chip under provperioden, ett tydligare kort de sista tre
- *   dagarna och ett lugnt kort när den är slut. Inget visas med licens.
+ *   dagarna och ett lugnt kort när den är slut. Inget visas med licens. I iPhone-appen visas ett
+ *   kort med "Starta 14 dagar gratis" tills provperioden har startats (köpet 'prov14').
  * - `PremiumHubCard` (Mer): status för Lagom Premium med länk till köpsidan.
  */
 import { memo, useId } from 'react'
@@ -10,7 +11,8 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, Download, Sprout } from 'lucide-react'
 import { Button, Card, cx } from '../../components/ui'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
-import { daysText, formatLongDate, priceSummaryText, trialBannerLevel } from './premiumLogic'
+import { daysText, formatLongDate, priceSummaryText, storeTrialText, trialBannerLevel } from './premiumLogic'
+import { StartTrialButton } from './StartTrialButton'
 import { TRIAL_DAYS } from '../../config/commerce'
 import { LICENSE_ERRORS } from '../../lib/license'
 
@@ -66,6 +68,24 @@ export const TrialBanner = memo(function TrialBanner({ className }: { className?
     )
   }
 
+  // iPhone-appen: provperioden startas med ett gratis köp i App Store.
+  if (level === 'start') {
+    return (
+      <Card tone="gran" padding="md" className={className} as="section" aria-labelledby={headingId}>
+        <h2 id={headingId} className="font-display text-[1.1875rem] font-semibold leading-snug tracking-tight text-ink">
+          Starta din provperiod – {TRIAL_DAYS} dagar gratis
+        </h2>
+        <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-2">{storeTrialText()}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StartTrialButton size="sm" />
+          <Button to="/premium" size="sm" variant="ghost">
+            Se priser
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
   // Provperioden (eller årslicensen) är slut.
   return (
     <Card tone="sol" padding="md" className={className} as="section" aria-labelledby={headingId}>
@@ -93,6 +113,8 @@ export function premiumStatusLine(status: AccessStatus): string {
   switch (status.kind) {
     case 'ny':
       return `Prova gratis i ${TRIAL_DAYS} dagar`
+    case 'ejstartad':
+      return `Starta ${TRIAL_DAYS} dagar gratis`
     case 'prov':
       return `Provperiod · ${daysText(status.daysLeft)} kvar`
     case 'utgangen':

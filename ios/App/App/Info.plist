@@ -33,9 +33,11 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Lagom använder kameran för att läsa streckkoder på förpackningar. Bilderna sparas inte.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Lagom läser vikt, steg och aktiv energi från Hälsa om du vill, så att dagboken och dagsmålet stämmer. Uppgifterna stannar på din iPhone.</string>
+	<string>Om du vill läser Lagom vikt och steg från Hälsa – vikten hamnar i viktkurvan och stegen under Träning. Uppgifterna stannar på din iPhone.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Lagom sparar vikt, energi från måltider och vatten som du loggar i Hälsa om du vill. Inget skickas någon annanstans.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Om du vill spara en produktbild i Bilder behöver Lagom lov att lägga till den där. Lagom läser inga bilder från ditt bildbibliotek.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

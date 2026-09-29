@@ -4,8 +4,9 @@
  */
 import { CLOUD_ENABLED } from '../../config/cloud'
 import { wipeAllData } from '../../lib/backup'
-import { clearDemoFlag } from '../../lib/demoFlag'
+import { clearDemoFlag, isDemoData } from '../../lib/demoFlag'
 import { logError } from '../../lib/errorLog'
+import { isNative, loadNative } from '../../native'
 import { clearLastBackup } from './backupStatus'
 
 /** Nollställ det som hör till den raderade datan (exempelmarkering, senaste kopia, utkast). */
@@ -37,12 +38,36 @@ export async function signOutOfCloud(): Promise<void> {
 }
 
 /**
+ * De inbyggda apparna: ta bort det som ligger utanför butikerna – den automatiska kopian
+ * (`lagom-spegling.json`), exportfiler i cachen och kopplingen till Apple Hälsa/Health Connect
+ * (`lagom-health`). "Radera all data" får inte kunna ta tillbaka något. No-op på webben; kastar
+ * aldrig.
+ *
+ * `keepMirror`: raderingen gällde bara exempeldata ("Skapa min egen profil"). Exempeldata speglas
+ * aldrig, så en kopia som finns är användarens egen tidigare dagbok – den får ligga kvar och
+ * ersätts först när något nytt läggs in.
+ */
+export async function clearNativeCopies(opts: { keepMirror?: boolean } = {}): Promise<void> {
+  if (!isNative()) return
+  try {
+    const [mirror, files, health] = await Promise.all([opts.keepMirror ? null : loadNative('mirror'), loadNative('files'), loadNative('health')])
+    health?.resetHealth()
+    await Promise.all([mirror?.deleteMirror(), files?.clearExportCache()])
+  } catch (error) {
+    logError(error, 'radera: kopior i appen')
+  }
+}
+
+/**
  * Radera all data och gör appen redo för en ny profil. Provperiodens start finns kvar, och
  * licensen behålls om inte `removeLicense` anges. Är Lagom Moln påslaget loggas man också ut på
- * den här enheten (se `signOutOfCloud`).
+ * den här enheten (se `signOutOfCloud`). I apparna tas också kopian på telefonen, exportfilerna och
+ * hälsokopplingen bort (se `clearNativeCopies`) – kopian dock inte när det bara var exempeldata
+ * som raderades.
  */
 export function wipeAndReset(opts: { removeLicense?: boolean } = {}): Promise<void> {
+  const demo = isDemoData()
   wipeAllData(opts)
   resetAfterWipe()
-  return signOutOfCloud()
+  return Promise.all([signOutOfCloud(), clearNativeCopies({ keepMirror: demo })]).then(() => undefined)
 }

@@ -107,6 +107,18 @@ describe('SettingsPage – index', () => {
     expect(screen.getByRole('link', { name: 'integritetspolicyn' })).toHaveAttribute('href', '/integritet')
   })
 
+  it('Påminnelser och Apple Hälsa/Health Connect finns bara i apparna', async () => {
+    const index = renderAt('/installningar')
+    expect(screen.queryByRole('link', { name: /Påminnelser/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Apple Hälsa|Health Connect/ })).not.toBeInTheDocument()
+    index.unmount()
+    for (const section of ['paminnelser', 'halsa']) {
+      const { unmount } = renderAt(`/installningar/${section}`)
+      expect(await screen.findByRole('heading', { level: 1, name: 'Inställningar' })).toBeInTheDocument()
+      unmount()
+    }
+  })
+
   it('Lagom Moln syns inte när det är avstängt (ingen VITE_SUPABASE_URL)', async () => {
     renderAt('/installningar')
     expect(screen.queryByRole('link', { name: /Lagom Moln/ })).not.toBeInTheDocument()

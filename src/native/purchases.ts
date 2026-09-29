@@ -10,10 +10,13 @@
  * Produkterna (samma id i båda butikerna, alla hämtas och köps som `PURCHASE_TYPE.INAPP`):
  * - 'livstid': engångsköp (App Store: non-consumable; Play: engångsprodukt som aldrig förbrukas).
  * - 'ar': ett år som inte förnyas automatiskt (App Store: non-renewing subscription; Play:
- *   engångsprodukt). Butikerna ger inget slutdatum – året räknas från köpdatumet. I Play går en
- *   engångsprodukt inte att köpa igen så länge den ägs, så ett utgånget år förbrukas (consume)
- *   först när ett nytt år köps – till dess syns "Årslicensen har gått ut".
- * - 'prov14': gratis provperiod i App Store (non-consumable för 0 kr, riktlinje 3.1.1), om den används.
+ *   engångsprodukt). Butikerna ger inget slutdatum – året räknas från köpdatumet. I App Store kan
+ *   ett nytt år köpas i förväg: alla köpta år (StoreKits `Transaction.all`) läggs efter varandra,
+ *   så att inga betalda dagar går förlorade (`chainYears`). I Play går en engångsprodukt inte att
+ *   köpa igen så länge den ägs, så ett utgånget år förbrukas (consume) först när ett nytt år köps –
+ *   till dess syns "Årslicensen har gått ut" (och förnyelse i förväg är spärrad i appen).
+ * - 'prov14': provperioden i iPhone-appen (non-consumable för 0 kr, riktlinje 3.1.1). Den räknas
+ *   från det tidigaste köpet, så att den inte börjar om efter en ominstallation.
  *
  * Kvittering i Play: ett köp som inte kvitteras (acknowledge) inom 3 dagar återbetalas. Tillägget
  * kvitterar annars själv men stänger butiksanslutningen direkt efteråt (8.8.1), så här kvitteras
@@ -81,6 +84,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
+/** Säger telefonen att den saknar uppkoppling? */
+function isOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
+}
+
 function errorCode(error: unknown): string {
   const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined
   return typeof code === 'string' ? code : ''
@@ -95,13 +103,15 @@ function errorMessage(error: unknown): string {
 /**
  * Vad ett avvisat köp betyder. Tillägget (8.8.1) avvisar med:
  * - iPhone: "User cancelled" (avbrutet), "Transaction pending" ("Be om lov att köpa", SCA …).
+ *   "Återställ köp" (AppStore.sync) avvisas med StoreKits egen text på telefonens språk – på en
+ *   svensk iPhone t.ex. att åtgärden avbröts.
  * - Android: koden USER_CANCELED (avbrutet), "Purchase is pending" (t.ex. kontantbetalning),
  *   koden ITEM_ALREADY_OWNED (produkten ägs redan, t.ex. köpt på en annan telefon).
  */
 export function classifyPurchaseError(error: unknown): 'cancelled' | 'pending' | 'owned' | 'failed' {
   const code = errorCode(error).toUpperCase()
   const message = errorMessage(error)
-  if (code === 'USER_CANCELED' || code === 'USER_CANCELLED' || /\buser ?cancel/i.test(message)) return 'cancelled'
+  if (code === 'USER_CANCELED' || code === 'USER_CANCELLED' || /\buser ?cancel|\bcancell?ed\b|avbr(?:öt|ut|yt|ö)/i.test(message)) return 'cancelled'
   if (/\bpending\b/i.test(message)) return 'pending'
   if (code === 'ITEM_ALREADY_OWNED') return 'owned'
   return 'failed'
@@ -128,6 +138,9 @@ export function toEntitlement(tx: Transaction, platform: StorePlatform): StoreEn
   // iPhone: ett återbetalt eller återkallat köp har `revocationDate`.
   if (platform === 'ios' && tx.revocationDate) return null
   let purchasedAt = parseStoreDate(tx.purchaseDate, platform)
+  // Provperioden räknas från det ursprungliga köpet, om butiken ger det (den får aldrig börja om).
+  const original = product === 'prov14' ? parseStoreDate(tx.originalPurchaseDate, platform) : null
+  if (original !== null) purchasedAt = purchasedAt === null ? original : Math.min(purchasedAt, original)
   if (purchasedAt === null) {
     // Utan köpdatum går årets slut (och provperiodens start) inte att räkna ut – hellre inget än
     // ett år som aldrig tar slut. En livstidslicens gäller ändå.
@@ -158,6 +171,43 @@ export function toStoreProducts(products: readonly Product[]): StoreProduct[] {
   })
 }
 
+/**
+ * Slutet på årslicenserna när de läggs efter varandra: varje år börjar när det förra slutar (eller
+ * vid köpet, om det förra redan hade gått ut). Ett år som köps i förväg förlänger alltså licensen
+ * med ett helt år. undefined utan köp.
+ */
+export function chainYears(purchases: readonly number[], yearMs: number = YEAR_MS): number | undefined {
+  let end: number | undefined
+  for (const at of [...purchases].sort((a, b) => a - b)) end = Math.max(at, end ?? at) + yearMs
+  return end
+}
+
+/**
+ * iPhone: `Transaction.currentEntitlements` ger bara det senaste köpet per produkt. Med hela
+ * historiken (`Transaction.all`) läggs köpta år efter varandra och provperioden räknas från det
+ * första köpet. Bara köp fram till det senaste gällande köpet räknas (samma Apple-konto), och
+ * återkallade köp aldrig. `current` är köpen från `currentEntitlements`.
+ */
+export function withIosHistory(current: readonly StoreEntitlement[], history: readonly Transaction[]): StoreEntitlement[] {
+  const earlier = (id: 'ar' | 'prov14', until: number) =>
+    history.flatMap((tx) => {
+      if (tx.productIdentifier !== id) return []
+      const e = toEntitlement(tx, 'ios')
+      return e && e.purchasedAt <= until ? [e.purchasedAt] : []
+    })
+  return current.map((e) => {
+    if (e.product === 'ar') {
+      const end = chainYears([...earlier('ar', e.purchasedAt).filter((at) => at < e.purchasedAt), e.purchasedAt])
+      return end !== undefined && end > (e.expiresAt ?? 0) ? { ...e, expiresAt: end } : e
+    }
+    if (e.product === 'prov14') {
+      const first = Math.min(e.purchasedAt, ...earlier('prov14', e.purchasedAt))
+      return first < e.purchasedAt ? { ...e, purchasedAt: first } : e
+    }
+    return e
+  })
+}
+
 function isActivePaid(e: StoreEntitlement, id: StoreProductId, now: number): boolean {
   return e.product === id && (e.product === 'livstid' || e.product === 'ar') && (e.expiresAt === undefined || e.expiresAt > now)
 }
@@ -176,11 +226,12 @@ export function createNativeStorePurchases(platform: StorePlatform, plugin: Nati
     return run
   }
 
-  async function fetchPurchases(): Promise<Transaction[]> {
+  async function fetchPurchases(onlyCurrentEntitlements = true): Promise<Transaction[]> {
     // onlyCurrentEntitlements: på iPhone `Transaction.currentEntitlements` – bara det inloggade
-    // Apple-kontots gällande köp (inte andra konton som har använt telefonen). Play: queryPurchases.
+    // Apple-kontots gällande köp (inte andra konton som har använt telefonen). false: hela
+    // historiken (`Transaction.all`), för att lägga köpta år efter varandra. Play: queryPurchases.
     const { purchases } = await withTimeout(
-      plugin.getPurchases({ productType: PURCHASE_TYPE.INAPP, onlyCurrentEntitlements: true }),
+      plugin.getPurchases({ productType: PURCHASE_TYPE.INAPP, onlyCurrentEntitlements }),
       CALL_TIMEOUT_MS,
       'getPurchases',
     )
@@ -208,10 +259,19 @@ export function createNativeStorePurchases(platform: StorePlatform, plugin: Nati
   async function readEntitlements(): Promise<StoreEntitlement[]> {
     const purchases = await fetchPurchases()
     await acknowledgeAll(purchases)
-    return purchases.flatMap((tx) => {
+    const current = purchases.flatMap((tx) => {
       const e = toEntitlement(tx, platform)
       return e ? [e] : []
     })
+    // iPhone: årslicenser som köpts i förväg och provperiodens första köp (se withIosHistory).
+    if (platform !== 'ios' || !current.some((e) => e.product === 'ar' || e.product === 'prov14')) return current
+    try {
+      return withIosHistory(current, await fetchPurchases(false))
+    } catch (error) {
+      // Historiken gick inte att läsa – det senaste köpet gäller tills nästa hämtning.
+      logError(error, LOG_CONTEXT)
+      return current
+    }
   }
 
   /**
@@ -331,13 +391,14 @@ export function createNativeStorePurchases(platform: StorePlatform, plugin: Nati
           logError(error, LOG_CONTEXT)
           throw error
         }
-        // Gick synkningen inte att göra (t.ex. utan uppkoppling) och inget betalt köp finns på
-        // telefonen: säg att återställningen misslyckades i stället för "Inga köp att återställa".
-        // Har man själv avbrutit inloggningen räcker köpen som redan finns på telefonen.
+        // Gick synkningen inte att göra utan uppkoppling och inget betalt köp finns på telefonen:
+        // säg att återställningen misslyckades i stället för "Inga köp att återställa". Annars (t.ex.
+        // när man själv avbröt inloggningen till Apple-kontot, vars felmeddelande är på telefonens
+        // språk) räcker köpen som redan finns på telefonen – och svaret blir neutralt.
         const now = Date.now()
-        if (syncError !== null && classifyPurchaseError(syncError) !== 'cancelled' && !list.some((e) => isActivePaid(e, e.product, now))) {
+        if (syncError !== null && classifyPurchaseError(syncError) !== 'cancelled') {
           logError(syncError, LOG_CONTEXT)
-          throw syncError
+          if (isOffline() && !list.some((e) => isActivePaid(e, e.product, now))) throw syncError
         }
         return list
       }),
@@ -371,6 +432,9 @@ export function registerNativePurchases(): void {
     }
     setNativeStorePurchases(createNativeStorePurchases(platform))
     registered = true
+    // Hämta köpen direkt: en hämtning som gav upp innan köpen hann kopplas in (NATIVE_WAIT_MS)
+    // skulle annars inte göras om förrän appen återfår fokus.
+    void refreshStoreEntitlements({ fresh: true })
     if (platform === 'ios') {
       // Köp som blir klara utanför köprutan: "Be om lov att köpa" som godkänns, köp på en annan
       // enhet med samma Apple-konto och återbetalningar (StoreKit 2 `Transaction.updates`).

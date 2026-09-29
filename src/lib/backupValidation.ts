@@ -50,6 +50,7 @@ import { ACTIVITY_LEVELS, FOOD_CATEGORIES, MEAL_IDS } from '../types'
 import type { FoodUsage } from '../stores/foodStore'
 import type { FastRecord } from '../stores/fastingStore'
 import { DEFAULT_MEALS, DEFAULT_SETTINGS } from '../stores/profileStore'
+import { sanitizeReminderSettings, type ReminderSettings } from '../stores/reminderStore'
 import { NUTRIENT_KEYS } from './nutrients'
 import { VOLUME_ML, gramsFor } from './units'
 import { fromISODate, isValidISODate } from './dates'
@@ -1007,6 +1008,8 @@ export interface SanitizedBackupData {
   license?: { licenseKey: string | null; trialStartedAt: number | null }
   /** Veckoplaneringen och inköpslistan – saknas i säkerhetskopior från äldre versioner. */
   plan?: PlanData
+  /** Påminnelserna i apparna – saknas i säkerhetskopior från äldre versioner. */
+  reminders?: ReminderSettings
 }
 
 /**
@@ -1192,6 +1195,9 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
     broken(ctx, 'plan')
   }
 
+  // Påminnelserna (saknas i äldre säkerhetskopior): ogiltiga val blir avstängda.
+  const reminders = sanitizeReminderSettings(data.reminders)
+
   return {
     data: {
       profile: { profile, settings },
@@ -1201,6 +1207,7 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
       fasting: { active, history },
       ...(license ? { license } : {}),
       ...(plan ? { plan } : {}),
+      ...(reminders ? { reminders } : {}),
     },
     repairs,
   }

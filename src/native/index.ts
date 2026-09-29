@@ -9,11 +9,8 @@
  *   `src/native/` som får importera `@capacitor/*` statiskt. Modulen registreras i `MODULES` nedan
  *   och laddas med `loadNative()`, som ger null på webben:
  *
- *     const share = await loadNative('share')
- *     if (share) {
- *       await share.shareFile(…)
- *       return
- *     }
+ *     const files = await loadNative('files')
+ *     if (files) return files.saveFile(filename, content, mime)
  *     // … webbens väg som förut
  *
  * - Därför måste alla dynamiska importer av native-moduler stå här, i samma fil som
@@ -43,6 +40,22 @@ export const NATIVE_BUILD: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' 
 const MODULES = {
   /** Start av native-funktionerna (initNative). */
   init: () => import('./init'),
+  /** Systemfält, tangentbord, startskärm, bakåtknapp och länkar ut ur appen. */
+  system: () => import('./system'),
+  /** Köp i appen (StoreKit 2 / Play Billing) – kopplas in i src/lib/storePurchases.ts. */
+  purchases: () => import('./purchases'),
+  /** Export och delning (filer via delningsbladet, text). */
+  files: () => import('./files'),
+  /** Lokal spegling av all data (skydd mot att systemet rensar webbvyns lagring). */
+  mirror: () => import('./mirror'),
+  /** Lokala påminnelser (startas från init.ts; inställningssidan använder bron i stores/reminderStore.ts). */
+  reminders: () => import('./reminders'),
+  /** Haptik: tap() och success() – använd `haptic()` nedan. */
+  haptics: () => import('./haptics'),
+  /** Streckkodsläsaren (ZXing på Android, Vision på iPhone) – ScanPage. */
+  barcode: () => import('./barcode'),
+  /** Apple Hälsa och Health Connect (Inställningar → Apple Hälsa/Health Connect). */
+  health: () => import('./health'),
 }
 
 export type NativeModuleName = keyof typeof MODULES
@@ -92,6 +105,17 @@ export async function loadNative<K extends NativeModuleName>(name: K): Promise<N
     logError(error, `native:${name}`)
     return null
   }
+}
+
+/**
+ * Haptisk återkoppling i apparna – no-op på webben, med "Minska rörelse" och om det inte går.
+ * Väntar inte och kastar aldrig: `haptic('success')` när något har loggats, `haptic('tap')` för
+ * små val.
+ */
+export function haptic(kind: 'tap' | 'success'): void {
+  if (!NATIVE_BUILD) return
+  if (!isNative()) return
+  void loadNative('haptics').then((h) => h?.[kind]())
 }
 
 let started: Promise<void> | null = null

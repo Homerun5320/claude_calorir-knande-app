@@ -35,7 +35,7 @@ import { ChoiceCard, ChoiceGroup } from './ChoiceCard'
 import { MacroSplitBar } from './MacroSplitBar'
 import { TargetsSummary } from './TargetsSummary'
 import { TRIAL_DAYS } from '../../config/commerce'
-import { storagePlace } from '../../config/platform'
+import { storagePlace, trialViaStore } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { daysText, priceSummaryText } from '../premium/premiumLogic'
 import { usePriceSummaryText } from '../premium/useStorePrices'
@@ -110,7 +110,8 @@ function promises(priceText: string): ReadonlyArray<{ icon: LucideIcon; tone: To
     {
       icon: Gift,
       tone: 'lingon',
-      title: `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
+      // iPhone-appen: provperioden startas med ett gratis köp i App Store – inget dras.
+      title: trialViaStore() ? `Prova gratis i ${TRIAL_DAYS} dagar – inget dras` : `Prova gratis i ${TRIAL_DAYS} dagar – inget kort behövs`,
       // Kronpriser där Lagom säljs på webben – i butiksapparna butikens priser (när de har hämtats).
       text: `Sedan väljer du ${priceText} – ingen reklam och ingen automatisk förnyelse. ${AFTER_TRIAL_TEXT}`,
     },
@@ -468,11 +469,22 @@ export function DietStep({ draft, onChange, focusOnMount, eyebrow }: StepProps) 
 // 6 Sammanfattning
 // ---------------------------------------------------------------------------
 
+/**
+ * iPhone-appen (`trialViaStore()`): provperioden startas med ett gratis köp i App Store. Apple kräver
+ * att det före start står hur länge den gäller, vad som sedan kräver köp och vad det kostar (3.1.1).
+ */
+export function storeTrialNote(): string {
+  return `Tryck på Starta ${TRIAL_DAYS} dagar gratis så startar provperioden – ett gratis köp i App Store som gäller en gång per Apple-konto. Allt är öppet i ${TRIAL_DAYS} dagar. Sedan väljer du själv: ${priceSummaryText()}, utan automatisk förnyelse. ${AFTER_TRIAL_TEXT}`
+}
+
 /** Provperioden i sammanfattningen – ärligt oavsett om den redan har startat. */
 export function trialNote(status: AccessStatus): string {
   switch (status.kind) {
     case 'ny':
+      if (trialViaStore()) return storeTrialNote()
       return `Din provperiod på ${TRIAL_DAYS} dagar startar nu – allt är öppet och inget kort behövs. Sedan väljer du själv: ${priceSummaryText()}, utan automatisk förnyelse. ${AFTER_TRIAL_TEXT}`
+    case 'ejstartad':
+      return storeTrialNote()
     case 'prov':
       return `Du har ${daysText(status.daysLeft)} kvar av provperioden – allt är öppet. Sedan väljer du själv: ${priceSummaryText()}, utan automatisk förnyelse. ${AFTER_TRIAL_TEXT}`
     case 'licensierad':

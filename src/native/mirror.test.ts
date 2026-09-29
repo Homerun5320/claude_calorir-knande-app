@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => {
     key,
     listeners,
     memoryOnly: false,
+    platform: 'android' as 'ios' | 'android' | 'web',
     writeFile: vi.fn(async (o: FsOptions) => {
       files.set(key(o.directory, o.path), o.data ?? '')
       return { uri: `file:///${key(o.directory, o.path)}` }
@@ -59,7 +60,9 @@ const mocks = vi.hoisted(() => {
       listeners.add(listener)
       return { remove: async () => void listeners.delete(listener) }
     }),
-    confirmDialog: vi.fn(async (_options: { title: unknown; message?: unknown; confirmLabel?: string; cancelLabel?: string }) => false),
+    confirmDialog: vi.fn(
+      async (_options: { title: unknown; message?: unknown; confirmLabel?: string; cancelLabel?: string; dismissible?: boolean }) => false,
+    ),
     logError: vi.fn(),
   }
 })
@@ -76,6 +79,10 @@ vi.mock('../components/ui', async (importOriginal) => ({
 vi.mock('../lib/errorLog', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/errorLog')>()),
   logError: mocks.logError,
+}))
+vi.mock('./index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./index')>()),
+  nativePlatform: () => mocks.platform,
 }))
 vi.mock('../stores/storage', async (importOriginal) => {
   const original = await importOriginal<typeof import('../stores/storage')>()
@@ -123,6 +130,7 @@ beforeEach(async () => {
   mocks.files.clear()
   mocks.listeners.clear()
   mocks.memoryOnly = false
+  mocks.platform = 'android'
   for (const fn of [mocks.writeFile, mocks.readFile, mocks.deleteFile, mocks.rename, mocks.addListener, mocks.confirmDialog, mocks.logError]) fn.mockClear()
   mocks.confirmDialog.mockImplementation(async () => false)
 })
@@ -283,14 +291,35 @@ describe('återställning vid start', () => {
     expect(useBodyStore.getState().weights).toMatchObject([{ date: '2026-09-20', kg: 72.5 }])
   })
 
-  it('standardfrågan: "Vi hittade din data från …"', async () => {
+  it('standardfrågan: "Vi hittade din data från …" – bara knapparna svarar, och "Börja om" bekräftas', async () => {
     seedMirror()
     await expect(startMirror()).resolves.toBe('declined')
-    expect(mocks.confirmDialog).toHaveBeenCalledTimes(1)
+    expect(mocks.confirmDialog).toHaveBeenCalledTimes(2)
     const options = mocks.confirmDialog.mock.calls[0][0]
     expect(options.title).toBe('Vi hittade din data från 20 september 2026')
     expect(options.message).toContain('1 vägning')
-    expect(options).toMatchObject({ confirmLabel: 'Återställ', cancelLabel: 'Börja om' })
+    // Inte stängbar: ett tryck utanför rutan, Escape eller bakåtknappen räknas aldrig som "Börja om".
+    expect(options).toMatchObject({ confirmLabel: 'Återställ', cancelLabel: 'Börja om', dismissible: false })
+    expect(mocks.confirmDialog.mock.calls[1][0]).toMatchObject({ title: 'Börja om utan din tidigare data?', confirmLabel: 'Återställ', dismissible: false })
+  })
+
+  it('ångrar man sig i bekräftelsen återställs kopian', async () => {
+    seedMirror()
+    mocks.confirmDialog.mockImplementationOnce(async () => false).mockImplementationOnce(async () => true)
+    await expect(startMirror({ onRestored: () => {} })).resolves.toBe('restored')
+    expect(useBodyStore.getState().weights).toMatchObject([{ kg: 72.5 }])
+  })
+
+  it('stängs appen medan frågan visas skrivs kopian inte över (frågan kommer igen vid nästa start)', async () => {
+    seedMirror()
+    mocks.confirmDialog.mockImplementation(() => new Promise<boolean>(() => {}))
+    void startMirror()
+    await idle()
+    useBodyStore.getState().logWeight('2026-09-28', 80)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE) + writesTo(MIRROR_FILE)).toBe(0)
+    expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 72.5 }])
   })
 
   it('efter återställningen lämnas välkomstsidan', async () => {
@@ -364,6 +393,30 @@ describe('readMirror efter en avbruten skrivning', () => {
   it('en spegling utan egen data räknas inte', async () => {
     mocks.files.set(MAIN, JSON.stringify(createBackup()))
     await expect(readMirror()).resolves.toBeNull()
+  })
+})
+
+describe('iPhone: Library/NoCloud', () => {
+  const IOS_MAIN = mocks.key(Directory.LibraryNoCloud, MIRROR_FILE)
+
+  it('skrivs utanför iCloud- och datorsäkerhetskopian, och en äldre kopia i Documents tas bort', async () => {
+    mocks.platform = 'ios'
+    seedMirror(MAIN) // de första testbyggena skrev till Documents (Directory.Data)
+    useBodyStore.getState().logWeight('2026-09-28', 80)
+    await expect(writeMirrorNow()).resolves.toBe(true)
+    expect(mocks.rename).toHaveBeenCalledWith({ from: MIRROR_TMP_FILE, to: MIRROR_FILE, directory: Directory.LibraryNoCloud, toDirectory: Directory.LibraryNoCloud })
+    expect(parseBackup(mocks.files.get(IOS_MAIN) ?? '').data.body.weights).toMatchObject([{ kg: 80 }])
+    expect(mocks.files.has(MAIN)).toBe(false)
+  })
+
+  it('en kopia i den gamla mappen hittas ändå vid start, och radering tar bort båda', async () => {
+    mocks.platform = 'ios'
+    seedMirror(MAIN)
+    const info = await readMirror()
+    expect(info?.backup.data.body.weights).toMatchObject([{ kg: 72.5 }])
+    mocks.files.set(IOS_MAIN, mocks.files.get(MAIN) ?? '')
+    await deleteMirror()
+    expect(mocks.files.size).toBe(0)
   })
 })
 

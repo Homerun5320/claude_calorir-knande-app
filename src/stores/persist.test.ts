@@ -12,6 +12,7 @@ import { useFoodStore } from './foodStore'
 import { useLicenseStore } from './licenseStore'
 import { useProfileStore } from './profileStore'
 import { usePlanStore } from './planStore'
+import { useReminderStore } from './reminderStore'
 import { hasNewerData, isMemoryOnlyStorage, PERSIST_VERSIONS, resetStorageStateForTests, STORE_KEYS } from './storage'
 import { wipeAllData } from '../lib/backup'
 
@@ -23,6 +24,7 @@ const BY_KEY = {
   [STORE_KEYS.fasting]: useFastingStore,
   [STORE_KEYS.license]: useLicenseStore,
   [STORE_KEYS.plan]: usePlanStore,
+  [STORE_KEYS.reminders]: useReminderStore,
 } as const
 
 const ALL = Object.entries(BY_KEY)

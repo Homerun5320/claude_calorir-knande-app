@@ -1,6 +1,9 @@
 /**
- * Dela text med Web Share API – med urklipp som reserv (t.ex. på datorer utan delningsdialog).
+ * Dela text med Web Share API – med urklipp som reserv (t.ex. på datorer utan delningsdialog). I de
+ * inbyggda apparna används systemets delningsblad (`src/native/files.ts`), eftersom Androids
+ * webbvy saknar `navigator.share`.
  */
+import { isNative, loadNative } from '../../native'
 
 export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'failed'
 
@@ -23,6 +26,14 @@ export function isAbort(err: unknown): boolean {
  * - 'failed'    – varken delning eller urklipp fungerade
  */
 export async function shareOrCopy(title: string, text: string, env: ShareEnv | undefined = typeof navigator !== 'undefined' ? navigator : undefined): Promise<ShareOutcome> {
+  // De inbyggda apparna – bara med standardmiljön: en egen miljö (t.ex. inköpslistans "Kopiera",
+  // som bara har urklipp) ska aldrig öppna delningsbladet.
+  if (isNative() && typeof navigator !== 'undefined' && env === navigator) {
+    const files = await loadNative('files')
+    const outcome = files ? await files.shareText(title, text) : 'failed'
+    if (outcome !== 'failed') return outcome
+    // Annars: försök med urklipp nedan.
+  }
   const data: ShareData = { title, text }
   if (env && typeof env.share === 'function' && (typeof env.canShare !== 'function' || env.canShare(data))) {
     try {

@@ -15,10 +15,12 @@
  *
  * Plattformar: de publicerade sidorna (webbplatsen) visar hela texten. I appen väljer
  * `visibleSections` det som gäller där: webbköpens stycken bara när Lagom säljs på webben,
- * stycken om licensnycklar bara där nycklar kan aktiveras, och i iPhone-appen (App Store) texten
+ * stycken om licensnycklar bara där nycklar kan aktiveras, i iPhone-appen (App Store) texten
  * i `appStore` – Apple godkänner inga omnämnanden av andra plattformar eller köpsätt i appen
- * (riktlinje 2.3.10 och 3.1.1). Anteckningarna till ägaren finns i legalDocs.ts, så att de inte
- * byggs in i appen.
+ * (riktlinje 2.3.10 och 3.1.1) – och i Google Play-appen texten i `play` (inga webbköp,
+ * webbläsare eller service worker, ägarens beslut: bara köp i appen i butiksapparna). Play-texten
+ * finns också som fristående sida för Health Connect (public/integritet/android/, se legalDocs.ts).
+ * Anteckningarna till ägaren finns i legalDocs.ts, så att de inte byggs in i appen.
  *
  * Små märkningar i texterna:
  * - `[text](adress)` blir en länk. `lagom:villkor` och `lagom:integritet` pekar på den andra sidan.
@@ -42,7 +44,7 @@ export interface LegalTable {
   rows: string[][]
 }
 
-/** Texten i iPhone-appen (App Store). Fälten som anges ersätter avsnittets vanliga fält. */
+/** Texten i iPhone-appen (App Store) eller Google Play-appen. Fälten som anges ersätter avsnittets vanliga fält. */
 export interface LegalVariant {
   heading?: string
   paragraphs?: string[]
@@ -78,6 +80,8 @@ export interface LegalSection {
   webOnly?: boolean
   /** Texten i iPhone-appen, där bara iPhone och App Store får nämnas. */
   appStore?: LegalVariant
+  /** Texten i Google Play-appen: inga webbköp, webbläsare eller service worker. */
+  play?: LegalVariant
   /** Anteckning till ägaren. Sätts bara av legalDocs.ts (docs/), aldrig i appen. */
   ownerNote?: string
 }
@@ -171,7 +175,14 @@ function fillTable(table: LegalTable | undefined, seller: SellerInfo): LegalTabl
 
 function fillSection(s: LegalSection, seller: SellerInfo): LegalSection {
   const all = (list: string[] | undefined) => list?.map((t) => fill(t, seller))
-  const v = s.appStore
+  const variant = (v: LegalVariant | undefined): LegalVariant | undefined =>
+    v && {
+      heading: v.heading === undefined ? undefined : fill(v.heading, seller),
+      paragraphs: all(v.paragraphs),
+      items: all(v.items),
+      table: fillTable(v.table, seller),
+      closing: all(v.closing),
+    }
   return {
     ...s,
     heading: fill(s.heading, seller),
@@ -183,13 +194,8 @@ function fillSection(s: LegalSection, seller: SellerInfo): LegalSection {
     keyItems: all(s.keyItems),
     closing: all(s.closing),
     table: fillTable(s.table, seller),
-    appStore: v && {
-      heading: v.heading === undefined ? undefined : fill(v.heading, seller),
-      paragraphs: all(v.paragraphs),
-      items: all(v.items),
-      table: fillTable(v.table, seller),
-      closing: all(v.closing),
-    },
+    appStore: variant(s.appStore),
+    play: variant(s.play),
   }
 }
 
@@ -213,13 +219,13 @@ function priceOf(id: 'ar' | 'livstid'): string {
  * - där webbköp inte erbjuds (butiksapparna, eller webben med webbförsäljningen avstängd) tas
  *   avsnitt och stycken om Stripe och webbpriser bort,
  * - stycken om licensnycklar visas bara där nycklar kan aktiveras,
- * - i iPhone-appen ersätts texten av `appStore`-varianten.
+ * - i iPhone-appen ersätts texten av `appStore`-varianten och i Google Play-appen av `play`.
  */
 export function visibleSections(sections: readonly LegalSection[], ctx: LegalContext): LegalSection[] {
   return sections
     .filter((s) => ctx.webSales || !s.webOnly)
     .map((s) => {
-      const v = ctx.platform === 'appstore' ? s.appStore : undefined
+      const v = ctx.platform === 'appstore' ? s.appStore : ctx.platform === 'play' ? s.play : undefined
       return {
         ...s,
         heading: v?.heading ?? s.heading,
@@ -231,6 +237,7 @@ export function visibleSections(sections: readonly LegalSection[], ctx: LegalCon
         webItems: ctx.webSales ? s.webItems : undefined,
         keyItems: ctx.licenseKeys ? s.keyItems : undefined,
         appStore: undefined,
+        play: undefined,
         ownerNote: undefined,
       }
     })
@@ -298,6 +305,100 @@ const ERROR_LOG_ROW = [
   'Om Lagom → Felsökning → Rensa felloggen',
 ]
 
+/** Påminnelser (bara i apparna): lokala notiser som telefonen själv visar. */
+const REMINDER_ROW = [
+  'Påminnelser du själv har slagit på (text och klockslag) – bara i apparna',
+  'Telefonens notissystem',
+  'Så att påminnelsen kan visas i tid, även när appen är stängd',
+  'Tills du stänger av påminnelsen',
+  'Inställningar → Påminnelser, eller Inställningar → Data → Radera all data',
+]
+
+const REMINDER_ROW_IOS = [
+  'Påminnelser du själv har slagit på (text och klockslag)',
+  'Telefonens notissystem',
+  'Så att påminnelsen kan visas i tid, även när appen är stängd',
+  'Tills du stänger av påminnelsen',
+  'Inställningar → Påminnelser, eller Inställningar → Data → Radera all data',
+]
+
+/** Den automatiska kopian på telefonen (src/native/mirror.ts) – bara i apparna. */
+const MIRROR_ROW = [
+  'Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia – bara i apparna',
+  'En fil i appens egen mapp på telefonen (lagom-spegling.json) – på iPhone utanför telefonens säkerhetskopia',
+  'Så att dagboken inte försvinner om telefonen rensar appens lagring',
+  'Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+const MIRROR_ROW_IOS = [
+  'Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia',
+  'En fil i appens egen mapp på din iPhone (lagom-spegling.json), som inte följer med i telefonens säkerhetskopia',
+  'Så att dagboken inte försvinner om iOS rensar appens lagring',
+  'Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+/** Exportfiler som delas med telefonens delningsblad (src/native/files.ts) – bara i apparna. */
+const EXPORT_ROW = [
+  'Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV) – bara i apparna',
+  'Appens cache (mappen delning)',
+  'Så att filen kan sparas eller delas med telefonens delningsblad',
+  'Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+const EXPORT_ROW_IOS = [
+  'Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV)',
+  'Appens cache (mappen delning)',
+  'Så att filen kan sparas eller delas, till exempel med Spara i Filer',
+  'Tills nästa export, tills du raderar din data eller tills iOS rensar cachen',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+/** Kopplingen till Apple Hälsa/Health Connect (src/native/health.ts) – bara i apparna. */
+const HEALTH_ROW = [
+  'Kopplingen till Apple Hälsa eller Health Connect: vad du har valt att hämta och skicka, när den senast synkade och en liten logg (id för hämtade vikter samt de senaste dagarnas ifyllda steg och skickade summor), så att inget hämtas eller skickas två gånger',
+  'localStorage (lagom-health)',
+  'Så att kopplingen fungerar utan dubbletter – bara i apparna och bara om du slår på den',
+  'Tills du kopplar från, raderar din data eller avinstallerar appen. Loggen sparar bara de senaste dagarna (hämtade vikter högst 400 dagar)',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+const HEALTH_ROW_IOS = [
+  'Kopplingen till Apple Hälsa: vad du har valt att hämta och skicka, när den senast synkade och en liten logg (id för hämtade vikter samt de senaste dagarnas ifyllda steg och skickade summor), så att inget hämtas eller skickas två gånger',
+  'localStorage (lagom-health)',
+  'Så att kopplingen fungerar utan dubbletter – bara om du slår på den',
+  'Tills du kopplar från, raderar din data eller avinstallerar appen. Loggen sparar bara de senaste dagarna (hämtade vikter högst 400 dagar)',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+/** De senast kända köpen i appen (STORE_CACHE_KEY i src/hooks/useAccess.ts) – bara i apparna. */
+const STORE_CACHE_ROW = [
+  'Köp i appen som gäller: vilken licens (eller provperiod), köpdatum och slutdatum – bara i apparna',
+  'localStorage (lagom-butikskop)',
+  'Så att Lagom är upplåst även när butiken inte svarar, till exempel utan uppkoppling',
+  'Tills butiken svarar med nya uppgifter – ett återbetalt köp försvinner då även här',
+  'Avinstallera appen',
+]
+
+const STORE_CACHE_ROW_IOS = [
+  'Köp i App Store som gäller: vilken licens eller provperiod, köpdatum och slutdatum',
+  'localStorage (lagom-butikskop)',
+  'Så att Lagom är upplåst även när App Store inte svarar, till exempel utan uppkoppling',
+  'Tills App Store svarar med nya uppgifter – ett återbetalt köp försvinner då även här',
+  'Avinstallera appen',
+]
+
+/** Lagringstiderna som gäller överallt (avsnittet "Hur länge vi sparar"). */
+const RETENTION_ITEMS = [
+  'Bokföringsunderlag, till exempel kvitton och utbetalningsrapporter: så länge bokföringslagen kräver (7 kap. 2 §) – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.',
+  'Supportmejl: i 24 månader efter vår senaste kontakt, om de inte behövs längre för en pågående reklamation eller för bokföringen.',
+  'Serverloggar hos Netlify: enligt Netlifys lagringstid för loggar.',
+  'Anropsbegränsning: Netlify och våra funktioner använder IP-adressen bara en kort stund – några minuter – för att begränsa missbruk.',
+  'Din dagbok: tills du själv raderar den – vi har ingen kopia.',
+]
+
 const TRANSFER_TEXT =
   'Våra biträden kan föra över uppgifter till USA. Det sker med stöd av EU–US Data Privacy Framework (för certifierade företag) och EU-kommissionens standardavtalsklausuler.'
 
@@ -338,12 +439,22 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara på din enhet, i webbläsaren eller i appen. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
       'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
       'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort enheten eller rensar webbläsaren försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
+      'I apparna för iPhone och Android sparar Lagom dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom, och på iPhone följer den inte med i telefonens säkerhetskopia. På iPhone kan telefonens egen säkerhetskopia (iCloud eller en dator) ta med appens övriga data, som allt annat på telefonen – den sköts av Apple och ditt Apple-konto, inte av oss. På Android följer appens data inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
     ],
     appStore: {
       paragraphs: [
         'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din iPhone. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
         'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
         'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
+        'Lagom sparar dessutom en automatisk kopia av dagboken i appens egen mapp på din iPhone, så att inget försvinner om iOS rensar appens lagring. Kopian lämnar inte telefonen genom Lagom och följer inte med i telefonens säkerhetskopia. Din iPhones egen säkerhetskopia (iCloud eller en dator) kan ta med appens övriga data, som allt annat på telefonen – den sköts av Apple och ditt Apple-konto, inte av oss.',
+      ],
+    },
+    play: {
+      paragraphs: [
+        'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din telefon. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
+        'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+        'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
+        'Lagom sparar dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom. Appens data följer inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
       ],
     },
   },
@@ -357,7 +468,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       columns: STORAGE_COLUMNS,
       rows: [
         [
-          'Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering och inställningar',
+          'Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar',
           'IndexedDB',
           'Det är själva dagboken – appen fungerar inte utan den',
           'Tills du raderar den',
@@ -377,6 +488,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           'Tills en nyare lista hämtas',
           'Rensa webbplatsens data eller avinstallera appen',
         ],
+        STORE_CACHE_ROW,
         [
           'Tema (ljust eller mörkt)',
           'localStorage (lagom-theme)',
@@ -395,6 +507,10 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
         DEMO_ROW,
         BACKUP_ROW,
         ERROR_LOG_ROW,
+        HEALTH_ROW,
+        MIRROR_ROW,
+        EXPORT_ROW,
+        REMINDER_ROW,
         [
           'Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet, om appen startats från Google Play och när appen senast laddades om efter en uppdatering',
           'sessionStorage (lagom-korg, lagom-onboarding, lagom-twa, lagom-chunk-reload)',
@@ -403,7 +519,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           'Stäng fliken eller appen',
         ],
         [
-          'Appens filer, Livsmedelsverkets databas och produktbilder du har visat',
+          'Appens filer, Livsmedelsverkets databas och produktbilder du har visat (på webben – apparna har sina filer med sig)',
           'Service workerns cache',
           'Så att appen startar snabbt och fungerar utan uppkoppling',
           'Tills en ny version ersätter filerna. Produktbilder högst 60 dagar',
@@ -412,27 +528,35 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       ],
     },
     closing: ['Allt rensas också om du tar bort webbplatsens data i webbläsarens inställningar eller avinstallerar appen.'],
-    appStore: {
+    play: {
       paragraphs: [
-        'Lagom sparar det som behövs för att appen ska fungera i appens lagring på din iPhone: IndexedDB, localStorage, sessionStorage och en cache för bilder. Inget av det används för reklam eller spårning, och inget skickas till oss. All lagring är nödvändig för tjänsten du har bett om, så Lagom behöver inte fråga om samtycke.',
+        'Lagom sparar det som behövs för att appen ska fungera i appens lagring på telefonen: IndexedDB, localStorage, sessionStorage och en cache för bilder. Inget av det används för reklam eller spårning, och inget skickas till oss. All lagring är nödvändig för tjänsten du har bett om, så Lagom behöver inte fråga om samtycke.',
       ],
       table: {
         columns: STORAGE_COLUMNS,
         rows: [
           [
-            'Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering och inställningar',
+            'Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar',
             'IndexedDB',
             'Det är själva dagboken – appen fungerar inte utan den',
             'Tills du raderar den',
             'Inställningar → Data → Radera all data',
           ],
           [
-            'När provperioden startade',
+            'Licens och när provperioden startade',
             'IndexedDB',
-            'För att veta hur länge provperioden gäller. Köp i appen hämtas från App Store och sparas inte av Lagom',
-            'Tills du avinstallerar appen. Startdatumet finns kvar när du raderar din data, så att provperioden inte börjar om',
+            'För att veta om Lagom är upplåst',
+            'Tills du tar bort den. Provperiodens startdatum finns kvar när du raderar din data, så att provperioden inte börjar om',
+            'Licensen: Inställningar → Data → Radera all data med valet Ta även bort licensen. Provperiodens startdatum: avinstallera appen',
+          ],
+          [
+            'Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet har återbetalats eller bestridits',
+            'localStorage (lagom-sparrlista)',
+            'Så att en återkallad licens slutar gälla även utan uppkoppling',
+            'Tills en nyare lista hämtas',
             'Avinstallera appen',
           ],
+          STORE_CACHE_ROW,
           ['Tema (ljust eller mörkt)', 'localStorage (lagom-theme)', 'Så att appen startar i rätt färger utan att blinka', 'Tills du byter tema', 'Inställningar → Utseende och visning'],
           ['Små visningsval, till exempel dolda tips och pausad animation', 'localStorage', 'Så att appen minns dina val', 'Tills du ändrar dem', 'Avinstallera appen'],
           [
@@ -445,6 +569,53 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           DEMO_ROW,
           BACKUP_ROW,
           ERROR_LOG_ROW,
+          HEALTH_ROW,
+          MIRROR_ROW,
+          EXPORT_ROW,
+          REMINDER_ROW,
+          [
+            'Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet och när appen senast laddades om efter en uppdatering',
+            'sessionStorage (lagom-korg, lagom-onboarding, lagom-chunk-reload)',
+            'Så att inget försvinner om appen laddas om',
+            'Tills du stänger appen',
+            'Stäng appen',
+          ],
+          ['Produktbilder du har visat', 'Appens cache', 'Så att bilderna visas snabbt', 'Tills Android rensar cachen', 'Avinstallera appen'],
+        ],
+      },
+      closing: ['Allt rensas också om du avinstallerar appen.'],
+    },
+    appStore: {
+      paragraphs: [
+        'Lagom sparar det som behövs för att appen ska fungera i appens lagring på din iPhone: IndexedDB, localStorage, sessionStorage och en cache för bilder. Inget av det används för reklam eller spårning, och inget skickas till oss. All lagring är nödvändig för tjänsten du har bett om, så Lagom behöver inte fråga om samtycke.',
+      ],
+      table: {
+        columns: STORAGE_COLUMNS,
+        rows: [
+          [
+            'Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar',
+            'IndexedDB',
+            'Det är själva dagboken – appen fungerar inte utan den',
+            'Tills du raderar den',
+            'Inställningar → Data → Radera all data',
+          ],
+          STORE_CACHE_ROW_IOS,
+          ['Tema (ljust eller mörkt)', 'localStorage (lagom-theme)', 'Så att appen startar i rätt färger utan att blinka', 'Tills du byter tema', 'Inställningar → Utseende och visning'],
+          ['Små visningsval, till exempel dolda tips och pausad animation', 'localStorage', 'Så att appen minns dina val', 'Tills du ändrar dem', 'Avinstallera appen'],
+          [
+            'När varje del av dagboken senast sparades – bara en slumpad tidsstämpel, ingen data',
+            'localStorage (lagom-sparad:…)',
+            'Så att en äldre kopia av dagboken aldrig skriver över en nyare',
+            'Tills du avinstallerar appen',
+            'Avinstallera appen',
+          ],
+          DEMO_ROW,
+          BACKUP_ROW,
+          ERROR_LOG_ROW,
+          HEALTH_ROW_IOS,
+          MIRROR_ROW_IOS,
+          EXPORT_ROW_IOS,
+          REMINDER_ROW_IOS,
           [
             'Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet och när appen senast laddades om efter en uppdatering',
             'sessionStorage (lagom-korg, lagom-onboarding, lagom-chunk-reload)',
@@ -465,11 +636,11 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       'För att appen ska fungera kontaktar den några tjänster på internet. Varje gång det sker ser mottagaren din IP-adress – så fungerar internet. Din dagbok, ditt namn och din e-post skickas aldrig med.',
     ],
     items: [
-      'Netlify, vårt webbhotell: när du öppnar Lagom på webben eller i Google Play-appen hämtas appen därifrån, och där körs också våra serverfunktioner – för köp, för spärrlistan över återkallade licenser och för receptimport. Netlify sparar IP-adressen en kort tid i sina loggar, och Netlify och våra funktioner använder den en kort stund för att begränsa missbruk.',
+      'Netlify, vårt webbhotell: när du öppnar Lagom på webben hämtas appen därifrån, och där körs också våra serverfunktioner – för köp på webben, för spärrlistan över återkallade licenser och för receptimport. Apparna för iPhone och Android har sina filer med sig och anropar bara serverfunktionerna. Netlify sparar IP-adressen en kort tid i sina loggar, och Netlify och våra funktioner använder den en kort stund för att begränsa missbruk.',
       OFF_ITEM,
       LMV_ITEM,
       RECIPE_ITEM,
-      'App Store och Google Play: när du köper i appen eller trycker på Återställ köp kontaktar appen butiken via din telefon.',
+      'App Store och Google Play: när du köper i appen, trycker på Återställ köp eller öppnar appen (för att se vilka köp som gäller) kontaktar appen butiken via din telefon.',
     ],
     webItems: ['Stripe: när du köper en licens på webben (se ”När du köper”).'],
     keyItems: [
@@ -481,7 +652,16 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
         OFF_ITEM,
         LMV_ITEM,
         RECIPE_ITEM,
-        'App Store: när du köper i appen eller trycker på Återställ köp kontaktar appen App Store via din telefon.',
+        'App Store: när du köper i appen, trycker på Återställ köp eller öppnar appen (för att se vilka köp som gäller) kontaktar appen App Store via din telefon.',
+      ],
+    },
+    play: {
+      items: [
+        'Netlify, vårt webbhotell: där körs våra serverfunktioner – för spärrlistan över återkallade licenser och för receptimport. Android-appen har sina filer med sig och anropar bara serverfunktionerna. Netlify sparar IP-adressen en kort tid i sina loggar, och Netlify och våra funktioner använder den en kort stund för att begränsa missbruk.',
+        OFF_ITEM,
+        LMV_ITEM,
+        RECIPE_ITEM,
+        'Google Play: när du köper i appen, trycker på Återställ köp eller öppnar appen (för att se vilka köp som gäller) kontaktar appen Google Play via din telefon.',
       ],
     },
   },
@@ -490,10 +670,50 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     heading: 'Kameran',
     paragraphs: [
       'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.',
+      'I apparna används telefonens egen streckkodsläsare: Apples inbyggda bildanalys på iPhone och den öppna läsaren ZXing, som ingår i appen, på Android. Båda läser koden på telefonen och skickar ingenting vidare.',
     ],
     appStore: {
       paragraphs: [
-        'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.',
+        'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.',
+      ],
+    },
+    play: {
+      paragraphs: [
+        'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.',
+      ],
+    },
+  },
+  {
+    id: 'halsa',
+    heading: 'Apple Hälsa och Health Connect',
+    paragraphs: [
+      'I apparna för iPhone och Android kan du koppla Lagom till Apple Hälsa (iPhone) eller Health Connect (Android). Kopplingen är avstängd från början, och du väljer själv vad Lagom får läsa och skriva – telefonen frågar om lov för varje datatyp.',
+      'Lagom kan läsa din vikt (nya vägningar hamnar i viktkurvan) och dina steg (fylls i under Träning). Lagom kan skriva energi från det du äter och dricker, vatten och vikter som du loggar i Lagom. Mat och vatten skickas dagen efter, när dagen är avslutad.',
+      'Allt läses och skrivs direkt på telefonen. Uppgifterna från Apple Hälsa och Health Connect skickas aldrig till oss eller någon annan, används inte för reklam eller marknadsföring och delas inte vidare. Det som hämtas sparas i din dagbok på telefonen, som allt annat du loggar. Det Lagom har skickat till Apple Hälsa eller Health Connect finns kvar där om du kopplar från – där kan du ta bort det.',
+      'Lagoms användning av uppgifter från Health Connect följer Health Connects behörighetspolicy, inklusive kraven på begränsad användning.',
+      'Du kan när som helst stänga av kopplingen i Lagom (Inställningar → Apple Hälsa eller Health Connect) och ta tillbaka behörigheterna i Hälsa-appen (din profilbild → Appar → Lagom) eller i Health Connect (Appbehörigheter → Lagom).',
+    ],
+    appStore: {
+      heading: 'Apple Hälsa',
+      paragraphs: [
+        'Du kan koppla Lagom till Apple Hälsa. Kopplingen är avstängd från början, och du väljer själv vad Lagom får läsa och skriva – din iPhone frågar om lov för varje datatyp.',
+        'Lagom kan läsa din vikt (nya vägningar hamnar i viktkurvan) och dina steg (fylls i under Träning). Lagom kan skriva energi från det du äter och dricker, vatten och vikter som du loggar i Lagom. Mat och vatten skickas dagen efter, när dagen är avslutad.',
+        'Allt läses och skrivs direkt på din iPhone. Uppgifterna från Apple Hälsa skickas aldrig till oss eller någon annan, används inte för reklam eller marknadsföring och delas inte vidare. Det som hämtas sparas i din dagbok på telefonen, som allt annat du loggar. Det Lagom har skickat till Apple Hälsa finns kvar där om du kopplar från – du tar bort det i Hälsa-appen.',
+        'Du kan när som helst stänga av kopplingen i Lagom (Inställningar → Apple Hälsa) och ta tillbaka behörigheterna i Hälsa-appen: tryck på din profilbild och välj Appar → Lagom.',
+      ],
+    },
+  },
+  {
+    id: 'paminnelser',
+    heading: 'Påminnelser',
+    paragraphs: [
+      'I apparna för iPhone och Android kan du slå på påminnelser, till exempel om måltider, vatten eller säkerhetskopian. Allt är avstängt från början, och telefonen frågar om lov att visa notiser först när du slår på en påminnelse.',
+      'Påminnelserna schemaläggs i telefonens eget notissystem och visas av telefonen, även när appen är stängd. Inget skickas via internet, och texterna nämner aldrig kalorier eller vikt. Du stänger av dem under Inställningar → Påminnelser eller i telefonens inställningar för notiser.',
+    ],
+    appStore: {
+      paragraphs: [
+        'Du kan slå på påminnelser, till exempel om måltider, vatten eller säkerhetskopian. Allt är avstängt från början, och din iPhone frågar om lov att visa notiser först när du slår på en påminnelse.',
+        'Påminnelserna schemaläggs i telefonens eget notissystem och visas av telefonen, även när appen är stängd. Inget skickas via internet, och texterna nämner aldrig kalorier eller vikt. Du stänger av dem under Inställningar → Påminnelser eller under Inställningar → Notiser på din iPhone.',
       ],
     },
   },
@@ -501,7 +721,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     id: 'kop',
     heading: 'När du köper',
     paragraphs: [
-      'I App Store och Google Play sköter Apple respektive Google betalningen. Appen får bara en bekräftelse på köpet – vilken licens och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Apple och Google ansvarar själva för sin behandling.',
+      'I App Store och Google Play sköter Apple respektive Google betalningen. Köpet görs i butikens eget köpfönster, direkt mellan telefonen och butiken – det går inte via oss eller någon annan tjänst. Appen får bara en bekräftelse på köpet – vilken licens och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Bekräftelsen hämtas från butiken när appen startar, och den senast hämtade (vilken licens, köpdatum och slutdatum) sparas bara på telefonen, så att Lagom fungerar även utan uppkoppling. I iPhone-appen startas provperioden med ett gratis köp i App Store på samma sätt. Apple och Google ansvarar själva för sin behandling.',
     ],
     webParagraphs: [
       'På webben sköter Stripe betalningen. Stripe behandlar din e-postadress, ditt namn, land, betalkortsuppgifter (eller uppgifter för det betalsätt du väljer) och köp-id. Väljer du Klarna, Swish, Apple Pay eller Google Pay behandlar de också dina uppgifter enligt sina villkor. Vi ser köpet i Stripe – e-post, namn, land, belopp, licens och köp-id – men aldrig dina kortuppgifter. Vid köpet sparas köp-id, licenstyp och när du samtyckte till omedelbar leverans på köpet hos Stripe – vi har ingen egen databas – så att vi kan utfärda licensen, hjälpa dig om du tappar nyckeln, spärra licensen om köpet återbetalas och sköta bokföringen.',
@@ -510,7 +730,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     ],
     appStore: {
       paragraphs: [
-        'I App Store sköter Apple betalningen. Appen får bara en bekräftelse på köpet – vilken licens och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Apple ansvarar själv för sin behandling.',
+        'I App Store sköter Apple betalningen. Köpet görs i App Stores eget köpfönster, direkt mellan telefonen och Apple – det går inte via oss eller någon annan tjänst. Appen får bara en bekräftelse på köpet – vilken licens eller provperiod och när – aldrig ditt namn, din e-post eller dina betalningsuppgifter. Provperioden startas på samma sätt, med ett gratis köp i App Store. Bekräftelsen hämtas från App Store när appen startar, och den senast hämtade (vilken licens eller provperiod, köpdatum och slutdatum) sparas bara på telefonen, så att Lagom fungerar även utan uppkoppling. Apple ansvarar själv för sin behandling.',
       ],
     },
   },
@@ -523,21 +743,31 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       'Rättslig förpliktelse (artikel 6.1 c): för att bokföra köpet enligt bokföringslagen.',
       'Berättigat intresse (artikel 6.1 f): för säkerhet, för att begränsa missbruk av våra serverfunktioner, för spärrlistan över återkallade licenser och för att kunna svara när du kontaktar oss. Du kan invända mot sådan behandling (se ”Dina rättigheter”).',
     ],
+    appStore: {
+      items: [
+        'Avtal (artikel 6.1 b): för att ge dig de funktioner du ber om, till exempel sökning, streckkodsläsning och receptimport, och för att hjälpa dig med köp i appen.',
+        'Rättslig förpliktelse (artikel 6.1 c): för att bokföra försäljningen i App Store enligt bokföringslagen.',
+        'Berättigat intresse (artikel 6.1 f): för säkerhet, för att begränsa missbruk av våra serverfunktioner och för att kunna svara när du kontaktar oss. Du kan invända mot sådan behandling (se ”Dina rättigheter”).',
+      ],
+    },
   },
   {
     id: 'lagringstid',
     heading: 'Hur länge vi sparar',
     paragraphs: [],
     items: [
-      'Bokföringsunderlag, till exempel kvitton och utbetalningsrapporter: så länge bokföringslagen kräver (7 kap. 2 §) – i dag till och med det sjunde året efter utgången av det kalenderår då räkenskapsåret avslutades.',
-      'Supportmejl: i 24 månader efter vår senaste kontakt, om de inte behövs längre för en pågående reklamation eller för bokföringen.',
-      'Serverloggar hos Netlify: enligt Netlifys lagringstid för loggar.',
-      'Anropsbegränsning: Netlify och våra funktioner använder IP-adressen bara en kort stund – några minuter – för att begränsa missbruk.',
-      'Din dagbok: tills du själv raderar den – vi har ingen kopia.',
+      ...RETENTION_ITEMS,
+      'Uppgifter från Apple Hälsa eller Health Connect: bara på telefonen, i din dagbok, tills du raderar dem.',
     ],
     webItems: ['Köp på webben: uppgifterna om köpet finns kvar hos Stripe lika länge som bokföringsunderlaget. Stripe sparar också uppgifter enligt sina egna regler.'],
     closing: ['Apple och Google sparar uppgifter om köp i butikerna enligt sina egna regler.'],
-    appStore: { closing: ['Apple sparar uppgifter om köp i App Store enligt sina egna regler.'] },
+    appStore: {
+      items: [
+        ...RETENTION_ITEMS,
+        'Uppgifter från Apple Hälsa: bara på din iPhone, i din dagbok, tills du raderar dem.',
+      ],
+      closing: ['Apple sparar uppgifter om köp i App Store enligt sina egna regler.'],
+    },
   },
   {
     id: 'mottagare',
@@ -704,6 +934,13 @@ function termsTemplate(): LegalSection[] {
           'Köp i App Store följer ditt Apple-konto – på en ny iPhone trycker du på Återställ köp.',
         ],
       },
+      play: {
+        paragraphs: [
+          'Lagom fungerar på Android-telefoner med en aktuell version av Android. Appen fungerar utan uppkoppling; sökning online, streckkoder, köp och receptimport kräver uppkoppling.',
+          'Din data sparas i appen på din telefon och synkas inte mellan enheter. Du flyttar den med en säkerhetskopia (Inställningar → Data).',
+          'Köp i Google Play följer ditt Google-konto – på en ny telefon trycker du på Återställ köp. Har du en licensnyckel klistrar du in den under Inställningar → Licens.',
+        ],
+      },
     },
     {
       id: 'reklamation',
@@ -739,9 +976,16 @@ function termsTemplate(): LegalSection[] {
       heading: 'Provperioden',
       paragraphs: [
         `De första ${TRIAL_DAYS} dagarna är gratis och allt är öppet. Inget kort behövs, och inget dras automatiskt när provperioden tar slut.`,
-        'Provperioden startar när du skapar din egen profil – inte när du tittar på exempeldata. Den gäller en gång per enhet och börjar inte om om du raderar din data.',
+        'Provperioden startar när du skapar din egen profil – inte när du tittar på exempeldata. Den gäller en gång per enhet och börjar inte om om du raderar din data. I iPhone-appen startas den i stället med ett gratis köp i App Store och följer ditt Apple-konto.',
         'Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.',
       ],
+      appStore: {
+        paragraphs: [
+          `De första ${TRIAL_DAYS} dagarna är gratis och allt är öppet. Inget dras automatiskt när provperioden tar slut.`,
+          'Du startar provperioden med ett gratis köp i App Store när du har skapat din egen profil – att titta på exempeldata startar ingen provperiod. Provperioden följer ditt Apple-konto, gäller en gång och börjar inte om om du raderar din data eller installerar om appen.',
+          'Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.',
+        ],
+      },
     },
     {
       id: 'butikerna',
@@ -749,6 +993,7 @@ function termsTemplate(): LegalSection[] {
       paragraphs: [
         'Köper du Lagom i App Store eller Google Play sköter butiken betalningen, kvittot och eventuell återbetalning enligt sina villkor, och priset visas i butiken. Återbetalning begär du hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com) eller i Google Play.',
         'Köpet följer ditt Apple- eller Google-konto. På en ny telefon trycker du på Återställ köp i Lagom.',
+        'Köper du en ny årslicens i App Store innan den förra har gått ut börjar det nya året när det förra slutar. I Google Play kan en ny årslicens köpas när den förra har gått ut.',
         APPLE_EULA_TEXT,
       ],
       appStore: {
@@ -756,6 +1001,7 @@ function termsTemplate(): LegalSection[] {
         paragraphs: [
           'Köper du Lagom i App Store sköter Apple betalningen, kvittot och eventuell återbetalning enligt sina villkor, och priset visas i App Store. Återbetalning begär du hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com).',
           'Köpet följer ditt Apple-konto. På en ny iPhone trycker du på Återställ köp i Lagom.',
+          'Köper du en ny årslicens innan den förra har gått ut börjar det nya året när det förra slutar – inga betalda dagar går förlorade.',
           APPLE_EULA_TEXT,
         ],
       },

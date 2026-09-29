@@ -8,6 +8,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { isAppleWebKit, isInApp, isStandalone } from '../../config/platform'
 import { useDemoData } from '../../hooks/useDemoData'
+import { useReminderBridge } from '../../stores/reminderStore'
 
 export const LAST_BACKUP_KEY = 'lagom-last-backup'
 /** Påminn om säkerhetskopia efter så här många dagar. */
@@ -47,6 +48,8 @@ function write(value: number | null) {
 
 export function markBackupNow(now: number = Date.now()): void {
   write(now)
+  // Söndagens påminnelse om säkerhetskopia flyttas en vecka fram (bara i apparna).
+  void useReminderBridge.getState().bridge?.sync()
 }
 
 export function clearLastBackup(): void {

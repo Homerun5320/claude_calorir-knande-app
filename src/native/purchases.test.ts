@@ -7,6 +7,7 @@ import type { Transaction } from '@capgo/native-purchases'
 import { getStorePurchases, NATIVE_WAIT_MS, setNativeStorePurchases, setStorePurchasesForTests, type StorePurchases } from '../lib/storePurchases'
 import {
   CALL_TIMEOUT_MS,
+  chainYears,
   classifyPurchaseError,
   createNativeStorePurchases,
   parseStoreDate,
@@ -230,6 +231,47 @@ describe('gällande köp', () => {
     expect(YEAR_MS).toBe(365 * DAY_MS)
   })
 
+  it('iPhone: ett år som köps i förväg läggs efter det som gäller (hela historiken, utan återkallade köp)', async () => {
+    const current = [tx({ productIdentifier: 'ar', transactionId: 't3', purchaseDate: '2026-12-20T08:00:00Z' })]
+    const history = [
+      tx({ productIdentifier: 'ar', transactionId: 't1', purchaseDate: '2026-01-10T08:00:00Z' }),
+      tx({ productIdentifier: 'ar', transactionId: 't2', purchaseDate: '2026-06-01T08:00:00Z', revocationDate: '2026-06-02T08:00:00Z' }),
+      ...current,
+    ]
+    mocks.plugin.getPurchases.mockImplementation(async ({ onlyCurrentEntitlements }: { onlyCurrentEntitlements: boolean }) => ({
+      purchases: onlyCurrentEntitlements ? current : history,
+    }))
+    const list = await createNativeStorePurchases('ios').currentEntitlements()
+    expect(mocks.plugin.getPurchases).toHaveBeenCalledWith({ productType: 'inapp', onlyCurrentEntitlements: false })
+    // Förnyad 21 dagar före slutet: det nya året börjar när det första slutar – inga dagar försvinner.
+    const first = Date.UTC(2026, 0, 10, 8)
+    expect(list).toEqual([{ product: 'ar', purchasedAt: Date.UTC(2026, 11, 20, 8), expiresAt: first + 2 * YEAR_MS, source: 'appstore' }])
+  })
+
+  it('iPhone: provperioden räknas från det första köpet, och utan historik gäller det senaste köpet', async () => {
+    const current = [tx({ productIdentifier: 'prov14', purchaseDate: '2026-03-01T08:00:00Z' })]
+    mocks.plugin.getPurchases.mockImplementation(async ({ onlyCurrentEntitlements }: { onlyCurrentEntitlements: boolean }) => ({
+      purchases: onlyCurrentEntitlements ? current : [tx({ productIdentifier: 'prov14', purchaseDate: '2026-02-01T08:00:00Z' }), ...current],
+    }))
+    await expect(createNativeStorePurchases('ios').currentEntitlements()).resolves.toEqual([
+      { product: 'prov14', purchasedAt: Date.UTC(2026, 1, 1, 8), source: 'appstore' },
+    ])
+    mocks.plugin.getPurchases.mockImplementation(async ({ onlyCurrentEntitlements }: { onlyCurrentEntitlements: boolean }) => {
+      if (!onlyCurrentEntitlements) throw new Error('historiken svarar inte')
+      return { purchases: current }
+    })
+    await expect(createNativeStorePurchases('ios').currentEntitlements()).resolves.toEqual([
+      { product: 'prov14', purchasedAt: Date.UTC(2026, 2, 1, 8), source: 'appstore' },
+    ])
+    expect(mocks.logError).toHaveBeenCalledWith(expect.any(Error), 'native:kop')
+  })
+
+  it('Play: historiken hämtas inte (där går ett år inte att köpa i förväg)', async () => {
+    mocks.plugin.getPurchases.mockResolvedValue({ purchases: [playTx({ productIdentifier: 'ar' })] })
+    await createNativeStorePurchases('android').currentEntitlements()
+    expect(mocks.plugin.getPurchases).toHaveBeenCalledTimes(1)
+  })
+
   it('Play: bara betalda köp, lokal tid i köpdatumet och okvitterade köp kvitteras', async () => {
     mocks.plugin.getPurchases.mockResolvedValue({
       purchases: [
@@ -269,10 +311,21 @@ describe('Återställ köp', () => {
     expect(mocks.plugin.restorePurchases.mock.invocationCallOrder[0]).toBeLessThan(mocks.plugin.getPurchases.mock.invocationCallOrder[0])
   })
 
-  it('iPhone: gick synkningen inte att göra och finns inget köp – då misslyckas återställningen', async () => {
+  it('iPhone: utan uppkoppling och utan köp på telefonen misslyckas återställningen', async () => {
+    vi.stubGlobal('navigator', { ...navigator, onLine: false })
     mocks.plugin.restorePurchases.mockRejectedValue(new Error('The Internet connection appears to be offline.'))
     await expect(createNativeStorePurchases('ios').restore()).rejects.toThrow('offline')
     expect(mocks.logError).toHaveBeenCalledWith(expect.any(Error), 'native:kop')
+  })
+
+  it('iPhone: ett annat fel från synkningen (t.ex. en avbruten inloggning på svenska) ger ett neutralt svar', async () => {
+    mocks.plugin.restorePurchases.mockRejectedValueOnce(new Error('Åtgärden kunde inte slutföras.'))
+    await expect(createNativeStorePurchases('ios').restore()).resolves.toEqual([])
+    expect(mocks.logError).toHaveBeenCalledWith(expect.any(Error), 'native:kop')
+    mocks.logError.mockReset()
+    mocks.plugin.restorePurchases.mockRejectedValueOnce(new Error('Användaren avbröt åtgärden.'))
+    await expect(createNativeStorePurchases('ios').restore()).resolves.toEqual([])
+    expect(mocks.logError).not.toHaveBeenCalled()
   })
 
   it('iPhone: köp som redan finns på telefonen räcker när synkningen inte gick, eller avbröts', async () => {
@@ -334,6 +387,15 @@ describe('hjälpfunktioner', () => {
     expect(classifyPurchaseError(null)).toBe('failed')
   })
 
+  it('årslicenser läggs efter varandra – ett utgånget år förlänger inget', () => {
+    const y = 100
+    expect(chainYears([], y)).toBeUndefined()
+    expect(chainYears([0], y)).toBe(100)
+    expect(chainYears([80, 0], y)).toBe(200) // förnyat i förväg: slutet flyttas ett helt år
+    expect(chainYears([0, 150], y)).toBe(250) // köpt efter att det förra gick ut: räknas från köpet
+    expect(chainYears([0, 50, 60], y)).toBe(300)
+  })
+
   it('köpdatum: UTC på iPhone, lokal tid från Play-delen', () => {
     expect(parseStoreDate('2026-06-01T10:00:00Z', 'ios')).toBe(Date.UTC(2026, 5, 1, 10))
     expect(parseStoreDate('2026-06-01T10:00:00Z', 'android')).toBe(new Date(2026, 5, 1, 10).getTime())
@@ -377,6 +439,12 @@ describe('inkopplingen i src/lib/storePurchases.ts', () => {
     expect(mocks.plugin.addListener).toHaveBeenCalledWith('transactionUpdated', expect.any(Function))
     const onUpdate = mocks.plugin.addListener.mock.calls[0][1] as () => void
     onUpdate()
+    expect(mocks.refresh).toHaveBeenCalledWith({ fresh: true })
+  })
+
+  it('köpen hämtas direkt när de kopplas in (även om en tidigare hämtning redan har gett upp)', () => {
+    nativeIos()
+    registerNativePurchases()
     expect(mocks.refresh).toHaveBeenCalledWith({ fresh: true })
   })
 

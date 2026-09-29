@@ -55,3 +55,9 @@ android/app/src/main/res/values/lagom_generated.xml
 android/app/release/
 *.ipa
 *.xcarchive
+
+# Molnbyggena (docs/NATIVE.md §9): nycklar som base64 för hemligheterna, Apples certifikatnyckel
+# och Google Plays tjänstekonto – skapas utanför repot, men mönstren skyddar ändå.
+*.b64
+lagom_ios_distribution_key*
+lagom-play-*.json

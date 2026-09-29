@@ -847,7 +847,7 @@ alltid. Bara NY loggning kräver en licens.
 - `<AccessSync />`, `<AccessBlockedDialog />` – monteras i AppShell
 
 ### `src/features/premium/premiumLogic.ts`
-- `statusSummary(status)`, `trialBannerLevel(status)` (`'none' | 'chip' | 'soon' | 'expired'`), `plansToOffer(status, plans)`
+- `statusSummary(status)`, `trialBannerLevel(status)` (`'none' | 'chip' | 'soon' | 'expired'`), `plansToOffer(status, plans, distribution?)`, `renewalBlockedInStore(status)` (Google Play: en årslicens från butiken som gäller kan inte köpas igen – `PLAY_RENEWAL_NOTE`)
 - `formatPrice(kr)` ("699 kr"), `formatKronor(kr)` ("139,80 kr"), `priceSummary()` ("349 kr/år eller 699 kr för alltid"), `priceSummaryText()` (kronor på webben, butikens priser i apparna), `formatLongDate(ms)`, `daysText(n)`
 - `activateLicense(input)` – verifierar och sparar en inklistrad nyckel; `buyInTestMode(plan)`
 - `createCheckout(plan)` → Stripe-adress (POST /api/create-checkout { plan, consent: true }), `verifyPurchase(sessionId)` → `{ kind: 'ok', licenseKey } | { kind: 'pending' }`; fel som `PurchaseError` (`offline | server | not-found | invalid`) med svensk text (serverns eget meddelande när det finns)

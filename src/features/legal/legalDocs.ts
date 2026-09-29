@@ -3,7 +3,7 @@
  * ägaren. legal.test.tsx jämför dem med filerna i repot (`toMatchFileSnapshot`) – ändra texten i
  * legalContent.ts eller här och kör `npx vitest run src/features/legal -u`.
  */
-import { PRIVACY_VERSION, STATIC_SELLER, TERMS_VERSION, USER_TERMS_SECTION_IDS, privacySections, termsSections, type LegalSection } from './legalContent'
+import { PRIVACY_VERSION, STATIC_SELLER, TERMS_VERSION, USER_TERMS_SECTION_IDS, privacySections, termsSections, visibleSections, type LegalSection } from './legalContent'
 import { renderLegalHtml, renderLegalMarkdown, type LegalDocSpec } from './legalExport'
 
 /**
@@ -11,6 +11,10 @@ import { renderLegalHtml, renderLegalMarkdown, type LegalDocSpec } from './legal
  * i legalContent.ts, som byggs in i appen.
  */
 const PRIVACY_OWNER_NOTES: Readonly<Record<string, string>> = {
+  kameran:
+    'Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först.',
+  halsa:
+    'Google granskar texten i Health Connect-deklarationen (Play Console → Appinnehåll → Hälsoappar). Datatyperna här ska stämma med AndroidManifest.xml, Info.plist och motiveringarna i docs/NATIVE.md §6. Ändras de i src/native/health.ts måste policyn uppdateras först.',
   lagringstid: 'Kontrollera hur länge loggar sparas i din Netlify-plan och skriv gärna in tiden här.',
   mottagare:
     'Kontrollera att e-posttjänsten du använder för support har ett personuppgiftsbiträdesavtal (ett privat gratiskonto har det oftast inte) och skriv gärna in dess namn. Netlifys och Stripes avtal (DPA) ingår i deras villkor – spara en kopia. Väljer du RevenueCat för köpen i appen blir RevenueCat också ett biträde – lägg då till det här, i registerförteckningen och i App Privacy/Data safety före inskickningen.',
@@ -33,6 +37,12 @@ function withOwnerNotes(sections: LegalSection[], notes: Readonly<Record<string,
 /** Sökvägar relativt repots rot. */
 export const LEGAL_FILES = {
   privacyHtml: 'public/integritet/index.html',
+  /**
+   * Integritetspolicyn för Android-appen, fristående och utan länkar vidare. Google Play-bygget
+   * kopierar den till dist-native/privacypolicy.html (vite.config.ts), som Health Connect visar i
+   * appen (@capgo/capacitor-health, scripts/native-config.mjs) – även utan uppkoppling.
+   */
+  privacyAndroidHtml: 'public/integritet/android/index.html',
   termsHtml: 'public/villkor/index.html',
   privacyMd: 'docs/INTEGRITETSPOLICY.md',
   termsMd: 'docs/KOPVILLKOR.md',
@@ -59,6 +69,20 @@ export function termsDoc(title = 'Köp- och användarvillkor'): LegalDocSpec {
 
 export function privacyHtml(): string {
   return renderLegalHtml(privacyDoc(), [{ href: '../villkor/', label: 'Köp- och användarvillkor' }])
+}
+
+/** Integritetspolicyn så som Google Play-appen visar den – utan webbköp och utan länkar vidare. */
+export function privacyAndroidDoc(): LegalDocSpec {
+  return {
+    title: 'Integritetspolicy för Lagom på Android',
+    version: PRIVACY_VERSION,
+    description: 'Så hanterar Lagom för Android dina uppgifter, även från Health Connect: dagboken stannar på telefonen, ingen reklam och ingen spårning.',
+    sections: visibleSections(privacySections(STATIC_SELLER), { platform: 'play', webSales: false, licenseKeys: true }),
+  }
+}
+
+export function privacyAndroidHtml(): string {
+  return renderLegalHtml(privacyAndroidDoc(), [], { standalone: true })
 }
 
 export function termsHtml(): string {

@@ -57,6 +57,7 @@ import { StartOwnProfileButton } from '../../premium/AccessGate'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
 import { markBackupNow, useLastBackup } from '../backupStatus'
 import { wipeAndReset } from '../wipe'
+import { isNative } from '../../../native'
 import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
@@ -81,8 +82,9 @@ async function exportBackup(): Promise<SaveOutcome> {
 /** Butiken som sköter köpen i den här versionen av appen (aldrig en annan plattforms namn i iPhone-appen). */
 function purchaseText(): string {
   if (sellsOnWeb()) return 'När du köper en licens på webben sköts betalningen av Stripe.'
-  if (DISTRIBUTION === 'appstore' || (isNativeApp() && !isTwa())) return 'Köp sköts av App Store.'
+  // Play-appen är också en inbyggd app (Capacitor) – därför avgör bygget först.
   if (DISTRIBUTION === 'play' || isTwa()) return 'Köp sköts av Google Play.'
+  if (DISTRIBUTION === 'appstore' || isNativeApp()) return 'Köp sköts av App Store.'
   return 'Köp sköts av App Store eller Google Play.'
 }
 
@@ -328,6 +330,12 @@ export function DataSection() {
               Din data finns {storagePlace()} och flyttar inte med automatiskt. Spara en säkerhetskopia här, öppna Lagom på den nya enheten eller i
               appen och välj Återställ från säkerhetskopia.
             </p>
+            {isNative() && (
+              <p className="mt-2">
+                Appen sparar också en automatisk kopia på telefonen, så att inget försvinner om telefonen rensar appens lagring. Den kopian är bara ett
+                skydd här på telefonen – använd säkerhetskopian när du byter telefon.
+              </p>
+            )}
             {/* Bara på webben, för den som har en licensnyckel. I apparna nämns aldrig webbköp (Apples
                 riktlinjer 3.1.1 och 3.1.3) – webbköpare som byter till iPhone hjälps via supporten. */}
             {hasLicense && !isInApp() && (

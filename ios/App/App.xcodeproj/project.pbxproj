@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		1A6E0B0D2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1A6E0B0C2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy */; };
+		1A6E0B112E8A4F0100C0FFEE /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1A6E0B102E8A4F0100C0FFEE /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		1A6E0B0C2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1A6E0B0E2E8A4F0100C0FFEE /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		1A6E0B0F2E8A4F0100C0FFEE /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +78,7 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				1A6E0B0E2E8A4F0100C0FFEE /* App.entitlements */,
 				1A6E0B0C2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy */,
+				1A6E0B102E8A4F0100C0FFEE /* Localizable.strings */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
@@ -154,6 +157,7 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				1A6E0B0D2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy in Resources */,
+				1A6E0B112E8A4F0100C0FFEE /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +190,14 @@
 				504EC3111FED79650016851F /* Base */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		1A6E0B102E8A4F0100C0FFEE /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				1A6E0B0F2E8A4F0100C0FFEE /* sv */,
+			);
+			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

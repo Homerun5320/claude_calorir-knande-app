@@ -26,6 +26,7 @@ import { useFastingStore } from '../../stores/fastingStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { usePlanStore } from '../../stores/planStore'
+import { useReminderStore } from '../../stores/reminderStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { isMemoryOnlyStorage } from '../../stores/storage'
 import { CLOUD_CONSENT_VERSION } from './consent'
@@ -109,7 +110,7 @@ export const SKIP_MESSAGES: Record<SkipReason, string> = {
  * `STORES` i src/stores/hydration.ts – får kopian en ny butik (t.ex. veckoplaneringen) ska den in
  * här också, annars kan en halvt inläst butik laddas upp tom.
  */
-const PERSISTED_STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore]
+const PERSISTED_STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore, useReminderStore]
 
 /** true när alla butiker med användarens data har lästs in från enheten (samma regel som `useHydrated`). */
 export function storesHydrated(): boolean {

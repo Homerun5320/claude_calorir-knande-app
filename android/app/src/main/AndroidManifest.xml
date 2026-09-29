@@ -51,6 +51,18 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!--
+          Google ML Kit följer med @capacitor/barcode-scanner men används inte: Android-appen läser
+          streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). ML Kits
+          ContentProvider skulle annars starta ML Kit (och Googles datatransport) när appen startar.
+          Byts läsaren till ML Kit måste raden tas bort – och Data safety, integritetspolicyn och
+          docs/NATIVE.md ses över först.
+        -->
+        <provider
+            android:name="com.google.mlkit.common.internal.MlKitInitProvider"
+            android:authorities="${applicationId}.mlkitinitprovider"
+            tools:node="remove" />
     </application>
 
     <!-- Nätet: Open Food Facts, receptimport och serverfunktionerna. -->
@@ -66,18 +78,18 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:node="remove" />
 
     <!--
-      Health Connect: bara de datatyper Lagom använder. Läsa vikt, steg och aktiv energi; skriva
-      vikt, näring (energi från måltider) och vatten. Varje behörighet ska motiveras i Play Console
+      Health Connect: bara de datatyper Lagom använder. Läsa vikt och steg; skriva vikt, näring
+      (energi från måltider) och vatten. Varje behörighet ska motiveras i Play Console
       (Appinnehåll → Hälsoappar och Health Connect), se docs/NATIVE.md.
     -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
-    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.WRITE_NUTRITION" />
     <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
 
     <!-- Hälsobehörigheter som @capgo/capacitor-health deklarerar men Lagom inte använder. -->
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" tools:node="remove" />

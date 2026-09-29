@@ -2,27 +2,28 @@
 
 Allt som behövs för att lägga upp Lagom i Google Play: konto, sluten test, butikstexter, grafik,
 köp i appen, formulärsvar i Play Console, instruktioner till granskarna och själva appen (en
-Trusted Web Activity byggd med Bubblewrap). Skrivet för en ägare utan jurist eller revisor.
-
-> **Ändrat 2026-09-28 – Play-appen blir en inbyggd Capacitor-app, inte en TWA.** Ägaren har
-> beslutat att båda butiksapparna byggs med Capacitor 8. Android-appen är nu projektet `android/`
-> (applicationId `se.lagomappen.lagom`, bygget `npm run build:android` med
-> `VITE_DISTRIBUTION=play`), köpen görs med Google Play Billing via `@capgo/native-purchases`, och
-> appen använder Health Connect. Det som står nedan om TWA, Bubblewrap och Digital Asset Links
-> (avsnitt 10–11, delar av 7) gäller inte längre och skrivs om; kontot, butikstexterna, grafiken,
-> den slutna testen och formulären gäller fortfarande, med tilläggen i [NATIVE.md](NATIVE.md)
-> (behörigheter, Health Connect-deklarationen, Data safety, 16 KB-sidor).
+inbyggd Capacitor 8-app, projektet `android/`). Skrivet för en ägare utan jurist eller revisor.
 
 > **Viktigt:** det här är en arbetsbeskrivning, inte juridisk rådgivning. Googles regler och
 > formulär ändras ofta – läs texten i Play Console innan du svarar, och kontrollera skatt och
 > moms med Skatteverket (verksamt.se) om du är osäker.
 
-**Så fungerar Play-appen:** den är ett tunt Android-skal (Trusted Web Activity, TWA) runt
-webbversionen av Lagom. Appen startar `https://<domän>/?plattform=play`, och Lagom känner igen
-att den körs i Play-appen (`RUNTIME === 'twa'` i `src/config/platform.ts`): då visas inga
-webbpriser eller webbköp, och köp görs med Google Play Billing. Filen
-`/.well-known/assetlinks.json` på webbplatsen bevisar att webbplatsen och appen hör ihop – utan
-den visas en adressrad överst i appen.
+**Så fungerar Play-appen:** den är en inbyggd Android-app byggd med
+[Capacitor 8](NATIVE.md) (applicationId `se.lagomappen.lagom`). Hela Lagom ligger i appen – samma
+kod som webbversionen, byggd med `VITE_DISTRIBUTION=play` (`npm run build:android`) – så den
+fungerar utan uppkoppling och visar aldrig webbpriser eller webbköp. Köp görs med **Google Play
+Billing** i appen (`@capgo/native-purchases`). Appen har också inbyggda funktioner: streckkodsläsare,
+delning och export via telefonens delningsmeny, lokala påminnelser, en frivillig koppling till
+**Health Connect**, haptik och Androids bakåtknapp. Allt om projektet, behörigheterna och byggena:
+[NATIVE.md](NATIVE.md).
+
+Skillnader mot den tidigare planen med en Trusted Web Activity (TWA/Bubblewrap):
+
+- **Ingen Digital Asset Links-fil behövs** för appen (`assetlinks.json` hörde till TWA:n).
+- **Varje ändring kräver en ny uppladdning.** Appen innehåller webbdelen, så en ny webbversion på
+  Netlify når inte Play-appen – bygg och ladda upp en ny AAB (avsnitt 10).
+- Appen byggs i molnet (GitHub Actions eller Codemagic) och signeras med **uppladdningsnyckeln**
+  (avsnitt 11). Android Studio behövs inte, men går att använda om du har en PC (avsnitt 10).
 
 ## Innehåll
 
@@ -35,8 +36,8 @@ den visas en adressrad överst i appen.
 7. [Köp i appen och priser](#7-köp-i-appen-och-priser)
 8. [Appinnehåll – formulären i Play Console](#8-appinnehåll--formulären-i-play-console)
 9. [App access – instruktioner till granskarna](#9-app-access--instruktioner-till-granskarna)
-10. [Bygga appen med Bubblewrap](#10-bygga-appen-med-bubblewrap)
-11. [Digital Asset Links (assetlinks.json)](#11-digital-asset-links-assetlinksjson)
+10. [Bygga och ladda upp appen](#10-bygga-och-ladda-upp-appen)
+11. [Uppladdningsnyckeln och Play App Signing](#11-uppladdningsnyckeln-och-play-app-signing)
 12. [Nycklar och säkerhet](#12-nycklar-och-säkerhet)
 13. [Checklista före produktion](#13-checklista-före-produktion)
 
@@ -53,6 +54,8 @@ den visas en adressrad överst i appen.
 | Livstid | För alltid, felrättningar ingår – inga löften om nya funktioner. |
 | Betalning | **Bara köp i appen** (Google Play Billing). Inga länkar till eller omnämnanden av webbköp i appen eller texterna. |
 | Licensnycklar | Kan aktiveras i Play-appen (Inställningar → Licens), men appen hänvisar aldrig till webbköp. |
+| Appskal | **Capacitor 8** (inbyggd app, inte TWA). Minst Android 8.0 (API 26). |
+| Native-funktioner i v1 | Streckkodsläsare, delning/export, lokala påminnelser, Health Connect (frivilligt), haptik, bakåtknappen. |
 | Provperiod | 14 dagar. Startar när den egna profilen skapas – exempeldatan är skrivskyddad. |
 
 ## 2. Konto och avtal
@@ -89,11 +92,15 @@ knappt tre veckor från start till ansökan.
    e-postlista i Play Console, och lägg in testarnas Gmail-adresser (de måste använda samma
    Google-konto som i Play Butik).
 3. **Play Console → Testa och släpp → Testning → Sluten testning → Skapa spår**: lägg till
-   gruppen/listan, välj Sverige och ladda upp appen (`.aab`, se [avsnitt 10](#10-bygga-appen-med-bubblewrap)).
+   gruppen/listan, välj Sverige och ladda upp appen (`.aab`, se [avsnitt 10](#10-bygga-och-ladda-upp-appen)).
+   Tips: börja med spåret **Intern testning** (upp till 100 testare, ingen granskning) för dig
+   själv – molnbygget laddar upp dit – och flytta sedan samma version till den slutna testen
+   (*Intern testning → versionen → Flytta upp → Sluten testning*).
 4. **Skicka anmälningslänken** (*Anmäl dig till testet*) till alla. Be dem:
    - gå med via länken och installera appen från Play Butik,
    - **inte lämna testet** under de 14 dagarna,
-   - öppna appen några gånger i veckan och gärna prova exempeldata, en egen profil och sökning.
+   - öppna appen några gånger i veckan och gärna prova exempeldata, en egen profil, sökning,
+     streckkodsläsaren och – om de vill – påminnelser och Health Connect.
 5. **Följ upp** efter 2–3 dagar och efter en vecka (Play Console visar hur många som är med).
    Tacka gärna testarna med en gratis licensnyckel efteråt.
 6. **Samla synpunkter** i ett enkelt formulär eller i Google-gruppen – Google frågar i ansökan
@@ -112,6 +119,10 @@ knappt tre veckor från start till ansökan.
 | App eller spel | App |
 | Kostnadsfri eller betald | **Kostnadsfri** (köpen görs i appen) – kan inte ändras till betald senare |
 | Deklarationer | Godkänn riktlinjerna för utvecklare och exportlagarna i USA |
+
+Paketnamnet anges inte här – det kommer från den första AAB:n (`se.lagomappen.lagom`, se
+[NATIVE.md §1](NATIVE.md#1-att-bekräfta-innan-första-uppladdningen)) och kan **aldrig** ändras
+efteråt. Bekräfta det innan du laddar upp.
 
 Under *Testa och släpp* → *Produktion* → *Länder/regioner*: välj **bara Sverige** (gör samma sak
 för spåret för sluten test).
@@ -158,6 +169,8 @@ NÄRING OCH MÅL
 • Vitaminer och mineraler jämförs med Nordiska näringsrekommendationer (NNR 2023)
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Vatten, träning och vikt på samma ställe
+• Koppla till Health Connect om du vill: hämta vikt och steg, och spara energi, vatten och vikt
+• Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
 
 RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
@@ -172,6 +185,7 @@ Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
+• Uppgifter från Health Connect läses och sparas bara i telefonen
 • Exportera allt när du vill, eller radera allt med ett par tryck
 • Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
@@ -184,8 +198,10 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(Ungefär 2 750 tecken.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
-veckoplaneringen och receptimporten finns i version 1.0, men kontrollera ändå. Googles policy för
+(Ungefär 3 100 tecken.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
+veckoplaneringen, receptimporten, påminnelserna och Health Connect ska finnas i version 1.0, men
+kontrollera i den version du laddar upp (Inställningar → Påminnelser och Inställningar → Health
+Connect). Saknas någon: ta bort raden. Googles policy för
 appar med information från myndigheter kräver att källan anges (gärna med adress) – det gör raden
 "Källa:" ovan.
 
@@ -224,12 +240,18 @@ designsystemets färger – inga priser, rankingord eller myndighetslogotyper.
 ### Skärmdumpar
 
 ```sh
-npx vite build                                              # webbygget – Play-appen visar webbversionen
-node scripts/app-store-screenshots.mjs --only=play          # → store-assets/screenshots/play/{ljust,morkt}/
+# 1. Butiksbygget för Play (samma miljövariabler som i NATIVE.md §3 – säljaruppgifterna krävs):
+VITE_DISTRIBUTION=play VITE_API_BASE=https://<domän> npx vite build     # → dist-native/
+# 2. Ta bilderna:
+node scripts/app-store-screenshots.mjs --dist=dist-native --only=play   # → store-assets/screenshots/play/{ljust,morkt}/
 ```
 
-- Skriptet öppnar appen med `?plattform=play`, precis som Play-appen, så att bilderna visar det
-  som syns i Play-appen (inga webbpriser eller tips om hemskärmen).
+- Ta bilderna från butiksbygget (`dist-native/`), inte från webbygget – då visar de det som syns
+  i Play-appen (inga webbpriser eller tips om hemskärmen). Skriptet lägger till `?plattform=play`
+  (från tiden med TWA); det ändrar inget i butiksbygget.
+- Inbyggda vyer (streckkodsläsarens helskärm, Health Connects behörighetsfråga, notiser) syns inte
+  i webbläsaren. Vill du visa dem: ta en skärmdump på en Android-telefon med testbygget (1 080 ×
+  1 920 px eller större, 9:16) – redigera den inte.
 - Skriptet startar `vite preview` på en ledig port, laddar exempeldatan via *Utforska med
   exempeldata* och fotograferar Idag, Dagbok, Insikter (förra veckan), Recept, Vikt & mått och
   ett livsmedel med näringsvärden – i ljust och mörkt läge. Servern stängs efteråt.
@@ -243,25 +265,69 @@ node scripts/app-store-screenshots.mjs --only=play          # → store-assets/s
 
 ## 7. Köp i appen och priser
 
-*Play Console → Tjäna pengar → Produkter*
+Köpen görs **i appen med Google Play Billing** (Play Billing Library 9.1 via
+`@capgo/native-purchases`, koden i `src/native/purchases.ts`) – direkt mellan telefonen och Google
+Play, utan egen server och utan konto hos någon tredje part. Google kräver Play Billing Library 8
+eller senare för nya appar sedan 2026-08-31; 9.1 uppfyller det.
+
+Innan produkter kan skapas måste betalningsprofilen vara klar ([avsnitt 2](#2-konto-och-avtal))
+och en AAB med behörigheten `com.android.vending.BILLING` vara uppladdad till något spår – ladda
+upp den första versionen till intern testning först ([avsnitt 10](#10-bygga-och-ladda-upp-appen)).
+
+*Play Console → Tjäna pengar med Play → Produkter → Engångsprodukter → Skapa engångsprodukt*
 
 Produkt-id:na måste vara exakt desamma som i `src/lib/storePurchases.ts`:
 
-| Produkt | Produkt-id | Typ i Play Console | Pris |
-| --- | --- | --- | --- |
-| Livstidslicens | `livstid` | **Engångsprodukt** (köps en gång, förbrukas aldrig) | 699 kr |
-| Årslicens | `ar` | **Prenumeration med förbetald basplan** (*prepaid plan*, 1 år) – förnyas inte automatiskt | 349 kr |
+| Produkt | Produkt-id | Typ i Play Console | Köpalternativ | Pris |
+| --- | --- | --- | --- | --- |
+| Livstidslicens | `livstid` | **Engångsprodukt** | Köp (*Buy*), id t.ex. `kop` | 699 kr |
+| Årslicens | `ar` | **Engångsprodukt** (inte prenumeration) | Köp (*Buy*), id t.ex. `kop` | 349 kr |
 
-- Play Console anger priset inklusive moms för Sverige. Välj Sverige som enda land.
-- Årslicensen ska **inte** vara en vanlig automatiskt förnyad prenumeration – Lagom lovar
-  "utan automatisk förnyelse". En förbetald basplan gäller ett år och förnyas bara om köparen
-  själv köper igen. Den syns i Play-kontot, så att *Återställ köp* fungerar på en ny telefon.
-- **Kontrollera när köpen byggs** (Digital Goods API i TWA:n): att förbetalda planer stöds fullt
-  ut. Om inte: använd en engångsprodukt för årslicensen och låt appen räkna 365 dagar från köpet –
-  men den får då inte förbrukas (*consume*), annars kan köpet inte återställas.
-- Någon särskild produkt för provperioden behövs inte i Google Play – de 14 dagarna räknas i appen.
-- Aktivera produkterna och testa dem med **licenstestare** (*Konfigurera* → *Licenstestning*) –
-  då dras inga pengar.
+För varje produkt:
+
+1. Namn: `Livstidslicens` respektive `Årslicens`. Beskrivning: `Allt i Lagom. För alltid –
+   felrättningar ingår.` respektive `Allt i Lagom i ett år. Förnyas inte automatiskt.`
+2. Köpalternativ: typen **Köp** (inte Hyra). Pris i svenska kronor inklusive moms – 349 kr
+   respektive 699 kr – och tillgänglighet **bara Sverige**.
+3. **Aktivera** både produkten och köpalternativet. Inaktiva produkter syns inte i appen (där står
+   då att köp inte är tillgängliga just nu).
+
+Så beter sig appen:
+
+- **Årslicensen är en engångsprodukt, inte en prenumeration** – Lagom lovar "utan automatisk
+  förnyelse". Appen räknar 365 dagar från köpdatumet (Google har inget slutdatum för
+  engångsprodukter). Köpet kvitteras men förbrukas inte medan året gäller, så det syns i
+  Play-kontot och *Återställ köp* fungerar på en ny telefon. Köper någon ett nytt år efter att det
+  gamla har gått ut förbrukar appen först det gamla köpet – annars svarar Play "Du äger redan den
+  här produkten".
+- **Livstidslicensen** kvitteras och förbrukas aldrig. Årslicensen döljs när livstid redan är köpt.
+- **Kvittering:** ett köp som inte kvitteras (*acknowledge*) inom 3 dagar återbetalas automatiskt av
+  Google. Appen kvitterar direkt efter köpet och varje gång köpen hämtas (vid start, när appen
+  öppnas igen och vid *Återställ köp*) – även ett väntande köp som blev klart senare.
+- **Återbetalning:** återbetala och återkalla i *Play Console → Beställningshantering*. Köpet
+  försvinner då ur telefonens köp och licensen slutar gälla nästa gång appen hämtar köpen.
+- **Priserna i appen kommer från Google Play** (lokaliserat, t.ex. "349,00 kr") – inga kronbelopp
+  är inskrivna i appbygget.
+- Någon produkt för provperioden behövs inte i Google Play – de 14 dagarna räknas i appen
+  (`prov14` finns bara i App Store).
+- Licensnycklar från webbköp kan aktiveras i Play-appen (Inställningar → Licens), men appen
+  hänvisar aldrig till webbköpet.
+
+### Testa köpen med licenstestare
+
+1. *Play Console → Konfigurera → Licenstestning*: lägg till din Gmail-adress (och testarnas om de
+   ska kunna köpa) och välj svaret **RESPOND_NORMALLY**.
+2. Samma konton måste vara testare på ett testspår (intern testning räcker) och ha installerat
+   appen från Play Butik via testlänken – en APK som installerats på annat sätt kan inte köpa.
+3. Köprutan visar då att det är en testbeställning utan debitering, med testkorten *Test card,
+   always approves* och *Test card, always declines* (och kort som godkänns eller nekas efter en
+   stund – bra för väntande köp).
+4. Prova: köp `ar`, köp `livstid`, avbryt ett köp, ett nekat kort, ett väntande köp som blir klart
+   när appen är stängd, *Återställ köp* efter att appen har avinstallerats, och en återbetalning.
+   Kontrollera i *Beställningshantering* att köpen är kvitterade.
+5. `NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts` är satt till true men räknas som klar
+   först när det här fungerar på en riktig telefon. Fungerar något inte: sätt den till false och
+   bygg om, så stoppar byggkontrollen butiksbyggena tills det är rättat.
 
 ## 8. Appinnehåll – formulären i Play Console
 
@@ -277,8 +343,12 @@ Produkt-id:na måste vara exakt desamma som i `src/lib/storePurchases.ts`:
 
 ### Annons-id (Advertising ID)
 
-**Nej**, appen använder inte annons-id. Kontrollera att Android-manifestet i Bubblewrap-projektet
-inte innehåller behörigheten `com.google.android.gms.permission.AD_ID`.
+**Nej**, appen använder inte annons-id. Varken Capacitor, Play Billing, Health Connect eller
+streckkodsläsaren lägger till behörigheten `com.google.android.gms.permission.AD_ID`. Kontrollera
+efter första uppladdningen: *Testa och släpp → Appsamling (App bundle explorer) → versionen →
+Behörigheter* – där ska bara behörigheterna i [NATIVE.md §6](NATIVE.md#behörigheter) finnas
+(internet, kamera, notiser, start efter omstart, vibration, köp i appen och de sex
+Health Connect-behörigheterna).
 
 ### Datasäkerhet (Data safety)
 
@@ -302,18 +372,72 @@ skickas. Inget konto, ingen reklam och ingen koppling till någon person.
 | Köphistorik | **Inte insamlat** av appen – köpet hanteras av Google Play. *Om* köp senare kontrolleras mot en egen server (Netlify-funktion): ange *Köphistorik – insamlad, inte delad, appens funktioner*. Väljs **RevenueCat** som köp-i-appen-tillägg får RevenueCat köphistorik och ett användar-id: ange då *Köphistorik* och *Enhets- eller andra id:n* (insamlade, delade med tjänsteleverantör), och lägg till RevenueCat i integritetspolicyn och registerförteckningen – före inskickningen. Rekommendationen är ett tillägg som talar direkt med Play Billing utan egen server. |
 | Kraschloggar och diagnostik | **Inte insamlat** – felloggen stannar i telefonen och skickas bara om användaren själv mejlar den till supporten. |
 | Receptimport från en webbadress | Adressen skickas till Lagoms server, som hämtar receptet direkt och inte sparar något. Vill du vara försiktig: ange *Appaktivitet → Annat användargenererat innehåll – insamlad, behandlas bara tillfälligt, inte delad, appens funktioner*. |
-| Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen för streckkoder och sparas eller skickas inte. |
+| Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen (ZXing) för streckkoder och sparas eller skickas inte. (Se också rutan om ML Kit nedan.) |
+| Health Connect (vikt, steg, näring, vatten) | **Inte insamlat** – läses och skrivs bara i telefonen och lämnar den aldrig. Data som bara behandlas på enheten räknas inte som insamling. Kopplingen ska ändå beskrivas i integritetspolicyn (Health Connect-kravet). |
+| Påminnelser | **Inte insamlat** – lokala notiser som skapas i telefonen, ingen pushtjänst. |
+| Köp i appen | **Inte insamlat** av Lagom – köpet går direkt mellan telefonen och Google Play (`@capgo/native-purchases` gör inga egna nätanrop). |
+| Export och delning | **Inte insamlat** – filen går bara dit användaren själv väljer i delningsmenyn. |
 | Säkerhetsgranskning (MASA) | Nej (valfri) |
 
-### Hälsoappar (Health apps)
+> **Streckkodsläsaren på Android och Google ML Kit – beslutat: ZXing.** Bilden tolkas i
+> telefonen och lämnar den aldrig. Men enligt Googles egen redovisning (*ML Kit – Prepare for
+> Google Play's data disclosure requirements*, developers.google.com/ml-kit/android-data-disclosure)
+> skickar ML Kit driftdata till Google: uppgifter om enheten och appen, identifierare,
+> prestandamått, API-inställningar, händelsetyper och felkoder – krypterat, inte delat med tredje
+> part, för diagnostik och analys av ML Kit. Det räknas som insamling i Data safety och passar
+> dåligt med Lagoms princip om inga analysverktyg (CLAUDE.md). Välj en väg:
+>
+> 1. **Rekommenderat: ZXing som läsare på Android.** Tillägget har ZXing inbyggt; det läser EAN-
+>    och UPC-koder utan att skicka något. **Så är det nu:** `src/native/barcode.ts` läser med
+>    ZXing (`ANDROID_SCANNING_LIBRARY`), och svaren ovan gäller som de står. ML Kits bibliotek
+>    följer ändå med tillägget, men dess `MlKitInitProvider` (som annars startar ML Kit när appen
+>    startar) tas bort i `AndroidManifest.xml` med `tools:node="remove"`. Kontrollera i
+>    Play-testningen (t.ex. med en nätverkslogg) att inget går till `firebaselogging`/
+>    `datatransport`. Testa läsaren i svagt ljus på en riktig telefon.
+> 2. **Behåll ML Kit:** ta bort raden med `MlKitInitProvider` i `AndroidManifest.xml`, läs Googles aktuella lista och ange det den säger, i dag troligen
+>    *Appinfo och prestanda → Diagnostik* och *Enhets-id eller andra id:n* (insamlade, inte delade,
+>    syfte *Analys*). Lägg också till Google (ML Kit) i integritetspolicyn och
+>    registerförteckningen, och bedöm om identifieraren kräver samtycke (LEK 9 kap. 28 §) – före
+>    inskickningen.
+>
+> På iPhone används Apples Vision, som inte skickar något.
 
-*Appinnehåll → Hälsoappar*. Kryssa i:
+### Hälsoappar och Health Connect (Health apps)
 
-- **Nutrition and weight management** (Kost och viktkontroll)
-- **Activity and fitness** (Aktivitet och träning)
+*Appinnehåll → Hälsoappar*. Formuläret krävs för varje version som använder Health Connect, och
+Google granskar det innan appen (eller en ändrad lista över datatyper) godkänns – räkna med några
+dagar. Godkännandet gäller paketnamnet, inte en viss version.
 
-Kryssa **inte** i något som rör medicinteknik, sjukdomar, mediciner, graviditet eller Health
-Connect. Svara **Nej** på frågan om appen är en medicinteknisk produkt (se docs/AVSETT-ANDAMAL.md).
+1. **Hälsofunktioner** – kryssa i:
+   - **Nutrition and weight management** (Kost och viktkontroll)
+   - **Activity and fitness** (Aktivitet och träning)
+
+   Kryssa **inte** i något under *Medical* (medicinteknik, sjukdomar, mediciner, graviditet) eller
+   *Human subjects research*. Svara **Nej** på frågan om appen är en medicinteknisk produkt (se
+   docs/AVSETT-ANDAMAL.md).
+2. **Health Connect-datatyper** – deklarera exakt de fem behörigheter som finns i
+   `android/app/src/main/AndroidManifest.xml`, inga fler (aktiv energi läses inte – tillägget
+   deklarerar `READ_ACTIVE_CALORIES_BURNED`, men den tas bort i manifestet med
+   `tools:node="remove"`). Motiveringen skrivs på engelska
+   (granskarna), en per behörighet:
+
+   | Behörighet | Läsa/skriva | Motivering att klistra in |
+   | --- | --- | --- |
+   | `READ_WEIGHT` | Läsa | `Optional and off by default. When the user turns it on, new weight measurements (for example from a smart scale) are shown in Lagom's weight chart, so the user does not have to enter them twice. One value per day; values stay on the device.` |
+   | `WRITE_WEIGHT` | Skriva | `Optional. Saves weights that the user logs in Lagom to Health Connect, so other health apps the user chooses can use them.` |
+   | `READ_STEPS` | Läsa | `Optional. Shows today's step count in the activity part of Lagom's food diary. Values stay on the device.` |
+   | `WRITE_NUTRITION` | Skriva | `Optional. Saves the energy (kcal) of meals the user logs in Lagom's food diary to Health Connect once the day is finished, so the user's other health apps can show it.` |
+   | `WRITE_HYDRATION` | Skriva | `Optional. Saves the water the user logs in Lagom to Health Connect once the day is finished.` |
+
+3. **Integritetspolicyn** i formuläret är webbplatsens adress (`https://<domän>/integritet/`, eller
+   Android-versionen `https://<domän>/integritet/android/`). Inne i appen visar Health Connect
+   samma text från appens eget paket (`privacypolicy.html`, skapad ur `legalContent.ts` av
+   Google Play-bygget; `npm run build:android` pekar ut den via `scripts/native-config.mjs`) –
+   utan uppkoppling och utan länkar vidare till webbplatsens villkor med webbpriser. Den ska beskriva kopplingen: vilka datatyper, att de bara läses och
+   skrivs i telefonen, att inget skickas till Lagom eller någon annan, och hur man stänger av den
+   (Inställningar → Health Connect i Lagom, eller i Health Connect).
+4. **Ändras datatyperna** (i `src/native/health.ts`): ändra manifestet, Info.plist-texterna,
+   integritetspolicyn och det här formuläret i samma version.
 
 ### Innehållsklassning (IARC-formuläret)
 
@@ -374,96 +498,173 @@ No account or login is needed. On the welcome screen, tap 'Utforska med exempeld
 
 To try logging food, tap 'Börja med min egen profil' on the Idag screen and answer a few questions. This creates a profile and starts the 14-day free trial, during which everything is available.
 
-After the trial, viewing, export and deletion always work; only new logging requires a purchase (Google Play Billing: Mer → Lagom Premium, with a Restore purchases button). To test full access without buying, open Inställningar → Licens and paste this licence key, then tap 'Aktivera licensen':
+After the trial, viewing, export and deletion always work; only new logging requires a purchase (Google Play Billing: Mer → Lagom Premium, with a Restore purchases button; one-time products 'livstid' and 'ar', the annual licence lasts 365 days and does not renew). To test full access without buying, open Inställningar → Licens and paste this licence key, then tap 'Aktivera licensen':
 <LICENSNYCKEL>
+
+Optional features, all off by default: Health Connect (Inställningar → Health Connect) reads weight and steps and writes weight, dietary energy and water (energy and water for finished days); data stays on the device. Reminders (Inställningar → Påminnelser) are local notifications. The camera is only used to scan barcodes; no images are stored or sent.
 
 The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```
 
-## 10. Bygga appen med Bubblewrap
+## 10. Bygga och ladda upp appen
 
-Bubblewrap (Googles verktyg) gör ett Android-projekt av webbappens manifest. Det behövs inte i
-`package.json` – det körs med `npx`. Första gången laddar Bubblewrap ned Java (JDK 17) och
-Android SDK åt dig, så det går bra på Windows, Mac och Linux.
+Appen byggs i molnet – ingen egen Android-miljö behövs. Allt om projektet och byggena:
+[NATIVE.md](NATIVE.md) (§3 byggkommandon, §9 molnbyggena, §10 steg för steg).
 
-1. **Publicera webbplatsen** först (Netlify) och kontrollera att
-   `https://<domän>/manifest.webmanifest` fungerar.
-2. **Skapa projektet** i en egen mapp utanför repot (t.ex. `~/lagom-play`):
+### Molnbygget (rekommenderat)
 
-   ```sh
-   npx @bubblewrap/cli@1.25 init --manifest https://<domän>/manifest.webmanifest
-   ```
+- **GitHub Actions** (`.github/workflows/release.yml`, jobbet *Android*): körs när du taggar en
+  version (`git tag v1.0.0 && git push origin v1.0.0`) eller för hand (*Actions → Butiksbyggen →
+  Run workflow*). Det bygger webbdelen skarpt (`VITE_DISTRIBUTION=play`, dina säljaruppgifter,
+  `VITE_COMMERCE_MODE=live`), en **signerad AAB** med uppladdningsnyckeln, kontrollerar
+  signaturen och 16 KB-sidorna, sparar AAB:n som artefakt (30 dagar) och laddar – om
+  tjänstekontot finns – upp den till **intern testning**. Körs på Linux: kostar bara vanliga
+  minuter.
+- **Codemagic** (`codemagic.yaml`, arbetsflödet `android-play`): samma steg på Codemagics Mac,
+  startas för hand. Använd en tjänst för Android, inte båda.
 
-   Svara på frågorna:
+### Första uppladdningen görs för hand
 
-   | Fråga | Svar |
-   | --- | --- |
-   | Domain | `<domän>` |
-   | URL path / Start URL | `/?plattform=play` – så känner Lagom igen Play-appen |
-   | Application name / Short name | `Lagom – kaloriräknaren` / `Lagom` |
-   | Application ID (paketnamn) | T.ex. `se.<dittnamn>.lagom` – **kan inte ändras efter första uppladdningen** |
-   | Display mode | `standalone` |
-   | Orientation | `portrait` eller `default` – webbappens manifest anger ingen orientering, så välj det som ser bäst ut i skärmdumparna |
-   | Status bar color / Splash | `#1F5A43` / `#F6F3EC` |
-   | Icon URL | `https://<domän>/icon-512.png`, maskable `https://<domän>/icon-512-maskable.png` |
-   | Include support for Play Billing? | **Ja** (lägger till Digital Goods API) |
-   | Request geolocation permission? | Nej |
-   | Signing key | Låt Bubblewrap skapa `android.keystore` och välj **starka lösenord** – se [avsnitt 12](#12-nycklar-och-säkerhet) |
+Google Plays API kan inte skapa den första versionen av en app. Första gången:
 
-3. **Bygg:**
+1. Kör molnbygget utan tjänstekonto (eller med – uppladdningen misslyckas då med "Package not
+   found", det gör inget). Hämta AAB:n under körningens *Artifacts* (`lagom-android-<version>-<nr>`,
+   packa upp zip-filen).
+2. *Play Console → Lagom → Testa och släpp → Testning → Intern testning → Skapa ny version*.
+3. Play Console frågar om **Play App Signing** – godkänn standardvalet (Google skapar och förvarar
+   appens signeringsnyckel). Din uppladdningsnyckel registreras med den första AAB:n
+   ([avsnitt 11](#11-uppladdningsnyckeln-och-play-app-signing)).
+4. Ladda upp AAB:n, skriv en kort versionsnotering ("Första testversionen") och **släpp** versionen
+   till intern testning (ingen granskning, klar inom några minuter).
+5. Därefter laddar molnbygget upp nya versioner själv. Svarar Play "Only releases with status
+   draft may be created on draft app": sätt Variablen `PLAY_RELEASE_STATUS` till `draft` i GitHub
+   (eller `submit_as_draft: true` i `codemagic.yaml`) och släpp utkasten i Play Console tills
+   appen har släppts på något spår.
 
-   ```sh
-   npx @bubblewrap/cli@1.25 build
-   ```
+### Versionsnummer
 
-   Resultatet är `app-release-bundle.aab` (laddas upp i Play Console) och `app-release-signed.apk`
-   (för att testa på en egen telefon).
-4. **Versionsnummer:** höj `appVersionCode` (ett heltal som alltid måste öka) och
-   `appVersionName` (t.ex. `1.0.0`, samma som `version` i `package.json`) i `twa-manifest.json`
-   före varje ny uppladdning, och kör `npx @bubblewrap/cli@1.25 update` följt av `build`.
-5. **Ladda upp** `.aab`-filen till spåret för sluten test ([avsnitt 3](#3-sluten-test-med-12-testare-krav-före-produktion)).
-   Aktivera **Play App Signing** när Play Console frågar (standard för nya appar).
-6. **Webbversionen uppdateras utan ny uppladdning.** Play-appen visar alltid den publicerade
-   webbversionen – en ny `.aab` behövs bara när skalet ändras (ikon, namn, paket, behörigheter).
+- **versionName** (t.ex. `1.0.0`, visas för användarna) = `version` i `package.json` – samma i
+  iPhone-appen och Om Lagom. Höj den före en ny version och tagga `v<version>`.
+- **versionCode** (heltal som måste öka för varje uppladdning) = körningens nummer i GitHub Actions
+  (plus Variablen `LAGOM_BUILD_NUMBER_OFFSET`) eller Google Plays senaste + 1 i Codemagic. Byter du
+  tjänst: sätt `LAGOM_BUILD_NUMBER_OFFSET` så att numret blir högre än det senaste i Play Console.
 
-Finns det en nyare 1.x-version av Bubblewrap kan den användas på samma sätt.
+### Flytta vidare
 
-## 11. Digital Asset Links (assetlinks.json)
+Intern testning → **Sluten testning** (de 12 testarna, [avsnitt 3](#3-sluten-test-med-12-testare-krav-före-produktion))
+→ efter godkänd ansökan **Produktion**: *versionen → Flytta upp*, eller skapa en ny version i
+spåret och välj AAB:n från biblioteket. Den slutna testen och produktion granskas av Google.
 
-Filen `public/.well-known/assetlinks.json` skapas med skriptet `scripts/generate-assetlinks.mjs`
-från paketnamnet och fingeravtrycken för signeringsnycklarna:
+### Med Android Studio (om du har en PC)
 
-1. Hämta fingeravtrycken i *Play Console → Testa och släpp → Appintegritet → Appsignering*:
-   - **App signing key certificate** – SHA-256 (Googles nyckel, som signerar appen användarna får)
-   - **Upload key certificate** – SHA-256 (din uppladdningsnyckel)
-2. Skapa filen (båda fingeravtrycken, kommaseparerade):
+Går att använda för att provköra appen i en emulator eller på din telefon med USB-kabel – se
+[NATIVE.md §10](NATIVE.md#android-studio-på-en-pc-valfritt). Butiksbyggena görs ändå i molnet, så
+att uppladdningsnyckeln inte behöver ligga på datorn.
 
-   ```sh
-   ANDROID_PACKAGE=se.<dittnamn>.lagom \
-   ANDROID_SHA256="AA:BB:…(32 par),CC:DD:…(32 par)" \
-   node scripts/generate-assetlinks.mjs
-   ```
+### Testbygget utan Play
 
-   Skriptet kontrollerar att paketnamnet är en omvänd domän och att varje fingeravtryck är 32
-   par hexsiffror med kolon emellan, och säger på svenska vad som är fel. Ett SHA-1-fingeravtryck
-   (20 par) känns igen och avvisas.
-3. Checka in filen och publicera webbplatsen. Netlify skickar den som `application/json`.
-4. Kontrollera:
-   `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://<domän>&relation=delegate_permission/common.handle_all_urls`
-   – svaret ska innehålla ditt paketnamn. Öppna sedan appen: ingen adressrad ska synas överst.
+Kontrollbygget (`.github/workflows/native.yml`) sparar en **debug-APK** (`lagom-android-testbygge`)
+som kan installeras direkt på en Android-telefon (tillåt installation från okända källor för
+filhanteraren). Den är osignerad för butiken, kan inte köpa något och får aldrig delas ut – använd
+den bara för att snabbt prova en ändring.
 
-Fingeravtrycken är inte hemliga (de står öppet i filen).
+## 11. Uppladdningsnyckeln och Play App Signing
+
+Med **Play App Signing** förvarar Google den nyckel som signerar appen till användarna. Du signerar
+bara uppladdningen med din **uppladdningsnyckel**. Tappar du den kan den bytas (appen går inte
+förlorad), men den ska ändå hanteras som en hemlighet.
+
+### Skapa uppladdningsnyckeln (en gång)
+
+Skapa nycklarna i en egen mapp **utanför** repot (t.ex. `Dokument/lagom-nycklar`), så att de aldrig
+kan hamna i Git. Du behöver `keytool`, som följer med Java (Android Studio har det i
+`…\Android Studio\jbr\bin\keytool.exe`; annars installera Temurin JDK 21 från adoptium.net). I
+Git Bash, PowerShell eller Terminal:
+
+```sh
+keytool -genkeypair -v -keystore lagom-upload.jks -storetype PKCS12 \
+  -keyalg RSA -keysize 4096 -validity 10000 -alias lagom-upload \
+  -dname "CN=<ditt namn>, C=SE"
+```
+
+- Välj ett **starkt lösenord** (minst 20 tecken, från lösenordshanteraren). I PKCS12-formatet är
+  nyckelns lösenord detsamma som filens.
+- Spara `lagom-upload.jks` och lösenordet i lösenordshanteraren (filen som bilaga) **och** på ett
+  krypterat USB-minne hemma. Aldrig i Git – `.gitignore` stoppar `*.jks` och `*.keystore`.
+
+### Lägg in den i molnbygget
+
+**GitHub** (*repot → Settings → Secrets and variables → Actions → Secrets → New repository secret*):
+
+| Hemlighet | Värde |
+| --- | --- |
+| `LAGOM_UPLOAD_KEYSTORE_BASE64` | Hela `lagom-upload.jks` i base64 (se nedan) |
+| `LAGOM_UPLOAD_KEYSTORE_PASSWORD` | Lösenordet |
+| `LAGOM_UPLOAD_KEY_ALIAS` | `lagom-upload` |
+| `LAGOM_UPLOAD_KEY_PASSWORD` | Samma lösenord (PKCS12) |
+
+Base64 utan radbrytningar:
+
+```sh
+# Git Bash (Windows) eller Linux:
+base64 -w0 lagom-upload.jks > lagom-upload.b64
+# PowerShell:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("lagom-upload.jks")) | Set-Content -NoNewline lagom-upload.b64
+# macOS:
+base64 -i lagom-upload.jks -o lagom-upload.b64
+```
+
+Öppna `lagom-upload.b64`, kopiera allt till hemligheten och **radera filen** efteråt.
+`android/app/build.gradle` läser nyckeln från miljövariablerna `LAGOM_UPLOAD_KEYSTORE` (sökvägen,
+sätts av bygget), `LAGOM_UPLOAD_KEYSTORE_PASSWORD`, `LAGOM_UPLOAD_KEY_ALIAS` och
+`LAGOM_UPLOAD_KEY_PASSWORD`.
+
+**Codemagic:** *Personal Account → codemagic.yaml settings → Code signing identities → Android
+keystores*: ladda upp `lagom-upload.jks` med lösenord, alias och referensnamnet `lagom_upload`.
+
+### Kontrollera fingeravtrycket
+
+Molnbygget skriver uppladdningsnyckelns SHA-256 i körningens sammanfattning. Efter första
+uppladdningen ska samma fingeravtryck stå under *Play Console → Testa och släpp → Appintegritet →
+Appsignering → Certifikat för uppladdningsnyckel*.
+
+### Tappad eller läckt nyckel
+
+*Appintegritet → Appsignering → Begär återställning av uppladdningsnyckel*: skapa en ny nyckel som
+ovan, exportera certifikatet och ladda upp det där:
+
+```sh
+keytool -export -rfc -keystore lagom-upload-ny.jks -alias lagom-upload -file upload_certificate.pem
+```
+
+Det tar några dagar. Byt sedan hemligheterna i GitHub/Codemagic.
+
+### Tjänstekonto för uppladdning (valfritt)
+
+Behövs bara för att molnbygget ska ladda upp till intern testning själv:
+
+1. **Google Cloud Console** (console.cloud.google.com), inloggad med samma Google-konto: skapa
+   ett projekt (t.ex. `lagom-play`) och aktivera **Google Play Android Developer API**.
+2. *IAM och administratör → Tjänstkonton → Skapa tjänstkonto*, t.ex. `lagom-uppladdning`. Inga
+   roller i Cloud-projektet behövs.
+3. Tjänstkontot → *Nycklar → Lägg till nyckel → JSON* – filen laddas ned en gång.
+4. **Play Console → Användare och behörigheter → Bjud in nya användare**: tjänstkontots
+   e-postadress (`…@…iam.gserviceaccount.com`). Under *Appbehörigheter*: lägg till Lagom med
+   **Visa appinformation (skrivskyddad)** och **Släpp appar till testspår**. Ge inte behörighet
+   att släppa till produktion eller administrera kontot.
+5. Klistra in hela JSON-filens innehåll som hemligheten `PLAY_SERVICE_ACCOUNT_JSON` i GitHub (eller
+   `GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS` i Codemagics grupp `google_play`) och **radera filen**.
+   Läcker den: ta bort nyckeln i Cloud Console och skapa en ny.
 
 ## 12. Nycklar och säkerhet
 
-- **`android.keystore` (uppladdningsnyckeln) och dess lösenord är hemliga.** Med dem kan vem som
-  helst ladda upp en falsk version av Lagom. De ska aldrig in i Git – `.gitignore` stoppar
-  `*.jks`, `*.keystore` och `android.keystore`.
-- **Säkerhetskopiera** nyckelfilen och lösenorden på två ställen: i en lösenordshanterare (t.ex.
-  Bitwarden, med filen som bilaga) och på ett krypterat USB-minne som förvaras hemma.
-- **Play App Signing:** Google förvarar den nyckel som signerar appen till användarna. Tappar du
-  uppladdningsnyckeln kan du be om en ny i *Appintegritet → Appsignering → Begär återställning
-  av uppladdningsnyckel* – det tar några dagar, men appen går inte förlorad.
+- **Uppladdningsnyckeln (`lagom-upload.jks`), dess lösenord och tjänstkontots JSON-nyckel är
+  hemliga.** De finns bara i lösenordshanteraren, på USB-minnet och som hemligheter i GitHub eller
+  Codemagic – aldrig i Git, i mejl eller i `VITE_`-variabler.
+- Molnbygget använder hemligheterna bara i de steg som signerar och laddar upp, och kör aldrig
+  för pull requests.
+- Slå på GitHubs *secret scanning* och *push protection* (*Settings → Code security*), så stoppas
+  en nyckel som råkar hamna i en commit.
 - **Licensnyckelns privata del** (`LICENSE_PRIVATE_KEY`) hanteras lika försiktigt – se
   docs/BETALNING.md.
 - Ge aldrig någon annan inloggning till Play Console med ditt konto. Behöver någon hjälpa till:
@@ -471,13 +672,17 @@ Fingeravtrycken är inte hemliga (de står öppet i filen).
 
 ## 13. Checklista före produktion
 
-- [ ] Konto verifierat, betalningsprofil klar, DSA-status ifylld, 15 %-nivån aktiverad.
+- [ ] Konto verifierat, betalningsprofil klar, DSA-status ifylld, serviceavgiftsnivån kontrollerad.
 - [ ] Säljaruppgifterna (`VITE_SELLER_*`) och `VITE_SUPPORT_EMAIL` ifyllda – inga platshållare kvar på `/integritet/`, `/villkor/` och `/support/`.
-- [ ] `assetlinks.json` publicerad och kontrollerad; ingen adressrad i appen.
+- [ ] Uppladdningsnyckeln skapad och säkerhetskopierad på två ställen; hemligheterna inlagda; Play App Signing aktiverat och fingeravtrycket kontrollerat.
+- [ ] Första AAB:n uppladdad för hand till intern testning; molnbygget laddar upp nästa.
+- [ ] 16 KB-kontrollen grön i molnbygget.
+- [ ] Produkterna `livstid` och `ar` (engångsprodukter, 699 kr och 349 kr, bara Sverige) aktiva och testade med licenstestare: köp, avbrutet köp, väntande köp, Återställ köp, återbetalning.
+- [ ] Testat på en riktig telefon: exempeldata, egen profil, streckkodsläsaren, export/delning, påminnelser, Health Connect, bakåtknappen, utan uppkoppling.
+- [x] Streckkodsläsaren på Android läser med ZXing – Data safety och integritetspolicyn stämmer med det ([avsnitt 8](#datasäkerhet-data-safety)).
+- [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
 - [ ] Sluten test: minst 12 testare i 14 dagar i följd.
-- [ ] Butikstexter, ikon, funktionsgrafik och 2–8 skärmdumpar uppladdade.
-- [ ] Produkterna `livstid` och `ar` skapade, aktiva och testade med licenstestare.
-- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar, IARC, målgrupp 18+, appåtkomst med granskarlicens.
+- [ ] Butikstexter, ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
+- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de sex Health Connect-typerna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
 - [ ] Länder: bara Sverige.
 - [ ] Inga omnämnanden av webbköp eller App Store i appen eller texterna.
-- [ ] `android.keystore` och lösenorden säkerhetskopierade på två ställen.

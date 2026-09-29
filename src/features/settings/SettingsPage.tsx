@@ -7,12 +7,14 @@
 import { lazy, Suspense, useState, type ComponentType } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import {
+  Bell,
   CalendarHeart,
   Cloud,
   Database,
   Dumbbell,
   HardDrive,
   HeartHandshake,
+  HeartPulse,
   Info,
   KeyRound,
   Palette,
@@ -47,12 +49,32 @@ import { premiumStatusLine } from '../premium/TrialBanner'
 import { overrideCount } from './settingsLogic'
 import { CLOUD_ENABLED } from '../../config/cloud'
 import { allowsLicenseKeyEntry } from '../../config/platform'
+import { isNative, platform } from '../../native'
 import { useCloudStore } from '../../stores/cloudStore'
+import type { AppSectionRowsProps } from './sections/AppSectionRows'
 
 /** Lagom Moln laddas bara när funktionen finns i bygget (VITE_SUPABASE_URL) – se docs/BACKEND.md. */
 const CloudSection = lazy(() => import('./sections/CloudSection'))
 
-export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'data' | 'databas' | 'licens' | 'moln'
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * true i butiksbyggen. En konstant i bygget (samma mönster som `NATIVE_BUILD` i src/native/index.ts),
+ * så att apparnas egna sektioner – Påminnelser och Apple Hälsa/Health Connect – inte följer med i
+ * webbygget. I testerna är den true. Sektionerna visas bara i de inbyggda apparna (`isNative()`).
+ */
+const APP_SECTIONS_BUILD: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'web' : true
+const NoSection: ComponentType = () => null
+const NoRows: ComponentType<AppSectionRowsProps> = () => null
+const RemindersSection: ComponentType = APP_SECTIONS_BUILD ? lazy(() => import('./sections/RemindersSection')) : NoSection
+const HealthSection: ComponentType = APP_SECTIONS_BUILD ? lazy(() => import('./sections/HealthSection')) : NoSection
+const AppSectionRows: ComponentType<AppSectionRowsProps> = APP_SECTIONS_BUILD ? lazy(() => import('./sections/AppSectionRows')) : NoRows
+
+export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'paminnelser' | 'halsa' | 'data' | 'databas' | 'licens' | 'moln'
+
+/** Sektioner som bara finns i de inbyggda apparna. */
+const APP_ONLY_SECTIONS: readonly string[] = ['paminnelser', 'halsa']
 
 interface SectionMeta {
   title: string
@@ -68,6 +90,14 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   maltider: { title: 'Måltider', description: 'Namn och vilka måltider som visas.', icon: UtensilsCrossed, tone: 'hjortron', component: MealsSection },
   utseende: { title: 'Utseende och visning', description: 'Tema, energienhet och medvetet läge.', icon: Palette, tone: 'vinbar', component: AppearanceSection },
   traning: { title: 'Träning och vatten', description: 'Träningskalorier och glasstorlek.', icon: Dumbbell, tone: 'fjall', component: TrainingSection },
+  paminnelser: { title: 'Påminnelser', description: 'Frivilliga notiser – allt är avstängt tills du väljer.', icon: Bell, tone: 'sol', component: RemindersSection },
+  halsa: {
+    title: platform === 'android' ? 'Health Connect' : 'Apple Hälsa',
+    description: 'Vikt och steg in, mat och vatten ut – om du vill.',
+    icon: HeartPulse,
+    tone: 'lingon',
+    component: HealthSection,
+  },
   data: { title: 'Data och säkerhetskopia', description: 'Exportera, importera och radera – allt ligger på din enhet.', icon: HardDrive, tone: 'gran', component: DataSection },
   databas: { title: 'Livsmedelsdatabas', description: 'Vad som finns inbyggt, källor och import.', icon: Database, tone: 'mossa', component: DatabaseSection },
   licens: {
@@ -83,6 +113,7 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
 
 function isSection(s: string | undefined): s is SectionId {
   if (s === 'moln' && !CLOUD_ENABLED) return false
+  if (s !== undefined && APP_ONLY_SECTIONS.includes(s) && !isNative()) return false
   return s !== undefined && Object.prototype.hasOwnProperty.call(SECTIONS, s)
 }
 
@@ -201,6 +232,11 @@ function SettingsIndex() {
         <ListGroup title="Appen">
           {row('utseende', appearanceSummary(settings))}
           {row('traning', `${trainingSub} · glas ${formatNumber(settings.waterGlassMl / 100, 1)}\u00a0dl`)}
+          {isNative() && (
+            <Suspense fallback={null}>
+              <AppSectionRows row={row} />
+            </Suspense>
+          )}
         </ListGroup>
 
         <ListGroup title="Lagom Premium">{row('licens', checking ? 'Kontrollerar licensen …' : premiumStatusLine(status))}</ListGroup>

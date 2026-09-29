@@ -21,9 +21,10 @@ export function RestorePurchasesButton({
     if (busy) return
     setBusy(true)
     try {
-      const count = await restoreStorePurchases()
-      if (count === 0) toast('Inga köp att återställa')
-      else toast('Dina köp är återställda – tack!', { tone: 'success' })
+      const { paid, trial } = await restoreStorePurchases()
+      if (paid > 0) toast('Dina köp är återställda – tack!', { tone: 'success' })
+      else if (trial) toast('Din provperiod är återställd.', { tone: 'success' })
+      else toast('Inga köp att återställa')
     } catch {
       toast('Köpen kunde inte återställas just nu. Kontrollera uppkopplingen och försök igen.', { tone: 'error' })
     } finally {

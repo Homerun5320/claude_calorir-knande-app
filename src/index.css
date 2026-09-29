@@ -269,6 +269,14 @@
   input[type='number'] {
     -moz-appearance: textfield;
   }
+  /*
+   * De inbyggda apparna (src/native/system.ts sätter klassen): ingen meny med "Spara bild" när man
+   * håller fingret på en bild – en app ska inte bete sig som en webbsida, och på iPhone skulle
+   * sparandet kräva tillgång till Bilder.
+   */
+  html.native-app img {
+    -webkit-touch-callout: none;
+  }
 }
 
 @layer components {

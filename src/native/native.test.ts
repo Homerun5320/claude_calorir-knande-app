@@ -106,6 +106,14 @@ describe('native-koden hålls borta från webbygget', () => {
     expect(offenders.map((f) => f.rel)).toEqual([])
   })
 
+  it('varje modul i src/native/ är registrerad i MODULES', () => {
+    const index = files.find((f) => f.rel === 'native/index.ts')?.text ?? ''
+    const modules = files.map((f) => f.rel).filter((rel) => /^native\/[^/]+\.ts$/.test(rel) && rel !== 'native/index.ts')
+    expect(modules.length).toBeGreaterThan(5)
+    const missing = modules.filter((rel) => !index.includes(`import('./${rel.slice('native/'.length, -'.ts'.length)}')`))
+    expect(missing).toEqual([])
+  })
+
   it('index.ts importerar inga native-moduler statiskt', () => {
     const index = files.find((f) => f.rel === 'native/index.ts')?.text ?? ''
     expect(index).not.toMatch(/^import\s+(?!type\b)[^;]*from\s+['"]\.\/(?!index)/m)

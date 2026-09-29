@@ -33,6 +33,8 @@ export const STORE_KEYS = {
   license: 'lagom-license',
   /** Veckoplaneringen och inköpslistan (planStore.ts). */
   plan: 'lagom-plan',
+  /** Påminnelserna i apparna (reminderStore.ts). */
+  reminders: 'lagom-reminders',
 } as const
 
 export type StoreKey = (typeof STORE_KEYS)[keyof typeof STORE_KEYS]
@@ -52,6 +54,7 @@ export const PERSIST_VERSIONS: Readonly<Record<StoreKey, number>> & Readonly<Rec
   [STORE_KEYS.fasting]: 1,
   [STORE_KEYS.license]: 1,
   [STORE_KEYS.plan]: 1,
+  [STORE_KEYS.reminders]: 1,
 }
 
 /** Hur länge en läsning får ta innan appen visas utan den (läsningen fortsätter i bakgrunden). */

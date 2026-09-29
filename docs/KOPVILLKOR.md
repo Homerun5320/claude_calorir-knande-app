@@ -115,6 +115,14 @@ En licensnyckel från ett köp på webben klistrar du in under Inställningar �
 >
 > Köp i App Store följer ditt Apple-konto – på en ny iPhone trycker du på Återställ köp.
 
+> **I Google Play-appen står i stället:**
+>
+> Lagom fungerar på Android-telefoner med en aktuell version av Android. Appen fungerar utan uppkoppling; sökning online, streckkoder, köp och receptimport kräver uppkoppling.
+>
+> Din data sparas i appen på din telefon och synkas inte mellan enheter. Du flyttar den med en säkerhetskopia (Inställningar → Data).
+>
+> Köp i Google Play följer ditt Google-konto – på en ny telefon trycker du på Återställ köp. Har du en licensnyckel klistrar du in den under Inställningar → Licens.
+
 > **Till ägaren:** Skriv gärna in lägsta iOS- och Android-version när apparna är byggda (i iPhone-appen står i dag ”en aktuell version av iOS”).
 
 ## Fel och reklamation
@@ -153,15 +161,25 @@ Du betalar en gång, och du kan alltid exportera din data.
 
 De första 14 dagarna är gratis och allt är öppet. Inget kort behövs, och inget dras automatiskt när provperioden tar slut.
 
-Provperioden startar när du skapar din egen profil – inte när du tittar på exempeldata. Den gäller en gång per enhet och börjar inte om om du raderar din data.
+Provperioden startar när du skapar din egen profil – inte när du tittar på exempeldata. Den gäller en gång per enhet och börjar inte om om du raderar din data. I iPhone-appen startas den i stället med ett gratis köp i App Store och följer ditt Apple-konto.
 
 Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.
+
+> **I iPhone-appen (App Store) står i stället:**
+>
+> De första 14 dagarna är gratis och allt är öppet. Inget dras automatiskt när provperioden tar slut.
+>
+> Du startar provperioden med ett gratis köp i App Store när du har skapat din egen profil – att titta på exempeldata startar ingen provperiod. Provperioden följer ditt Apple-konto, gäller en gång och börjar inte om om du raderar din data eller installerar om appen.
+>
+> Efter provperioden kan du fortfarande se, exportera och radera allt – att logga nytt kräver ett köp.
 
 ## Köp i App Store och Google Play
 
 Köper du Lagom i App Store eller Google Play sköter butiken betalningen, kvittot och eventuell återbetalning enligt sina villkor, och priset visas i butiken. Återbetalning begär du hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com) eller i Google Play.
 
 Köpet följer ditt Apple- eller Google-konto. På en ny telefon trycker du på Återställ köp i Lagom.
+
+Köper du en ny årslicens i App Store innan den förra har gått ut börjar det nya året när det förra slutar. I Google Play kan en ny årslicens köpas när den förra har gått ut.
 
 För köp i App Store gäller även Apples [standardvillkor för appar](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/). Din rätt att reklamera enligt konsumentköplagen påverkas inte.
 
@@ -172,6 +190,8 @@ För köp i App Store gäller även Apples [standardvillkor för appar](https://
 > Köper du Lagom i App Store sköter Apple betalningen, kvittot och eventuell återbetalning enligt sina villkor, och priset visas i App Store. Återbetalning begär du hos Apple på [reportaproblem.apple.com](https://reportaproblem.apple.com).
 >
 > Köpet följer ditt Apple-konto. På en ny iPhone trycker du på Återställ köp i Lagom.
+>
+> Köper du en ny årslicens innan den förra har gått ut börjar det nya året när det förra slutar – inga betalda dagar går förlorade.
 >
 > För köp i App Store gäller även Apples [standardvillkor för appar](https://www.apple.com/legal/internet-services/itunes/dev/stdeula/). Din rätt att reklamera enligt konsumentköplagen påverkas inte.
 

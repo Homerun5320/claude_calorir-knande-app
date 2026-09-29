@@ -1,0 +1,11 @@
+/*
+  Lagom – svenska texter för dialoger som tilläggen visar med NSLocalizedString (huvudbunten).
+
+  Streckkodsläsaren (@capacitor/barcode-scanner → OSBarcodeLib) visar den här dialogen när
+  kameran har nekats tidigare. Nycklarna måste stämma exakt med bibliotekets engelska texter
+  (OSBARCPermissionsBehaviourLabels).
+*/
+"Camera Access Not Enabled" = "Kameran är inte tillåten";
+"To continue, please go to the Settings app and enable it." = "Tillåt kameran för Lagom i Inställningar för att kunna skanna streckkoder.";
+"OK" = "OK";
+"Settings" = "Inställningar";

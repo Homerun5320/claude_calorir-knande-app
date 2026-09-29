@@ -49,9 +49,10 @@ import {
   type Plan,
   type PlanId,
 } from '../../config/commerce'
-import { IS_STORE_BUILD, isInApp, sellsOnWeb } from '../../config/platform'
+import { IS_STORE_BUILD, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
 import { formatNumber } from '../../lib/format'
 import { getStorePurchases, type StoreProduct, type StoreProductId } from '../../lib/storePurchases'
+import { haptic } from '../../native'
 import type { AccessStatus } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
 import {
@@ -322,7 +323,9 @@ function storeTerms(): TermItem[] {
     },
     {
       title: 'Provperiod',
-      text: `De första ${TRIAL_DAYS} dagarna är gratis. Sedan spärras bara ny loggning – du kan fortfarande se, exportera och radera all din data.`,
+      text: trialViaStore()
+        ? `De första ${TRIAL_DAYS} dagarna är gratis. Provperioden startas med ett gratis köp i App Store och gäller en gång per Apple-konto. Sedan spärras bara ny loggning – du kan fortfarande se, exportera och radera all din data.`
+        : `De första ${TRIAL_DAYS} dagarna är gratis. Sedan spärras bara ny loggning – du kan fortfarande se, exportera och radera all din data.`,
     },
     { title: 'Integritet', text: `${PRIVACY_BASE} Betalningen sköts av butiken – vi får aldrig dina kortuppgifter.` },
     { title: 'Reklamation', text: 'Din rätt att reklamera fel enligt konsumentlagstiftningen påverkas inte.' },
@@ -728,11 +731,12 @@ function isPlanProduct(p: StoreProduct): p is StoreProduct & { id: 'ar' | 'livst
 }
 
 /**
- * Köp i butiksapparna: köpet görs i App Store eller Google Play och priset visas av butiken.
- * Inga kronpriser, ingen Stripe. Tills IAP-tillägget finns (se src/lib/storePurchases.ts) är
- * köpknappen avstängd – "Återställ köp" finns alltid.
+ * Köp i butiksapparna: köpet görs i App Store eller Google Play (src/native/purchases.ts) och
+ * priset visas av butiken. Inga kronpriser, ingen Stripe. Svarar butiken inte (eller körs
+ * butiksbygget i en vanlig webbläsare) är köpknappen avstängd – "Återställ köp" finns alltid.
+ * `note` visas under planerna, t.ex. att årslicensen i Google Play förnyas när den har gått ut.
  */
-export function StorePurchasePanel({ headingId, planIds }: { headingId?: string; planIds?: readonly PlanId[] }) {
+export function StorePurchasePanel({ headingId, planIds, note }: { headingId?: string; planIds?: readonly PlanId[]; note?: string }) {
   const autoId = useId()
   const hid = headingId ?? autoId
   const store = getStorePurchases()
@@ -761,7 +765,10 @@ export function StorePurchasePanel({ headingId, planIds }: { headingId?: string;
     setBusy(id)
     const result = await buyInStore(id)
     setBusy(null)
-    if (result === 'purchased') toast('Tack! Lagom är upplåst.', { tone: 'success' })
+    if (result === 'purchased') {
+      haptic('success')
+      toast('Tack! Lagom är upplåst.', { tone: 'success' })
+    }
     else if (result === 'pending') toast('Köpet väntar på godkännande i butiken. Lagom låses upp när det är klart.')
     else if (result === 'failed') toast('Köpet kunde inte genomföras. Försök igen om en stund.', { tone: 'error' })
   }
@@ -830,6 +837,8 @@ export function StorePurchasePanel({ headingId, planIds }: { headingId?: string;
           </div>
         </>
       )}
+
+      {note && <p className="mt-3 text-[0.875rem] leading-relaxed text-ink-2">{note}</p>}
 
       <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
         <p className="text-[0.875rem] leading-relaxed text-ink-2">Har du redan köpt Lagom, t.ex. på en annan telefon med samma konto?</p>

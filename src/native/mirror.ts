@@ -4,13 +4,15 @@
  * `loadNative('mirror')` (src/native/index.ts) och startas med `startMirror()` från
  * `startNative()` – aldrig på webben.
  *
- * - En automatisk säkerhetskopia (samma format som `createBackup`) skrivs till appens egen
- *   datamapp (`Directory.Data`: Documents på iPhone, appens filmapp på Android) högst 30 sekunder
+ * - En automatisk säkerhetskopia (samma format som `createBackup`) skrivs till appens egen mapp
+ *   (`mirrorDirectory()`: Library/NoCloud på iPhone, appens filmapp på Android) högst 30 sekunder
  *   efter en ändring och direkt när appen går till bakgrunden.
  * - Filen skrivs först till en tillfällig fil som sedan byter namn, så att ett avbrott mitt i en
  *   skrivning aldrig förstör den senaste hela kopian. Vid läsning används den nyaste hela filen.
  * - Är dagboken tom vid start men speglingen finns frågar appen om den ska återställas ("Vi hittade
- *   din data från …").
+ *   din data från …"). Frågan går bara att besvara med knapparna, och "Börja om" bekräftas en gång
+ *   till – ett tryck utanför rutan eller på bakåtknappen får aldrig kosta dagboken. Stängs appen
+ *   under frågan skrivs inget över, och frågan kommer igen vid nästa start.
  * - Speglingen skrivs aldrig från ett ofullständigt läge: inte förrän alla butiker har lästs in,
  *   inte när lagringen bara finns i minnet (t.ex. en läsning som inte blivit klar), inte med data
  *   från en nyare version och aldrig med exempeldata. Då ligger den senaste riktiga kopian kvar.
@@ -18,8 +20,10 @@
  *   `deleteMirror()` vid radering – den tar bort filen även när speglingen inte är igång.
  *
  * Integritet: filen ligger bara på enheten, i appens egen mapp som andra appar inte kommer åt. På
- * Android följer den inte med i Googles molnkopia (data_extraction_rules.xml), på iPhone ingår den
- * i telefonens egen säkerhetskopia precis som webbvyns data.
+ * iPhone ligger den i Library/NoCloud, som inte följer med i iCloud- eller datorsäkerhetskopian (den
+ * ska bara skydda mot att lagringen rensas på samma telefon – och inte bli en andra kopia av
+ * dagboken, med vikter från Apple Hälsa, i säkerhetskopian). På Android följer den inte med i
+ * Googles molnkopia (data_extraction_rules.xml).
  */
 import { App } from '@capacitor/app'
 import type { PluginListenerHandle } from '@capacitor/core'
@@ -38,20 +42,40 @@ import { useFoodStore } from '../stores/foodStore'
 import { useLicenseStore } from '../stores/licenseStore'
 import { usePlanStore } from '../stores/planStore'
 import { useProfileStore } from '../stores/profileStore'
+import { useReminderStore } from '../stores/reminderStore'
 import { hasNewerData, isMemoryOnlyStorage, READ_TIMEOUT_MS } from '../stores/storage'
+import { nativePlatform } from './index'
 
 /** Speglingen i appens datamapp. */
 export const MIRROR_FILE = 'lagom-spegling.json'
 /** Den tillfälliga filen under en skrivning (byter namn till `MIRROR_FILE` när den är klar). */
 export const MIRROR_TMP_FILE = 'lagom-spegling.tmp'
-export const MIRROR_DIRECTORY = Directory.Data
+
+/**
+ * Speglingens mapp: på iPhone Library/NoCloud (ingår inte i iCloud- eller datorsäkerhetskopian),
+ * på Android appens filmapp (som Googles molnkopia inte tar med).
+ */
+export function mirrorDirectory(): Directory {
+  return nativePlatform() === 'ios' ? Directory.LibraryNoCloud : Directory.Data
+}
+
+/**
+ * iPhone: där speglingen låg i de första testbyggena (Documents, som ingår i telefonens
+ * säkerhetskopia). Läses som reserv och tas bort när en ny kopia har skrivits.
+ */
+const LEGACY_IOS_DIRECTORY = Directory.Data
+
+/** Mappar där en spegling kan ligga – den nuvarande först. */
+function mirrorDirectories(): Directory[] {
+  return nativePlatform() === 'ios' ? [Directory.LibraryNoCloud, LEGACY_IOS_DIRECTORY] : [Directory.Data]
+}
 /** Speglingen skrivs högst så här lång tid efter den första osparade ändringen. */
 export const MIRROR_DEBOUNCE_MS = 30_000
 /** Längsta väntan på att butikerna ska läsas in innan speglingen startar ändå. */
 const HYDRATION_WAIT_MS = READ_TIMEOUT_MS + 2000
 
 /** Butikerna i säkerhetskopian (samma som `createBackup`). */
-const PERSISTED = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore] as const
+const PERSISTED = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore, useReminderStore] as const
 
 const LOG_CONTEXT = 'native:mirror'
 
@@ -163,10 +187,10 @@ export interface MirrorInfo {
   dateLabel: string
 }
 
-async function readCandidate(path: string): Promise<BackupFile | null> {
+async function readCandidate(path: string, directory: Directory = mirrorDirectory()): Promise<BackupFile | null> {
   let text: string
   try {
-    const result = await Filesystem.readFile({ path, directory: MIRROR_DIRECTORY, encoding: Encoding.UTF8 })
+    const result = await Filesystem.readFile({ path, directory, encoding: Encoding.UTF8 })
     text = typeof result.data === 'string' ? result.data : await result.data.text()
   } catch (error) {
     if (!isNotFound(error)) logError(error, LOG_CONTEXT)
@@ -192,9 +216,9 @@ const exportedTime = (b: BackupFile) => {
  */
 export function readMirror(): Promise<MirrorInfo | null> {
   return enqueue(async () => {
-    const found = [await readCandidate(MIRROR_FILE), await readCandidate(MIRROR_TMP_FILE)].filter(
-      (b): b is BackupFile => b !== null && backupHasData(b.data),
-    )
+    const candidates: (BackupFile | null)[] = []
+    for (const directory of mirrorDirectories()) candidates.push(await readCandidate(MIRROR_FILE, directory), await readCandidate(MIRROR_TMP_FILE, directory))
+    const found = candidates.filter((b): b is BackupFile => b !== null && backupHasData(b.data))
     if (found.length === 0) return null
     const backup = found.reduce((newest, b) => (exportedTime(b) > exportedTime(newest) ? b : newest))
     return { backup, summary: summarizeBackup(backup), dateLabel: backupDateLabel(backup.exportedAt) }
@@ -202,8 +226,24 @@ export function readMirror(): Promise<MirrorInfo | null> {
 }
 
 async function writeText(path: string, data: string): Promise<void> {
-  await Filesystem.writeFile({ path, data, directory: MIRROR_DIRECTORY, encoding: Encoding.UTF8, recursive: true })
+  await Filesystem.writeFile({ path, data, directory: mirrorDirectory(), encoding: Encoding.UTF8, recursive: true })
 }
+
+/** Ta bort filerna i mapparna (tysta om de inte finns). */
+async function deleteIn(directories: readonly Directory[]): Promise<void> {
+  for (const directory of directories) {
+    for (const path of [MIRROR_FILE, MIRROR_TMP_FILE]) {
+      try {
+        await Filesystem.deleteFile({ path, directory })
+      } catch (error) {
+        if (!isNotFound(error)) logError(error, LOG_CONTEXT)
+      }
+    }
+  }
+}
+
+/** Den gamla mappen på iPhone har städats (en gång per start räcker). */
+let legacyCleared = false
 
 /**
  * Skriv speglingen nu (i kö efter andra filoperationer). Skriver bara när datan är hel och
@@ -227,15 +267,21 @@ export function writeMirrorNow(): Promise<boolean> {
     }
     // Ändringar som görs medan filen skrivs gör speglingen osparad igen (se `handleChange`).
     dirty = false
+    const directory = mirrorDirectory()
     try {
       await writeText(MIRROR_TMP_FILE, text)
       try {
-        await Filesystem.rename({ from: MIRROR_TMP_FILE, to: MIRROR_FILE, directory: MIRROR_DIRECTORY, toDirectory: MIRROR_DIRECTORY })
+        await Filesystem.rename({ from: MIRROR_TMP_FILE, to: MIRROR_FILE, directory, toDirectory: directory })
       } catch {
         // Namnbytet gick inte (t.ex. om målet inte fick skrivas över): skriv filen direkt. Den
         // tillfälliga filen tas bort först när den vanliga är hel.
         await writeText(MIRROR_FILE, text)
-        await Filesystem.deleteFile({ path: MIRROR_TMP_FILE, directory: MIRROR_DIRECTORY }).catch(() => {})
+        await Filesystem.deleteFile({ path: MIRROR_TMP_FILE, directory }).catch(() => {})
+      }
+      // iPhone: den nya kopian är hel – ta bort en äldre kopia i den gamla mappen (Documents).
+      if (!legacyCleared && directory !== LEGACY_IOS_DIRECTORY) {
+        legacyCleared = true
+        await deleteIn([LEGACY_IOS_DIRECTORY])
       }
       return true
     } catch (error) {
@@ -275,15 +321,7 @@ export function deleteMirror(): Promise<void> {
   clearTimer()
   dirty = false
   hadData = false
-  return enqueue(async () => {
-    for (const path of [MIRROR_FILE, MIRROR_TMP_FILE]) {
-      try {
-        await Filesystem.deleteFile({ path, directory: MIRROR_DIRECTORY })
-      } catch (error) {
-        if (!isNotFound(error)) logError(error, LOG_CONTEXT)
-      }
-    }
-  })
+  return enqueue(() => deleteIn(mirrorDirectories()))
 }
 
 // ---------------------------------------------------------------------------
@@ -345,15 +383,29 @@ export function mirrorContents(summary: ImportSummary): string {
   )
 }
 
-/** Standardfrågan: "Vi hittade din data från 20 september 2026". */
-function askRestore(info: MirrorInfo): Promise<boolean> {
+/**
+ * Standardfrågan: "Vi hittade din data från 20 september 2026". Går bara att besvara med knapparna
+ * (inte med ett tryck utanför rutan, Escape eller bakåtknappen), och "Börja om" bekräftas en gång
+ * till – annars kunde ett oavsiktligt tryck göra att kopian skrivs över och dagboken försvinner.
+ */
+async function askRestore(info: MirrorInfo): Promise<boolean> {
   const contents = mirrorContents(info.summary)
-  return confirmDialog({
+  const restore = await confirmDialog({
     title: `Vi hittade din data från ${info.dateLabel}`,
     message: `${contents ? `Kopian på telefonen innehåller ${contents}. ` : ''}Vill du fortsätta där du slutade? Väljer du att börja om ersätts kopian när du lägger in något nytt.`,
     confirmLabel: 'Återställ',
     cancelLabel: 'Börja om',
     icon: ArchiveRestore,
+    dismissible: false,
+  })
+  if (restore) return true
+  return confirmDialog({
+    title: 'Börja om utan din tidigare data?',
+    message: `Kopian från ${info.dateLabel} ersätts när du lägger in något nytt och går då inte att få tillbaka. Vill du hellre återställa den?`,
+    confirmLabel: 'Återställ',
+    cancelLabel: 'Börja om',
+    icon: ArchiveRestore,
+    dismissible: false,
   })
 }
 
@@ -474,4 +526,5 @@ export function resetMirrorForTests(): void {
   stopMirror()
   queue = Promise.resolve()
   queuedWrite = null
+  legacyCleared = false
 }

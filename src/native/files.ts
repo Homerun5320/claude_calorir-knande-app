@@ -6,8 +6,9 @@
  * inte pålitligt. Här skrivs filen i stället till appens cachemapp och öppnas i systemets
  * delningsblad: på iPhone finns "Spara i Filer", på Android t.ex. Filer, Drive eller mejl.
  *
- * - Filerna läggs i `Directory.Cache/delning/`. Androids FileProvider delar bara ut appens cache-
- *   och filmapp (android/app/src/main/res/xml/file_paths.xml), och cachen får systemet rensa.
+ * - Filerna läggs i `Directory.Cache/delning/`. Androids FileProvider delar bara ut den mappen
+ *   (android/app/src/main/res/xml/file_paths.xml) – aldrig filmappen med den automatiska kopian av
+ *   dagboken – och cachen får systemet rensa.
  * - Tidigare exporter tas bort före varje ny, så att gamla kopior av dagboken inte blir liggande
  *   (`clearExportCache` rensar också, t.ex. vid "Radera all data").
  * - Funktionerna kastar aldrig. Utfallen är desamma som webbens (`SaveOutcome` i lib/backup.ts och

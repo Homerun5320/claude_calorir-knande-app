@@ -15,6 +15,11 @@
  *   – Apple och Google avvisar en app där det inte går att köpa. Bara testbyggen får göras med
  *   LAGOM_ALLOW_STORE_WITHOUT_IAP=1.
  * - Testköp som godtas i ett produktionsbygge eller butiksbygge (`VITE_ACCEPT_TEST_PURCHASES`).
+ * - Lagom Moln (`VITE_SUPABASE_URL`) i ett butiksbygge: apparnas integritetsuppgifter (App Privacy,
+ *   PrivacyInfo, Data safety, Health Connect-deklarationen) och policyn säger att dagboken aldrig
+ *   lämnar telefonen, och Apple kräver radering av kontot i appen. Molnet får slås på i apparna
+ *   först när ägaren har godkänt det och allt det är uppdaterat (docs/BACKEND.md) – då med
+ *   LAGOM_ALLOW_STORE_CLOUD=1.
  * Se docs/BETALNING.md.
  */
 import { createPrivateKey, createPublicKey } from 'node:crypto'
@@ -44,6 +49,11 @@ export interface CommerceBuildContext {
    * för testbyggen (simulator, skärmdumpar), aldrig för inskickning.
    */
   allowStoreWithoutIap?: string
+  /**
+   * `LAGOM_ALLOW_STORE_CLOUD`: '1' = Lagom Moln får följa med i ett butiksbygge. Bara när ägaren har
+   * godkänt det och integritetsuppgifterna i butikerna är uppdaterade (docs/BACKEND.md).
+   */
+  allowStoreCloud?: string
 }
 
 /** Början av en privat ECDSA P-256-nyckel (PKCS#8, base64) – som från generate-license-keys.mjs. */
@@ -256,6 +266,15 @@ export function checkCommerceBuild(env: BuildEnv, ctx: CommerceBuildContext = {}
       warnings.push(
         'Google Play-bygget saknar publik licensnyckel (VITE_LICENSE_PUBLIC_KEY) – licensnycklar från webbköp kan inte aktiveras i appen ' +
           'och spärrlistan för återbetalda licenser kan inte kontrolleras.',
+      )
+    }
+    if (env.VITE_SUPABASE_URL?.trim() && ctx.allowStoreCloud !== '1') {
+      errors.push(
+        'VITE_SUPABASE_URL är satt i ett butiksbygge – då skulle apparna få Lagom Moln (konton och molnkopior av dagboken, med ' +
+          'hälsodata). Apparnas integritetsuppgifter (App Privacy, PrivacyInfo, Data safety, Health Connect-deklarationen), ' +
+          'integritetspolicyn och radering av kontot i appen stämmer då inte. Ta bort VITE_SUPABASE_URL och ' +
+          'VITE_SUPABASE_PUBLISHABLE_KEY ur butiksbygget, eller sätt LAGOM_ALLOW_STORE_CLOUD=1 när ägaren har godkänt molnet i ' +
+          'apparna och allt i docs/BACKEND.md är uppdaterat.',
       )
     }
     if (!ctx.nativePurchasesReady) {

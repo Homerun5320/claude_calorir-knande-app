@@ -7,6 +7,7 @@ import { useFoodStore } from './foodStore'
 import { useProfileStore } from './profileStore'
 import { useLicenseStore } from './licenseStore'
 import { usePlanStore } from './planStore'
+import { useReminderStore } from './reminderStore'
 import { canRehydrate, onLateRead, onRemoteWrite, READ_TIMEOUT_MS, STORE_KEYS } from './storage'
 
 /**
@@ -14,7 +15,7 @@ import { canRehydrate, onLateRead, onRemoteWrite, READ_TIMEOUT_MS, STORE_KEYS } 
  * i `BY_KEY`/`STORE_KEYS` – den sköter själv inläsningen från andra flikar och ska aldrig med i
  * säkerhetskopior eller "Radera all data".
  */
-const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore, useCloudStore]
+const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore, useLicenseStore, usePlanStore, useReminderStore, useCloudStore]
 
 type PersistedStore = Pick<(typeof STORES)[number], 'persist'>
 
@@ -26,6 +27,7 @@ const BY_KEY: Record<string, PersistedStore> = {
   [STORE_KEYS.fasting]: useFastingStore,
   [STORE_KEYS.license]: useLicenseStore,
   [STORE_KEYS.plan]: usePlanStore,
+  [STORE_KEYS.reminders]: useReminderStore,
 }
 
 // En läsning som tog för lång tid (t.ex. en stor dagbok på en äldre telefon) blev till slut klar:

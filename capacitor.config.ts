@@ -59,8 +59,10 @@ const config: CapacitorConfig = {
       style: 'DEFAULT',
     },
     SplashScreen: {
-      // Kort startskärm som döljs av sig själv – appen ritar sin första vy direkt efteråt.
-      launchShowDuration: 600,
+      // Startskärmen döljs av appen när dagboken har lästs in (`hideSplash()` i src/native/system.ts,
+      // via initNative i AppShell). Döljs den inte inom 3 s gör den det själv – en reserv ifall
+      // skriptet aldrig startar.
+      launchShowDuration: 3000,
       launchAutoHide: true,
       launchFadeOutDuration: 200,
       // Ingen backgroundColor här: startskärmens bild och färg (ljus #F6F3EC, mörk #0B1210) ligger i
@@ -73,8 +75,6 @@ const config: CapacitorConfig = {
     Keyboard: {
       // iPhone: webbvyn krymper när tangentbordet visas, så att fältet och knapparna syns.
       resize: 'native' as KeyboardResize,
-      // Android: kant till kant kräver att webbvyn ändå krymper när tangentbordet visas.
-      resizeOnFullScreen: true,
       // iPhone: bakgrunden bakom tangentbordet följer sidans bakgrund (ljust/mörkt).
       autoBackdropColor: 'dom',
     },

@@ -10,6 +10,7 @@
  * - Butiksappar (`!sellsOnWeb()` i en app): inga kronpriser, ingen Stripe – köpet görs i App Store
  *   eller Google Play (`StorePurchasePanel`) och priset visas av butiken.
  * - Webben med webbförsäljningen avstängd: länkar till appbutikerna (`StoreLinksPanel`).
+ * - iPhone-appen: provperioden startas med ett gratis köp i App Store ("Starta 14 dagar gratis").
  *
  * Nås även före välkomstflödet och efter provperioden.
  */
@@ -38,7 +39,8 @@ import {
   TestModeBanner,
 } from './components'
 import { StartOwnProfileButton } from './AccessGate'
-import { PURCHASE_ERRORS, PurchaseError, buyInTestMode, createCheckout, plansToOffer, redirectTo } from './premiumLogic'
+import { StartTrialButton } from './StartTrialButton'
+import { PURCHASE_ERRORS, PurchaseError, buyInTestMode, createCheckout, plansToOffer, redirectTo, storeRenewalNote } from './premiumLogic'
 
 function SectionHeading({ id, title, subtitle }: { id: string; title: string; subtitle?: string }) {
   return (
@@ -98,6 +100,9 @@ export default function PremiumPage() {
   const inApp = isInApp()
   const keyEntry = allowsLicenseKeyEntry()
   const offered = plansToOffer(status, PLANS)
+  // Årslicens från butiken som snart går ut: i Google Play kan den förnyas när den har gått ut, i
+  // App Store läggs ett nytt år efter det nuvarande.
+  const storeNote = storeRenewalNote(status)
   const licensed = status.kind === 'licensierad'
   // Utan webbköp visas köppanelen så länge det finns något att köpa (inte vid livstidslicens).
   const showStorePanel = !web && offered.length > 0
@@ -137,6 +142,8 @@ export default function PremiumPage() {
                     <Button to="/valkommen" iconLeft={UserRound}>
                       Skapa min profil
                     </Button>
+                  ) : status.kind === 'ejstartad' ? (
+                    <StartTrialButton />
                   ) : status.kind === 'utgangen' ? (
                     <Button to="/installningar/data" variant="secondary" iconLeft={Download}>
                       Exportera min data
@@ -148,7 +155,7 @@ export default function PremiumPage() {
           )}
         </div>
 
-        {showStorePanel && (inApp ? <StorePurchasePanel headingId="premium-planer" planIds={offered.map((p) => p.id)} /> : <StoreLinksPanel headingId="premium-planer" />)}
+        {showStorePanel && (inApp ? <StorePurchasePanel headingId="premium-planer" planIds={offered.map((p) => p.id)} note={storeNote} /> : <StoreLinksPanel headingId="premium-planer" />)}
 
         {web && offered.length > 0 && (
           <section aria-labelledby="premium-planer">

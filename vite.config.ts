@@ -34,6 +34,7 @@ function commerceGuard(): Plugin {
         allowTest: process.env.LAGOM_ALLOW_TEST_COMMERCE,
         nativePurchasesReady: NATIVE_PURCHASES_READY,
         allowStoreWithoutIap: process.env.LAGOM_ALLOW_STORE_WITHOUT_IAP,
+        allowStoreCloud: process.env.LAGOM_ALLOW_STORE_CLOUD,
       })
       for (const w of warnings) config.logger.warn(`Lagom: ${w}`)
       if (errors.length > 0) throw new Error(`Lagom kan inte byggas:\n- ${errors.join('\n- ')}`)
@@ -42,7 +43,7 @@ function commerceGuard(): Plugin {
 }
 
 /** De fristående sidorna i public/ som har säljarens uppgifter som platshållare ([Företagsnamn] …). */
-const STATIC_SELLER_PAGES = ['integritet/index.html', 'villkor/index.html', 'support/index.html', 'radera-konto/index.html']
+const STATIC_SELLER_PAGES = ['integritet/index.html', 'integritet/android/index.html', 'villkor/index.html', 'support/index.html', 'radera-konto/index.html']
 
 /**
  * Fyller i säljarens uppgifter (VITE_SELLER_*, VITE_SUPPORT_EMAIL) i de fristående sidorna när
@@ -91,7 +92,15 @@ function staticSellerPages(): Plugin {
  */
 const WEB_ONLY_FILES = ['integritet', 'villkor', 'support', 'radera-konto', 'sw-overgang.js']
 
-function removeWebOnlyFiles(): Plugin {
+/**
+ * Google Play-bygget: integritetspolicyn för Android-appen (skapas ur legalContent.ts, utan webbköp
+ * och utan länkar vidare) läggs som privacypolicy.html i appens paket. Health Connect visar den i
+ * appen (@capgo/capacitor-health, scripts/native-config.mjs) – även utan uppkoppling.
+ */
+const ANDROID_PRIVACY_SOURCE = 'integritet/android/index.html'
+const ANDROID_PRIVACY_FILE = 'privacypolicy.html'
+
+function removeWebOnlyFiles(distribution: string): Plugin {
   let config: ResolvedConfig
   return {
     name: 'lagom-remove-web-only-files',
@@ -101,6 +110,12 @@ function removeWebOnlyFiles(): Plugin {
     },
     writeBundle() {
       const outDir = resolve(config.root, config.build.outDir)
+      if (distribution === 'play') {
+        const source = join(outDir, ANDROID_PRIVACY_SOURCE)
+        if (!existsSync(source)) throw new Error(`Lagom: ${ANDROID_PRIVACY_SOURCE} saknas – kör npx vitest run src/features/legal -u.`)
+        // Säljarens uppgifter fylls i här också (staticSellerPages kan köras efter den här).
+        writeFileSync(join(outDir, ANDROID_PRIVACY_FILE), fillSellerPlaceholders(readFileSync(source, 'utf8'), config.env as Record<string, string | undefined>))
+      }
       for (const name of WEB_ONLY_FILES) rmSync(join(outDir, name), { recursive: true, force: true })
     },
   }
@@ -180,7 +195,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       staticSellerPages(),
-      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE), removeWebOnlyFiles()] : []),
+      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE), removeWebOnlyFiles(env.VITE_DISTRIBUTION)] : []),
       VitePWA({
         // Service workern registreras av UpdatePrompt (AppShell), som frågar innan en ny version tas i bruk.
         registerType: 'prompt',

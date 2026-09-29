@@ -295,7 +295,11 @@ export function AppShell() {
     }
   }, [])
 
-  // De inbyggda apparna (Capacitor): starta native-funktionerna en gång. No-op på webben (src/native).
+  // De inbyggda apparna (Capacitor): starta native-funktionerna en gång (statusfält, startskärm,
+  // bakåtknapp, köp, påminnelser, Hälsa och spegling – src/native/init.ts). No-op på webben. Körs
+  // här och inte i main.tsx: AppShell ritas först när butikerna har lästs in (Gate i App.tsx), så
+  // startskärmen döljs först när dagboken finns, och efter useTheme, så att statusfältet får rätt
+  // tema.
   useEffect(() => {
     void initNative()
   }, [])
@@ -343,12 +347,13 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* Bottennavigering på mobil */}
+      {/* Bottennavigering på mobil. I apparna krymper webbvyn med tangentbordet – då döljs den
+          (klassen keyboard-open sätts av src/native/system.ts), annars hamnar den ovanpå tangentbordet. */}
       {!fullscreen && (
         <nav
           aria-label="Huvudmeny"
           data-main-nav=""
-          className="fixed inset-x-0 bottom-0 z-50 px-3 lg:hidden print:hidden"
+          className="fixed inset-x-0 bottom-0 z-50 px-3 lg:hidden print:hidden [.keyboard-open_&]:hidden"
           style={{ paddingBottom: 'max(0.75rem, var(--sa-bottom))' }}
         >
           <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.75rem] border border-line/70 bg-surface/85 px-2 py-2 shadow-[var(--shadow-float)] backdrop-blur-xl">

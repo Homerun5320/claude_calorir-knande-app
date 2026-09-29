@@ -262,6 +262,16 @@ describe('distribution och butiksbyggen', () => {
     expect(checkCommerceBuild(complete()).errors).toEqual([])
   })
 
+  it('Lagom Moln stoppas i butiksbyggen tills ägaren uttryckligen tillåter det', () => {
+    const cloud = { VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc' }
+    for (const d of ['appstore', 'play']) {
+      expect(checkCommerceBuild({ ...storeEnv(d, 'https://lagom.example'), ...cloud }, READY).errors).toEqual([expect.stringContaining('VITE_SUPABASE_URL är satt i ett butiksbygge')])
+      expect(checkCommerceBuild({ ...storeEnv(d, 'https://lagom.example'), ...cloud }, { ...READY, allowStoreCloud: '1' }).errors).toEqual([])
+    }
+    // Webbygget påverkas inte.
+    expect(checkCommerceBuild({ ...complete(), ...cloud }).errors).toEqual([])
+  })
+
   it('testköp får aldrig godtas i produktionsbyggen eller butiksbyggen', () => {
     const flag = { VITE_ACCEPT_TEST_PURCHASES: '1' }
     expect(checkCommerceBuild({ ...complete(), ...flag }, { netlifyContext: 'deploy-preview' }).errors).toEqual([])

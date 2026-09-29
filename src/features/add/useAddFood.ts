@@ -33,6 +33,7 @@ import { uid } from '../../lib/id'
 import { toast } from '../../components/ui/toast'
 import { countLabel } from './addLogic'
 import { requireAccess, type BlockedAction } from '../premium/requireAccess'
+import { haptic } from '../../native'
 
 export interface AddTarget {
   date: ISODate
@@ -169,6 +170,7 @@ export function useAddFood(action: BlockedAction = 'mat'): UseAddFoodResult {
 
     const notify = (entries: DiaryEntry[], fx: FoodEffects, fallback: string, opts: AddOptions = {}) => {
       if (opts.silent || entries.length === 0) return
+      haptic('success')
       toast(opts.message ?? fallback, {
         tone: 'success',
         action: { label: 'Ångra', onClick: undoer(entries, fx) },

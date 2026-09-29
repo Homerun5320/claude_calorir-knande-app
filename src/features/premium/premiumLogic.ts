@@ -21,13 +21,13 @@ import {
   type Plan,
   type PlanId,
 } from '../../config/commerce'
-import { DISTRIBUTION, IS_STORE_BUILD, allowsLicenseKeyEntry, isAppleWebKit, isInApp, isTwa, sellsOnWeb } from '../../config/platform'
+import { DISTRIBUTION, IS_STORE_BUILD, allowsLicenseKeyEntry, isAppleWebKit, isInApp, isTwa, sellsOnWeb, trialViaStore, type Distribution } from '../../config/platform'
 import { LICENSE_ERRORS, LICENSE_PREFIX, createTestLicense, normalizeLicenseKey, verifyLicense, type LicensePayload } from '../../lib/license'
 import { getStorePurchases, type StoreProduct, type StoreProductId, type StorePurchaseResult } from '../../lib/storePurchases'
 import { MONTHS } from '../../lib/dates'
 import { formatNumber, plural } from '../../lib/format'
 import type { Tone } from '../../components/ui'
-import { isActiveStorePurchase, primeLicenseCheck, refreshStoreEntitlements, type AccessStatus } from '../../hooks/useAccess'
+import { currentAccess, isActiveStorePurchase, primeLicenseCheck, refreshStoreEntitlements, type AccessStatus } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { isLicenseRevoked, prepareRevocationCheck, refreshRevocations } from './revocations'
 
@@ -155,13 +155,30 @@ export interface StatusSummary {
   tone: Tone
 }
 
+/**
+ * iPhone-appen: provperioden startas med ett gratis köp i App Store (riktlinje 3.1.1) – texten före
+ * start säger hur länge den gäller, vad som sedan kräver köp och vad det kostar.
+ */
+export function storeTrialText(): string {
+  return `Provperioden startar när du trycker på Starta: ett gratis köp i App Store som gäller en gång per Apple-konto. Allt i Lagom är öppet i ${TRIAL_DAYS} dagar. Sedan kan du fortfarande se, exportera och radera din data – för att logga nytt behöver du en licens: ${priceSummaryText()}, utan automatisk förnyelse. Inget dras automatiskt.`
+}
+
 export function statusSummary(status: AccessStatus): StatusSummary {
   switch (status.kind) {
     case 'ny':
       return {
         label: 'Provperiod',
         title: `Prova gratis i ${TRIAL_DAYS} dagar`,
-        text: 'Inget kort behövs. Skapa din profil och börja logga direkt – provperioden startar när profilen är klar.',
+        text: trialViaStore()
+          ? 'Skapa din profil först. Sedan startar du provperioden med ett gratis köp i App Store – inget dras automatiskt.'
+          : 'Inget kort behövs. Skapa din profil och börja logga direkt – provperioden startar när profilen är klar.',
+        tone: 'gran',
+      }
+    case 'ejstartad':
+      return {
+        label: 'Provperiod',
+        title: `Starta ${TRIAL_DAYS} dagar gratis`,
+        text: storeTrialText(),
         tone: 'gran',
       }
     case 'prov':
@@ -212,22 +229,55 @@ export function statusSummary(status: AccessStatus): StatusSummary {
  * Hur provperioden visas på Idag: inget (licens/ny), ett litet chip, ett tydligare kort de sista
  * tre dagarna, eller ett kort när den är slut.
  */
-export type TrialBannerLevel = 'none' | 'chip' | 'soon' | 'expired'
+export type TrialBannerLevel = 'none' | 'chip' | 'soon' | 'expired' | 'start'
 
 export const TRIAL_SOON_DAYS = 3
 
 export function trialBannerLevel(status: AccessStatus): TrialBannerLevel {
   if (status.kind === 'prov') return status.daysLeft <= TRIAL_SOON_DAYS ? 'soon' : 'chip'
   if (status.kind === 'utgangen') return 'expired'
+  // iPhone-appen: provperioden väntar på att startas (köpet 'prov14').
+  if (status.kind === 'ejstartad') return 'start'
   return 'none'
 }
 
-/** Planer som är värda att visa: inga vid livstidslicens, bara livstid vid en färsk årslicens. */
-export function plansToOffer(status: AccessStatus, plans: readonly Plan[]): Plan[] {
+/**
+ * Kan årslicensen inte förnyas i förväg här? I Google Play går en engångsprodukt som ägs inte att
+ * köpa igen, och ett år som fortfarande gäller förbrukas aldrig (src/native/purchases.ts) – annars
+ * skulle det raderas. Årslicensen från Play kan därför förnyas först när den har gått ut.
+ *
+ * I App Store går det: ett år som köps i förväg läggs efter det som gäller (purchases.ts räknar
+ * ihop alla köpta år), så inga betalda dagar går förlorade.
+ */
+export function renewalBlockedInStore(status: AccessStatus, distribution: Distribution = DISTRIBUTION): boolean {
+  return distribution === 'play' && status.kind === 'licensierad' && status.source === 'store' && status.plan?.id === 'ar'
+}
+
+/** Texten i köppanelen när årslicensen från Play inte kan förnyas i förväg (se `renewalBlockedInStore`). */
+export const PLAY_RENEWAL_NOTE = 'Årslicensen kan förnyas här när den har gått ut.'
+
+/** Texten i köppanelen i iPhone-appen när årslicensen snart går ut: ett nytt år läggs efter det nuvarande. */
+export const APPSTORE_RENEWAL_NOTE = 'Förnyar du nu börjar det nya året när det nuvarande tar slut – inga dagar går förlorade.'
+
+/**
+ * Noten om förnyelse i köppanelen när en årslicens köpt i appen har högst 30 dagar kvar: i Play att
+ * den kan förnyas när den har gått ut, i App Store att ett nytt år läggs efter det nuvarande.
+ */
+export function storeRenewalNote(status: AccessStatus, distribution: Distribution = DISTRIBUTION): string | undefined {
+  if (status.kind !== 'licensierad' || status.source !== 'store' || status.plan?.id !== 'ar' || (status.daysLeft ?? Infinity) > 30) return undefined
+  if (renewalBlockedInStore(status, distribution)) return PLAY_RENEWAL_NOTE
+  return distribution === 'appstore' ? APPSTORE_RENEWAL_NOTE : undefined
+}
+
+/**
+ * Planer som är värda att visa: inga vid livstidslicens, bara livstid vid en färsk årslicens (och
+ * vid en årslicens från Google Play som fortfarande gäller, se `renewalBlockedInStore`).
+ */
+export function plansToOffer(status: AccessStatus, plans: readonly Plan[], distribution: Distribution = DISTRIBUTION): Plan[] {
   if (status.kind !== 'licensierad') return [...plans]
   if (status.expiresAt === undefined) return []
-  // Mindre än en månad kvar: erbjud förnyelse också.
-  if ((status.daysLeft ?? 0) <= 30) return [...plans]
+  // Mindre än en månad kvar: erbjud förnyelse också – utom där butiken inte tillåter det.
+  if ((status.daysLeft ?? 0) <= 30 && !renewalBlockedInStore(status, distribution)) return [...plans]
   return plans.filter((p) => !p.durationDays)
 }
 
@@ -295,15 +345,34 @@ export async function buyInStore(id: StoreProductId): Promise<StorePurchaseResul
 }
 
 /**
- * "Återställ köp": hämta tidigare köp i appen från butiken (t.ex. på en ny telefon). Returnerar
+ * "Återställ köp": hämta tidigare köp i appen från butiken (t.ex. på en ny telefon). `paid` är
  * antalet betalda köp som gäller nu – utgångna årslicenser och provperioden ('prov14') räknas
- * inte. Kastar om butiken inte svarar.
+ * inte; `trial` är true om en provperiod ('prov14') fanns bland köpen och fortfarande pågår. Kastar
+ * om butiken inte svarar.
  */
-export async function restoreStorePurchases(): Promise<number> {
+export async function restoreStorePurchases(): Promise<{ paid: number; trial: boolean }> {
   const restored = await getStorePurchases().restore()
   await refreshStoreEntitlements({ fresh: true })
   const now = Date.now()
-  return restored.filter((e) => isActiveStorePurchase(e, now)).length
+  const trial = restored.some((e) => e.product === 'prov14') && currentAccess(now).status.kind === 'prov'
+  return { paid: restored.filter((e) => isActiveStorePurchase(e, now)).length, trial }
+}
+
+export type StoreTrialResult = 'started' | 'used' | 'licensed' | 'cancelled' | 'pending' | 'failed'
+
+/**
+ * iPhone-appen: starta provperioden med det gratis köpet 'prov14' i App Store. 'used' = köpet fanns
+ * redan och provperioden är slut (den gäller en gång per Apple-konto), 'licensed' = en licens gäller
+ * redan. Kastar aldrig.
+ */
+export async function startStoreTrial(): Promise<StoreTrialResult> {
+  const result = await buyInStore('prov14')
+  if (result !== 'purchased') return result
+  const { status } = currentAccess()
+  if (status.kind === 'prov') return 'started'
+  if (status.kind === 'licensierad') return 'licensed'
+  // Köpet gick igenom men syns inte bland köpen än – eller så har provperioden redan använts.
+  return status.kind === 'utgangen' ? 'used' : 'failed'
 }
 
 // ---------------------------------------------------------------------------

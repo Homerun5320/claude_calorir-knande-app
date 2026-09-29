@@ -250,6 +250,25 @@ Integrationen i appen görs först när Lagom Moln är godkänt (allt fungerar a
 7. Texter som säger att Lagom saknar konton (Inställningar, supportsidan, integritetspolicyn)
    uppdateras – se DPIA-SYNK.md.
 
+### I butiksapparna (App Store och Google Play)
+
+Byggkontrollen (`scripts/commerce-guard.ts`) **stoppar ett butiksbygge** (`VITE_DISTRIBUTION=appstore`
+eller `play`) där `VITE_SUPABASE_URL` är satt – annars skulle en variabel som kopierats från
+Netlifys produktion ge apparna konton och molnkopior av dagboken, med uppgifter från Apple Hälsa
+och Health Connect. Sätt alltså inte Supabase-variablerna i GitHub eller Codemagic. Innan molnet
+får slås på i apparna (då med `LAGOM_ALLOW_STORE_CLOUD=1`) måste ägaren ha godkänt det, och det här
+vara uppdaterat:
+
+- App Privacy i App Store Connect och `ios/App/App/PrivacyInfo.xcprivacy` (*Health & Fitness*,
+  *Email Address*, *User ID* m.m. – kopplade till personen) samt Data safety i Play Console.
+- Health Connect-deklarationen i Play Console (data som lämnar telefonen, även krypterad) och
+  Apples krav på hälsodata (riktlinje 5.1.3: HealthKit-data får inte lagras i iCloud eller hos
+  tredje part utan uttryckligt samtycke – överväg att hålla hälsodata utanför molnkopian).
+- Integritetspolicyn i båda apparnas varianter (`legalContent.ts`, `appStore` och `play`).
+- Radering av kontot inne i appen (Apple 5.1.1(v)) och webbadressen för kontoradering i Play
+  Console – provade i båda apparna.
+- `connect-src` i CSP:n för butiksbyggena (samma `netlify.toml`).
+
 ### Prova innan lansering
 
 - [ ] Logga in med e-post och kod, godkänn samtycket (kryssrutan är tom från början), välj

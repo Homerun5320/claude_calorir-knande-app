@@ -9,17 +9,21 @@
  *
  * Med exempeldata visas i stället för köpspärren en vänlig förklaring: exemplet är skrivskyddat,
  * och man skapar sin egen profil för att börja logga (provperioden startar då).
+ *
+ * I iPhone-appen startas provperioden med ett gratis köp i App Store ('prov14'). Innan den har
+ * startats (statusen 'ejstartad') förklarar spärren det och har knappen "Starta 14 dagar gratis".
  */
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, KeyRound, Leaf, Sparkles, Sprout, UserRound } from 'lucide-react'
 import { Button, Dialog, PageHeader, confirmDialog } from '../../components/ui'
 import { TRIAL_DAYS } from '../../config/commerce'
-import { allowsLicenseKeyEntry, isInApp, sellsOnWeb } from '../../config/platform'
+import { allowsLicenseKeyEntry, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { BLOCKED_ACTION_TEXT, useAccessGateStore, type BlockedAction } from './requireAccess'
 import { priceSummary, priceSummaryText } from './premiumLogic'
 import { RestorePurchasesButton } from './RestorePurchasesButton'
+import { StartTrialButton } from './StartTrialButton'
 
 /** Håller tillgången uppdaterad (licensverifiering, provstart). Renderar inget. */
 export function AccessSync() {
@@ -28,12 +32,16 @@ export function AccessSync() {
 }
 
 export function blockedTitle(status: AccessStatus): string {
+  if (status.kind === 'ejstartad') return 'Starta din provperiod'
   if (status.kind === 'utgangen' && status.revoked) return 'Licensen har återkallats'
   return status.kind === 'utgangen' && status.licenseExpired ? 'Årslicensen har gått ut' : 'Provperioden är slut'
 }
 
-export function blockedText(action?: BlockedAction): string {
+export function blockedText(action?: BlockedAction, status?: AccessStatus): string {
   const what = action ? BLOCKED_ACTION_TEXT[action] : 'logga nytt'
+  if (status?.kind === 'ejstartad') {
+    return `För att ${what} startar du först provperioden – ${TRIAL_DAYS} dagar gratis med ett gratis köp i App Store – eller köper en licens. Allt du redan har lagt in finns kvar.`
+  }
   return `För att ${what} behöver du en licens. Allt du redan har loggat finns kvar – du kan se, exportera och radera din data precis som vanligt.`
 }
 
@@ -44,16 +52,28 @@ export function blockedPriceLine(): string {
   return `${text.charAt(0).toLocaleUpperCase('sv-SE')}${text.slice(1)} · ingen automatisk förnyelse`
 }
 
-/** Knapparna: priser, export och aktivering. `onNavigate` stänger t.ex. dialogen först. */
-function BlockedActions({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * Knapparna: (starta provperioden,) priser, export och aktivering. `onNavigate` stänger t.ex.
+ * dialogen först.
+ */
+function BlockedActions({ onNavigate, status }: { onNavigate?: () => void; status: AccessStatus }) {
   const navigate = useNavigate()
   const go = (to: string) => {
     onNavigate?.()
     navigate(to)
   }
+  const startTrial = status.kind === 'ejstartad'
   return (
     <div className="flex flex-col gap-2">
-      <Button fullWidth iconLeft={Sprout} onClick={() => go('/premium')}>
+      {startTrial && (
+        <StartTrialButton
+          fullWidth
+          onDone={(result) => {
+            if (result === 'started' || result === 'licensed') onNavigate?.()
+          }}
+        />
+      )}
+      <Button fullWidth variant={startTrial ? 'secondary' : 'primary'} iconLeft={Sprout} onClick={() => go('/premium')}>
         Se priser
       </Button>
       <Button fullWidth variant="secondary" iconLeft={Download} onClick={() => go('/installningar/data')}>
@@ -77,9 +97,10 @@ export const DEMO_TITLE = 'Det här är exempeldata'
 
 /** Förklaringen när man försöker logga i exemplet. */
 export function demoText(status: AccessStatus): string {
-  return status.kind === 'ny'
-    ? `Det här är exempeldata. Skapa din egen profil för att börja logga – provperioden på ${TRIAL_DAYS} dagar startar då.`
-    : 'Det här är exempeldata. Skapa din egen profil för att börja logga.'
+  if (status.kind !== 'ny') return 'Det här är exempeldata. Skapa din egen profil för att börja logga.'
+  return trialViaStore()
+    ? `Det här är exempeldata. Skapa din egen profil för att börja logga – sedan startar du provperioden på ${TRIAL_DAYS} dagar gratis.`
+    : `Det här är exempeldata. Skapa din egen profil för att börja logga – provperioden på ${TRIAL_DAYS} dagar startar då.`
 }
 
 export const DEMO_WIPE_NOTE = 'Exempeldatan tas bort när du börjar. Du kan titta på den hur mycket du vill innan dess.'
@@ -155,7 +176,7 @@ export function AccessBlockedDialog() {
       open={blocked !== null}
       onClose={close}
       title={demo ? DEMO_TITLE : blockedTitle(status)}
-      description={demo ? demoText(status) : blockedText(current?.action)}
+      description={demo ? demoText(status) : blockedText(current?.action, status)}
       icon={demo ? Sparkles : Leaf}
       tone={demo ? 'hjortron' : 'sol'}
       showClose
@@ -168,7 +189,7 @@ export function AccessBlockedDialog() {
         ) : (
           <>
             <p className="mb-4 text-[0.8125rem] leading-snug text-ink-3">{blockedPriceLine()}</p>
-            <BlockedActions onNavigate={close} />
+            <BlockedActions onNavigate={close} status={status} />
           </>
         )
       }
@@ -186,10 +207,10 @@ export function AccessBlockedPage({ action, status }: { action?: BlockedAction; 
           <Leaf className="size-7" strokeWidth={2} />
         </span>
         <p className="font-display text-[1.25rem] font-semibold leading-snug tracking-tight text-ink">Din data är trygg</p>
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">{blockedText(action)}</p>
+        <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-2">{blockedText(action, status)}</p>
         <p className="mt-3 text-[0.8125rem] leading-snug text-ink-3">{blockedPriceLine()}</p>
         <div className="mt-6 w-full">
-          <BlockedActions />
+          <BlockedActions status={status} />
         </div>
       </div>
     </div>

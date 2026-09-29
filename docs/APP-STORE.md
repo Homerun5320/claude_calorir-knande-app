@@ -9,10 +9,12 @@ Mac – varje steg säger var i App Store Connect det görs.
 > skatt och moms med Skatteverket (verksamt.se) om du är osäker.
 
 **Läget just nu (2026-09-28):** iPhone-appen byggs med Capacitor 8. Xcode-projektet (`ios/`,
-bara iPhone, integritetsmanifest, HealthKit) och tilläggen – bland dem `@capgo/native-purchases`
-för köp i appen – är på plats; funktionerna kopplas in i `src/native/` i nästa steg. Allt om
-projektet, paketen och byggena: [NATIVE.md](NATIVE.md). Bygget görs i molnet – se
-[IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md).
+bara iPhone, integritetsmanifest, HealthKit), köp i appen med StoreKit 2
+(`@capgo/native-purchases`) och de inbyggda funktionerna – streckkodsläsare (Apples Vision),
+delning och export, lokala påminnelser, Apple Hälsa, haptik, statusfält och tangentbord – finns i
+`src/native/`. Signerade byggen och uppladdning till TestFlight görs i molnet
+(`.github/workflows/release.yml` eller `codemagic.yaml`). Allt om projektet, paketen och byggena:
+[NATIVE.md](NATIVE.md); molnbygget steg för steg: [IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md).
 
 ## Innehåll
 
@@ -44,7 +46,9 @@ projektet, paketen och byggena: [NATIVE.md](NATIVE.md). Bygget görs i molnet �
 | Livstid | För alltid, felrättningar ingår – inga löften om nya funktioner. |
 | Betalning | **Bara köp i appen** (Apple In-App Purchase). Inga länkar till eller omnämnanden av webbköp. |
 | Licensnycklar | Kan **inte** aktiveras i App Store-appen. Köp återställs med **Återställ köp** (Apple-ID). Den som har köpt på webben får en erbjudandekod via supporten (se [avsnitt 6](#erbjudandekoder-för-webbköpare)). |
-| Provperiod | 14 dagar. Startar när den egna profilen skapas – exempeldatan är skrivskyddad och startar ingen provperiod. |
+| Provperiod | 14 dagar. Startas med ett gratis köp i App Store (`prov14`, 0 kr, riktlinje 3.1.1) när den egna profilen är skapad – exempeldatan är skrivskyddad och startar ingen provperiod. Följer Apple-kontot och börjar inte om efter en ominstallation. |
+| Appskal | **Capacitor 8**, iOS 16.4 eller senare, byggs med Xcode 26 i molnet. |
+| Native-funktioner i v1 | Streckkodsläsare, delning/export, lokala påminnelser, Apple Hälsa (frivilligt), haptik. |
 
 ## 2. Konto och avtal
 
@@ -137,6 +141,8 @@ NÄRING OCH MÅL
 • Vitaminer och mineraler jämförs med Nordiska näringsrekommendationer (NNR 2023)
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Vatten, träning och vikt på samma ställe
+• Koppla till Apple Hälsa om du vill: hämta vikt och steg, och spara energi, vatten och vikt
+• Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
 
 RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
@@ -151,11 +157,12 @@ Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
+• Uppgifter från Apple Hälsa läses och sparas bara i telefonen och används aldrig för reklam
 • Exportera allt när du vill, eller radera allt med ett par tryck
 • Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
-14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse. Priserna visas i App Store innan du köper. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
+14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen, utan automatisk förnyelse. Priserna visas i App Store innan du köper. Provperioden startar du med ett köp för 0 kr i App Store när du har skapat din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
 
 KÄLLOR
 Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de flesta näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0), övriga är samlingsvärden för vanliga märken och värden från förpackningar. Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
@@ -163,9 +170,11 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(Ungefär 2 700 tecken.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
-rankingord vid granskningen. Veckoplaneringen och receptimporten finns i version 1.0 – kontrollera
-ändå i det bygge du skickar in att allt i texten finns i appen (2.3.1).
+(Ungefär 3 000 tecken.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
+rankingord vid granskningen. Veckoplaneringen, receptimporten, påminnelserna och Apple Hälsa ska
+finnas i version 1.0 – kontrollera ändå i det bygge du skickar in att allt i texten finns i appen
+(2.3.1). Raden om Apple Hälsa ska stå kvar så länge kopplingen finns: Apple kräver att en app som
+använder HealthKit säger det i beskrivningen och tydligt i appen (2.5.1).
 
 ### Nyckelord (högst 100 tecken, kommaseparerade utan mellanslag)
 
@@ -179,7 +188,7 @@ upprepas. Använd aldrig namn på andra appar, företag eller myndigheter som ny
 ### Nyheter i den här versionen (version 1.0)
 
 ```
-Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare, recept, insikter, vikt och mått, vatten och träning. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
+Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare, recept, insikter, vikt och mått, vatten och träning – och om du vill påminnelser och koppling till Apple Hälsa. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
 ```
 
 ### Kategori
@@ -277,9 +286,9 @@ Så beter sig appen (bra att veta vid granskningen):
   priser visas i välkomststeget och i sammanfattningen innan provperioden startar (riktlinje
   3.1.1: det som kostar efter provperioden ska synas innan den börjar). Går priserna inte att
   hämta står det "priserna visas i App Store innan du köper".
-- **Byggkontrollen stoppar App Store-bygget** tills köp i appen är inkopplade
-  (`NATIVE_PURCHASES_READY = true` i `src/lib/storePurchases.ts`, som sätts när IAP-tillägget
-  fungerar). Då kan en app där det inte går att köpa aldrig skickas in av misstag. Ett testbygge
+- **Byggkontrollen stoppar App Store-bygget** om köp i appen inte är inkopplade
+  (`NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts`; köpen finns i `src/native/purchases.ts`
+  och flaggan är true). Då kan en app där det inte går att köpa aldrig skickas in av misstag. Ett testbygge
   för simulatorn eller skärmdumpar görs med `LAGOM_ALLOW_STORE_WITHOUT_IAP=1` – skicka aldrig in ett
   sådant bygge. Går butiken inte att nå visar köpknappen "Köp är inte tillgängliga just nu" –
   aldrig ett löfte om en kommande version.
@@ -287,31 +296,62 @@ Så beter sig appen (bra att veta vid granskningen):
 - **Återställ köp** finns på sidan Lagom Premium och under Inställningar → Licens.
 - Årslicensen gäller 365 dagar från köpet och förnyas inte. Apple kräver att sådana köp kan
   återställas på användarens alla iPhone med samma Apple-ID – det sköts av Återställ köp.
-  **Att tänka på när köp-i-appen-tillägget väljs:** tillägget måste använda StoreKit 2
-  (`Transaction.currentEntitlements`). Den äldre återställningen i StoreKit 1
-  (`restoreCompletedTransactions`) hämtar inte köp av typen Non-Renewing Subscription, och då
-  skulle årslicensen inte gå att återställa.
+  Tillägget (`@capgo/native-purchases`) använder StoreKit 2 (`Transaction.currentEntitlements`,
+  `Transaction.all`, `AppStore.sync`), som till skillnad från StoreKit 1 också hämtar köp av typen
+  Non-Renewing Subscription.
+- **Förnyelse i förväg:** de sista 30 dagarna kan ett nytt år köpas. Appen läser då alla köpta år
+  (`Transaction.all`, utan återkallade) och lägger dem efter varandra – det nya året börjar när
+  det förra slutar, så inga betalda dagar går förlorade. Köppanelen säger det före köpet, och
+  köpvillkoren likaså (Apples modell för non-renewing subscriptions: appen ansvarar för perioden).
+- De senast kända köpen sparas på telefonen (`lagom-butikskop` i localStorage: produkt, köpdatum,
+  slutdatum), så att den som har köpt inte stängs ute när App Store inte svarar.
+- Ett återbetalt köp (Apple återbetalar själv, via reportaproblem.apple.com) får ett
+  återkallelsedatum och slutar gälla nästa gång appen hämtar köpen.
+
+### Testa köpen (TestFlight och sandlådan)
+
+- **I TestFlight** görs köpen automatiskt i Apples testmiljö (sandlådan) med testarens **eget
+  Apple-ID** – inga pengar dras. Ett köp av `livstid` eller `prov14` kan inte nollställas för det
+  Apple-ID:t. Prova därför i den här ordningen: provperioden (`prov14`), sedan `ar`, sedan
+  `livstid`, och be en vän med ett annat Apple-ID att prova samma sak.
+- **Sandlådekonton** (*App Store Connect → Användare och åtkomst → Sandlåda → Testkonton → +*)
+  går att nollställa (*Rensa köphistorik*). Använd en e-postadress som inte redan är ett Apple-ID,
+  t.ex. `dittnamn+sandbox1@gmail.com`, och land **Sverige**. På iPhone med iOS 18 eller senare
+  loggar du in under *Inställningar → Utvecklare → Sandbox-Apple-konto*. Menyn *Utvecklare* visas
+  normalt bara på telefoner som har använts med Xcode – finns den inte räcker TestFlight och ett
+  andra Apple-ID.
+- Prova: starta provperioden med "Starta 14 dagar gratis" (och avbryt en gång först – då startar
+  inget), köp `ar` och `livstid`, avbryt ett köp, *Återställ köp* efter att appen har tagits bort
+  och installerats igen (provperioden ska komma tillbaka, inte börja om), att priserna från App
+  Store syns före provperioden, att ett år som köps i förväg förlänger årslicensen med ett helt år,
+  att Lagom är upplåst i flygplansläge, och att årslicensen döljs när livstid är köpt.
+- `NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts` är satt till true men räknas som klar
+  först när det här fungerar på en riktig iPhone. Fungerar något inte: sätt den till false och
+  bygg om, så stoppar byggkontrollen butiksbyggena tills det är rättat.
 
 ### Provperioden (14 dagar) i App Store
 
 Apple beskriver i riktlinje 3.1.1 hur en app utan automatiskt förnyad prenumeration får erbjuda
 en gratis provperiod: som ett **engångsköp (Non-Consumable) för 0 kr** med namnet
-"14 dagars provperiod" (på engelska *14-day Trial*). Lagom är förberett för det – produkt-id
-`prov14` i `src/lib/storePurchases.ts`, och appen räknar provperioden från det tidigaste av den
-lokala starten och köpet.
+"14 dagars provperiod" (på engelska *14-day Trial*). **Så gör iPhone-appen:** provperioden
+startas med köpet `prov14` och räknas från det (`trialViaStore()` i `src/config/platform.ts`,
+`startStoreTrial()` i `src/features/premium/premiumLogic.ts`). Webben och Google Play-appen har
+kvar den lokala provperioden.
 
 | Referensnamn | Produkt-id | Typ | Pris |
 | --- | --- | --- | --- |
 | 14 dagars provperiod | `prov14` | Non-Consumable | 0 kr (gratis) |
 
-- **Rekommendation:** skapa produkten och låt appen "köpa" den när provperioden startar (när den
-  egna profilen skapas) – så följer du Apples beskrivning, och provperioden börjar inte om när
-  appen installeras på nytt. Hur det kopplas in avgörs när köp-i-appen-tillägget installeras.
-- Före provperioden måste appen tydligt säga hur lång den är, vad som inte går efteråt (logga
-  nytt) och vad det kostar att fortsätta (priserna från App Store). Kontrollera det i
-  välkomstflödet innan du skickar in.
-- Är du osäker: skicka in med produkten och skriv i granskningsanteckningarna hur provperioden
-  fungerar (se avsnitt 10). Det är enklare än att få ett avslag.
+- **Produkten måste finnas och skickas in med appversionen** – appen köper den. Visningsnamn
+  `14 dagars provperiod`, beskrivning `Prova allt i Lagom i 14 dagar. Inget dras.`, granskningsbild:
+  kortet "Starta din provperiod" på Idag.
+- Välkomstflödets sista steg har knappen **"Starta 14 dagar gratis"**, och texten ovanför säger hur
+  länge provperioden gäller, att den gäller en gång per Apple-konto, att ny loggning sedan kräver
+  en licens och vad licenserna kostar (butikens priser). Profilen skapas även om köpet avbryts; då
+  har Idag, spärren, Inställningar → Licens och Lagom Premium samma knapp. Exempeldatan går att
+  titta på utan att starta provperioden.
+- Provperioden följer Apple-kontot: den kommer tillbaka med *Återställ köp* och börjar inte om
+  när appen installeras på nytt eller datan raderas.
 
 ### Erbjudandekoder för webbköpare
 
@@ -362,6 +402,16 @@ Det här samlas **inte** in (och ska inte kryssas i):
   server, som hämtar receptet direkt och inte sparar något. Apple räknar inte sådant som
   insamling, eftersom uppgiften bara används just då för att svara på förfrågan.
 
+De inbyggda funktionerna ändrar inte svaren:
+
+| Funktion | Lämnar data telefonen? | Anges i App Privacy? |
+| --- | --- | --- |
+| Apple Hälsa (HealthKit) – läser vikt och steg; skriver vikt, energi och vatten | Nej – läses och skrivs på telefonen | Nej (men beskrivs i integritetspolicyn; Apple kräver att hälsodata aldrig används för reklam eller lämnas vidare) |
+| Streckkodsläsaren (Apples Vision) | Nej – bilden tolkas på telefonen och sparas inte; bara streckkoden skickas till Open Food Facts | Sökhistorik (som ovan) |
+| Påminnelser (lokala notiser) | Nej – ingen pushtjänst | Nej |
+| Köp i appen (StoreKit 2) | Bara mellan telefonen och Apple | Nej |
+| Export och delning | Bara dit användaren själv väljer i delningsbladet | Nej |
+
 **Spårning (App Tracking Transparency):** Nej. Appen visar ingen spårningsfråga.
 
 **Privacy manifest (`PrivacyInfo.xcprivacy`):** finns i Xcode-projektet
@@ -401,7 +451,8 @@ gränsen – det är okej, eftersom appen själv släpper in bara vuxna.
 | **Betalningsval i EU** (alternativa villkor, länkar till extern betalning) | **Nej.** Behåll Apples standardvillkor och bara köp i appen. Ansök inte om *StoreKit External Purchase Link Entitlement* eller *Alternative Terms Addendum for Apps in the EU*. |
 | **Sign in with Apple** | Behövs inte – appen har inga konton. |
 | **Kamerabehörighet** (`NSCameraUsageDescription` i `Info.plist`) | `Lagom använder kameran för att läsa streckkoder på förpackningar. Bilderna sparas inte.` |
-| **Apple Hälsa** (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`, HealthKit-förmågan) | Texterna och förmågan finns i projektet ([NATIVE.md §5](NATIVE.md#5-iphone-projektet-ios)). Slå på **HealthKit** för Bundle ID:t på developer.apple.com. Apple kräver att appen tydligt visar när den använder Hälsa och att hälsodata aldrig används för reklam eller lämnas vidare. |
+| **Apple Hälsa** (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`, HealthKit-förmågan) | Texterna och förmågan finns i projektet ([NATIVE.md §5](NATIVE.md#5-iphone-projektet-ios)). Slå på **HealthKit** för Bundle ID:t på developer.apple.com. Apple kräver att appen tydligt visar när den använder Hälsa (Inställningar → Apple Hälsa), att beskrivningen nämner kopplingen (2.5.1), att integritetspolicyn beskriver den och att hälsodata aldrig används för reklam eller lämnas vidare (5.1.3). |
+| **Notiser** | Lokala påminnelser – ingen pushfunktion (*Push Notifications* ska **inte** slås på för Bundle ID:t). iPhone frågar om lov först när användaren slår på en påminnelse. |
 | **Digital Services Act – trader** | Ja (du säljer appen). Se [avsnitt 2](#2-konto-och-avtal). |
 
 ## 10. App Review Notes (granskningsanteckningar)
@@ -410,67 +461,59 @@ gränsen – det är okej, eftersom appen själv släpper in bara vuxna.
 Kontaktuppgifter: ditt namn, telefon och e-post. Klistra in (på engelska):
 
 ```
-No account needed. Tap 'Utforska med exempeldata' on the welcome screen to load two weeks of sample data. All data stays on the device. Purchases: Mer → Lagom Premium (In-App Purchase, Restore button). The Annual licence is hidden when a Lifetime licence is owned. The 14-day trial starts when a profile is created; after it ends only new logging requires a purchase – viewing, export and deletion always work.
+No account needed. Tap 'Utforska med exempeldata' on the welcome screen to load two weeks of sample data. All data stays on the device. Purchases: Mer → Lagom Premium (In-App Purchase, Restore button). The Annual licence is hidden when a Lifetime licence is owned. After the trial only new logging requires a purchase – viewing, export and deletion always work.
 
-The sample data is read-only. To try logging food, tap 'Börja med min egen profil' (Idag) and answer a few questions – this creates a profile and starts the 14-day trial.
+The sample data is read-only. To try logging food, tap 'Börja med min egen profil' (Idag) and answer a few questions. The last step explains the trial (length, what requires a purchase afterwards, prices from the App Store) and its button 'Starta 14 dagar gratis' starts the 14-day trial with the free in-app purchase 'prov14'. If that purchase is cancelled, the profile is still created and the same button is shown on Idag.
 
-In-app purchases: 'livstid' (Lifetime licence, non-consumable) and 'ar' (Annual licence, non-renewing subscription, 365 days, does not auto-renew). Prices are loaded from the App Store. Restore Purchases is on Mer → Lagom Premium and in Inställningar → Licens.
+In-app purchases: 'prov14' (14-day Trial, non-consumable, free – follows the Apple ID and is restored with Restore Purchases, so it cannot be restarted by reinstalling), 'livstid' (Lifetime licence, non-consumable) and 'ar' (Annual licence, non-renewing subscription, 365 days, does not auto-renew; an Annual licence bought during the last 30 days starts when the current one ends). Prices are loaded from the App Store. Restore Purchases is on Mer → Lagom Premium and in Inställningar → Licens.
 
-The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice. The camera is only used to scan barcodes; no images are stored or sent.
+Native features (all optional and off by default): Apple Health (HealthKit) in Inställningar → Apple Hälsa reads weight and steps and writes weight that the user logs, and dietary energy and water for finished days (HealthKit samples cannot be edited by the app afterwards, so only completed days are sent); health data stays on the device and is never used for advertising or shared. Reminders (Inställningar → Påminnelser) are local notifications only. The barcode scanner uses the camera with Apple's Vision framework; no images are stored or sent. Export and backup use the iOS share sheet. The whole app works offline with on-device storage.
+
+The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```
 
-Använder appen provperioden i App Store (`prov14`, se [avsnitt 6](#provperioden-14-dagar-i-app-store)),
-lägg till den här meningen i stycket om köp i appen:
-
-```
-'prov14' (14-day Trial, non-consumable, free) is claimed automatically when a profile is created; the trial length, what requires a purchase afterwards and the prices are shown before it starts.
-```
-
-När kopplingen till Apple Hälsa finns i appen, lägg till:
-
-```
-Apple Health (HealthKit) is optional and off until the user turns it on. It reads weight, steps and active energy and writes weight, dietary energy and water that the user logs. Health data stays on the device and is never used for advertising or shared.
-```
+Kontrollera före inskickningen att texten stämmer med bygget – ta bort en funktion ur stycket
+"Native features" om den inte finns i versionen du skickar in.
 
 ## 11. Bygge, TestFlight och inskickning
 
-Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och steg finns i
-[IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md). I korthet:
+Du har ingen Mac – bygget, signeringen och uppladdningen görs i molnet, med **GitHub Actions**
+(`.github/workflows/release.yml`) eller **Codemagic** (`codemagic.yaml`). Jämförelse och steg för
+steg: [IOS-BYGGE-I-MOLNET.md](IOS-BYGGE-I-MOLNET.md); hemligheterna: [NATIVE.md §9](NATIVE.md#9-molnbyggen-kontroll-signering-och-uppladdning).
+I korthet:
 
-1. **Webbdelen för appen** (på din dator eller i molnbygget):
-
-   ```sh
-   npm ci
-   VITE_API_BASE=https://<domän> npm run build:ios   # vite build → dist-native/ och cap sync ios
-   ```
-
-   Byggkontrollen (`scripts/commerce-guard.ts`) stoppar butiksbygget om något av det här saknas –
-   lägg in dem som miljövariabler (hemliga värden hör aldrig hemma i `VITE_`-variabler):
+1. **En gång:** Bundle ID `se.lagomappen.lagom` med **HealthKit** och **In-App Purchase**, appen i
+   App Store Connect, en App Store Connect API-nyckel (rollen **App Manager**) och en privat nyckel
+   för distributionscertifikatet – se [NATIVE.md §10](NATIVE.md#10-steg-för-steg-för-ägaren-utan-mac).
+   Xcode-projektet är redan klart (bara iPhone, ikon, `ITSAppUsesNonExemptEncryption` = NO,
+   kamera- och Hälsa-texter, integritetsmanifest).
+2. **Webbdelen** byggs skarpt i molnbygget (`npm run build:ios`) med dina uppgifter som
+   variabler – samma som i Netlifys produktion:
 
    | Variabel | Vad |
    | --- | --- |
-   | `VITE_DISTRIBUTION` | `appstore` |
    | `VITE_API_BASE` | Webbplatsens adress med `https://` (serverfunktionerna) |
    | `VITE_SELLER_NAME`, `VITE_SELLER_ADDRESS`, `VITE_SELLER_PHONE` | Dina uppgifter som säljare (enskild firma: ditt namn) – visas i köpvillkoren |
    | `VITE_SELLER_ORGNR` | Frivilligt (bara en varning utan): för enskild firma ditt personnummer, som då blir offentligt. Läs rutan om det i docs/BETALNING.md |
    | `VITE_SUPPORT_EMAIL` | Supportadressen (inte en exempeladress) |
-   | `VITE_LICENSE_PUBLIC_KEY` | Behövs inte i App Store-bygget – licensnycklar används inte där |
+   | `VITE_COMMERCE_MODE` | `live` – molnbygget vägrar annars (i testläge godtas osignerade testlicenser från säkerhetskopior) |
+   | `VITE_LICENSE_PUBLIC_KEYS` | Samma publika licensnyckel som på Netlify (krävs i skarpt läge; licensnycklar kan inte klistras in i App Store-appen) |
 
-   Bygget stoppas också tills köp i appen är inkopplade (`NATIVE_PURCHASES_READY`, se avsnitt 6).
-   Ett testbygge för simulatorn eller skärmdumpar: lägg till `LAGOM_ALLOW_STORE_WITHOUT_IAP=1`
-   framför kommandot – och skicka aldrig in det bygget. De fristående sidorna (integritetspolicy,
-   villkor, support, radering) tas bort ur `dist-native/`: i appen finns policyn och villkoren som
-   egna sidor med iPhone-text, och de fristående sidorna finns bara på webbplatsen.
-2. **Xcode-projektet** (en gång, i molnbygget eller på en lånad Mac): Bundle ID, ditt team,
-   bara iPhone, ikon från `store-assets/app-store-icon-1024.png`, `ITSAppUsesNonExemptEncryption`
-   = NO, `NSCameraUsageDescription` och privacy manifest.
-3. **Versionsnummer:** marknadsversionen (t.ex. 1.0.0) följer `version` i `package.json`;
-   byggnumret måste öka för varje uppladdning.
-4. **Arkivera och ladda upp** – molnbygget signerar med en App Store Connect API-nyckel och
-   laddar upp till TestFlight.
-5. **TestFlight:** installera TestFlight-appen på din iPhone, testa köp med ett
-   sandbox-konto (*App Store Connect → Användare och åtkomst → Sandbox*), Återställ köp,
-   streckkodsläsaren och exportera/radera data.
+   Byggkontrollen (`scripts/commerce-guard.ts`) stoppar bygget om något saknas. Ett testbygge med
+   `LAGOM_ALLOW_STORE_WITHOUT_IAP=1` (simulator, skärmdumpar) görs bara i kontrollbygget
+   (`native.yml`) och skickas aldrig in. De fristående sidorna (integritetspolicy, villkor,
+   support, radering) tas bort ur `dist-native/`: i appen finns policyn och villkoren som egna
+   sidor med iPhone-text.
+3. **Versionsnummer:** marknadsversionen (t.ex. 1.0.0) tas från `version` i `package.json`;
+   byggnumret är körningens nummer i GitHub (plus `LAGOM_BUILD_NUMBER_OFFSET`) eller App Store
+   Connects senaste + 1 i Codemagic. Molnbygget kontrollerar båda i den färdiga IPA:n.
+4. **Signera och ladda upp:** molnbygget hämtar (eller skapar första gången)
+   distributionscertifikatet och en App Store-profil via API-nyckeln, arkiverar med Xcode 26,
+   kontrollerar att HealthKit finns i appens behörigheter och laddar upp till App Store Connect.
+5. **TestFlight:** efter uppladdningen behandlar Apple bygget (upp till en timme). Interna testare
+   får det direkt; installera TestFlight-appen på din iPhone. Testa köp (avsnitt 6), Återställ
+   köp, streckkodsläsaren, Apple Hälsa, påminnelser, export/delning och radering av data – och
+   att appen fungerar utan uppkoppling.
 6. **Skicka in:** välj bygget under versionen, fyll i allt i den här filen och tryck på
    *Lägg till för granskning*. Svaret kommer oftast inom ett par dygn.
 
@@ -481,9 +524,12 @@ Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och s
 - [ ] `https://<domän>/support/`, `/integritet/` och `/villkor/` fungerar.
 - [ ] Namn, undertitel, beskrivning, nyckelord, kategori och URL:er inlagda.
 - [ ] Ikon och 3–10 skärmdumpar (1 320 × 2 868 px) från den version som skickas in.
-- [ ] Köp i appen `livstid` och `ar` skapade, prissatta, bara Sverige, med granskningsbild – och `prov14` (0 kr) om provperioden görs i App Store (avsnitt 6).
+- [ ] Köp i appen `prov14` (0 kr), `livstid` och `ar` skapade, prissatta, bara Sverige, med granskningsbild, och valda för den här versionen (avsnitt 6) – appen köper `prov14` när provperioden startas.
+- [ ] Köpen provade i TestFlight enligt "Testa köpen" ovan (provperioden, avbrutet köp, Återställ köp, förnyelse i förväg, flygplansläge).
 - [ ] Välkomstflödet säger före provperioden hur lång den är, vad som kräver köp efteråt och vad licenserna kostar (butikens priser – kontrollera i TestFlight att de syns).
-- [ ] Bygget är gjort **utan** `LAGOM_ALLOW_STORE_WITHOUT_IAP` och med `NATIVE_PURCHASES_READY = true`.
+- [ ] Bygget kommer från molnbygget (`release.yml` eller `codemagic.yaml`) – **utan** `LAGOM_ALLOW_STORE_WITHOUT_IAP`, med `VITE_COMMERCE_MODE=live` och `NATIVE_PURCHASES_READY = true` – och är **inte** markerat "bara intern test".
+- [ ] HealthKit och In-App Purchase påslagna för Bundle ID:t; integritetspolicyn beskriver Apple Hälsa, påminnelser och köp via App Store.
+- [ ] Testat i TestFlight på en riktig iPhone: Apple Hälsa (koppla, neka, koppla bort), påminnelser (tillåt/neka notiser), streckkodsläsaren (och nekad kamera), export via delningsbladet.
 - [ ] App Privacy, åldersklassning, MDR = Nej, export compliance, Content Rights besvarade.
 - [ ] Tillgänglighet: bara Sverige. Enheter: bara iPhone.
 - [ ] Granskningsanteckningarna ovan inklistrade.
@@ -499,7 +545,9 @@ Du har ingen Mac – bygget och uppladdningen görs i molnet. Jämförelse och s
 | 2.3.10 Andra plattformar | Texten nämner Android eller webben. | Håll texterna som ovan. |
 | 3.1.1 Köp i appen | Länk till eller omnämnande av webbköp. | App Store-bygget visar inga webbpriser eller licensnycklar. |
 | 3.1.2 Återställning | Köp går inte att återställa. | Knappen Återställ köp finns på två ställen. |
-| 4.2 Minsta funktion | Appen upplevs som en webbsida i ett skal. | Nämn i anteckningarna att allt fungerar offline, med lokal lagring och streckkodsläsare. |
+| 4.2 Minsta funktion | Appen upplevs som en webbsida i ett skal. | Anteckningarna nämner de inbyggda funktionerna (Apple Hälsa, påminnelser, streckkodsläsare med Vision, delningsbladet) och att allt fungerar offline. |
+| 2.5.1 / 5.1.3 HealthKit | Kopplingen nämns inte i beskrivningen, syns inte tydligt i appen eller saknas i integritetspolicyn. | Raden om Apple Hälsa i beskrivningen, Inställningar → Apple Hälsa i appen, och ett stycke om Hälsa i policyn. |
+| 5.1.1 Behörigheter | Appen frågar om kamera, Hälsa eller notiser utan att det behövs just då. | Frågorna kommer först när användaren själv startar streckkodsläsaren, kopplar Hälsa eller slår på en påminnelse. |
 | 5.1.1 Integritet | Integritetspolicyn saknas eller stämmer inte med App Privacy. | Samma uppgifter i båda (se avsnitt 7). |
 | 1.4.1 Hälsa | Påståenden om medicinsk effekt. | Texten säger "allmän information och uppskattningar – inte medicinsk rådgivning". |
 

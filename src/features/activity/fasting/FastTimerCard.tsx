@@ -20,6 +20,7 @@ import {
   protocolById,
 } from '../fastingLogic'
 import { useNow } from '../hooks'
+import { haptic } from '../../../native'
 
 export interface ActiveFast {
   start: number
@@ -68,6 +69,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
     }
     const rec = useFastingStore.getState().endFast()
     if (!rec) return
+    haptic('success')
     toast(endMessage(rec), { tone: 'success' })
     onEnded(rec)
   }

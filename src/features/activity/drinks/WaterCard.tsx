@@ -12,6 +12,7 @@ import { useProfileStore } from '../../../stores/profileStore'
 import type { ISODate } from '../../../types'
 import { waterPresets } from '../drinksLogic'
 import { requireAccess } from '../../premium/requireAccess'
+import { haptic } from '../../../native'
 
 export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISODate; targetMl: number }) {
   const waterMl = useDiaryStore((s) => s.water[date] ?? 0)
@@ -26,6 +27,7 @@ export const WaterCard = memo(function WaterCard({ date, targetMl }: { date: ISO
   const addWater = (ml: number) => {
     if (!requireAccess('vatten')) return false
     changeWater(ml)
+    haptic('tap')
     return true
   }
 

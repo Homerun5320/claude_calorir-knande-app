@@ -36,12 +36,17 @@ function markPlaceholders(html: string): string {
   return html.replace(/\[(Företagsnamn|Org\.nr|Adress|Telefon|Momsreg\.nr|E-post)\]/g, '<span class="fyll">[$1]</span>')
 }
 
-function inlineHtml(text: string): string {
+/**
+ * `standalone`: sidan visas fristående (Health Connect i Android-appen) – länkar till appens andra
+ * sidor blir vanlig text, så att man inte kan gå vidare till webbplatsens villkor med webbpriser.
+ */
+function inlineText(text: string, standalone = false): string {
   const html = parseInline(text)
     .map((p) => {
       if (!p.href) return esc(p.text)
       const internal = HTML_INTERNAL[p.href]
-      if (internal) return `<a href="${internal}">${esc(p.text)}</a>`
+      if (internal) return standalone ? esc(p.text) : `<a href="${internal}">${esc(p.text)}</a>`
+      if (standalone && p.href.startsWith('lagom:')) return esc(p.text)
       return `<a href="${esc(p.href)}" rel="noopener noreferrer">${esc(p.text)}</a>`
     })
     .join('')
@@ -113,7 +118,8 @@ const CSS = `
       footer { margin-top: 2rem; color: var(--ink-3); font-size: 0.875rem; }
 `
 
-function sectionHtml(s: LegalSection): string {
+function sectionHtml(s: LegalSection, standalone = false): string {
+  const inlineHtml = (text: string) => inlineText(text, standalone)
   const out: string[] = []
   out.push(`      <section class="kort" id="${esc(s.id)}" aria-labelledby="${esc(s.id)}-rubrik">`)
   out.push(`        <h2 id="${esc(s.id)}-rubrik">${esc(s.heading)}</h2>`)
@@ -146,18 +152,23 @@ function sectionHtml(s: LegalSection): string {
   return out.join('\n')
 }
 
-/** En fristående HTML-sida (utan JavaScript) med hela texten. */
-export function renderLegalHtml(doc: LegalDocSpec, related: ReadonlyArray<{ href: string; label: string }>): string {
+/**
+ * En fristående HTML-sida (utan JavaScript) med hela texten. `standalone`: utan länkar till andra
+ * sidor och utan ikon (sidan visas inne i Android-appen, se legalDocs.ts).
+ */
+export function renderLegalHtml(doc: LegalDocSpec, related: ReadonlyArray<{ href: string; label: string }>, opts: { standalone?: boolean } = {}): string {
+  const standalone = opts.standalone === true
   const toc = doc.sections.map((s) => `          <li><a href="#${esc(s.id)}">${esc(s.heading)}</a></li>`).join('\n')
   const links = [...related, { href: '../', label: 'Öppna Lagom' }].map((r) => `<a href="${esc(r.href)}">${esc(r.label)}</a>`).join(' · ')
+  const icon = standalone ? '' : '\n    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />'
+  const footer = standalone ? '' : `\n      <footer>\n        <p>${links}</p>\n      </footer>`
   return `<!doctype html>
 <html lang="sv">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${esc(doc.title)} – Lagom</title>
-    <meta name="description" content="${esc(doc.description)}" />
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <meta name="description" content="${esc(doc.description)}" />${icon}
     <style>${CSS}    </style>
   </head>
   <body>
@@ -174,10 +185,7 @@ export function renderLegalHtml(doc: LegalDocSpec, related: ReadonlyArray<{ href
 ${toc}
         </ol>
       </nav>
-${doc.sections.map(sectionHtml).join('\n')}
-      <footer>
-        <p>${links}</p>
-      </footer>
+${doc.sections.map((s) => sectionHtml(s, standalone)).join('\n')}${footer}
     </main>
   </body>
 </html>
@@ -234,7 +242,8 @@ function sectionMd(s: LegalSection): string {
   if (s.items?.length || s.webItems?.length || s.keyItems?.length) out.push('')
   if (s.table) out.push(...tableMd(s.table), '')
   for (const p of s.closing ?? []) out.push(inlineMd(p), '')
-  if (s.appStore) out.push(...appStoreMd(s.appStore), '')
+  if (s.appStore) out.push(...variantMd('I iPhone-appen (App Store) står i stället:', s.appStore), '')
+  if (s.play) out.push(...variantMd('I Google Play-appen står i stället:', s.play), '')
   if (s.ownerNote) out.push(`> **Till ägaren:** ${s.ownerNote}`, '')
   return out.join('\n')
 }
@@ -247,9 +256,9 @@ function tableMd(table: LegalTable): string[] {
   ]
 }
 
-/** iPhone-appens egen text, som ett citat under avsnittet (bara i docs/). */
-function appStoreMd(v: LegalVariant): string[] {
-  const lines: string[] = ['**I iPhone-appen (App Store) står i stället:**', '']
+/** En apps egen text (iPhone-appen eller Google Play-appen), som ett citat under avsnittet (bara i docs/). */
+function variantMd(label: string, v: LegalVariant): string[] {
+  const lines: string[] = [`**${label}**`, '']
   if (v.heading) lines.push(`Rubrik: ${inlineMd(v.heading)}`, '')
   for (const p of v.paragraphs ?? []) lines.push(inlineMd(p), '')
   for (const t of v.items ?? []) lines.push(`- ${inlineMd(t)}`)

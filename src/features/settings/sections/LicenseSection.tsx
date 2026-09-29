@@ -14,6 +14,7 @@ import { useLicenseStore } from '../../../stores/licenseStore'
 import { LicenseActivation, LicenseManage, LicenseRecovery, StatusHero, TestModeBanner } from '../../premium/components'
 import { storeAccountName } from '../../premium/premiumLogic'
 import { RestorePurchasesButton } from '../../premium/RestorePurchasesButton'
+import { StartTrialButton } from '../../premium/StartTrialButton'
 
 export function LicenseSection() {
   const { status, checking } = useAccess()
@@ -36,7 +37,9 @@ export function LicenseSection() {
           actions={
             lifetime ? undefined : (
               <>
-                <Button to="/premium" iconRight={ArrowRight}>
+                {/* iPhone-appen: provperioden startas med ett gratis köp i App Store. */}
+                {status.kind === 'ejstartad' && <StartTrialButton />}
+                <Button to="/premium" variant={status.kind === 'ejstartad' ? 'secondary' : 'primary'} iconRight={ArrowRight}>
                   {status.kind === 'licensierad' ? 'Förnya eller uppgradera' : 'Se priser och köp'}
                 </Button>
                 {status.kind === 'utgangen' && (

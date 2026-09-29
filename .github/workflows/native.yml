@@ -1,11 +1,15 @@
-# De inbyggda apparna (Capacitor): kontrollbygge av Android-appen och, när du ber om det,
-# iPhone-appen. Här signeras och laddas inget upp – det görs i molnbygget för butikerna (se
-# docs/NATIVE.md och docs/IOS-BYGGE-I-MOLNET.md). Android SDK finns på GitHubs Linux-maskiner och
-# Xcode på macOS-maskinerna; lokalt behövs varken eller.
+# De inbyggda apparna (Capacitor): KONTROLLBYGGE av Android-appen och, när du ber om det,
+# iPhone-appen. Här signeras och laddas inget upp – butiksbyggena (signerade, till Google Play och
+# TestFlight) görs av release.yml eller codemagic.yaml (se docs/NATIVE.md §9). Android SDK finns
+# på GitHubs Linux-maskiner och Xcode på macOS-maskinerna; lokalt behövs varken eller.
 #
 # Webbdelen byggs som TESTBYGGE (LAGOM_ALLOW_STORE_WITHOUT_IAP=1) – paketen härifrån får aldrig
 # skickas in. Byggkontrollen kräver säljaruppgifter: lägg in dina riktiga som Variables
 # (Settings → Secrets and variables → Actions → Variables); annars används testvärdena nedan.
+#
+# macOS-minuter räknas tio gånger i privata repon, så iPhone-bygget körs bara på begäran
+# (Actions → Native-appar → Run workflow → "Bygg även iPhone-appen"). Android-kontrollen körs på
+# Linux när något som påverkar appskalet ändras.
 #
 # OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
 name: Native-appar
@@ -18,13 +22,34 @@ on:
         type: boolean
         default: false
   pull_request:
+    # Samma lista under push – håll dem lika.
     paths:
       - android/**
       - ios/**
       - capacitor.config.ts
       - package.json
       - package-lock.json
+      - .nvmrc
+      - vite.config.ts
       - src/native/**
+      - src/lib/storePurchases.ts
+      - scripts/commerce-guard.ts
+      - scripts/native-config.mjs
+      - scripts/check-android-16kb.mjs
+      - .github/workflows/native.yml
+  push:
+    branches: [main]
+    paths:
+      - android/**
+      - ios/**
+      - capacitor.config.ts
+      - package.json
+      - package-lock.json
+      - .nvmrc
+      - vite.config.ts
+      - src/native/**
+      - src/lib/storePurchases.ts
+      - scripts/commerce-guard.ts
       - scripts/native-config.mjs
       - scripts/check-android-16kb.mjs
       - .github/workflows/native.yml
@@ -82,7 +107,7 @@ jobs:
           node scripts/check-android-16kb.mjs android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Spara test-APK:n (kan installeras på en Android-telefon för test)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lagom-android-testbygge
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -91,7 +116,7 @@ jobs:
   ios:
     name: iPhone (simulatorbygge utan signering)
     if: github.event_name == 'workflow_dispatch' && inputs.ios
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - name: Hämta koden
@@ -103,11 +128,17 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Xcode 26 (App Store kräver iOS 26-SDK:n)
+      - name: Xcode 26 eller senare (App Store kräver iOS 26-SDK:n)
         run: |
-          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          # Senaste stabila Xcode 26+ (betaversioner kan inte ladda upp till App Store).
+          XCODE="$(find /Applications -maxdepth 1 -name 'Xcode_2[6-9]*.app' ! -iname '*beta*' | sort -V | tail -1)"
           if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
           xcodebuild -version
+          MAJOR="$(xcodebuild -version | awk 'NR==1 { split($2, v, "."); print v[1] }')"
+          if [ "${MAJOR:-0}" -lt 26 ]; then
+            echo "::error::Xcode 26 eller senare krävs (hittade $(xcodebuild -version | head -1))."
+            exit 1
+          fi
 
       - name: Installera beroenden
         run: npm ci
@@ -120,3 +151,11 @@ jobs:
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
           -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
           CODE_SIGNING_ALLOWED=NO build
+
+      - name: Spara Package.resolved (checka in den, så att Swift-paketen låses)
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-ios-package-resolved
+          path: ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+          if-no-files-found: ignore
+          retention-days: 14

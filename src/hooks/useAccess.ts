@@ -11,6 +11,14 @@
  * Exempeldata är skrivskyddad: medan den visas går inget nytt att logga, och provperioden
  * startar inte förrän den egna profilen skapas.
  *
+ * I iPhone-appen (`trialViaStore()`) startas provperioden i stället med ett gratis köp i App Store
+ * ('prov14', riktlinje 3.1.1) och räknas från köpet. Tills dess är statusen 'ejstartad': allt går
+ * att titta på, men ny loggning kräver att provperioden startas (eller en licens).
+ *
+ * Köpen i appen hämtas från butiken vid start och när appen återfår fokus. De senast kända sparas
+ * på enheten (`STORE_CACHE_KEY`), så att den som har betalat inte stängs ute när butiken inte svarar
+ * (t.ex. utan uppkoppling) – och en hämtning som misslyckas görs om efter en stund.
+ *
  * - `accessStatus` – ren funktion (testbar utan React).
  * - `currentAccess()` – synkron status ur butikerna, för kod utanför React (t.ex. `requireAccess`).
  * - `useAccess()` – samma status som hook; verifierar licensnyckeln (WebCrypto) och uppdateras
@@ -18,10 +26,10 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
-import { allowsLicenseKeyEntry } from '../config/platform'
+import { allowsLicenseKeyEntry, trialViaStore } from '../config/platform'
 import { isDemoData } from '../lib/demoFlag'
 import { verifyLicense, type LicenseCheck, type LicensePayload } from '../lib/license'
-import { getStorePurchases, type StoreEntitlement } from '../lib/storePurchases'
+import { getStorePurchases, STORE_PRODUCT_IDS, type StoreEntitlement, type StoreProductId } from '../lib/storePurchases'
 import { useLicenseStore } from '../stores/licenseStore'
 import { useProfileStore } from '../stores/profileStore'
 import {
@@ -57,6 +65,11 @@ export type AccessStatus =
   | { kind: 'utgangen'; endedAt: number; licenseExpired: boolean; revoked?: boolean }
   /** Ingen profil ännu (välkomstflödet eller exempeldata) – provperioden har inte startat. */
   | { kind: 'ny' }
+  /**
+   * iPhone-appen (`trialViaStore()`): profilen finns, men provperioden har inte startats med det
+   * gratis köpet i App Store ('prov14') och ingen licens finns. Ny loggning kräver att den startas.
+   */
+  | { kind: 'ejstartad' }
 
 // ---------------------------------------------------------------------------
 // Köp i appen
@@ -133,6 +146,13 @@ export function accessStatus(input: {
   trialDays?: number
   /** Köp i appen (App Store, Google Play). */
   store?: readonly StoreEntitlement[]
+  /**
+   * Provperioden startas med köpet 'prov14' (iPhone-appen, `trialViaStore()`): då räknas bara
+   * köpets datum, aldrig `trialStartedAt`.
+   */
+  storeTrial?: boolean
+  /** Med `storeTrial`: den egna profilen finns (inte exempeldata) – då blir statusen 'ejstartad' i stället för 'ny'. */
+  profileReady?: boolean
 }): AccessStatus {
   const { now } = input
   const store = input.store ?? []
@@ -162,8 +182,20 @@ export function accessStatus(input: {
     }
   }
   const storeStart = storeTrialStart(store)
-  const trialStartedAt = storeStart === null ? input.trialStartedAt : Math.min(storeStart, input.trialStartedAt ?? storeStart)
-  if (trialStartedAt === null) return { kind: 'ny' }
+  const trialStartedAt = input.storeTrial
+    ? storeStart
+    : storeStart === null
+      ? input.trialStartedAt
+      : Math.min(storeStart, input.trialStartedAt ?? storeStart)
+  if (trialStartedAt === null) {
+    if (!input.storeTrial) return { kind: 'ny' }
+    // iPhone-appen utan provstart: en utgången eller återkallad licens säger vad som har hänt –
+    // annars väntar provperioden på att startas (eller profilen på att skapas).
+    const expired = Boolean(license && !license.ok && license.reason === 'utgangen') || storeYearExpired(store, now)
+    const revoked = Boolean(license && !license.ok && license.reason === 'aterkallad')
+    if (expired || revoked) return { kind: 'utgangen', endedAt: now, licenseExpired: expired, ...(revoked ? { revoked: true } : {}) }
+    return input.profileReady ? { kind: 'ejstartad' } : { kind: 'ny' }
+  }
   // En provstart i framtiden (klockan gick före när profilen skapades och ställdes sedan tillbaka)
   // räknas som nu – provperioden kan aldrig bli längre än `trialDays`. Starten rättas även i
   // butiken (se useAccess), så att den inte fortsätter att flytta fram slutet.
@@ -181,7 +213,12 @@ export function accessStatus(input: {
 
 /** true om man får logga ny mat, träning, vikt m.m. */
 export function canLog(status: AccessStatus): boolean {
-  return status.kind !== 'utgangen'
+  return status.kind !== 'utgangen' && status.kind !== 'ejstartad'
+}
+
+/** Ny loggning är spärrad tills något köps eller provperioden startas ('utgangen' eller 'ejstartad'). */
+export function isBlockedStatus(status: AccessStatus): boolean {
+  return !canLog(status)
 }
 
 // ---------------------------------------------------------------------------
@@ -194,10 +231,86 @@ const checkListeners = new Set<() => void>()
 let checkVersion = 0
 
 const EMPTY_ENTITLEMENTS: readonly StoreEntitlement[] = []
-let storeEntitlements: readonly StoreEntitlement[] = EMPTY_ENTITLEMENTS
+
+/**
+ * De senast kända köpen i appen (localStorage, bara i apparna): vilken produkt, köpdatum, slutdatum
+ * och butik – inga kvitton, id:n eller tokens. Används när butiken inte svarar (t.ex. utan
+ * uppkoppling, eller när Google Play inte går att nå), så att den som har betalat inte stängs ute.
+ * Ersätts varje gång butiken svarar – ett återbetalt köp försvinner då även härifrån. Följer inte
+ * med i säkerhetskopian (köpen följer butikskontot och hämtas med "Återställ köp").
+ */
+export const STORE_CACHE_KEY = 'lagom-butikskop'
+
+const isStoreProductId = (v: unknown): v is StoreProductId => typeof v === 'string' && (STORE_PRODUCT_IDS as readonly string[]).includes(v)
+const positiveTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0
+
+/** Tolka de sparade köpen – ett skadat värde blir en tom lista i stället för ett fel. */
+export function parseStoreCache(raw: unknown): StoreEntitlement[] {
+  if (typeof raw !== 'object' || raw === null || (raw as { v?: unknown }).v !== 1) return []
+  const list = (raw as { entitlements?: unknown }).entitlements
+  if (!Array.isArray(list)) return []
+  return list.flatMap((item): StoreEntitlement[] => {
+    if (typeof item !== 'object' || item === null) return []
+    const { product, purchasedAt, expiresAt, source } = item as Record<string, unknown>
+    if (!isStoreProductId(product) || !positiveTime(purchasedAt) || (source !== 'appstore' && source !== 'play')) return []
+    if (expiresAt !== undefined && !positiveTime(expiresAt)) return []
+    return [{ product, purchasedAt, source, ...(expiresAt !== undefined ? { expiresAt } : {}) }]
+  })
+}
+
+/** Finns köp i appen här (de inbyggda apparna)? Bara där sparas och läses köpen. */
+function storeAvailable(): boolean {
+  try {
+    return getStorePurchases().available()
+  } catch {
+    return false
+  }
+}
+
+function readStoreCache(): readonly StoreEntitlement[] {
+  if (!storeAvailable()) return EMPTY_ENTITLEMENTS
+  try {
+    const raw = localStorage.getItem(STORE_CACHE_KEY)
+    const list = raw ? parseStoreCache(JSON.parse(raw)) : []
+    return list.length > 0 ? list : EMPTY_ENTITLEMENTS
+  } catch {
+    return EMPTY_ENTITLEMENTS
+  }
+}
+
+function writeStoreCache(list: readonly StoreEntitlement[]): void {
+  if (!storeAvailable()) return
+  try {
+    if (list.length === 0) localStorage.removeItem(STORE_CACHE_KEY)
+    else localStorage.setItem(STORE_CACHE_KEY, JSON.stringify({ v: 1, entitlements: list }))
+  } catch {
+    // Lagringen kan vara full eller blockerad – köpen gäller ändå tills appen stängs.
+  }
+}
+
+let storeEntitlements: readonly StoreEntitlement[] = readStoreCache()
 let storeRefresh: Promise<void> | null = null
 /** Har butiken svarat (eller misslyckats) minst en gång sedan start? */
 let storeLoaded = false
+
+/** Nya försök när butiken inte svarar: efter 15 s, 1 min och 5 min (sedan när appen återfår fokus och varje timme). */
+export const STORE_RETRY_DELAYS_MS: readonly number[] = [15_000, 60_000, 5 * 60_000]
+let storeRetryTimer: ReturnType<typeof setTimeout> | null = null
+let storeRetryAttempt = 0
+
+function clearStoreRetry(): void {
+  if (storeRetryTimer !== null) clearTimeout(storeRetryTimer)
+  storeRetryTimer = null
+}
+
+function scheduleStoreRetry(): void {
+  if (storeRetryTimer !== null || storeRetryAttempt >= STORE_RETRY_DELAYS_MS.length || !storeAvailable()) return
+  const delay = STORE_RETRY_DELAYS_MS[storeRetryAttempt++]
+  storeRetryTimer = setTimeout(() => {
+    storeRetryTimer = null
+    void refreshStoreEntitlements()
+  }, delay)
+}
 
 /**
  * Köpen i appen har inte hämtats än (bara där köp i appen finns). Då räknas tillgången som
@@ -255,13 +368,21 @@ export function primeLicenseCheck(key: string, result: LicenseCheck): void {
   void prepareRevocationCheck(key)
 }
 
-/** Endast för tester: glöm alla verifieringar och köp i appen. */
+/** Endast för tester: glöm alla verifieringar och köp i appen (även de sparade köpen i minnet). */
 export function resetLicenseChecks(): void {
   checks.clear()
   pending.clear()
   storeEntitlements = EMPTY_ENTITLEMENTS
   storeRefresh = null
   storeLoaded = false
+  clearStoreRetry()
+  storeRetryAttempt = 0
+  notifyChecks()
+}
+
+/** Endast för tester: läs de sparade köpen igen, som när appen startar. */
+export function loadStoreCacheForTests(): void {
+  storeEntitlements = readStoreCache()
   notifyChecks()
 }
 
@@ -284,12 +405,16 @@ export function refreshStoreEntitlements(opts: { fresh?: boolean } = {}): Promis
     try {
       const list = await getStorePurchases().currentEntitlements()
       const next = list.length === 0 ? EMPTY_ENTITLEMENTS : list
+      clearStoreRetry()
+      storeRetryAttempt = 0
+      writeStoreCache(next)
       if (next !== storeEntitlements && !(next.length === 0 && storeEntitlements.length === 0)) {
         storeEntitlements = next
         notifyChecks()
       }
     } catch {
-      /* butiken svarar inte – de senast kända köpen gäller */
+      // Butiken svarar inte – de senast kända (sparade) köpen gäller, och vi försöker igen strax.
+      scheduleStoreRetry()
     } finally {
       storeRefresh = null
       if (!storeLoaded) {
@@ -333,12 +458,14 @@ function computeAccess(input: {
   // En återbetald licens i spärrlistan gäller inte längre (datan finns kvar).
   if (license?.ok && licenseKey && isLicenseRevoked(licenseKey, license.payload)) license = { ok: false, reason: 'aterkallad' }
   const keyChecking = Boolean(licenseKey) && license === null
+  // iPhone-appen: provperioden räknas bara från köpet 'prov14' (se trialViaStore).
+  const storeTrial = trialViaStore()
   // Tills provstarten har sparats räknas provperioden från nu – men aldrig med exempeldata:
   // provperioden startar först när den egna profilen skapas.
-  const start = trialStartedAt ?? (onboardingDone && !demo ? now : null)
-  const status = accessStatus({ trialStartedAt: start, license, now, store })
+  const start = storeTrial ? null : (trialStartedAt ?? (onboardingDone && !demo ? now : null))
+  const status = accessStatus({ trialStartedAt: start, license, now, store, storeTrial, profileReady: onboardingDone && !demo })
   // Köpen i appen spelar bara roll när inget annat ger tillgång.
-  const checking = keyChecking || (status.kind === 'utgangen' && storePending())
+  const checking = keyChecking || (isBlockedStatus(status) && storePending())
   // Exempeldata är skrivskyddad, oavsett provperiod och licens.
   return { status, canLog: !demo && (checking || canLog(status)), checking, demo }
 }
@@ -380,9 +507,10 @@ export function useAccess(): AccessInfo {
 
   // Provperioden startar när profilen skapas (välkomstflödet anropar ensureTrialStarted).
   // Profiler som skapades innan appen fick provperiod får hela provperioden räknad från nu, så att
-  // ingen spärras direkt efter en uppdatering. Exempeldata startar ingen provperiod.
+  // ingen spärras direkt efter en uppdatering. Exempeldata startar ingen provperiod – och i
+  // iPhone-appen startas den bara med köpet 'prov14' (trialViaStore).
   useEffect(() => {
-    if (!onboardingDone || demo || trialStartedAt !== null) return
+    if (!onboardingDone || demo || trialStartedAt !== null || trialViaStore()) return
     ensureTrialStarted(Date.now())
   }, [onboardingDone, demo, trialStartedAt, ensureTrialStarted])
 

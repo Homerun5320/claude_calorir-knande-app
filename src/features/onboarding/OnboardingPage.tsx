@@ -24,7 +24,11 @@ import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
 import { useLicenseStore } from '../../stores/licenseStore'
-import { isInApp } from '../../config/platform'
+import { TRIAL_DAYS } from '../../config/commerce'
+import { isInApp, trialViaStore } from '../../config/platform'
+import { useAccess } from '../../hooks/useAccess'
+import { startStoreTrial, type StoreTrialResult } from '../premium/premiumLogic'
+import { announceTrialResult } from '../premium/StartTrialButton'
 import { backupDateLabel, restoreBackupSafely } from '../settings/backupImport'
 import { ImportSummaryList } from '../settings/ImportSummaryList'
 import { focusFirstInvalid } from './focusFirstInvalid'
@@ -181,6 +185,10 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
   const [attempted, setAttempted] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [demoLoading, setDemoLoading] = useState(false)
+  // iPhone-appen: sista knappen startar provperioden med ett gratis köp i App Store ('prov14') –
+  // bara när varken provperiod eller licens finns (t.ex. inte efter "Återställ köp").
+  const { status } = useAccess()
+  const startsStoreTrial = trialViaStore() && status.kind === 'ny'
 
   const rawStep = searchParams.get(STEP_PARAM)
   const requested = parseStep(rawStep)
@@ -236,14 +244,30 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
   const finish = async () => {
     if (finishing) return
     setFinishing(true)
+    const failed = () => {
+      setFinishing(false)
+      toast('Något saknas i profilen – gå tillbaka och kontrollera uppgifterna.', { tone: 'error' })
+    }
+    let profile: ReturnType<typeof buildProfile>
     try {
-      const profile = buildProfile(draft, { today })
+      profile = buildProfile(draft, { today })
+    } catch {
+      failed()
+      return
+    }
+    // iPhone-appen: när profilen är giltig visas App Stores köpruta för provperioden (texten om
+    // provperioden står i sammanfattningen). Profilen skapas oavsett svar – avbryter man startas
+    // ingen provperiod, och den kan startas senare från Idag eller Lagom Premium.
+    let trial: StoreTrialResult | null = null
+    if (startsStoreTrial) trial = await startStoreTrial()
+    try {
       if (depth > 0) {
         onLeaving()
         navigate(-depth)
       }
       // Provperioden startar när den första profilen är klar (en tidigare start gäller om den finns).
-      useLicenseStore.getState().ensureTrialStarted()
+      // I iPhone-appen räknas den i stället från köpet i App Store (trialViaStore).
+      if (!trialViaStore()) useLicenseStore.getState().ensureTrialStarted()
       setProfile(profile)
       logWeight(today, Math.round((draft.weightKg as number) * 10) / 10)
       updateSettings({ onboardingDone: true, mindfulMode: draft.goalChoice === 'medvetet' })
@@ -251,10 +275,11 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
       // Be webbläsaren skydda datan mot automatisk rensning (väntar inte på svaret).
       void requestPersistentStorage()
       toast(draft.name.trim() ? `Välkommen, ${draft.name.trim()}!` : 'Välkommen till Lagom!', { tone: 'success' })
+      if (trial === 'cancelled') toast(`Provperioden har inte startat. Starta den när du vill – ${TRIAL_DAYS} dagar gratis – från Idag eller Lagom Premium.`)
+      else if (trial) announceTrialResult(trial)
       if (depth === 0) navigate('/', { replace: true })
     } catch {
-      setFinishing(false)
-      toast('Något saknas i profilen – gå tillbaka och kontrollera uppgifterna.', { tone: 'error' })
+      failed()
     }
   }
 
@@ -447,7 +472,7 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
               className={cx(blockedContinue && 'opacity-70')}
               iconRight={current === 'sammanfattning' ? Check : ArrowRight}
             >
-              {welcome ? 'Kom igång' : current === 'sammanfattning' ? 'Börja använda Lagom' : 'Fortsätt'}
+              {welcome ? 'Kom igång' : current === 'sammanfattning' ? (startsStoreTrial ? `Starta ${TRIAL_DAYS} dagar gratis` : 'Börja använda Lagom') : 'Fortsätt'}
             </Button>
             {welcome && (
               <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2">

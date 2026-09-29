@@ -93,8 +93,9 @@ function displayedAsApp(win: Window): boolean {
 
 /**
  * Var körs appen just nu?
- * - 'native': inbyggd app via Capacitor (iPhone-appen).
- * - 'twa': Googles Play-skal runt webbversionen. Känns i första hand igen på ?plattform=play i
+ * - 'native': inbyggd app via Capacitor (iPhone- och Android-appen).
+ * - 'twa': Googles Play-skal runt webbversionen (den tidigare Play-appen; dagens Play-app är
+ *   inbyggd med Capacitor, men äldre installationer kan finnas kvar). Känns i första hand igen på ?plattform=play i
  *   startadressen (se docs/GOOGLE-PLAY.md), och annars på referrern android-app:// när sidan
  *   samtidigt visas som app. Minns under sessionen, eftersom referrern och parametern kan
  *   försvinna när man navigerar.
@@ -196,6 +197,18 @@ export function allowsLicenseKeyEntry(): boolean {
   if (DISTRIBUTION === 'appstore') return false
   if (isNativeIos()) return false
   return true
+}
+
+/**
+ * Startas provperioden med ett gratis köp i App Store ('prov14')? Apples riktlinje 3.1.1: en app
+ * utan prenumeration som erbjuder en tidsbegränsad gratis provperiod ska göra det som ett
+ * icke-förbrukningsbart köp för 0 kr. Gäller bara den inbyggda iPhone-appen från App Store-bygget.
+ * Där räknas provperioden från köpet, som följer Apple-kontot (och kommer tillbaka med "Återställ
+ * köp"). Webben, Google Play och butiksbygget i en vanlig webbläsare har kvar den lokala
+ * provperioden, som startar när profilen skapas.
+ */
+export function trialViaStore(): boolean {
+  return DISTRIBUTION === 'appstore' && RUNTIME === 'native'
 }
 
 /**

@@ -26,7 +26,7 @@ import {
   type LegalContext,
 } from './legalContent'
 import { htmlToText, sectionTexts } from './legalExport'
-import { LEGAL_FILES, privacyHtml, privacyMarkdown, termsDoc, termsHtml, termsMarkdown, userTermsMarkdown } from './legalDocs'
+import { LEGAL_FILES, privacyAndroidDoc, privacyAndroidHtml, privacyHtml, privacyMarkdown, termsDoc, termsHtml, termsMarkdown, userTermsMarkdown } from './legalDocs'
 import { fillSellerPlaceholders, missingSellerPlaceholders } from './staticSeller'
 import { BodyStats } from '../body/BodyStats'
 import { bodyOverview } from '../body/bodyLogic'
@@ -66,6 +66,8 @@ describe('legalContent', () => {
       'Lagring på din enhet',
       'Tjänster som appen kontaktar',
       'Kameran',
+      'Apple Hälsa och Health Connect',
+      'Påminnelser',
       'När du köper',
       'Varför vi får behandla uppgifterna',
       'Hur länge vi sparar',
@@ -103,6 +105,10 @@ describe('legalContent', () => {
     for (const row of table?.rows ?? []) expect(row).toHaveLength(5)
     const text = table?.rows.flat().join(' ') ?? ''
     for (const where of ['IndexedDB', 'lagom-theme', 'sessionStorage', 'lagom-korg', 'lagom-demo', 'lagom-last-backup', 'lagom-sparrlista', 'lagom-error-log', 'Service workerns cache']) {
+      expect(text).toContain(where)
+    }
+    // Apparnas egen lagring: hälsokopplingen, den automatiska kopian, exportfilerna och påminnelserna.
+    for (const where of ['lagom-health', 'lagom-spegling.json', 'mappen delning', 'Telefonens notissystem', 'lagom-butikskop']) {
       expect(text).toContain(where)
     }
   })
@@ -198,15 +204,42 @@ describe('legalContent', () => {
 
   it('iPhone-appen nämner bara iPhone och App Store – inte Google Play, webbläsare eller licensnycklar', () => {
     const text = textFor(APPSTORE)
-    for (const word of [/Google Play/, /Google-konto/, /Android/, /webbläsar/i, /service worker/i, /licensnyckel/i, /licensnycklar/i, /lagom-twa/, /sparrlista/, /webbplatsens data/, /Safari|Chrome|Firefox|Edge/]) {
+    for (const word of [/Google Play/, /Google-konto/, /Android/, /Health Connect/, /ZXing/, /webbläsar/i, /service worker/i, /licensnyckel/i, /licensnycklar/i, /lagom-twa/, /sparrlista/, /webbplatsens data/, /Safari|Chrome|Firefox|Edge/]) {
       expect(text).not.toMatch(word)
     }
     expect(text).toContain('Den här policyn gäller Lagom för iPhone')
     expect(text).toContain('I App Store sköter Apple betalningen')
     expect(text).toContain('Köp i App Store följer ditt Apple-konto')
     expect(visibleSections(TERMS_SECTIONS, APPSTORE).find((s) => s.id === 'butikerna')?.heading).toBe('Köp i App Store')
+    expect(visibleSections(PRIVACY_SECTIONS, APPSTORE).find((s) => s.id === 'halsa')?.heading).toBe('Apple Hälsa')
+    expect(text).toContain('lagom-spegling.json')
+    expect(text).toContain('iCloud')
     // Varianten gäller bara iPhone-appen – på webben och i Play-appen står den vanliga texten.
     expect(textFor(PLAY)).toContain('Den här policyn gäller Lagom på webben och i App Store och Google Play')
+  })
+
+  it('Google Play-appen nämner inga webbköp, webbläsare eller service worker', () => {
+    const text = textFor(PLAY)
+    for (const word of [/köp på webben/, /Stripe/, /service worker/i, /webbplatsens data/, /Safari|Chrome|Firefox|Edge/, /lagom-twa/]) {
+      expect(text).not.toMatch(word)
+    }
+    // Dagboken och kameran beskrivs för Android-appen, inte för webbläsaren.
+    for (const id of ['dagbok', 'kameran']) {
+      expect(JSON.stringify(visibleSections(PRIVACY_SECTIONS, PLAY).find((s) => s.id === id))).not.toMatch(/webbläsar/i)
+    }
+    expect(text).toContain('Google Play: när du köper i appen')
+    expect(text).toContain('lagom-butikskop')
+    // Lagringstabellen i Play-appen tar upp samma lagring i localStorage som på webben (utom temat i webbläsaren).
+    const play = visibleSections(PRIVACY_SECTIONS, PLAY).find((s) => s.id === 'lagring')?.table?.rows.flat().join(' ') ?? ''
+    for (const where of ['lagom-sparrlista', 'lagom-theme', 'lagom-demo', 'lagom-last-backup', 'lagom-error-log', 'lagom-health', 'lagom-spegling.json', 'lagom-butikskop']) expect(play).toContain(where)
+  })
+
+  it('iPhone-appen: provperioden startas med ett gratis köp i App Store, och spärrlistan finns inte i rättslig grund', () => {
+    const text = textFor(APPSTORE)
+    expect(text).toContain('Du startar provperioden med ett gratis köp i App Store när')
+    expect(text).toContain('lagom-butikskop')
+    const grounds = visibleSections(PRIVACY_SECTIONS, APPSTORE).find((s) => s.id === 'rattslig-grund')
+    expect(grounds?.items?.join(' ')).not.toMatch(/spärrlist/i)
   })
 
   it('spärrlistan nämns där licensnycklar kan aktiveras (webben och Play-appen), inte i iPhone-appen', () => {
@@ -292,8 +325,21 @@ describe('de fristående sidorna och docs/ stämmer med appen', () => {
     for (const t of termsSections(STATIC_SELLER).flatMap(sectionTexts)) expect(text).toContain(norm(t))
   })
 
+  it('integritetspolicyn för Android-appen (Health Connect) har Play-texten och inga länkar vidare', async () => {
+    await expect(privacyAndroidHtml()).toMatchFileSnapshot(`../../../${LEGAL_FILES.privacyAndroidHtml}`)
+    const html = await readRepoFile(LEGAL_FILES.privacyAndroidHtml)
+    const text = norm(htmlToText(html))
+    for (const t of privacyAndroidDoc().sections.flatMap(sectionTexts)) expect(text).toContain(norm(t))
+    // Inga webbköp, inga länkar till villkoren eller appens andra sidor, ingen ikon utanför appen.
+    for (const word of [/Stripe/, /köp på webben/, /\d\s?kr\b/, /service worker/i, /webbplatsens data/, /villkor\//, /href="\.\.\//]) expect(html).not.toMatch(word)
+    expect(html).not.toContain('<footer>')
+    expect(text).toContain('Health Connect')
+    expect(text).toContain('Google Play: när du köper i appen')
+    expect(text).toContain('lagom-butikskop')
+  })
+
   it('de fristående sidorna fungerar utan JavaScript, på svenska och i mörkt läge', async () => {
-    for (const path of [LEGAL_FILES.privacyHtml, LEGAL_FILES.termsHtml]) {
+    for (const path of [LEGAL_FILES.privacyHtml, LEGAL_FILES.termsHtml, LEGAL_FILES.privacyAndroidHtml]) {
       const html = await readRepoFile(path)
       expect(html.startsWith('<!doctype html>')).toBe(true)
       expect(html).toContain('<html lang="sv">')

@@ -32,6 +32,7 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator, och förbereds fö
 - **Insikter**: näring mot NNR 2023, Livsmedelsverkets kostråd, Tallriksmodellen, klimatavtryck (kg CO2e) och mönster – och en rapport att skriva ut (`/rapport`, bara på webben).
 - **Träning, dryck och fasta**: aktiviteter med MET-värden (längdskidor, innebandy, padel …), vatten, koffein, alkohol i standardglas och en fastetimer.
 - **Inställningar**: mål, måltider, tema, medvetet läge samt export/import och radering. Integritetspolicyn (`/integritet`) och köp- och användarvillkoren (`/villkor`) finns i appen och som fristående sidor.
+- **Bara i apparna för iPhone och Android**: telefonens egen streckkodsläsare, export och delning med delningsbladet, frivilliga påminnelser (lokala notiser), en frivillig koppling till Apple Hälsa eller Health Connect (vikt och steg in, energi, vatten och vikt ut), haptik, en automatisk kopia av dagboken på telefonen och Androids bakåtknapp.
 
 ## Livsmedelsdatabasen
 
@@ -58,7 +59,7 @@ Välj **Utforska med exempeldata** på välkomstskärmen. Då fylls appen med tv
 Lagom är gratis att prova i 14 dagar. Sedan köper man en **Årslicens (349 kr, 365 dagar, förnyas inte automatiskt)** eller en **Livstidslicens (699 kr, engångsköp)**. Livstid betyder för alltid, och felrättningar ingår – men inte ett löfte om alla framtida funktioner. Priserna på webben är inklusive moms (se [Moms](#moms) nedan).
 
 - **På webben** görs köpet via Stripe Checkout (kort, Klarna, Swish) och ger en signerad licensnyckel som appen kontrollerar offline – inget konto behövs. Återbetalda köp spärras med en signerad spärrlista, och den som tappat nyckeln kan hämta den igen med e-post och kvittonummer.
-- **I App Store och Google Play** görs köpet bara i appen (Apple IAP respektive Google Play Billing), och priset kommer från butiken. I App Store-bygget går det inte att klistra in licensnycklar – köp återställs via Apple-ID med "Återställ köp", och den som köpt på webben får en erbjudandekod via supporten. Köp i appen är ännu inte inkopplat (se [Plattformar och butiker](#plattformar-och-butiker)).
+- **I App Store och Google Play** görs köpet bara i appen (Apple IAP respektive Google Play Billing), och priset kommer från butiken. I App Store-bygget går det inte att klistra in licensnycklar – köp återställs via Apple-ID med "Återställ köp", och den som köpt på webben får en erbjudandekod via supporten. Köpen i appen är inkopplade men ska provas i TestFlight och Play-testning före inskickning (se [Plattformar och butiker](#plattformar-och-butiker)).
 
 Serverdelen är sex små Netlify Functions utan databas: `create-checkout`, `verify-purchase`, `stripe-webhook`, `recover-license`, `license-revocations` och `recipe-fetch` (receptimporten). De publika adresserna har anropsbegränsning i `netlify.toml`.
 
@@ -101,9 +102,9 @@ VITE_SELLER_NAME="…" VITE_SELLER_ORGNR="…" VITE_SELLER_ADDRESS="…" VITE_SE
 VITE_SUPPORT_EMAIL="…" npm run build:ios
 ```
 
-I butiksbygget finns ingen service worker (uppdateringar kommer via butiken), CSP:n läggs som meta-tagg i `index.html` (samma regler som `netlify.toml`, plus `VITE_API_BASE`), och varken Stripe-köp, kronpriser eller licensnyckelaktivering (App Store) visas. Köpen i appen görs med `@capgo/native-purchases` (StoreKit 2 och Play Billing, utan egen server); tills de är inkopplade (`NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts`) stoppar byggkontrollen butiksbyggen utom testbyggen (`LAGOM_ALLOW_STORE_WITHOUT_IAP=1`). Själva apparna byggs i CI (`.github/workflows/native.yml`) eller i molnet – Android SDK och Xcode behövs inte lokalt.
+I butiksbygget finns ingen service worker (uppdateringar kommer via butiken), CSP:n läggs som meta-tagg i `index.html` (samma regler som `netlify.toml`, plus `VITE_API_BASE`), och varken Stripe-köp, kronpriser eller licensnyckelaktivering (App Store) visas. Köpen i appen görs med `@capgo/native-purchases` (StoreKit 2 och Play Billing, utan egen server) i `src/native/purchases.ts`. De är inkopplade (`NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts` är true) men bara testade med ett mockat tillägg – prova köp, avbrutet köp, "Återställ köp" och butikens priser i TestFlight och Play-testning före första inskickningen. Själva apparna byggs i CI (`.github/workflows/native.yml` för kontrollbyggen, `.github/workflows/release.yml` eller `codemagic.yaml` för signerade byggen till TestFlight och Google Play intern test) – Android SDK och Xcode behövs inte lokalt.
 
-Steg för steg: [`docs/APP-STORE.md`](docs/APP-STORE.md), [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md) och [`docs/IOS-BYGGE-I-MOLNET.md`](docs/IOS-BYGGE-I-MOLNET.md) (iPhone-bygget i molnet, utan egen Mac).
+Steg för steg: [`docs/LANSERING.md`](docs/LANSERING.md) (vad som återstår före lansering), [`docs/APP-STORE.md`](docs/APP-STORE.md), [`docs/GOOGLE-PLAY.md`](docs/GOOGLE-PLAY.md) och [`docs/IOS-BYGGE-I-MOLNET.md`](docs/IOS-BYGGE-I-MOLNET.md) (iPhone-bygget i molnet, utan egen Mac).
 
 ### Butiksmaterial
 
@@ -112,7 +113,7 @@ node scripts/generate-icons.mjs --only=store     # appikonen 1024 × 1024 m.fl. 
 npm run native:assets                            # appikoner och startskärmar i ios/ och android/
 node scripts/generate-store-graphics.mjs         # Google Plays funktionsgrafik (1024 × 500)
 node scripts/app-store-screenshots.mjs [--dist=dist-native] [--only=apple|play] [--scheme=ljust|morkt]
-ANDROID_PACKAGE=… ANDROID_SHA256="…,…" node scripts/generate-assetlinks.mjs   # public/.well-known/assetlinks.json
+ANDROID_PACKAGE=… ANDROID_SHA256="…,…" node scripts/generate-assetlinks.mjs   # assetlinks.json – bara för den tidigare TWA-appen, behövs inte för Capacitor-appen
 ```
 
 Skärmdumparna kräver ett färdigt bygge och Playwright, och de checkas inte in (`store-assets/screenshots/` är gitignorerad).

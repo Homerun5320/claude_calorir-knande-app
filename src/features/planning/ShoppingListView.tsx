@@ -21,6 +21,7 @@ import {
 } from '../../lib/planning'
 import { shareOrCopy } from '../diary/share'
 import { requireAccess } from '../premium/requireAccess'
+import { isNative } from '../../native'
 
 const EMPTY_WEEK: WeekShopping = { checked: [], extras: [] }
 
@@ -35,7 +36,9 @@ export function shoppingTitle(weekStart: ISODate, today: ISODate): string {
   return `Inköpslista ${weekTitle(weekStart).toLocaleLowerCase('sv-SE')} (${weekRangeText(weekStart, today)})`
 }
 
+/** Finns en delningsdialog? I de inbyggda apparna alltid (systemets delningsblad – Androids webbvy saknar `navigator.share`). */
 function canNativeShare(): boolean {
+  if (isNative()) return true
   return typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 }
 

@@ -19,6 +19,7 @@ import {
   priceSummary,
   priceSummaryText,
   recoverLicense,
+  renewalBlockedInStore,
   sessionIdFrom,
   statusSummary,
   trialBannerLevel,
@@ -99,6 +100,20 @@ describe('statustexter', () => {
     expect(plansToOffer({ kind: 'licensierad', plan: PLANS[1], payload: { ...payload, plan: 'livstid' }, test: false }, PLANS)).toEqual([])
     expect(plansToOffer({ kind: 'licensierad', plan: PLANS[0], payload, expiresAt: NOW + 200 * DAY, daysLeft: 200, test: false }, PLANS).map((p) => p.id)).toEqual(['livstid'])
     expect(plansToOffer({ kind: 'licensierad', plan: PLANS[0], payload, expiresAt: NOW + 10 * DAY, daysLeft: 10, test: false }, PLANS)).toHaveLength(2)
+  })
+
+  it('Google Play: en årslicens från butiken som gäller kan inte förnyas i förväg', () => {
+    const payload = { v: 1 as const, id: 'x', plan: 'ar' as const, iat: 1 }
+    const fromStore = { kind: 'licensierad' as const, plan: PLANS[0], payload, expiresAt: NOW + 10 * DAY, daysLeft: 10, test: false, source: 'store' as const }
+    expect(PLANS[0].id).toBe('ar')
+    expect(renewalBlockedInStore(fromStore, 'play')).toBe(true)
+    expect(plansToOffer(fromStore, PLANS, 'play').map((p) => p.id)).toEqual(['livstid'])
+    // App Store (non-renewing subscription) och webben kan förnyas som förut.
+    expect(renewalBlockedInStore(fromStore, 'appstore')).toBe(false)
+    expect(plansToOffer(fromStore, PLANS, 'appstore')).toHaveLength(2)
+    // En licensnyckel (webbköp) i Play-appen kan förnyas – den är ingen ägd Play-produkt.
+    expect(renewalBlockedInStore({ ...fromStore, source: 'nyckel' }, 'play')).toBe(false)
+    expect(plansToOffer({ ...fromStore, source: 'nyckel' }, PLANS, 'play')).toHaveLength(2)
   })
 
   it('priser inklusive moms i klartext', () => {

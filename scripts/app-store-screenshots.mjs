@@ -26,11 +26,13 @@
  * fel när butikens priser ändras, och alkohol påverkar åldersklassningen. Notiser döljs, och
  * animationer stängs av (reducerad rörelse) så att bilderna blir desamma varje gång.
  *
- * Vilket bygge:
- * - apple: butiksbygget (VITE_DISTRIBUTION=appstore … npx vite build → --dist=dist-native), så att
- *   bilderna visar iPhone-appen (utan webbens tips om hemskärmen och utan webbköp).
- * - play: webbygget (dist/) – Play-appen visar webbversionen. Skriptet öppnar den med
- *   ?plattform=play, precis som Play-appen gör.
+ * Vilket bygge (en butik i taget, eftersom båda byggs till dist-native/):
+ * - apple: App Store-bygget (VITE_DISTRIBUTION=appstore … npx vite build → --dist=dist-native
+ *   --only=apple), så att bilderna visar iPhone-appen (utan webbens tips om hemskärmen och utan
+ *   webbköp).
+ * - play: Google Play-bygget (VITE_DISTRIBUTION=play … npx vite build → --dist=dist-native
+ *   --only=play). Play-appen är en inbyggd app (Capacitor) med samma webbdel. ?plattform=play i
+ *   startadressen kommer från den tidigare TWA-appen och ändrar inget i Play-bygget.
  */
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -70,10 +72,9 @@ export const DEVICES = {
 export const SCHEMES = { ljust: 'light', morkt: 'dark' }
 
 /**
- * Startadressen per butik. Play-appen öppnar webbversionen med ?plattform=play (se
- * docs/GOOGLE-PLAY.md) – då visar Lagom samma sak som i Play-appen (inga webbpriser eller tips om
- * hemskärmen). App Store-bilderna tas från butiksbygget (--dist=dist-native), som redan vet att
- * det är en app.
+ * Startadressen per butik. Båda butikernas bilder tas från butiksbygget (--dist=dist-native), som
+ * redan vet att det är en app. ?plattform=play (från den tidigare TWA-appen) gör att även webbygget
+ * visar samma sak som en app (inga webbpriser eller tips om hemskärmen) – ofarligt i Play-bygget.
  */
 export function startUrl(baseUrl, deviceKey) {
   return deviceKey === 'play' ? `${baseUrl}?plattform=play#/valkommen` : `${baseUrl}#/valkommen`

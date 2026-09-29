@@ -179,6 +179,12 @@ export interface ConfirmOptions {
   tone?: 'default' | 'danger'
   /** Valfri ikon ovanför rubriken. */
   icon?: IconLike
+  /**
+   * false = dialogen stängs bara med knapparna – inte med Escape, bakgrunden eller Androids
+   * bakåtknapp. För frågor där "Avbryt" har en egen betydelse (t.ex. "Börja om") och ett
+   * oavsiktligt tryck utanför rutan inte får räknas som ett svar. Standard: true.
+   */
+  dismissible?: boolean
 }
 
 export interface ConfirmDialogProps extends ConfirmOptions {
@@ -204,6 +210,7 @@ export function ConfirmDialog({
   cancelLabel = 'Avbryt',
   tone = 'default',
   icon,
+  dismissible = true,
   loading,
   onConfirm,
   onCancel,
@@ -226,7 +233,7 @@ export function ConfirmDialog({
       icon={icon}
       tone={danger ? 'lingon' : 'gran'}
       align="center"
-      dismissible={!loading}
+      dismissible={dismissible && !loading}
       // Vid destruktiva val får "Avbryt" fokus först – ett oavsiktligt Enter gör ingen skada.
       initialFocusRef={danger ? cancelRef : confirmRef}
       onExitComplete={onExitComplete}

@@ -8,11 +8,16 @@
  * in siffrorna.
  *
  * Kameran släpps alltid när sidan lämnas eller appen hamnar i bakgrunden.
+ *
+ * I de inbyggda apparna används telefonens egen streckkodsläsare (`src/native/barcode.ts`: ZXing
+ * på Android, Apple Vision på iPhone) i helskärm i stället för webbens kamera. Den öppnas en gång
+ * när sidan öppnas och sedan med knappen "Skanna streckkod" eller "Skanna nästa". Saknas
+ * tillägget tar webbens kamera över.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Camera, Flashlight, FlashlightOff, Keyboard, PackageSearch, Plus, RefreshCw, ShoppingBasket, WifiOff, X } from 'lucide-react'
+import { Camera, Flashlight, FlashlightOff, Keyboard, PackageSearch, Plus, RefreshCw, ScanBarcode, ShoppingBasket, WifiOff, X } from 'lucide-react'
 import type { Food } from '../../types'
 import { Button, IconButton, Sheet, Spinner, TextField, cx, toast } from '../../components/ui'
 import { CategoryIcon, MealIcon } from '../../components/domain'
@@ -23,6 +28,7 @@ import { findFoodByBarcode, rememberFoods } from '../../lib/foodRepo'
 import { OFF_MESSAGES, OpenFoodFactsError, fetchProductByBarcode, invalidBarcodeMessage, isAbortError, isValidEan, normalizeBarcode } from '../../lib/openFoodFacts'
 import { mealName } from '../../lib/meals'
 import { relativeDayLabel } from '../../lib/dates'
+import { haptic, isNative, loadNative } from '../../native'
 import { addPageHref, countLabel, findByBarcode, foodDetailHref, newFoodHref, nutriScoreInfo, parseAddParams } from './addLogic'
 import { useAddFood } from './useAddFood'
 import { useBasketStore } from './basketStore'
@@ -43,7 +49,14 @@ import {
   type CameraErrorKind,
 } from './scanner'
 
-type CamState = { kind: 'starting' } | { kind: 'scanning'; engine: 'native' | 'zxing' } | { kind: 'error'; reason: CameraErrorKind }
+/**
+ * Kameran. 'native': appens egen läsare är stängd och sidan visar knappen "Skanna streckkod"
+ * (läsaren visas i helskärm ovanpå webbvyn medan den är öppen – då är tillståndet 'starting').
+ */
+type CamState = { kind: 'starting' } | { kind: 'scanning'; engine: 'native' | 'zxing' } | { kind: 'native' } | { kind: 'error'; reason: CameraErrorKind }
+
+/** Vilken läsare som används: telefonens egen (de inbyggda apparna) eller webbens kamera. */
+type ScanEngine = 'native' | 'web'
 
 type Lookup =
   | { kind: 'idle' }
@@ -89,6 +102,7 @@ export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [gate] = useState(() => createScanGate())
+  const [engine, setEngine] = useState<ScanEngine>(() => (isNative() ? 'native' : 'web'))
   const [cam, setCam] = useState<CamState>({ kind: 'starting' })
   const [torch, setTorchState] = useState({ available: false, on: false })
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
@@ -98,6 +112,15 @@ export default function ScanPage() {
   const [manualOpen, setManualOpen] = useState(false)
   const manualInput = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const nativeBusy = useRef(false)
+  const nativeStarted = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   // --- Uppslag ---------------------------------------------------------------
   const runLookup = useCallback(async (raw: string) => {
@@ -167,9 +190,65 @@ export default function ScanPage() {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
+  // --- Appens egen läsare (de inbyggda apparna) -------------------------------
+  const startNativeScan = useCallback(async () => {
+    if (nativeBusy.current) return
+    nativeBusy.current = true
+    setCam({ kind: 'starting' })
+    try {
+      const scanner = await loadNative('barcode')
+      if (!mounted.current) return
+      if (!scanner) {
+        setEngine('web')
+        return
+      }
+      // Haptiken ges nedan (samma modul som resten av appen, med "Minska rörelse").
+      const outcome = await scanner.scanFoodBarcode({ haptic: false })
+      if (!mounted.current) return
+      switch (outcome.status) {
+        case 'scanned':
+          setCam({ kind: 'native' })
+          haptic('tap')
+          gate.reset()
+          void runLookup(outcome.code)
+          break
+        case 'cancelled':
+          setCam({ kind: 'native' })
+          break
+        case 'invalid':
+          setCam({ kind: 'native' })
+          toast(outcome.text)
+          break
+        case 'denied':
+        case 'error':
+          setCam({ kind: 'error', reason: outcome.reason })
+          break
+        case 'unavailable':
+          setEngine('web')
+          break
+      }
+    } finally {
+      nativeBusy.current = false
+    }
+  }, [gate, runLookup])
+
+  // Öppna läsaren en gång när sidan öppnas – aldrig kopplat till `visible`: på Android pausas
+  // webbvyn medan läsaren visas, och då skulle den öppnas om och om igen.
+  useEffect(() => {
+    if (engine !== 'native' || nativeStarted.current) return
+    nativeStarted.current = true
+    void startNativeScan()
+  }, [engine, startNativeScan])
+
+  /** Stäng uppslaget och – med appens läsare – öppna den direkt för nästa vara. */
+  const scanNext = () => {
+    closeLookup()
+    if (engine === 'native') void startNativeScan()
+  }
+
   // --- Kamera -------------------------------------------------------------
   useEffect(() => {
-    if (!visible) return
+    if (!visible || engine !== 'web') return
     let cancelled = false
     let stream: MediaStream | null = null
     let scanner: BarcodeScanner | null = null
@@ -214,7 +293,7 @@ export default function ScanPage() {
       }
       setTorchState({ available: false, on: false })
     }
-  }, [visible, attempt])
+  }, [visible, attempt, engine])
 
   const toggleTorch = async () => {
     const next = !torch.on
@@ -236,22 +315,25 @@ export default function ScanPage() {
 
   const found = lookup.kind === 'found' ? lookup.food : null
   const cameraOk = cam.kind !== 'error'
+  const webCamera = engine === 'web'
   const busy = lookup.kind === 'loading'
 
   return (
     <div className="dark fixed inset-0 z-50 flex flex-col overflow-hidden bg-bg text-ink">
-      {/* Kamerabild */}
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        autoPlay
-        aria-hidden
-        className={cx('absolute inset-0 size-full object-cover transition-opacity duration-500', cam.kind === 'scanning' ? 'opacity-100' : 'opacity-0')}
-      />
+      {/* Kamerabild (webbens kamera – appens egen läsare har en egen vy) */}
+      {webCamera && (
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          aria-hidden
+          className={cx('absolute inset-0 size-full object-cover transition-opacity duration-500', cam.kind === 'scanning' ? 'opacity-100' : 'opacity-0')}
+        />
+      )}
 
       {/* Sökram */}
-      {cameraOk && (
+      {cameraOk && webCamera && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <div
             className={cx(
@@ -313,7 +395,26 @@ export default function ScanPage() {
       {/* Mitten: tips eller reservläge utan kamera */}
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4">
         {cam.kind === 'error' ? (
-          <CameraFallback reason={cam.reason} onRetry={() => setAttempt((a) => a + 1)} onSubmit={submitManual} inputRef={manualInput} busy={busy} />
+          <CameraFallback
+            reason={cam.reason}
+            onRetry={webCamera ? () => setAttempt((a) => a + 1) : () => void startNativeScan()}
+            onSubmit={submitManual}
+            inputRef={manualInput}
+            busy={busy}
+          />
+        ) : !webCamera ? (
+          cam.kind === 'native' && lookup.kind === 'idle' ? (
+            <div className="w-full max-w-md rounded-[1.75rem] bg-surface p-5 shadow-[var(--shadow-float)]">
+              <p className="mb-4 text-[0.9375rem] leading-relaxed text-ink-2">Skanna streckkoden på förpackningen – eller skriv in siffrorna.</p>
+              <Button size="lg" fullWidth iconLeft={ScanBarcode} onClick={() => void startNativeScan()}>
+                Skanna streckkod
+              </Button>
+            </div>
+          ) : (
+            <p className="rounded-full bg-surface/60 px-4 py-2 text-sm text-ink backdrop-blur-md" aria-live="polite">
+              {busy ? 'Streckkod hittad – letar efter produkten\u00a0…' : cam.kind === 'starting' ? 'Startar kameran …' : ''}
+            </p>
+          )
         ) : (
           <p className="mt-[calc(min(80vw,24rem)/1.55_+_3rem)] rounded-full bg-surface/60 px-4 py-2 text-sm text-ink backdrop-blur-md" aria-live="polite">
             {busy ? 'Streckkod hittad – letar efter produkten\u00a0…' : cam.kind === 'scanning' ? 'Håll streckkoden inom ramen' : 'Startar kameran …'}
@@ -395,7 +496,7 @@ export default function ScanPage() {
             if (!found) return
             if (basketAdd(found, amount, unit, 'scan')) {
               toast('Lagt i korgen – skanna nästa vara', { tone: 'success' })
-              closeLookup()
+              scanNext()
             }
           },
         }}
@@ -426,7 +527,7 @@ export default function ScanPage() {
           lookup={lookup}
           onCreate={(code) => navigate(newFoodHref({ barcode: code, meal, date }), { replace: true })}
           onRetry={(code) => void runLookup(code)}
-          onScanAgain={closeLookup}
+          onScanAgain={scanNext}
           canScan={cameraOk}
         />
       </Sheet>

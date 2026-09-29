@@ -16,7 +16,8 @@
  * och Data safety ändras före inskickningen (docs/APP-STORE.md §7, docs/GOOGLE-PLAY.md §8).
  *
  * Produkterna i butikerna ska ha samma id som här: 'livstid' (engångsköp), 'ar' (ett år, förnyas
- * inte automatiskt) och 'prov14' (gratis provperiod i App Store, om den används).
+ * inte automatiskt) och 'prov14' (gratis provperiod – bara i App Store, där iPhone-appen startar
+ * provperioden med det köpet, se `trialViaStore()` i src/config/platform.ts).
  *
  * Filen får inte importera något: vite.config.ts läser `NATIVE_PURCHASES_READY` till
  * byggkontrollen (även när filen typkontrolleras med tsconfig.node.json – därför `globalThis` och
