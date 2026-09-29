@@ -14,11 +14,13 @@ import {
   flushMirror,
   MIRROR_DEBOUNCE_MS,
   MIRROR_FILE,
+  MIRROR_MIN_INTERVAL_MS,
   MIRROR_TMP_FILE,
   mirrorContents,
   readMirror,
   resetMirrorForTests,
   startMirror,
+  stopMirror,
   writeMirrorNow,
   type MirrorInfo,
 } from './mirror'
@@ -93,7 +95,7 @@ const MAIN = mocks.key(Directory.Data, MIRROR_FILE)
 const TMP = mocks.key(Directory.Data, MIRROR_TMP_FILE)
 const SAVED_AT = '2026-09-20T10:00:00.000Z'
 
-/** Den riktiga timern (testerna fejkar setTimeout för 30-sekundersväntan). */
+/** Den riktiga timern (testerna fejkar setTimeout och klockan för väntan och intervallet). */
 const realSetTimeout = globalThis.setTimeout
 /** Låt alla väntande löften (filkön, microtasks) bli klara. */
 const idle = () => new Promise<void>((resolve) => realSetTimeout(resolve, 0))
@@ -101,6 +103,8 @@ const background = async () => {
   mocks.listeners.forEach((l) => l({ isActive: false }))
   await flushMirror()
 }
+/** Tillbaka i appen (appStateChange med isActive true). */
+const foreground = () => mocks.listeners.forEach((l) => l({ isActive: true }))
 const mirrored = () => {
   const text = mocks.files.get(MAIN)
   return text === undefined ? null : parseBackup(text)
@@ -124,7 +128,10 @@ beforeAll(async () => {
 beforeEach(async () => {
   resetMirrorForTests()
   await idle()
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  // En skrivning från förra testet kan ha hunnit bli klar under väntan – glöm den också.
+  resetMirrorForTests()
+  // performance.now() är speglingens klocka för intervallet på fem minuter.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   wipeAllData()
   clearDemoFlag()
   mocks.files.clear()
@@ -203,7 +210,9 @@ describe('spegling av ändringar', () => {
   it('speglar en gång efter starten när det redan finns data', async () => {
     useBodyStore.getState().logWeight('2026-09-28', 71.2)
     await startMirror()
-    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS - 1)
+    expect(mirrored()).toBeNull()
+    await vi.advanceTimersByTimeAsync(1)
     await idle()
     expect(mirrored()?.data.body.weights).toHaveLength(1)
   })
@@ -235,7 +244,7 @@ describe('spegling av ändringar', () => {
     expect(mocks.confirmDialog).not.toHaveBeenCalled()
     useBodyStore.getState().logWeight('2026-09-28', 99)
     await background()
-    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS)
     expect(mocks.writeFile).not.toHaveBeenCalled()
     expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 72.5 }])
   })
@@ -250,6 +259,220 @@ describe('spegling av ändringar', () => {
   })
 })
 
+describe('högst var femte minut medan appen är öppen', () => {
+  const water = () => mirrored()?.data.diary.water['2026-09-28']
+
+  it('många ändringar under tio minuter blir två skrivningar – och ingen ändring går förlorad', async () => {
+    useBodyStore.getState().logWeight('2026-09-01', 72)
+    await startMirror()
+    // En ändring var 20:e sekund i tio minuter (med bara 30 s väntan blev det 15 skrivningar).
+    for (let i = 1; i <= 30; i++) {
+      useDiaryStore.getState().setWater('2026-09-28', 100 * i)
+      await vi.advanceTimersByTimeAsync(20_000)
+    }
+    await idle()
+    // Efter 30 s (starten) och fem minuter senare.
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(water()).toBeLessThan(3000)
+
+    // Den sista ändringen speglas senast fem minuter efter förra skrivningen.
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(3)
+    expect(water()).toBe(3000)
+    // Och sedan inget mer när inget ändras.
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS * 3)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(3)
+  })
+
+  it('första ändringen efter en skrivning väntar tills fem minuter har gått – annars bara 30 sekunder', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+
+    // En minut efter skrivningen: speglas fem minuter efter skrivningen, inte 30 s efter ändringen.
+    await vi.advanceTimersByTimeAsync(60_000)
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS - 60_000 - 1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+    // Senare ändringar flyttar inte tiden.
+    useBodyStore.getState().logWeight('2026-09-28', 71.2)
+    await vi.advanceTimersByTimeAsync(1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(mirrored()?.data.body.weights).toHaveLength(3)
+
+    // Långt efter förra skrivningen gäller bara den korta väntan.
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS * 2)
+    useBodyStore.getState().logWeight('2026-09-29', 71)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS - 1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    await vi.advanceTimersByTimeAsync(1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(3)
+    expect(mirrored()?.data.body.weights).toHaveLength(4)
+  })
+
+  it('när appen går till bakgrunden skrivs den direkt, även inom intervallet', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+
+    await background()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(mirrored()?.data.body.weights).toHaveLength(2)
+
+    // Tillbaka i appen: nästa ändring räknar från skrivningen i bakgrunden, och den väntande
+    // timern är borta.
+    foreground()
+    useBodyStore.getState().logWeight('2026-09-28', 71.2)
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS - 1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    await vi.advanceTimersByTimeAsync(1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(3)
+    expect(mirrored()?.data.body.weights).toHaveLength(3)
+  })
+
+  it('en ändring som kommer efter att appen har lämnats skrivs direkt – t.ex. stegfältet som sparas på visibilitychange', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await background()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+
+    // appStateChange(false) kommer först (willResignActive på iPhone, onStop på Android);
+    // useDeferredSave sparar steg och anteckningar på visibilitychange eller efter 600 ms – då kan
+    // appen stängas när som helst, så speglingen väntar inte på intervallet.
+    useDiaryStore.getState().setDayMeta('2026-09-28', { steps: 8000 })
+    useDiaryStore.getState().setDayMeta('2026-09-28', { note: 'Promenad' })
+    await idle()
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(mirrored()?.data.diary.days['2026-09-28']).toMatchObject({ steps: 8000, note: 'Promenad' })
+
+    // Tillbaka i appen gäller intervallet på fem minuter igen.
+    foreground()
+    useDiaryStore.getState().setDayMeta('2026-09-28', { steps: 9000 })
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS - 1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    await vi.advanceTimersByTimeAsync(1)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(3)
+    expect(mirrored()?.data.diary.days['2026-09-28']?.steps).toBe(9000)
+  })
+
+  it('ett misslyckat försök lämnar ändringen osparad – den skrivs med nästa ändring, utan försök i en slinga', async () => {
+    await startMirror()
+    mocks.writeFile.mockRejectedValueOnce(new Error('disken är full'))
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(mirrored()).toBeNull()
+    expect(mocks.logError).toHaveBeenCalledWith(expect.any(Error), 'native:mirror')
+
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS * 2)
+    await idle()
+    expect(mocks.writeFile).toHaveBeenCalledTimes(1)
+
+    useBodyStore.getState().logWeight('2026-09-28', 71.2)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(mirrored()?.data.body.weights).toHaveLength(2)
+  })
+
+  it('ett misslyckat försök inom intervallet skrivs när appen går till bakgrunden', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await background()
+    foreground()
+    mocks.writeFile.mockRejectedValueOnce(new Error('disken är full'))
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await background()
+    expect(mirrored()?.data.body.weights).toHaveLength(1)
+    await background()
+    expect(mirrored()?.data.body.weights).toHaveLength(2)
+  })
+
+  it('stopMirror tar bort den väntande skrivningen, och en ny start speglar efter 30 sekunder', async () => {
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await startMirror()
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await idle() // ändringen är registrerad och skrivningen väntar
+
+    // (Butikerna kan ha egna timrar – räkna bara speglingens.)
+    const timers = vi.getTimerCount()
+    stopMirror()
+    expect(vi.getTimerCount()).toBe(timers - 1)
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS * 2)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+
+    await startMirror()
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(mirrored()?.data.body.weights).toHaveLength(2)
+  })
+
+  it('en ny start räknar appen som aktiv igen – även om den senast gick till bakgrunden', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await background()
+    stopMirror()
+
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(1)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(writesTo(MIRROR_TMP_FILE)).toBe(2)
+    expect(mirrored()?.data.body.weights).toHaveLength(2)
+  })
+
+  it('efter "Radera all data" speglas det som läggs in som efter en ny start', async () => {
+    useBodyStore.getState().logWeight('2026-09-26', 71.8)
+    await startMirror()
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    wipeAllData()
+    await idle()
+    expect(mocks.files.size).toBe(0)
+
+    useBodyStore.getState().logWeight('2026-09-28', 80)
+    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await idle()
+    expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 80 }])
+  })
+
+  it('inget skrivs medan lagringen är skyddad, även när intervallet har gått', async () => {
+    await startMirror()
+    useBodyStore.getState().logWeight('2026-09-27', 71.5)
+    await idle() // ändringen är registrerad och skrivningen väntar
+    mocks.memoryOnly = true
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS * 2)
+    await idle()
+    expect(mocks.writeFile).not.toHaveBeenCalled()
+    // När lagringen fungerar igen skrivs det osparade vid nästa tillfälle.
+    mocks.memoryOnly = false
+    await background()
+    expect(mirrored()?.data.body.weights).toHaveLength(1)
+  })
+})
+
 describe('radering', () => {
   it('"Radera all data" tar bort speglingen direkt', async () => {
     useBodyStore.getState().logWeight('2026-09-28', 71.2)
@@ -257,6 +480,7 @@ describe('radering', () => {
     await background()
     expect(mocks.files.has(MAIN)).toBe(true)
 
+    foreground()
     wipeAllData()
     await idle()
     expect(mocks.files.size).toBe(0)
@@ -316,7 +540,7 @@ describe('återställning vid start', () => {
     void startMirror()
     await idle()
     useBodyStore.getState().logWeight('2026-09-28', 80)
-    await vi.advanceTimersByTimeAsync(MIRROR_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(MIRROR_MIN_INTERVAL_MS)
     await idle()
     expect(writesTo(MIRROR_TMP_FILE) + writesTo(MIRROR_FILE)).toBe(0)
     expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 72.5 }])
@@ -337,6 +561,7 @@ describe('återställning vid start', () => {
     await background()
     expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 72.5 }])
 
+    foreground()
     useBodyStore.getState().logWeight('2026-09-28', 80)
     await background()
     expect(mirrored()?.data.body.weights).toMatchObject([{ kg: 80 }])

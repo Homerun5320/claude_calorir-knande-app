@@ -93,10 +93,14 @@ Bara iPhone ställs in i Xcode-projektet (*Targeted Device Family* = iPhone, `TA
 Reglerna som texterna följer (App Review Guidelines 2.3):
 
 - Inga priser och inga rankingord ("bäst", "nr 1", "gratis") i **namn, undertitel, ikon och nyckelord**, och inga emoji. I beskrivningen står provperioden som "14 dagar utan kostnad" – ordet "gratis" används inte ens där.
-- Inga andra plattformar (2.3.10) – nämn inte Android, Google Play eller webbversionen.
-- Ingen hänvisning till köp utanför appen (3.1.1).
+- Inga andra plattformar (2.3.10) – nämn inte Android, Google Play, Health Connect eller webbversionen.
+- Ingen hänvisning till köp utanför appen (3.1.1) – inga webbköp och inga licensnycklar.
 - Inga myndighetslogotyper och ingen antydan om att Lagom är kopplad till Livsmedelsverket.
-- Namn och undertitel högst 30 tecken, nyckelord högst 100 tecken, beskrivning högst 4 000 tecken.
+- Namn och undertitel högst 30 tecken, kampanjtext högst 170 och beskrivning och nyheter högst 4 000 tecken. Nyckelorden får vara högst 100 **byte** (inte tecken) – å, ä och ö räknas som två.
+- Bara det som finns i iPhone-appen (2.3.1). **Röstsökningen finns inte i apparna** och nämns aldrig. "Fyll i från förpackningen" beskrivs med iPhones egen *Skanna text* eller inklistrad text.
+- Allergier: säg aldrig "säker", "fri från" eller "innehåller inte" – bara att Lagom visar vad Open Food Facts anger, med källan, och att förpackningen alltid ska läsas.
+- Tonen från CLAUDE.md: varm och utan skuld – inga dagar i rad, inga röda varningar.
+- `src/native/storeBuilds.test.ts` läser kodblocken under rubrikerna nedan och kontrollerar gränserna och orden ovan. Byt inte namn på rubrikerna utan att ändra testet.
 
 ### Namn (högst 30 tecken)
 
@@ -124,8 +128,10 @@ Svensk mat, näring & kostråd
 ### Kampanjtext (högst 170 tecken, kan ändras utan ny granskning)
 
 ```
-Logga svensk mat med Livsmedelsverkets näringsvärden och svenska mått. Inget konto, ingen reklam – dagboken stannar i din telefon.
+Logga svensk mat med Livsmedelsverkets näringsvärden och svenska mått. Spara till fredagsmyset med veckobudgeten. Inget konto, ingen reklam – dagboken stannar hos dig.
 ```
+
+(167 tecken.)
 
 ### Beskrivning (högst 4 000 tecken)
 
@@ -137,31 +143,36 @@ LOGGA MAT SNABBT
 • Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
 • Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
 • Skanna streckkoden på förpackningen för att hitta produkten
+• Saknas en vara? Fyll i från förpackningen med iPhones Skanna text eller inklistrad text – du granskar innan du sparar
 • Spara måltider du äter ofta och lägg in dem med ett tryck
 
 NÄRING OCH MÅL
 • Dagsringen visar energi, protein, kolhydrater, fett och fibrer mot ditt dagsmål
+• Veckobudget om du vill: samma energi över veckan, med lite extra till fredagsmyset eller helgen – kalorigolvet gäller varje dag
 • Vitaminer och mineraler jämförs med Nordiska näringsrekommendationer (NNR 2023)
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
-• Vatten, träning och vikt på samma ställe
+• Allergiprofil: markera det du inte tål, så visar Lagom vad Open Food Facts anger om allergener och spår i produkten, med källan – läs alltid förpackningen
+• Vatten, träning, steg och vikt på samma ställe
 • Koppla till Apple Hälsa om du vill: hämta vikt och steg, och spara energi, vatten och vikt
 • Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
 
 RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
 • Hämta recept från en webbadress
+• Dela dina recept och sparade måltider som länk eller fil – mottagaren ser allt innan något sparas
 • Planera veckans måltider och få en inköpslista
 • Insikter för veckan, 30 och 90 dagar – bara dagar du har loggat räknas
 • Vikt och mått med en lugn trendlinje i stället för dagliga svängningar
+• Framstegsbilder om du vill – avstängda från början, sparas bara i telefonen och följer inte med i säkerhetskopian
 
 LUGNT OCH UTAN SKULD
-Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
+Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
 
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
 • Uppgifter från Apple Hälsa läses och sparas bara i telefonen och används aldrig för reklam
-• Exportera allt när du vill, eller radera allt med ett par tryck
+• Exportera allt du har loggat när du vill, eller radera allt med ett par tryck
 • Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
@@ -173,26 +184,44 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(Ungefär 3 000 tecken.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
+(3 861 tecken med radbrytningar.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
 rankingord vid granskningen. Veckoplaneringen, receptimporten, påminnelserna och Apple Hälsa ska
 finnas i version 1.0 – kontrollera ändå i det bygge du skickar in att allt i texten finns i appen
 (2.3.1). Raden om Apple Hälsa ska stå kvar så länge kopplingen finns: Apple kräver att en app som
 använder HealthKit säger det i beskrivningen och tydligt i appen (2.5.1).
 
-### Nyckelord (högst 100 tecken, kommaseparerade utan mellanslag)
+Funktionerna som kom till efter den första texten – veckobudgeten (Inställningar → Mål och makron),
+allergiprofilen (Inställningar → Allergier och överkänslighet), delade recept och måltider,
+framstegsbilderna (Vikt & mått), "Fyll i från förpackningen" (formuläret för eget livsmedel och
+skanningen) och milstolparna (Mer → Milstolpar) – finns i App Store-bygget (kontrollerat
+2026-09-29 med `VITE_DISTRIBUTION=appstore`). Delning som länk kräver webbplatsens adress
+(`VITE_API_BASE`), som byggkontrollen redan kräver i butiksbyggen; utan den går det bara att dela
+som fil. Röstsökningen är webbens och finns inte i appen – den står därför inte i texterna.
+
+### Nyckelord (högst 100 byte, kommaseparerade utan mellanslag)
 
 ```
-kalorier,kaloriräknare,kcal,kostdagbok,matdagbok,protein,fibrer,vikt,hälsa,recept,streckkod,vatten
+kalorier,kaloriräknare,kcal,kostdagbok,matdagbok,protein,allergi,vikt,hälsa,recept,streckkod
 ```
 
-(98 tecken.) Ord i namnet och undertiteln (Lagom, mat, näring, kostråd) räknas redan och ska inte
-upprepas. Använd aldrig namn på andra appar, företag eller myndigheter som nyckelord.
+(94 byte – å, ä och ö räknas som två; 92 tecken.) Apple räknar nyckelorden i byte (UTF-8), inte i
+tecken, så en sträng med 99 tecken kan vara för lång. Ord i namnet och undertiteln (Lagom, mat,
+näring, kostråd) räknas redan och ska inte upprepas. Använd aldrig namn på andra appar, företag
+eller myndigheter som nyckelord. "allergi" har ersatt "fibrer" (allergiprofilen är ny), och
+"vatten" har tagits bort för att hålla gränsen – fibrer och vatten står kvar i beskrivningen.
 
-### Nyheter i den här versionen (version 1.0)
+### Nyheter i den här versionen (från den andra versionen)
+
+Fältet finns inte för appens första version i App Store Connect – Apple visar det först från nästa
+version och kräver det sedan varje gång. Version 1.0 presenteras med beskrivningen och
+kampanjtexten ovan. Texten nedan är till den första uppdateringen om den bara rättar fel; har
+versionen något nytt som syns, börja med det ("Nytt: …") och säg var det finns i appen.
 
 ```
-Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare, recept, insikter, vikt och mått, vatten och träning – och om du vill påminnelser och koppling till Apple Hälsa. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
+Rättningar och förbättringar – tack för att du använder Lagom! Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
 ```
+
+(139 tecken.)
 
 ### Kategori
 
@@ -472,7 +501,7 @@ The sample data is read-only. To try logging food, tap 'Börja med min egen prof
 
 In-app purchases: 'prov14' (14-day Trial, non-consumable, free – follows the Apple ID and is restored with Restore Purchases, so it cannot be restarted by reinstalling), 'livstid' (Lifetime licence, non-consumable) and 'ar' (Annual licence, non-renewing subscription, 365 days, does not auto-renew; an Annual licence bought during the last 30 days starts when the current one ends). Prices are loaded from the App Store. Restore Purchases is on Mer → Lagom Premium and in Inställningar → Licens.
 
-Native features (all optional and off by default): Apple Health (HealthKit) in Inställningar → Apple Hälsa reads weight and steps and writes weight that the user logs, and dietary energy and water for finished days (HealthKit samples cannot be edited by the app afterwards, so only completed days are sent); health data stays on the device and is never used for advertising or shared. Reminders (Inställningar → Påminnelser) are local notifications only. The barcode scanner uses the camera with Apple's Vision framework; no images are stored or sent. Export and backup use the iOS share sheet. The whole app works offline with on-device storage.
+Native features (all optional and off by default): Apple Health (HealthKit) in Inställningar → Apple Hälsa reads weight and steps and writes weight that the user logs, and dietary energy and water for finished days (HealthKit samples cannot be edited by the app afterwards, so only completed days are sent); health data stays on the device and is never used for advertising or shared. Reminders (Inställningar → Påminnelser) are local notifications only. The barcode scanner uses the camera with Apple's Vision framework; no images are stored or sent. Progress photos (off by default, Vikt & mått → Framstegsbilder) may use the camera or the photo picker; the photos are downscaled, stripped of location data and stored only in the app on the device – never uploaded or included in backups. Export and backup use the iOS share sheet. The whole app works offline with on-device storage.
 
 The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```

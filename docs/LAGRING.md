@@ -132,7 +132,7 @@ månadsskrivaren är av – med den påslagen skrivs bara de ändrade månaderna
 | Träning: lägga till/ändra/ta bort | 1 | |
 | **Hälsa-synk** i apparna | **1 per dag med nya steg** (upp till 7 i rad, `importSteps` i `native/health.ts`) – **nu 1** (`setDayMetas`) | |
 | Annan flik sparar | 0 – men den här fliken läser och tolkar hela dagboken | |
-| Speglingen i apparna | 0 – men hela säkerhetskopian (alla butiker) blir JSON högst 30 s efter en ändring och när appen går till bakgrunden | fil `lagom-spegling.json` |
+| Speglingen i apparna | 0 – men hela säkerhetskopian (alla butiker) blir JSON högst 30 s efter en ändring – **nu högst en gång per fem minuter** medan appen är öppen (30 s efter den första ändringen, tidigast fem minuter efter förra skrivningen, `MIRROR_MIN_INTERVAL_MS`) – och alltid när appen går till bakgrunden (på Android även när en egen aktivitet öppnas: streckkodsläsaren, kameran, Health Connect) | fil `lagom-spegling.json` |
 
 Svar på frågorna i checklistan: **ja, varje ändring skriver om hela dagboken, utan fördröjning**
 (utom stegfältet och anteckningen, som väntar på en paus), och
@@ -247,7 +247,11 @@ Tumregel: en skrivning blockerar ungefär **60–95 ms per MB dagbok på en mell
 90–145 ms per MB på en enklare.
 
 **Speglingen i apparna** (`native/mirror.ts`) kostar på Android stringify + brygga: 0,45 s (4×) och
-0,7 s (6×) efter tre år, högst var 30:e sekund medan man loggar och när appen går till bakgrunden.
+0,7 s (6×) efter tre år, högst var femte minut medan man loggar (före 2026-09-29 var 30:e sekund)
+och när appen går till bakgrunden. På Android räknas också streckkodsläsaren, kameran för "Ta en
+bild" och Health Connects behörighetsfråga som att gå till bakgrunden (egna aktiviteter som stoppar
+appens) – den som loggar genom att skanna betalar alltså fortfarande en skrivning per skanning när
+något har ändrats, som före 2026-09-29.
 Därtill tolkar Capacitors Java-sida anropet (9 miljoner tecken JSON) och skriver filen (inte
 mätt, sker utanför webbvyns huvudtråd). På iPhone skickas anropet utan JSON-steget; stringify av säkerhetskopian
 återstår. `parseBackup` (med kontroll av varje post) tar 155 ms i Node efter tre år och körs bara
@@ -502,6 +506,43 @@ där: en fil per månad plus ett index, eller hela filen gzip-komprimerad (`Comp
 1,1 MB i stället för 7,6 MB genom bryggan). Enklast först: skriv den glesare (t.ex. högst var
 femte minut) men alltid när appen går till bakgrunden.
 
+*Glesare: gjort 2026-09-29* (`src/native/mirror.ts`, `src/native/mirror.test.ts`). Medan appen är
+öppen skrivs speglingen högst en gång per `MIRROR_MIN_INTERVAL_MS` (fem minuter): den första
+ändringen efter en skrivning speglas vid det senare av "förra skrivningen + fem minuter" och
+"ändringen + 30 s" (`MIRROR_DEBOUNCE_MS`), senare ändringar flyttar inte tiden, och en ändring
+väntar alltså aldrig mer än fem minuter. Intervallet räknas med `performance.now()`, som inte
+hoppar när telefonens klocka ställs om.
+
+- Som förut: en gång 30 s efter starten när det finns data, och alltid direkt när appen går till
+  bakgrunden (`appStateChange` med `isActive: false` → `flushMirror`) – även mitt i intervallet.
+  Nästa ändring räknar sina fem minuter från den skrivningen.
+- En ändring som kommer efter `flushMirror` men innan appen är aktiv igen skrivs direkt. Stegfältet
+  och anteckningen (`useDeferredSave`) sparar på `visibilitychange` eller efter 600 ms, och
+  `appStateChange(false)` kommer före (`willResignActive` på iPhone, `onStop` på Android) – annars
+  skulle värdet vänta upp till fem minuter medan appen ligger i bakgrunden och kan stängas.
+- Android: streckkodsläsaren, kameran för "Ta en bild" och Health Connects behörighetsfråga är
+  egna aktiviteter som stoppar appens (`BridgeActivity.onStop` → `isActive: false`). De räknas som
+  att gå till bakgrunden – JavaScript kan inte skilja dem från hemknappen – så den som loggar genom
+  att skanna får en skrivning per skanning när något har ändrats (samma som före 2026-09-29).
+  Gränsen på fem minuter gäller alltså medan man loggar inne i appen. På iPhone visas skannern i
+  appen och påverkar inte speglingen.
+- Inget går förlorat: ändringen är osparad tills en skrivning lyckas. Ett misslyckat försök
+  räknas som en skrivning för intervallet (strängen var redan byggd) och görs om vid nästa
+  ändring eller när appen går till bakgrunden – aldrig i en slinga.
+- Som förut aldrig när lagringen är skyddad (`canMirror`: inte inläst, bara i minnet, nyare data),
+  för exempeldata eller medan frågan om återställning är öppen.
+- Efter "Radera all data" speglas det som läggs in som efter en ny start (30 s).
+
+Efter tre år på Android blir det alltså 0,45–0,7 s av huvudtråden högst var femte minut i stället
+för var 30:e sekund medan man loggar i appen (vid skanning se ovan). Kvarvarande risk: stängs appen
+av systemet utan att först gå till bakgrunden (sällsynt), eller innan skrivningen efter en sen
+ändring hunnit bli klar, kan speglingen sakna de senaste minuterna – dagboken i IndexedDB har dem
+ändå; speglingen skyddar bara mot att iOS rensar webbvyns lagring. Vill man slippa skrivningen per
+skanning på Android kan modulerna som öppnar en egen aktivitet (barcode, photos, health) markera
+det, så att `flushMirror` då bara skriver när förra skrivningen är äldre än fem minuter – inte gjort,
+eftersom en app som stängs medan skannern är öppen då kan sakna upp till fem minuter i speglingen. En fil per månad eller komprimering
+är kvar som nästa steg om skrivningen i bakgrunden blir för långsam.
+
 ### Migreringsplan
 
 1. **Version A – läsaren:** *byggd 2026-09-29.* Läser version 1 och 2, skriver version 1 och tar
@@ -552,8 +593,8 @@ tillbaka till version 1 i Chromium).
   praktiken rensar webbvyns lagring trots speglingen, eller om dagböckerna blir mycket större.
 - **Bara fördröja skrivningarna** (debounce): färre skrivningar i rad, men varje skrivning kostar
   lika mycket, och det som inte hunnit sparas förloras om appen stängs av systemet. Kan
-  kombineras med månadsnycklar, med tömning vid `pagehide`/`visibilitychange` och när appen går
-  till bakgrunden – så gör stegfältet och anteckningen nu (`useDeferredSave`, §9).
+  kombineras med månadsnycklar, med tömning vid `beforeunload`/`pagehide`/`visibilitychange` och
+  när appen går till bakgrunden – så gör stegfältet och anteckningen nu (`useDeferredSave`, §9).
 - **Komprimering** (`CompressionStream`): 85 % mindre, men stringify blir kvar och
   komprimeringen kostar också.
 - **Stringify i en Web Worker:** objektet måste kopieras till arbetaren (structured clone), vilket
@@ -572,8 +613,10 @@ Ingen av dem ändrar formatet. De minskar antalet omskrivningar i rad:
    per dag. *Gjort 2026-09-29.*
 3. **Stegfältet:** spara efter en kort paus (som anteckningen, 600 ms) i stället för vid varje
    tangenttryck. *Gjort 2026-09-29* (`src/hooks/useDeferredSave.ts`: 600 ms efter sista
-   ändringen, direkt vid blur, byte av dag, avmontering, `pagehide` och `visibilitychange` →
-   hidden, aldrig när värdet är oförändrat; `StepsCard.test.tsx`). Anteckningen (`DayNotesCard`)
+   ändringen, direkt vid blur, byte av dag, avmontering, `beforeunload` (bara medan något väntar –
+   Chromium sparar aldrig en IndexedDB-skrivning som startar i `pagehide` när sidan laddas om eller
+   fliken öppnar en annan adress; hittat med `scripts/e2e/karna.mjs`), `pagehide` och
+   `visibilitychange` → hidden, aldrig när värdet är oförändrat; `StepsCard.test.tsx`). Anteckningen (`DayNotesCard`)
    använder samma krok och sparar nu också när appen göms. "12000" siffra för siffra är en
    skrivning, tryck på −/+ i rad likaså.
 4. **Hoppa över skrivningar som inte ändrar något** (`addWater`, `setWater`, `setDayMeta` och

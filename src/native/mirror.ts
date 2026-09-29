@@ -5,8 +5,18 @@
  * `startNative()` – aldrig på webben.
  *
  * - En automatisk säkerhetskopia (samma format som `createBackup`) skrivs till appens egen mapp
- *   (`mirrorDirectory()`: Library/NoCloud på iPhone, appens filmapp på Android) högst 30 sekunder
- *   efter en ändring och direkt när appen går till bakgrunden.
+ *   (`mirrorDirectory()`: Library/NoCloud på iPhone, appens filmapp på Android). Medan appen är
+ *   öppen skrivs den högst en gång per `MIRROR_MIN_INTERVAL_MS` (fem minuter): den första ändringen
+ *   efter en skrivning speglas 30 sekunder senare, men tidigast fem minuter efter förra skrivningen
+ *   – alltså högst fem minuter efter ändringen. Direkt när appen går till bakgrunden skrivs den
+ *   alltid, och en ändring som kommer efter det (t.ex. stegfältet som sparas på visibilitychange)
+ *   skrivs direkt tills appen är aktiv igen. (En skrivning kostar på Android 0,45–0,7 s av
+ *   huvudtråden efter tre år – stringify och bryggan, docs/LAGRING.md §5 – och ska inte göras var
+ *   30:e sekund medan man loggar.)
+ * - Android: en egen aktivitet ovanpå appen – streckkodsläsaren, kameran för "Ta en bild" och
+ *   Health Connects behörighetsfråga – stoppar appens aktivitet och räknas som att appen går till
+ *   bakgrunden. Den som loggar genom att skanna får därför en skrivning per skanning när något har
+ *   ändrats (JavaScript kan inte skilja det från hemknappen). På iPhone visas skannern i appen.
  * - Filen skrivs först till en tillfällig fil som sedan byter namn, så att ett avbrott mitt i en
  *   skrivning aldrig förstör den senaste hela kopian. Vid läsning används den nyaste hela filen.
  * - Är dagboken tom vid start men speglingen finns frågar appen om den ska återställas ("Vi hittade
@@ -69,8 +79,16 @@ const LEGACY_IOS_DIRECTORY = Directory.Data
 function mirrorDirectories(): Directory[] {
   return nativePlatform() === 'ios' ? [Directory.LibraryNoCloud, LEGACY_IOS_DIRECTORY] : [Directory.Data]
 }
-/** Speglingen skrivs högst så här lång tid efter den första osparade ändringen. */
+/**
+ * Väntan efter den första osparade ändringen, så att ändringar i rad blir en skrivning. Gäller när
+ * förra skrivningen var mer än `MIRROR_MIN_INTERVAL_MS` sedan (och första gången efter starten).
+ */
 export const MIRROR_DEBOUNCE_MS = 30_000
+/**
+ * Medan appen är öppen skrivs speglingen högst en gång per fem minuter. När appen går till
+ * bakgrunden skrivs den alltid direkt (`flushMirror`).
+ */
+export const MIRROR_MIN_INTERVAL_MS = 5 * 60_000
 /** Längsta väntan på att butikerna ska läsas in innan speglingen startar ändå. */
 const HYDRATION_WAIT_MS = READ_TIMEOUT_MS + 2000
 
@@ -89,6 +107,17 @@ let dirty = false
 /** Fanns det data senast vi tittade? Blir den tom (radering) tas speglingen bort. */
 let hadData = false
 let timer: ReturnType<typeof setTimeout> | null = null
+/**
+ * När den senaste skrivningen började (`performance.now()`, som inte hoppar när klockan ställs om).
+ * Även ett försök som misslyckades räknas – strängen var redan byggd. null före den första.
+ */
+let lastWriteAt: number | null = null
+/**
+ * false från appStateChange med isActive false till nästa med true. En ändring som kommer då (t.ex.
+ * stegfältet som sparas på visibilitychange, efter `flushMirror`) skrivs direkt – appen kan stängas
+ * när som helst och ska inte vänta på intervallet.
+ */
+let appActive = true
 let changeQueued = false
 let unsubscribers: (() => void)[] = []
 let appListener: PluginListenerHandle | null = null
@@ -107,6 +136,9 @@ function clearTimer(): void {
   if (timer !== null) clearTimeout(timer)
   timer = null
 }
+
+/** Monoton klocka för intervallet (ms). */
+const now = (): number => performance.now()
 
 // ---------------------------------------------------------------------------
 // Hjälpfunktioner
@@ -265,8 +297,12 @@ export function writeMirrorNow(): Promise<boolean> {
       logError(error, LOG_CONTEXT)
       return false
     }
-    // Ändringar som görs medan filen skrivs gör speglingen osparad igen (se `handleChange`).
+    // Allt som har ändrats hittills är med: en väntande timer behövs inte längre, och nästa ändring
+    // räknar sitt intervall från den här skrivningen. Ändringar som görs medan filen skrivs gör
+    // speglingen osparad igen (se `handleChange`).
+    clearTimer()
     dirty = false
+    lastWriteAt = now()
     const directory = mirrorDirectory()
     try {
       await writeText(MIRROR_TMP_FILE, text)
@@ -285,6 +321,8 @@ export function writeMirrorNow(): Promise<boolean> {
       }
       return true
     } catch (error) {
+      // Ändringen ligger kvar som osparad och skrivs vid nästa ändring eller när appen går till
+      // bakgrunden.
       dirty = true
       logError(error, LOG_CONTEXT)
       return false
@@ -294,14 +332,34 @@ export function writeMirrorNow(): Promise<boolean> {
   return run
 }
 
-/** Spegla om en stund (högst `MIRROR_DEBOUNCE_MS` efter den första osparade ändringen). */
-export function scheduleMirror(delayMs: number = MIRROR_DEBOUNCE_MS): void {
+/**
+ * Hur länge nästa skrivning ska vänta: `MIRROR_DEBOUNCE_MS`, men tidigast `MIRROR_MIN_INTERVAL_MS`
+ * efter förra skrivningen – aldrig mer än `MIRROR_MIN_INTERVAL_MS`.
+ */
+function nextDelay(): number {
+  if (lastWriteAt === null) return MIRROR_DEBOUNCE_MS
+  const untilInterval = lastWriteAt + MIRROR_MIN_INTERVAL_MS - now()
+  return Math.min(MIRROR_MIN_INTERVAL_MS, Math.max(MIRROR_DEBOUNCE_MS, untilInterval))
+}
+
+/**
+ * Spegla om en stund: den första osparade ändringen bestämmer tiden (se `nextDelay`), senare
+ * ändringar flyttar den inte. Medan appen inte är aktiv skrivs ändringen direkt. Speglingen förblir
+ * osparad tills en skrivning lyckas.
+ */
+export function scheduleMirror(): void {
   dirty = true
+  if (!appActive) {
+    // Appen är på väg till bakgrunden: skriv nu (en skrivning som står i kön tar med allt).
+    void writeMirrorNow()
+    return
+  }
   if (timer !== null) return
   timer = setTimeout(() => {
     timer = null
-    void writeMirrorNow()
-  }, delayMs)
+    // Finns inget osparat (en annan skrivning har redan tagit med allt) behövs ingen skrivning.
+    if (dirty) void writeMirrorNow()
+  }, nextDelay())
 }
 
 /** Skriv osparade ändringar direkt (t.ex. när appen går till bakgrunden). Kastar aldrig. */
@@ -321,6 +379,8 @@ export function deleteMirror(): Promise<void> {
   clearTimer()
   dirty = false
   hadData = false
+  // Det som läggs in efter raderingen speglas som efter en ny start.
+  lastWriteAt = null
   return enqueue(() => deleteIn(mirrorDirectories()))
 }
 
@@ -494,10 +554,12 @@ export async function startMirror(options: StartMirrorOptions = {}): Promise<Mir
     hadData = false
   }
   unsubscribers = PERSISTED.map((s) => s.subscribe(onStoreChange))
-  // Spegla en gång efter starten, så att kopian alltid motsvarar det som finns nu.
+  // Spegla en gång efter starten (efter `MIRROR_DEBOUNCE_MS`), så att kopian alltid motsvarar det
+  // som finns nu.
   if (hadData) scheduleMirror()
   try {
     const handle = await App.addListener('appStateChange', ({ isActive }) => {
+      appActive = isActive
       if (!isActive) void flushMirror()
     })
     if (started) appListener = handle
@@ -519,6 +581,8 @@ export function stopMirror(): void {
   dirty = false
   hadData = false
   changeQueued = false
+  lastWriteAt = null
+  appActive = true
 }
 
 /** Endast för tester: stoppa och glöm allt, även filkön. */

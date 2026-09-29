@@ -129,7 +129,7 @@ describe('StepsCard', () => {
     expect(storedSteps()).toBe(4321)
   })
 
-  it('sparar när sidan göms eller stängs', () => {
+  it('sparar när sidan göms, stängs eller lämnas (omladdning, en annan adress)', () => {
     render(<Card date={todayISO()} />)
     fireEvent.change(field(), { target: { value: '3000' } })
     setVisibility('hidden')
@@ -144,7 +144,13 @@ describe('StepsCard', () => {
       window.dispatchEvent(new Event('pagehide'))
     })
     expect(storedSteps()).toBe(3500)
-    expect(setDayMeta).toHaveBeenCalledTimes(2)
+    // Omladdning eller en annan adress: Chromium hinner bara spara det som startas i beforeunload.
+    fireEvent.change(field(), { target: { value: '4000' } })
+    act(() => {
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true }))
+    })
+    expect(storedSteps()).toBe(4000)
+    expect(setDayMeta).toHaveBeenCalledTimes(3)
   })
 
   it('flera tryck på −/+ i rad blir en skrivning', () => {

@@ -4,9 +4,9 @@
  * promenader inte räknas två gånger.
  *
  * Fältet har ett eget utkast så att det går snabbt att skriva: stegen sparas först efter en kort
- * paus (`useDeferredSave`), direkt när fältet lämnas, när dagen byts (på den gamla dagen) och när
- * appen göms. Varje sparning skriver om hela dagboken, så tangenttryck och tryck på −/+ i rad blir
- * en enda sparning (docs/LAGRING.md §3).
+ * paus (`useDeferredSave`), direkt när fältet lämnas, när dagen byts (på den gamla dagen), när
+ * sidan lämnas och när appen göms. Varje sparning skriver om hela dagboken, så tangenttryck och
+ * tryck på −/+ i rad blir en enda sparning (docs/LAGRING.md §3).
  */
 import { memo, useMemo, useState } from 'react'
 import { Footprints, Plus, RefreshCw } from 'lucide-react'

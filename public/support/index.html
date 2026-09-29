@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Support – Lagom</title>
-    <meta name="description" content="Hjälp med Lagom: byta telefon, återställa köp, exportera eller radera din data, provperioden och licensnyckeln." />
+    <meta name="description" content="Hjälp med Lagom: byta telefon, återställa köp, exportera eller radera din data, provperioden, licensnyckeln, delade recept, framstegsbilder, allergiflaggor, Fyll i från förpackningen och veckobudgeten." />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <!--
       Fristående supportsida (ingen JavaScript) – adressen anges som Support-URL i App Store Connect
@@ -93,6 +93,12 @@
           <li><a href="#radera">Radera allt</a></li>
           <li><a href="#provperioden">När provperioden är slut</a></li>
           <li><a href="#licensnyckel">Tappad licensnyckel</a></li>
+          <li><a href="#dela">Dela recept och måltider</a></li>
+          <li><a href="#framstegsbilder">Framstegsbilder</a></li>
+          <li><a href="#allergier">Allergiflaggor</a></li>
+          <li><a href="#forpackningen">Fyll i från förpackningen</a></li>
+          <li><a href="#veckobudget">Veckobudget</a></li>
+          <li><a href="#sparas-automatiskt">Steg och anteckningar</a></li>
           <li><a href="#kontakt">Kontakta oss</a></li>
         </ul>
       </nav>
@@ -105,6 +111,7 @@
           <li>På den nya telefonen: installera Lagom och välj <span class="vag">Återställ från säkerhetskopia</span> på välkomstsidan. Har du redan börjat använda appen finns samma sak under <span class="vag">Inställningar → Data och säkerhetskopia → Importera</span>.</li>
           <li>Har du köpt Lagom i App Store eller Google Play: tryck på <span class="vag">Återställ köp</span> (se nästa fråga).</li>
         </ol>
+        <p>Framstegsbilder följer inte med i säkerhetskopian – se <a href="#framstegsbilder">Var sparas mina framstegsbilder?</a></p>
         <p>Har du tappat bort den gamla telefonen utan att spara en säkerhetskopia går datan tyvärr inte att få tillbaka – vi har ingen kopia.</p>
       </section>
 
@@ -126,7 +133,7 @@
         <h2 id="exportera-rubrik">Hur exporterar jag min data?</h2>
         <p>Allt du har loggat är ditt, och du kan ta med dig det när du vill – även efter provperioden.</p>
         <ul>
-          <li><strong>Säkerhetskopia (allt):</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera (JSON)</span>. En fil med dagbok, vikt, recept, egna livsmedel och inställningar – för att flytta eller återställa.</li>
+          <li><strong>Säkerhetskopia:</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera (JSON)</span>. En fil med dagbok, vikt, recept, egna livsmedel och inställningar – för att flytta eller återställa. Framstegsbilder ingår inte.</li>
           <li><strong>Dagboken i Excel:</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera dagbok som CSV</span>. Alla poster med datum, måltid, mängd och näringsvärden – öppnas direkt i svenska Excel och Numbers.</li>
         </ul>
       </section>
@@ -134,8 +141,8 @@
       <section class="kort" id="radera" aria-labelledby="radera-rubrik">
         <h2 id="radera-rubrik">Hur raderar jag allt?</h2>
         <p>
-          Välj <span class="vag">Inställningar → Data och säkerhetskopia → Radera all data</span> och bekräfta. Då raderas dagbok, vikt, recept, egna livsmedel och
-          inställningar från telefonen. Spara gärna en säkerhetskopia först om du vill kunna ångra dig.
+          Välj <span class="vag">Inställningar → Data och säkerhetskopia → Radera all data</span> och bekräfta. Då raderas dagbok, vikt, recept, egna livsmedel,
+          framstegsbilder och inställningar från telefonen. Spara gärna en säkerhetskopia först om du vill kunna ångra dig.
         </p>
         <p>
           Du kan också avinstallera appen (eller rensa webbplatsens data i webbläsaren). Eftersom vi inte har några konton finns det inget hos
@@ -146,8 +153,13 @@
       <section class="kort" id="provperioden" aria-labelledby="provperioden-rubrik">
         <h2 id="provperioden-rubrik">Vad händer när provperioden är slut?</h2>
         <p>
-          De första 14 dagarna är gratis och allt är öppet. Provperioden startar när du skapar din egen profil – inte när du tittar på exempeldata. Inget
-          dras automatiskt när den tar slut.
+          De första 14 dagarna är gratis och allt är öppet. På webben och i Android-appen startar provperioden när du skapar din egen profil – inte när
+          du tittar på exempeldata. Inget dras automatiskt när den tar slut.
+        </p>
+        <p>
+          I iPhone-appen startar du provperioden själv när profilen är skapad: tryck på <span class="vag">Starta 14 dagar gratis</span>, ett köp för 0 kr i
+          App Store. Provperioden räknas från det köpet, och <span class="vag">Återställ köp</span> ger tillbaka den om du installerar om appen – den börjar
+          inte om.
         </p>
         <p>Efter provperioden:</p>
         <ul>
@@ -169,6 +181,147 @@
           <li>Hjälper inget: kontakta oss med e-postadressen du använde vid köpet och ungefär när du köpte, så skickar vi nyckeln igen.</li>
         </ul>
         <p>Har du köpt en licensnyckel och vill använda Lagom på en annan enhet – kontakta oss, så hjälper vi dig.</p>
+      </section>
+
+      <section class="kort" id="dela" aria-labelledby="dela-rubrik">
+        <h2 id="dela-rubrik">Hur delar jag ett recept eller en måltid?</h2>
+        <p>
+          Du kan dela dina egna recept och dina sparade måltider. Bara receptet eller måltiden följer med – aldrig något ur din dagbok eller dina
+          allergiinställningar.
+        </p>
+        <ol>
+          <li>
+            Öppna receptet under <span class="vag">Mer → Recept</span>, eller den sparade måltiden under <span class="vag">Lägg till mat → Måltider</span>, och tryck
+            på dela-knappen.
+          </li>
+          <li>
+            Dela eller kopiera länken – eller välj <span class="vag">Dela som fil</span> (en fil som slutar på <span class="vag">.lagom.json</span>). Är receptet för
+            stort för en länk går det alltid att dela som fil.
+          </li>
+        </ol>
+        <p>Alla som har länken kan se det du delar. Det ligger i själva länken och skickas inte till oss – bara dit du själv skickar länken eller filen.</p>
+        <p><strong>Så öppnar mottagaren det:</strong></p>
+        <ul>
+          <li>I webbläsaren: öppna länken, så visas receptet. Har mottagaren inte använt Lagom där förut visas det efter välkomststegen.</li>
+          <li>
+            I appen på iPhone eller Android: en länk öppnas i webbläsaren. Kopiera den i stället och klistra in den under
+            <span class="vag">Mer → Recept → Öppna delat recept</span> – där öppnas också delade måltider, och en fil väljer du med <span class="vag">Välj fil</span>.
+          </li>
+        </ul>
+        <p>
+          <strong>Det här ser mottagaren:</strong> en förhandsvisning med namn, ingredienser och näring per portion. Inget sparas förrän hen trycker på
+          <span class="vag">Spara recept</span> eller <span class="vag">Spara måltid</span>, och det fungerar som allt annat nytt i Lagom: det kräver en egen profil
+          och en provperiod eller licens. Livsmedel som inte finns i Lagoms lista blir egna livsmedel hos mottagaren. Uppgifter om allergener och märkningar som
+          glutenfri eller laktosfri följer aldrig med – läs alltid förpackningarna själv.
+        </p>
+      </section>
+
+      <section class="kort" id="framstegsbilder" aria-labelledby="framstegsbilder-rubrik">
+        <h2 id="framstegsbilder-rubrik">Var sparas mina framstegsbilder?</h2>
+        <p>
+          Framstegsbilder är avstängda från början. Vill du använda dem slår du på dem under <span class="vag">Mer → Vikt &amp; mått → Framstegsbilder</span>. De
+          visas aldrig på Idag och döljs helt i medvetet läge.
+        </p>
+        <ul>
+          <li>
+            <strong>Bara på enheten:</strong> i appen på iPhone och Android sparas bilderna i appens egen mapp i telefonen – de följer inte med i telefonens
+            säkerhetskopia till iCloud eller Google. Använder du Lagom i webbläsaren sparas de i webbläsaren på den enheten.
+          </li>
+          <li>
+            <strong>Inte i säkerhetskopian:</strong> bilderna ingår inte när du sparar en säkerhetskopia i Lagom, och de flyttar inte med när du läser in
+            säkerhetskopian på en ny telefon. Vi har ingen kopia och kan inte se dem.
+          </li>
+          <li>
+            <strong>Mindre och utan platsuppgifter:</strong> bilderna skalas ned, och platsuppgifter och annan information i bildfilen tas bort. Väljer du en bild
+            ur ditt bildbibliotek sparar Lagom en egen kopia – originalet ligger kvar där det låg.
+          </li>
+          <li>
+            <strong>Radera:</strong> på sidan Framstegsbilder, eller med <span class="vag">Radera all data</span>. Bilderna försvinner också när du avinstallerar
+            appen (eller rensar webbplatsens data i webbläsaren).
+          </li>
+        </ul>
+      </section>
+
+      <section class="kort" id="allergier" aria-labelledby="allergier-rubrik">
+        <h2 id="allergier-rubrik">Vad betyder allergiflaggorna?</h2>
+        <p>
+          Under <span class="vag">Inställningar → Allergier och överkänslighet</span> markerar du det du inte tål – EU:s 14 allergener och laktos. Det du markerar
+          stannar på enheten och skickas varken till oss eller till Open Food Facts.
+        </p>
+        <ul>
+          <li>
+            <strong>Vad flaggorna visar:</strong> när du skannar en streckkod, söker bland märkesvaror eller tittar på en produkt från Open Food Facts berättar Lagom
+            vad produktens uppgifter där anger, till exempel ”Innehåller mjölk – som du har markerat” eller ”Kan innehålla spår av nötter – som du har markerat”.
+            Källan står med.
+          </li>
+          <li>
+            <strong>Var uppgifter saknas:</strong> Lagoms egna livsmedel, Livsmedelsverkets livsmedel, recept, dina egna livsmedel och det som kommer med ett delat
+            recept eller en delad måltid har inga uppgifter om allergener. Där står i stället att Lagom saknar uppgifter.
+          </li>
+          <li>
+            <strong>Begränsningar:</strong> Open Food Facts byggs av användare, och uppgifterna kan vara ofullständiga, gamla eller felaktiga. Att en flagga saknas
+            betyder inte att produkten passar dig. Läs alltid ingrediensförteckningen på förpackningen – innehållet kan ändras.
+          </li>
+        </ul>
+      </section>
+
+      <section class="kort" id="forpackningen" aria-labelledby="forpackningen-rubrik">
+        <h2 id="forpackningen-rubrik">Hur fungerar Fyll i från förpackningen?</h2>
+        <p>
+          Saknas en vara i Lagom, eller saknar den näringsvärden, kan du läsa in näringsdeklarationen från förpackningen i stället för att skriva av den. Du hittar
+          <span class="vag">Fyll i från förpackningen</span> i formuläret för ett eget livsmedel (<span class="vag">Lägg till mat → Mina → Nytt livsmedel</span>, eller sök och välj <span class="vag">Skapa eget livsmedel</span>) och
+          när du skannar en streckkod som Lagom inte hittar eller som saknar värden.
+        </p>
+        <ol>
+          <li>
+            Öppna <span class="vag">Fyll i från förpackningen</span> och få in texten i rutan:
+            <ul>
+              <li><strong>iPhone:</strong> tryck i rutan, välj <span class="vag">Skanna text</span> och rikta kameran mot näringsdeklarationen.</li>
+              <li><strong>Android:</strong> kopiera texten med kamerans textigenkänning (till exempel Google Lens) och klistra in den i rutan.</li>
+              <li><strong>Dator:</strong> klistra in texten.</li>
+            </ul>
+          </li>
+          <li>
+            Tryck på <span class="vag">Tolka</span>. Lagom visar värdena som de står på förpackningen – per 100 g eller per portion – och säger till om något ser ut
+            att inte stämma.
+          </li>
+          <li>
+            Tryck på <span class="vag">Fyll i formuläret</span>, kontrollera värdena och spara med <span class="vag">Spara livsmedlet</span>. Inget sparas förrän du gör
+            det.
+          </li>
+        </ol>
+        <p>
+          Lagom har ingen egen textigenkänning: texten läses av med telefonens egen, och Lagom tolkar den på enheten. Texten sparas inte och
+          skickas inte till oss. Värden som inte går att läsa lämnas tomma och räknas som okända – inte som 0.
+        </p>
+      </section>
+
+      <section class="kort" id="veckobudget" aria-labelledby="veckobudget-rubrik">
+        <h2 id="veckobudget-rubrik">Hur fungerar veckobudgeten?</h2>
+        <p>
+          Med veckobudgeten flyttar du energi mellan veckans dagar. Veckans summa är densamma – den fördelas bara så som ditt liv ser ut. Slå på den under
+          <span class="vag">Inställningar → Mål och makron → Veckobudget</span> och välj en fördelning:
+        </p>
+        <ul>
+          <li><strong>Fredagsmys:</strong> lite extra på fredag och lördag, fördelat på veckans övriga dagar.</li>
+          <li><strong>Helg:</strong> lite extra på lördag och söndag, fördelat på måndag till fredag.</li>
+          <li><strong>Egen:</strong> välj själv per dag i steg om 50 kcal – ändringen jämnas ut över de andra dagarna.</li>
+        </ul>
+        <p>
+          Kalorigolvet gäller varje enskild dag, och protein och fibrer är desamma alla dagar. Fördelningen gäller från dagen du slår på den – dagar som redan har
+          varit behåller sitt jämna mål. Under graviditet, när du ammar och under 18 år används ingen veckobudget: då behöver kroppen jämn energi varje dag, och
+          dagsmålet är detsamma alla dagar.
+        </p>
+      </section>
+
+      <section class="kort" id="sparas-automatiskt" aria-labelledby="sparas-automatiskt-rubrik">
+        <h2 id="sparas-automatiskt-rubrik">Sparas steg och anteckningar automatiskt?</h2>
+        <p>
+          Ja. Steg (<span class="vag">Mer → Träning → Steg</span>) och dagens anteckning (<span class="vag">Dagbok → Anteckningar och mående</span>) har ingen
+          spara-knapp. Det du skriver sparas en kort stund efter att du har slutat skriva, och direkt när du lämnar fältet, byter dag eller lämnar appen. Vid
+          anteckningen står det <span class="vag">Sparat</span> när den är sparad.
+        </p>
+        <p>Har du kopplat Apple Hälsa (iPhone) eller Health Connect (Android) kan stegen också hämtas därifrån.</p>
       </section>
 
       <section class="kort kontakt" id="kontakt" aria-labelledby="kontakt-rubrik">

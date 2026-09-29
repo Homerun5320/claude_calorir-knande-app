@@ -3,8 +3,8 @@
  * hunger på en skala 1–5 (samma skalor som kvällsreflektionen på Idag).
  *
  * Anteckningen sparas en stund efter att man slutat skriva (`useDeferredSave`), direkt när fältet
- * lämnas, när dagen byts och när sidan eller appen göms – inte vid varje tangenttryck, eftersom
- * varje sparning skriver om hela dagboken.
+ * lämnas, när dagen byts, när sidan lämnas (omladdning, en annan adress) och när sidan eller appen
+ * göms – inte vid varje tangenttryck, eftersom varje sparning skriver om hela dagboken.
  *
  * Rendera med `key={date}` så att texten nollställs när dagen byts.
  */

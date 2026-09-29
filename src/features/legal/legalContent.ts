@@ -327,7 +327,7 @@ const MIRROR_ROW = [
   'Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia – bara i apparna',
   'En fil i appens egen mapp på telefonen (lagom-spegling.json) – på iPhone utanför telefonens säkerhetskopia',
   'Så att dagboken inte försvinner om telefonen rensar appens lagring',
-  'Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
+  'Uppdateras högst fem minuter efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
   'Inställningar → Data → Radera all data, eller avinstallera appen',
 ]
 
@@ -335,7 +335,7 @@ const MIRROR_ROW_IOS = [
   'Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia',
   'En fil i appens egen mapp på din iPhone (lagom-spegling.json), som inte följer med i telefonens säkerhetskopia',
   'Så att dagboken inte försvinner om iOS rensar appens lagring',
-  'Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
+  'Uppdateras högst fem minuter efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen',
   'Inställningar → Data → Radera all data, eller avinstallera appen',
 ]
 

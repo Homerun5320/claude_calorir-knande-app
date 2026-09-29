@@ -135,6 +135,18 @@ Reglerna (Googles policy för metadata): inga rankingord ("bäst", "nr 1", "grat
 ikon och kort beskrivning – i den fullständiga beskrivningen står provperioden som "14 dagar utan
 kostnad" – inga emoji eller versaler för att sticka ut, inga omdömen från användare, inga myndighetslogotyper och
 ingen antydan om att Lagom är kopplad till Livsmedelsverket. Nämn inte webbköp eller andra butiker.
+Dessutom (samma som för App Store):
+
+- Inga andra plattformar: inte iPhone, Apple, App Store eller Apple Hälsa – och inte webbversionen.
+- Bara det som finns i Play-appen. **Röstsökningen finns inte i apparna** och nämns aldrig.
+  "Fyll i från förpackningen" beskrivs med telefonens egen textigenkänning eller inklistrad text.
+- Allergier: säg aldrig "säker", "fri från" eller "innehåller inte" – bara att Lagom visar vad Open
+  Food Facts anger, med källan, och att förpackningen alltid ska läsas.
+- Tonen från CLAUDE.md: varm och utan skuld – inga dagar i rad, inga röda varningar.
+- Appnamn högst 30 tecken, kort beskrivning högst 80, fullständig beskrivning högst 4 000 och
+  versionsinformationen högst 500 tecken. `src/native/storeBuilds.test.ts` läser kodblocken under
+  rubrikerna nedan och kontrollerar gränserna och orden – byt inte namn på rubrikerna utan att
+  ändra testet.
 
 ### Appnamn (högst 30 tecken)
 
@@ -162,31 +174,36 @@ LOGGA MAT SNABBT
 • Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
 • Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
 • Skanna streckkoden på förpackningen för att hitta produkten
+• Saknas en vara? Fyll i från förpackningen med telefonens textigenkänning eller inklistrad text – du granskar innan du sparar
 • Spara måltider du äter ofta och lägg in dem med ett tryck
 
 NÄRING OCH MÅL
 • Dagsringen visar energi, protein, kolhydrater, fett och fibrer mot ditt dagsmål
+• Veckobudget om du vill: samma energi över veckan, med lite extra till fredagsmyset eller helgen – kalorigolvet gäller varje dag
 • Vitaminer och mineraler jämförs med Nordiska näringsrekommendationer (NNR 2023)
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
-• Vatten, träning och vikt på samma ställe
+• Allergiprofil: markera det du inte tål, så visar Lagom vad Open Food Facts anger om allergener och spår i produkten, med källan – läs alltid förpackningen
+• Vatten, träning, steg och vikt på samma ställe
 • Koppla till Health Connect om du vill: hämta vikt och steg, och spara energi, vatten och vikt
 • Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
 
 RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
 • Hämta recept från en webbadress
+• Dela dina recept och sparade måltider som länk eller fil – mottagaren ser allt innan något sparas
 • Planera veckans måltider och få en inköpslista
 • Insikter för veckan, 30 och 90 dagar – bara dagar du har loggat räknas
 • Vikt och mått med en lugn trendlinje i stället för dagliga svängningar
+• Framstegsbilder om du vill – avstängda från början, sparas bara i telefonen och följer inte med i säkerhetskopian
 
 LUGNT OCH UTAN SKULD
-Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
+Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
 
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
 • Dagboken sparas bara på din telefon – ingen reklam och ingen spårning
 • Uppgifter från Health Connect läses och sparas bara i telefonen
-• Exportera allt när du vill, eller radera allt med ett par tryck
+• Exportera allt du har loggat när du vill, eller radera allt med ett par tryck
 • Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
@@ -198,12 +215,32 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(Ungefär 3 100 tecken.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
+(3 883 tecken med radbrytningar.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
 veckoplaneringen, receptimporten, påminnelserna och Health Connect ska finnas i version 1.0, men
 kontrollera i den version du laddar upp (Inställningar → Påminnelser och Inställningar → Health
 Connect). Saknas någon: ta bort raden. Googles policy för
 appar med information från myndigheter kräver att källan anges (gärna med adress) – det gör raden
 "Källa:" ovan.
+
+Veckobudgeten (Inställningar → Mål och makron), allergiprofilen (Inställningar → Allergier och
+överkänslighet), delade recept och måltider, framstegsbilderna (Vikt & mått), "Fyll i från
+förpackningen" (formuläret för eget livsmedel och skanningen) och milstolparna (Mer → Milstolpar)
+finns i Play-bygget (kontrollerat 2026-09-29 med `VITE_DISTRIBUTION=play`). Delning som länk kräver
+webbplatsens adress (`VITE_API_BASE`), som byggkontrollen redan kräver i butiksbyggen; utan den går
+det bara att dela som fil. Röstsökningen är webbens och finns inte i appen – den står därför inte i
+texterna.
+
+### Versionsinformation (högst 500 tecken)
+
+*Play Console → Testa och släpp → Produktion → Skapa ny version → Versionsinformation.* Texten står
+mellan språktaggarna `<sv-SE>` och `</sv-SE>` i rutan. För de första testversionerna räcker en
+kort rad (avsnitt 10); den här texten gäller version 1.0 i produktion.
+
+```
+Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare och "Fyll i från förpackningen", recept som du kan dela som länk eller fil, veckoplanering och veckobudget, allergiprofil, insikter, milstolpar, vikt och mått, vatten och träning – och om du vill framstegsbilder, påminnelser och koppling till Health Connect. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
+```
+
+(470 tecken.)
 
 ### Kategori och kontaktuppgifter
 
@@ -762,7 +799,7 @@ Behövs bara för att molnbygget ska ladda upp till intern testning själv:
 - [x] Streckkodsläsaren på Android läser med ZXing – Data safety och integritetspolicyn stämmer med det ([avsnitt 8](#datasäkerhet-data-safety)).
 - [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
 - [ ] Sluten test: minst 12 testare i 14 dagar i följd.
-- [ ] Butikstexter, ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
+- [ ] Butikstexter (och versionsinformationen för produktion), ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
 - [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de sex Health Connect-typerna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
 - [ ] Länder: bara Sverige.
 - [ ] Inga omnämnanden av webbköp eller App Store i appen eller texterna.

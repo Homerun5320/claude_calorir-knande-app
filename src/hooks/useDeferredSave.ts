@@ -8,8 +8,14 @@
  *   senaste ändringen. Flera ändringar i rad (tangenttryck, tryck på −/+) blir en enda sparning.
  * - Det väntande värdet sparas direkt med `flush()` (anropas när fältet lämnas), när komponenten
  *   försvinner, när nyckeln byts (t.ex. en annan dag – värdet sparas då på den gamla nyckeln), när
- *   sidan stängs (`pagehide`) och när den göms (`visibilitychange` → hidden, vilket även täcker att
- *   apparna går till bakgrunden i WKWebView och Android WebView).
+ *   sidan lämnas (`beforeunload`, se nedan), när den stängs (`pagehide`) och när den göms
+ *   (`visibilitychange` → hidden, vilket även täcker att apparna går till bakgrunden i WKWebView
+ *   och Android WebView).
+ * - `beforeunload`: vid omladdning eller en annan adress i samma flik skickar Chromium `pagehide`
+ *   och `visibilitychange` först när sidan redan håller på att tas bort – en IndexedDB-transaktion
+ *   som startas då sparas aldrig. I `beforeunload` hinner den. Lyssnaren finns bara medan ett
+ *   värde väntar (så att sidan annars kan sparas i bakåt-framåt-cachen i Firefox och Safari) och
+ *   anropar aldrig `preventDefault()` – ingen "Lämna sidan?"-dialog.
  * - Inget sparas när värdet är detsamma som det sparade (`read(key)` läses precis före sparningen).
  * - `save` och `read` läses alltid från den senaste renderingen, och kroken tål React 19:s
  *   StrictMode (effekterna körs två gånger vid monteringen utan att något sparas i onödan).
@@ -83,12 +89,24 @@ export function useDeferredSave<T>(options: DeferredSaveOptions<T>): DeferredSav
       timerRef.current = undefined
     }
 
+    // Sparar när sidan lämnas – utan preventDefault(), så ingen dialog visas.
+    const onBeforeUnload = () => flush()
+    let listening = false
+    /** Det väntande värdet, `pending` och `beforeunload`-lyssnaren (bara medan något väntar). */
+    const setWaiting = (next: Pending<T> | null) => {
+      pendingRef.current = next
+      setPending(next !== null)
+      if (listening === (next !== null)) return
+      listening = next !== null
+      if (listening) window.addEventListener('beforeunload', onBeforeUnload)
+      else window.removeEventListener('beforeunload', onBeforeUnload)
+    }
+
     const flush = () => {
       clearTimer()
       const next = pendingRef.current
       if (next === null) return
-      pendingRef.current = null
-      setPending(false)
+      setWaiting(null)
       const { read, save, equals = Object.is } = optionsRef.current
       try {
         if (!equals(next.value, read(next.key))) save(next.value, next.key)
@@ -103,12 +121,10 @@ export function useDeferredSave<T>(options: DeferredSaveOptions<T>): DeferredSav
       if (pendingRef.current !== null && pendingRef.current.key !== current) flush()
       clearTimer()
       if (equals(value, read(current))) {
-        pendingRef.current = null
-        setPending(false)
+        setWaiting(null)
         return false
       }
-      pendingRef.current = { key: current, value }
-      setPending(true)
+      setWaiting({ key: current, value })
       timerRef.current = window.setTimeout(flush, delay)
       return true
     }
@@ -122,7 +138,8 @@ export function useDeferredSave<T>(options: DeferredSaveOptions<T>): DeferredSav
     if (waiting !== null && waiting.key !== key) controls.flush()
   }, [key, controls])
 
-  // Sidan stängs eller göms (även appen till bakgrunden), och när komponenten försvinner.
+  // Sidan stängs eller göms (även appen till bakgrunden), och när komponenten försvinner – då tas
+  // även `beforeunload`-lyssnaren bort (flush lämnar inget väntande värde efter sig).
   useEffect(() => {
     const onPageHide = () => controls.flush()
     const onVisibility = () => {

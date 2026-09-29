@@ -93,7 +93,7 @@ describe('DayNotesCard', () => {
     expect(note()).toHaveValue('Igår')
   })
 
-  it('sparar när sidan göms eller stängs', () => {
+  it('sparar när sidan göms, stängs eller lämnas (omladdning, en annan adress)', () => {
     render(<Notes date={todayISO()} />)
     fireEvent.change(note(), { target: { value: 'Före bakgrunden' } })
     setVisibility('hidden')
@@ -108,7 +108,13 @@ describe('DayNotesCard', () => {
       window.dispatchEvent(new Event('pagehide'))
     })
     expect(storedNote()).toBe('Före stängningen')
-    expect(setDayMeta).toHaveBeenCalledTimes(2)
+    // Omladdning eller en annan adress: Chromium hinner bara spara det som startas i beforeunload.
+    fireEvent.change(note(), { target: { value: 'Före omladdningen' } })
+    act(() => {
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true }))
+    })
+    expect(storedNote()).toBe('Före omladdningen')
+    expect(setDayMeta).toHaveBeenCalledTimes(3)
   })
 
   it('sparar inget när bara mellanslag ändras eller texten skrivs tillbaka', () => {

@@ -53,7 +53,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(self), usb=(), bluetooth=()"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(self), usb=()"
     Cross-Origin-Opener-Policy = "same-origin"
     Strict-Transport-Security = "max-age=31536000"
 

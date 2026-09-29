@@ -1,8 +1,8 @@
 /**
  * useDeferredSave: sparar det senaste värdet en gång efter pausen, direkt vid flush, när
- * komponenten försvinner, när nyckeln byts (på den gamla nyckeln) och när sidan stängs eller göms –
- * aldrig när värdet redan är sparat, alltid med den senaste `save` och utan extra sparningar i
- * StrictMode.
+ * komponenten försvinner, när nyckeln byts (på den gamla nyckeln) och när sidan lämnas, stängs
+ * eller göms – aldrig när värdet redan är sparat, alltid med den senaste `save` och utan extra
+ * sparningar i StrictMode.
  */
 import { act, renderHook } from '@testing-library/react'
 import type { MockInstance } from 'vitest'
@@ -37,7 +37,7 @@ function listenersFor(add: ListenerSpy, remove: ListenerSpy, type: string) {
   return { added: of(add), removed: of(remove) }
 }
 
-/** Följer `pagehide` på window och `visibilitychange` på document. */
+/** Följer `pagehide` och `beforeunload` på window och `visibilitychange` på document. */
 function spyListeners() {
   const spies = {
     windowAdd: vi.spyOn(window, 'addEventListener') as unknown as ListenerSpy,
@@ -47,6 +47,7 @@ function spyListeners() {
   }
   return {
     pagehide: () => listenersFor(spies.windowAdd, spies.windowRemove, 'pagehide'),
+    beforeunload: () => listenersFor(spies.windowAdd, spies.windowRemove, 'beforeunload'),
     visibility: () => listenersFor(spies.documentAdd, spies.documentRemove, 'visibilitychange'),
     restore: () => {
       for (const spy of Object.values(spies)) spy.mockRestore()
@@ -211,6 +212,80 @@ describe('useDeferredSave', () => {
     expect(save).toHaveBeenCalledWith(11, 'a')
   })
 
+  // Chromium skickar pagehide/visibilitychange vid omladdning och en annan adress först när sidan
+  // tas bort – då sparas en IndexedDB-transaktion aldrig. beforeunload kommer i tid (e2e-resorna
+  // anteckning och vatten-och-steg i scripts/e2e/karna.mjs).
+  it('sparar när sidan lämnas (beforeunload) – utan "Lämna sidan?"-dialog', () => {
+    const { result, save } = setup()
+    act(() => {
+      result.current.schedule(13)
+    })
+    const event = new Event('beforeunload', { cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith(13, 'a')
+    expect(event.defaultPrevented).toBe(false)
+    expect(result.current.pending).toBe(false)
+    // pagehide och timern efteråt sparar inte en gång till.
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+      vi.advanceTimersByTime(SAVE_DELAY_MS * 2)
+    })
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it('beforeunload-lyssnaren finns bara medan ett värde väntar', () => {
+    const listeners = spyListeners()
+    try {
+      const { result, save, unmount } = setup({ a: 5 })
+      // Inget väntar: ingen lyssnare (sidan kan sparas i bakåt-framåt-cachen).
+      expect(listeners.beforeunload().added).toHaveLength(0)
+      act(() => {
+        result.current.schedule(5)
+      })
+      expect(listeners.beforeunload().added).toHaveLength(0)
+
+      // Flera ändringar i rad: en lyssnare, som tas bort när värdet har sparats.
+      act(() => {
+        result.current.schedule(6)
+        result.current.schedule(7)
+      })
+      expect(listeners.beforeunload().added).toHaveLength(1)
+      expect(listeners.beforeunload().removed).toHaveLength(0)
+      act(() => {
+        vi.advanceTimersByTime(SAVE_DELAY_MS)
+      })
+      expect(save).toHaveBeenCalledWith(7, 'a')
+      expect(listeners.beforeunload().removed).toEqual(listeners.beforeunload().added)
+
+      // En ändring som ångras (tillbaka till det sparade värdet) tar också bort den.
+      act(() => {
+        result.current.schedule(8)
+      })
+      expect(listeners.beforeunload().added).toHaveLength(2)
+      act(() => {
+        result.current.schedule(7)
+      })
+      expect(listeners.beforeunload().removed).toEqual(listeners.beforeunload().added)
+
+      // Avmonteringen sparar det som väntar och lämnar ingen lyssnare kvar.
+      act(() => {
+        result.current.schedule(9)
+      })
+      unmount()
+      expect(save).toHaveBeenLastCalledWith(9, 'a')
+      const { added, removed } = listeners.beforeunload()
+      expect(added).toHaveLength(3)
+      expect(removed).toEqual(added)
+      window.dispatchEvent(new Event('beforeunload'))
+      expect(save).toHaveBeenCalledTimes(2)
+    } finally {
+      listeners.restore()
+    }
+  })
+
   it('tar bort lyssnarna när komponenten försvinner', () => {
     const listeners = spyListeners()
     try {
@@ -345,6 +420,8 @@ describe('useDeferredSave', () => {
       // Efter avmonteringen är varje lyssnare som lades till också borttagen.
       expect(listeners.pagehide().removed).toEqual(mounted.pagehide.added)
       expect(listeners.visibility().removed).toEqual(mounted.visibility.added)
+      expect(listeners.beforeunload().added.length).toBeGreaterThan(0)
+      expect(listeners.beforeunload().removed).toEqual(listeners.beforeunload().added)
     } finally {
       listeners.restore()
     }
