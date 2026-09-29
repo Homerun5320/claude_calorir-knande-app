@@ -43,8 +43,7 @@ function copyYesterdayMeal(today: ISODate, meal: MealId, mealLabel: string): boo
     action: {
       label: 'Ångra',
       onClick: () => {
-        const { removeEntry } = useDiaryStore.getState()
-        for (const id of ids) removeEntry(today, id)
+        useDiaryStore.getState().removeEntries(ids.map((id) => ({ date: today, id })))
       },
     },
   })

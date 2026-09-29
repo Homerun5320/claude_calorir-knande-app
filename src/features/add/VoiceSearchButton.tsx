@@ -16,11 +16,15 @@
  *   för att sluta; att skriva i fältet avbryter.
  * - Status och fel läses upp via en aria-live-region. Under lyssnandet är uppläsningen kort, så
  *   att skärmläsarens röst inte hamnar i mikrofonen.
+ * - I butiksbyggena (App Store och Google Play) finns ingen röstsökning: `useVoiceSearch` ger då
+ *   alltid `visible: false`, komponenterna ritar ingenting, och koden för taligenkänningen tas bort
+ *   ur paketet (`VOICE_SEARCH` nedan, se `VOICE_SEARCH_BUILD` i lib/voiceSearch).
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react'
 import { Mic, MicOff, Square } from 'lucide-react'
 import { IconButton, confirmDialog, cx } from '../../components/ui'
 import {
+  VOICE_SEARCH_BUILD,
   checkVoiceAvailability,
   createLocalRecognition,
   installSwedishVoice,
@@ -32,6 +36,15 @@ import {
   type VoiceAvailability,
 } from '../../lib/voiceSearch'
 import { logError } from '../../lib/errorLog'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * Röstsökningen finns i bygget (bara webbygget) – en konstant i samma modul, så att Vite tar bort
+ * koden ur butiksbyggena. Se VOICE_SEARCH_BUILD i src/lib/voiceSearch.ts.
+ */
+const VOICE_SEARCH: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : VOICE_SEARCH_BUILD
 
 export type VoiceSupport = 'checking' | 'unsupported' | VoiceAvailability
 /** checking = kontrollerar språkpaketet efter ett tryck; starting = väntar på mikrofonen. */
@@ -80,11 +93,8 @@ function quietAbort(rec: LocalRecognition): void {
   }
 }
 
-/**
- * Röstsökningens tillstånd. `onTranscript` får den tolkade texten efterhand (ska vara stabil,
- * t.ex. en state-setter – annars används den senaste ändå).
- */
-export function useVoiceSearch(onTranscript: (text: string) => void): VoiceSearch {
+/** Röstsökningens tillstånd i webbygget (se `useVoiceSearch`). */
+function useLocalVoiceSearch(onTranscript: (text: string) => void): VoiceSearch {
   // Avgörs en gång per sida: finns igenkänning på enheten här alls?
   const [ctor] = useState<LocalRecognitionCtor | null>(() => localRecognitionCtor())
   const [support, setSupport] = useState<VoiceSupport>(() => (ctor ? 'checking' : 'unsupported'))
@@ -323,8 +333,8 @@ export function useVoiceSearch(onTranscript: (text: string) => void): VoiceSearc
   return { visible, support, phase, notice, toggle, stop, cancel }
 }
 
-/** Ikonknappen i sökfältet (som `suffix` i TextField). */
-export function VoiceSearchButton({ voice, className }: { voice: VoiceSearch; className?: string }) {
+/** Ikonknappen i sökfältet (webbygget). */
+function LocalVoiceSearchButton({ voice, className }: VoiceSearchProps) {
   const active = voice.phase === 'starting' || voice.phase === 'listening'
   const listening = voice.phase === 'listening'
   return (
@@ -343,11 +353,11 @@ export function VoiceSearchButton({ voice, className }: { voice: VoiceSearch; cl
 }
 
 /**
- * Status under sökfältet. Live-regionen finns alltid i DOM:en (så att ändringar läses upp). Medan
- * mikrofonen är på säger den bara det korta ("Lyssnar …") – tips och exempel står utanför den, så
- * att skärmläsarens röst inte hamnar i mikrofonen.
+ * Status under sökfältet (webbygget). Live-regionen finns alltid i DOM:en (så att ändringar läses
+ * upp). Medan mikrofonen är på säger den bara det korta ("Lyssnar …") – tips och exempel står
+ * utanför den, så att skärmläsarens röst inte hamnar i mikrofonen.
  */
-export function VoiceSearchStatus({ voice, className }: { voice: VoiceSearch; className?: string }) {
+function LocalVoiceSearchStatus({ voice, className }: VoiceSearchProps) {
   const { phase, notice } = voice
   const live =
     phase === 'starting'
@@ -378,3 +388,38 @@ export function VoiceSearchStatus({ voice, className }: { voice: VoiceSearch; cl
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Det som exporteras – i butiksbyggena utan röstsökning (se VOICE_SEARCH överst)
+// ---------------------------------------------------------------------------
+
+export interface VoiceSearchProps {
+  voice: VoiceSearch
+  className?: string
+}
+
+const noop = (): void => {}
+
+/** Röstsökningen i butiksbyggena: ingen knapp, inget att göra. Samma objekt varje gång. */
+const NO_VOICE_SEARCH: VoiceSearch = { visible: false, support: 'unsupported', phase: 'idle', notice: null, toggle: noop, stop: noop, cancel: noop }
+
+function useNoVoiceSearch(): VoiceSearch {
+  return NO_VOICE_SEARCH
+}
+
+function NoVoiceSearch(): null {
+  return null
+}
+
+/**
+ * Röstsökningens tillstånd. `onTranscript` får den tolkade texten efterhand (ska vara stabil,
+ * t.ex. en state-setter – annars används den senaste ändå). I butiksbyggena alltid
+ * `visible: false`.
+ */
+export const useVoiceSearch: (onTranscript: (text: string) => void) => VoiceSearch = VOICE_SEARCH ? useLocalVoiceSearch : useNoVoiceSearch
+
+/** Ikonknappen i sökfältet (som `suffix` i TextField). Ritar ingenting i butiksbyggena. */
+export const VoiceSearchButton: ComponentType<VoiceSearchProps> = VOICE_SEARCH ? LocalVoiceSearchButton : NoVoiceSearch
+
+/** Status under sökfältet. Ritar ingenting i butiksbyggena. */
+export const VoiceSearchStatus: ComponentType<VoiceSearchProps> = VOICE_SEARCH ? LocalVoiceSearchStatus : NoVoiceSearch

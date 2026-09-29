@@ -80,8 +80,7 @@ function CopyMealInner({ source, open, onClose, today, meals, allMeals }: CopyMe
       action: {
         label: 'Ångra',
         onClick: () => {
-          const s = useDiaryStore.getState()
-          for (const id of ids) s.removeEntry(target.date, id)
+          useDiaryStore.getState().removeEntries(ids.map((id) => ({ date: target.date, id })))
         },
       },
     })

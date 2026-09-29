@@ -21,6 +21,8 @@
  * - Dator: sök → Enter (första träffen) → skriv mängd → Enter.
  * - Mikrofonen i sökfältet: röstsökning med svensk taligenkänning på enheten (`VoiceSearchButton`,
  *   `lib/voiceSearch`). Visas bara där igenkänningen sker på enheten – aldrig via en taltjänst.
+ *   Bara i webbygget: i butiksbyggena ger `useVoiceSearch` alltid `visible: false` och koden tas
+ *   bort ur paketet (`VOICE_SEARCH_BUILD`, kontrolleras av byggkontrollen i vite.config.ts).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -972,8 +974,7 @@ function CopyYesterday({
       action: {
         label: 'Ångra',
         onClick: () => {
-          const { removeEntry } = useDiaryStore.getState()
-          for (const e of added) removeEntry(e.date, e.id)
+          useDiaryStore.getState().removeEntries(added)
         },
       },
     })

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Camera, Flashlight, FlashlightOff, Keyboard, PackageSearch, Plus, RefreshCw, ScanBarcode, ShoppingBasket, WifiOff, X } from 'lucide-react'
+import { Camera, Flashlight, FlashlightOff, Keyboard, PackageSearch, Plus, RefreshCw, ScanBarcode, ScanText, ShoppingBasket, WifiOff, X } from 'lucide-react'
 import type { Food } from '../../types'
 import { Button, IconButton, Sheet, Spinner, TextField, cx, toast } from '../../components/ui'
 import { CategoryIcon, MealIcon } from '../../components/domain'
@@ -37,6 +37,7 @@ import { useBasketStore } from './basketStore'
 import { NutriScoreBadge, useLeave } from './components'
 import { PortionSheet } from './PortionSheet'
 import { AllergenFlags } from './AllergenFlags'
+import { withLabelPanel } from './customFood'
 import {
   CAMERA_ERROR_TEXT,
   cleanManualCode,
@@ -505,15 +506,27 @@ export default function ScanPage() {
         }}
         missingNutritionAction={
           found ? (
-            <Button
-              variant="soft"
-              size="sm"
-              iconLeft={Plus}
-              replace
-              to={newFoodHref({ copyOf: found.id, barcode: lookup.kind === 'found' ? lookup.code : undefined, meal, date })}
-            >
-              Komplettera värdena
-            </Button>
+            <span className="flex flex-wrap gap-2">
+              <Button
+                variant="soft"
+                size="sm"
+                iconLeft={Plus}
+                replace
+                to={newFoodHref({ copyOf: found.id, barcode: lookup.kind === 'found' ? lookup.code : undefined, meal, date })}
+              >
+                Komplettera värdena
+              </Button>
+              {/* Samma formulär med "Fyll i från förpackningen" öppen (textigenkänning i telefonen). */}
+              <Button
+                variant="outline"
+                size="sm"
+                iconLeft={ScanText}
+                replace
+                to={withLabelPanel(newFoodHref({ copyOf: found.id, barcode: lookup.kind === 'found' ? lookup.code : undefined, meal, date }))}
+              >
+                Fyll i från förpackningen
+              </Button>
+            </span>
           ) : undefined
         }
       >
@@ -535,6 +548,7 @@ export default function ScanPage() {
         <LookupProblem
           lookup={lookup}
           onCreate={(code) => navigate(newFoodHref({ barcode: code, meal, date }), { replace: true })}
+          onReadLabel={(code) => navigate(withLabelPanel(newFoodHref({ barcode: code, meal, date })), { replace: true })}
           onRetry={(code) => void runLookup(code)}
           onScanAgain={scanNext}
           canScan={cameraOk}
@@ -680,12 +694,15 @@ function CameraFallback({
 function LookupProblem({
   lookup,
   onCreate,
+  onReadLabel,
   onRetry,
   onScanAgain,
   canScan,
 }: {
   lookup: Lookup
   onCreate: (code: string) => void
+  /** Eget livsmedel med streckkoden och panelen "Fyll i från förpackningen" öppen. */
+  onReadLabel: (code: string) => void
   onRetry: (code: string) => void
   onScanAgain: () => void
   /** Kameran fungerar – annars döljs "Skanna en annan vara". */
@@ -718,6 +735,9 @@ function LookupProblem({
       <div className="flex flex-col gap-2">
         <Button size="lg" fullWidth iconLeft={Plus} onClick={() => onCreate(code)}>
           Skapa eget livsmedel
+        </Button>
+        <Button variant="soft" size="lg" fullWidth iconLeft={ScanText} onClick={() => onReadLabel(code)}>
+          Fyll i från förpackningen
         </Button>
         {lookup.kind !== 'notfound' && (
           <Button variant="soft" size="lg" fullWidth iconLeft={RefreshCw} onClick={() => onRetry(code)}>

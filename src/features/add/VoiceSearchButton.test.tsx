@@ -304,3 +304,37 @@ describe('AddFoodPage med röstsökning', () => {
     expect(screen.getByPlaceholderText('Sök livsmedel')).toHaveValue('Havregrynsgröt')
   })
 })
+
+describe('butiksbyggena', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it.each(['appstore', 'play'])('%s: ingen mikrofon och ingen kontroll av taligenkänningen', async (distribution) => {
+    const { available } = mockSpeechRecognition()
+    vi.stubEnv('VITE_DISTRIBUTION', distribution)
+    vi.resetModules()
+    const fresh = await import('./VoiceSearchButton')
+    let seen: ReturnType<typeof fresh.useVoiceSearch> | null = null
+    function StoreHarness() {
+      const [, setQ] = useState('')
+      const voice = fresh.useVoiceSearch(setQ)
+      seen = voice
+      // Komponenterna ritar ingenting, även om någon skulle visa dem.
+      return (
+        <div data-testid="rost">
+          <fresh.VoiceSearchButton voice={voice} />
+          <fresh.VoiceSearchStatus voice={voice} />
+        </div>
+      )
+    }
+    render(<StoreHarness />)
+    await flush()
+    expect(seen).toMatchObject({ visible: false, support: 'unsupported', phase: 'idle', notice: null })
+    expect(screen.getByTestId('rost')).toBeEmptyDOMElement()
+    expect(screen.queryByRole('button', { name: 'Sök med rösten' })).not.toBeInTheDocument()
+    expect(available).not.toHaveBeenCalled()
+    expect(instances).toHaveLength(0)
+  })
+})

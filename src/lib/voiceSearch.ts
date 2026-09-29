@@ -21,12 +21,33 @@
  * - Saknas `available()` eller egenskapen `processLocally` finns ingen röstsökning – aldrig reserv
  *   till server-igenkänning.
  * - Safari/WebKit (alla webbläsare på iPhone och iPad) och apparna (ingen godkänd native-plugin)
- *   får ingen röstsökning.
+ *   får ingen röstsökning. I butiksbyggena (App Store och Google Play) finns koden inte ens med –
+ *   se `VOICE_SEARCH_BUILD` nedan; i webbygget stängs den av när Lagom körs som app (TWA).
  * - Mikrofonen frågas först när man trycker på knappen (`start()`); inget spelas in i förväg,
  *   och varken ljud eller text sparas – texten hamnar bara i sökfältet.
  */
-import { isInApp } from '../config/platform'
+import { IS_STORE_BUILD, isInApp } from '../config/platform'
 import { logError } from './errorLog'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * Röstsökningen finns bara i webbygget. I butiksbyggena (App Store och Google Play) tas koden bort
+ * helt – apparna har ingen röstsökning, och koden för taligenkänningen ska inte ligga dold i paketet.
+ *
+ * Samma mönster som webbköpen (WEB_PURCHASES_BUILD i src/config/platform.ts): Vite (Rolldown) tar
+ * bara bort kod när villkoret är en konstant **i samma modul**. Modulen som ska krympa
+ * (features/add/VoiceSearchButton.tsx) upprepar därför uttrycket lokalt, med den här konstanten
+ * som reserv i testerna (där `define` saknas):
+ *
+ *     declare const __LAGOM_DISTRIBUTION__: string | undefined
+ *     const VOICE_SEARCH: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : VOICE_SEARCH_BUILD
+ *
+ * netlify/tests/store-bundle.test.ts bygger alla tre varianterna och kontrollerar att
+ * `SpeechRecognition` och `processLocally` saknas i butiksbyggena men finns i webbygget.
+ */
+export const VOICE_SEARCH_BUILD: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : !IS_STORE_BUILD
 
 /** Språket för röstsökningen. */
 export const VOICE_LANG = 'sv-SE'
@@ -108,11 +129,12 @@ export function localOptions(): LocalRecognitionOptions {
 
 /**
  * Konstruktorn för igenkänning på enheten – eller null när röstsökning inte får finnas här:
- * i apparna, i Safari/WebKit, utan oprefixad `SpeechRecognition`, utan `available()` eller utan
- * egenskapen `processLocally` (då skulle `processLocally = true` bara bli en vanlig egenskap som
- * webbläsaren struntar i, och ljudet kunde gå till en server).
+ * i butiksbyggena, i apparna, i Safari/WebKit, utan oprefixad `SpeechRecognition`, utan
+ * `available()` eller utan egenskapen `processLocally` (då skulle `processLocally = true` bara bli
+ * en vanlig egenskap som webbläsaren struntar i, och ljudet kunde gå till en server).
  */
 export function localRecognitionCtor(env: VoiceEnv = currentEnv()): LocalRecognitionCtor | null {
+  if (!VOICE_SEARCH_BUILD) return null
   try {
     if (env.inApp || isWebKitOnlyBrowser(env.userAgent)) return null
     const scope = env.scope as { SpeechRecognition?: unknown } | null | undefined

@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   VOICE_LANG,
+  VOICE_SEARCH_BUILD,
   checkVoiceAvailability,
   cleanTranscript,
   createLocalRecognition,
@@ -114,6 +115,26 @@ describe('localRecognitionCtor', () => {
       },
     })
     expect(localRecognitionCtor(env(scope))).toBeNull()
+  })
+})
+
+describe('butiksbyggena (VOICE_SEARCH_BUILD)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('webbygget har röstsökningen', () => {
+    expect(VOICE_SEARCH_BUILD).toBe(true)
+  })
+
+  it.each(['appstore', 'play'])('%s: ingen röstsökning, inte ens med igenkänning på enheten', async (distribution) => {
+    vi.stubEnv('VITE_DISTRIBUTION', distribution)
+    vi.resetModules()
+    const fresh = await import('./voiceSearch')
+    expect(fresh.VOICE_SEARCH_BUILD).toBe(false)
+    // Även om appen skulle köras i en vanlig webbläsare (inApp false) med SpeechRecognition.
+    expect(fresh.localRecognitionCtor(env({ SpeechRecognition: mockCtor() }))).toBeNull()
   })
 })
 

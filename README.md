@@ -8,7 +8,7 @@ Lagom är en installerbar webbapp (PWA) för mobil och dator, och förbereds fö
 
 | Problem i vanliga kaloriappar | Så gör Lagom |
 | --- | --- |
-| Crowdsourcade databaser med dubbletter och felaktiga värden | Kurerad svensk databas med 855 livsmedel baserad på Livsmedelsverkets värden – en rad per vardagsbegrepp (Kycklingbröst, Pasta, Havredryck) i stället för sex nästan likadana varianter. Varje fil är oberoende faktagranskad, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
+| Crowdsourcade databaser med dubbletter och felaktiga värden | Kurerad svensk databas med 855 livsmedel baserad på Livsmedelsverkets värden – en rad per vardagsbegrepp (Kycklingbröst, Pasta, Havredryck) i stället för sex nästan likadana varianter. Varje fil har kontrollerats mot Livsmedelsverkets värden av en separat granskning, och ett automatiskt test kontrollerar att energin stämmer med makronäringsämnena. Varje livsmedel visar sin källa, och användarbidrag från Open Food Facts märks tydligt. |
 | Okända näringsvärden visas som 0 | Okänt visas som "–", och appen visar hur fullständiga näringsdata är. |
 | Betalvägg för streckkoder, makromål och export – och prenumerationer som är svåra att säga upp | 14 dagar gratis att prova, sedan Årslicens 349 kr eller Livstidslicens 699 kr (engångsköp) utan automatisk förnyelse – ingen reklam, inga dolda avgifter. Allt ingår: streckkodsläsaren, alla näringsämnen, recept, export och insikter. Din data låses aldrig – efter provperioden kan du alltid se, exportera och radera den. |
 | Reklam och uppsäljning | Ingen reklam, inga konton, inga prenumerationer. |
@@ -47,7 +47,7 @@ Lagoms egen databas (`src/data/foods/`) har 855 kurerade livsmedel med svenska n
 ## Kvalitet
 
 - Drygt 2 200 automatiska tester (vitest), bland annat en säkerhetsmatris som prövar 40 000 slumpade profiler mot reglerna för kalorimål. CI (`.github/workflows/ci.yml`) kör typkontroll, lint, tester och bygge på varje ändring.
-- Granskad ur fem perspektiv: funktionstest i webbläsare, kodgranskning, design och svensk text, tillgänglighet (WCAG 2.2 AA) samt näringslära och säkerhet.
+- Granskad ur fem perspektiv: funktionstest i webbläsare, kodgranskning, design och svensk text, tillgänglighet (med WCAG 2.2 som riktmärke – ingen formell granskning) samt näringslära och säkerhet.
 - Fungerar från 320 px mobilbredd till stor skärm, i ljust och mörkt läge.
 
 ## Prova utan att mata in något

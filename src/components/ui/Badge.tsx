@@ -124,7 +124,8 @@ export function Badge({ tone = 'neutral', variant = 'soft', size = 'sm', icon, d
     >
       {dot && <span aria-hidden className={cx('size-1.5 rounded-full', variant === 'solid' ? 'bg-bg' : 'bg-(--tone)')} />}
       {renderIcon(icon, size === 'sm' ? 'size-3' : 'size-3.5', 2.4)}
-      {children !== undefined && <span className="truncate">{children}</span>}
+      {/* Egen radhöjd: med leading-none klipper overflow:hidden (truncate) prickarna över Ö/Ä och ringen på Å. */}
+      {children !== undefined && <span className="truncate leading-[1.3]">{children}</span>}
     </span>
   )
 }

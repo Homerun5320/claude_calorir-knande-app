@@ -224,11 +224,15 @@ Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt p
 
 I apparna används telefonens egen streckkodsläsare: Apples inbyggda bildanalys på iPhone och den öppna läsaren ZXing, som ingår i appen, på Android. Båda läser koden på telefonen och skickar ingenting vidare.
 
+Du kan också fylla i ett eget livsmedel från förpackningen genom att läsa av näringsdeklarationen med telefonens egen textigenkänning (till exempel Skanna text på iPhone) eller klistra in texten. Textigenkänningen är telefonens egen funktion och ingen del av Lagom – Lagom får bara texten, som tolkas direkt på enheten och inte sparas. Bara de värden du själv väljer att spara hamnar i det egna livsmedlet.
+
 Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara på din enhet (se ”Din dagbok finns bara på din enhet”).
 
 > **I iPhone-appen (App Store) står i stället:**
 >
 > Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.
+>
+> Du kan också fylla i ett eget livsmedel från förpackningen genom att välja Skanna text i textrutan eller klistra in texten från näringsdeklarationen. Textigenkänningen sköts av din iPhone och Lagom får bara texten, som tolkas direkt på telefonen och inte sparas – bara de värden du själv väljer att spara hamnar i det egna livsmedlet.
 >
 > Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din iPhone (se ”Din dagbok finns bara på din enhet”).
 
@@ -236,9 +240,11 @@ Har du slagit på framstegsbilder kan du också ta en bild med kameran eller vä
 >
 > Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.
 >
+> Du kan också fylla i ett eget livsmedel från förpackningen genom att kopiera texten i näringsdeklarationen med telefonens textigenkänning och klistra in den. Textigenkänningen är telefonens egen funktion och ingen del av Lagom – Lagom får bara texten, som tolkas direkt på telefonen och inte sparas. Bara de värden du själv väljer att spara hamnar i det egna livsmedlet.
+>
 > Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din telefon (se ”Din dagbok finns bara på din enhet”).
 
-> **Till ägaren:** Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först.
+> **Till ägaren:** Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först. ”Fyll i från förpackningen” (src/lib/nutritionLabel.ts, features/add/LabelTextImport.tsx) har ingen egen kamera- eller OCR-kod och lagrar ingenting (därför ingen rad i lagringstabellen): telefonens textigenkänning ger bara text. Byggs en egen textigenkänning med kameran in (t.ex. ett nytt tillägg) måste texten här, Info.plist, PrivacyInfo.xcprivacy och Data safety ses över först.
 
 ## Mikrofonen och röstsökning
 

@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { WEB_PURCHASE_MARKERS, checkCommerceBuild, findWebPurchaseCode, isExampleEmail, isP256PublicKey } from '../../scripts/commerce-guard.ts'
+import { VOICE_SEARCH_MARKERS, WEB_PURCHASE_MARKERS, checkCommerceBuild, findVoiceSearchCode, findWebPurchaseCode, isExampleEmail, isP256PublicKey } from '../../scripts/commerce-guard.ts'
 import { licenseKeyPair } from './fakeStripe.ts'
 
 let keys: { priv: string; pub: string }
@@ -360,5 +360,29 @@ describe('webbköpen i butiksappens paket (findWebPurchaseCode)', () => {
       expect(m.stores.length, m.text).toBeGreaterThan(0)
       expect(code, `"${m.text}" finns inte längre i src/ – uppdatera WEB_PURCHASE_MARKERS`).toContain(m.text)
     }
+  })
+})
+
+describe('röstsökningen i butiksappens paket (findVoiceSearchCode)', () => {
+  const voice = [
+    { name: 'assets/AddFoodPage-abc.js', code: 'const R=globalThis.SpeechRecognition;r.processLocally=!0' },
+    { name: 'assets/index-abc.js', code: 'const a=`Sök livsmedel`' },
+  ]
+
+  it('webbygget kontrolleras inte – där finns röstsökningen', () => {
+    expect(findVoiceSearchCode(voice, 'web')).toEqual([])
+    expect(findVoiceSearchCode(voice, undefined)).toEqual([])
+  })
+
+  it('båda butiksbyggena: en rad per spår med filnamn', () => {
+    for (const store of ['appstore', 'play']) {
+      expect(findVoiceSearchCode(voice, store)).toEqual(['assets/AddFoodPage-abc.js: SpeechRecognition', 'assets/AddFoodPage-abc.js: processLocally'])
+    }
+    expect(findVoiceSearchCode([voice[1]], 'play')).toEqual([])
+  })
+
+  it('varje spår finns i röstsökningens källkod – annars är kontrollen tom', () => {
+    const code = readFileSync(fileURLToPath(new URL('../../src/lib/voiceSearch.ts', import.meta.url)), 'utf8')
+    for (const m of VOICE_SEARCH_MARKERS) expect(code, `"${m}" finns inte längre i src/lib/voiceSearch.ts – uppdatera VOICE_SEARCH_MARKERS`).toContain(m)
   })
 })

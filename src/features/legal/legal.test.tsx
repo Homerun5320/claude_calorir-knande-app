@@ -130,6 +130,18 @@ describe('legalContent', () => {
     expect(play).toContain('med de platsuppgifter kameran eventuellt lägger till')
   })
 
+  it('"Fyll i från förpackningen": bara texten, tolkad på enheten och inte sparad – i alla varianter', () => {
+    const contexts: LegalContext[] = [
+      { platform: 'web', webSales: true, licenseKeys: true },
+      { platform: 'play', webSales: false, licenseKeys: true },
+      { platform: 'appstore', webSales: false, licenseKeys: false },
+    ]
+    for (const ctx of contexts) {
+      const kameran = visibleSections(PRIVACY_SECTIONS, ctx).find((s) => s.id === 'kameran')?.paragraphs.join(' ') ?? ''
+      for (const needle of ['fylla i ett eget livsmedel från förpackningen', 'Lagom får bara texten', 'inte sparas']) expect(kameran, `${ctx.platform}: ${needle}`).toContain(needle)
+    }
+  })
+
   it('delningen beskriver vad som följer med och att länken går genom den app man själv väljer', () => {
     const dela = PRIVACY_SECTIONS.find((s) => s.id === 'dela')?.paragraphs.join(' ') ?? ''
     for (const needle of ['märke, kategori, näringsvärden per 100 g och portioner', 'dina allergiinställningar', 'inte heller uppgifter om allergener', 'Länken går däremot genom den app du själv skickar den med']) {

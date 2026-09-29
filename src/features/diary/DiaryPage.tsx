@@ -198,16 +198,14 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
       icon: Eraser,
     })
     if (!ok) return
-    const store = useDiaryStore.getState()
-    const removed = list.map((e) => store.removeEntry(date, e.id)).filter((e): e is DiaryEntry => e !== undefined)
+    const removed = useDiaryStore.getState().removeEntries(list)
     // "Fler val"-knappen försvinner med posterna – ge fokus till måltidens "Lägg till i …".
     focusAfterClose(() => addFoodLink(meal), firstAddFoodLink)
     toast(`${name} är tömd`, {
       action: {
         label: 'Ångra',
         onClick: () => {
-          const s = useDiaryStore.getState()
-          for (const e of removed) s.restoreEntry(e)
+          useDiaryStore.getState().restoreEntries(removed)
         },
       },
     })
@@ -276,8 +274,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
       action: {
         label: 'Ångra',
         onClick: () => {
-          const s = useDiaryStore.getState()
-          for (const id of ids) s.removeEntry(today, id)
+          useDiaryStore.getState().removeEntries(ids.map((id) => ({ date: today, id })))
         },
       },
     })

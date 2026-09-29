@@ -5,10 +5,11 @@
  * Allt är rena funktioner – sidan `CustomFoodPage` håller bara tillståndet.
  */
 import type { Food, FoodCategory, FoodTag, NutrientKey, Nutrients, Portion } from '../../types'
-import { KJ_PER_KCAL, MINERAL_KEYS, NUTRIENT_KEYS, VITAMIN_KEYS, completeNutrients, kcalFromMacros, sodiumMgFromSalt } from '../../lib/nutrients'
+import { KJ_PER_KCAL, MINERAL_KEYS, NUTRIENTS, NUTRIENT_KEYS, VITAMIN_KEYS, completeNutrients, kcalFromMacros, sodiumMgFromSalt } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
 import { isValidEan, normalizeBarcode } from '../../lib/openFoodFacts'
 import { slugify, uid } from '../../lib/id'
+import type { NutritionLabelResult } from '../../lib/nutritionLabel'
 
 export type InputBasis = 'per100' | 'portion'
 export type EnergyInputUnit = 'kcal' | 'kJ'
@@ -338,4 +339,138 @@ export function draftToFood(draft: CustomFoodDraft, base: { id: string; createdA
 /** Har formuläret ändrats sedan start? (Portionernas interna nycklar räknas inte.) */
 export function draftSignature(draft: CustomFoodDraft): string {
   return JSON.stringify({ ...draft, portions: draft.portions.map(({ key: _k, ...p }) => p) })
+}
+
+// ---------------------------------------------------------------------------
+// Fyll i från förpackningen (näringsdeklarationen som text, lib/nutritionLabel)
+// ---------------------------------------------------------------------------
+
+/** URL-parametern som öppnar panelen "Fyll i från förpackningen": /nytt-livsmedel?…&etikett=1 */
+export const LABEL_PANEL_PARAM = 'etikett'
+
+/** Lägg till `etikett=1` på en länk till formuläret (t.ex. från `newFoodHref`). */
+export function withLabelPanel(href: string): string {
+  return `${href}${href.includes('?') ? '&' : '?'}${LABEL_PANEL_PARAM}=1`
+}
+
+/** Räkna om ett värde från per 100 g till vald bas. `undefined` om portionsvikten saknas. */
+export function fromPer100(value: number | undefined, basis: InputBasis, basisGrams?: number): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined
+  if (basis === 'per100') return value
+  return basisGrams !== undefined && Number.isFinite(basisGrams) && basisGrams > 0 ? round((value * basisGrams) / 100) : undefined
+}
+
+export interface LabelApplyResult {
+  draft: CustomFoodDraft
+  /**
+   * Värden i formuläret som etiketten inte nämner och som inte gick att räkna om till etikettens bas
+   * (portionens vikt saknas) – de har tömts i stället för att gälla fel mängd.
+   */
+  cleared: Array<NutrientKey | 'energy'>
+}
+
+/**
+ * Fyll i formuläret med en tolkad näringsdeklaration. Bara det som stod på etiketten ändras –
+ * övriga fält (namn, märke, egna värden som etiketten inte nämner) lämnas kvar, och användaren
+ * granskar och sparar själv.
+ *
+ * - Formuläret får samma bas som förpackningen, så att varje fält går att jämföra med den: per
+ *   100 g (ml), eller per portion med portionens vikt och namn ("Per bar (55 g)"). Lagom räknar om
+ *   till per 100 g när livsmedlet sparas.
+ * - Byts basen räknas formulärets övriga värden om. Går det inte (portionens vikt saknas) töms de
+ *   och står i `cleared` – annars skulle t.ex. fibrer per 100 g gälla per portion.
+ * - Portionen i en kolumnrubrik läggs till som mått, och formulärets tidigare portion (när värdena
+ *   gällde per portion) blir ett mått i stället för att försvinna.
+ * - Energin fylls i den enhet användaren har valt om den står på etiketten, annars den som står.
+ * - Värden i ml markerar livsmedlet som flytande.
+ * - Salt och natrium: anger etiketten bara det ena tas formulärets andra bort (det räknas fram
+ *   när livsmedlet sparas) – annars skulle de säga emot varandra.
+ */
+export function applyLabelToDraft(draft: CustomFoodDraft, label: NutritionLabelResult): LabelApplyResult {
+  const column = label.column
+  const source = label.stated
+  if (!column || Object.keys(source.nutrients).length === 0) return { draft, cleared: [] }
+
+  // Etikettens bas
+  const basis: InputBasis = column.kind === 'per100' ? 'per100' : 'portion'
+  const basisGrams =
+    column.kind === 'portion' ? (column.amount ?? (draft.basis === 'portion' ? draft.basisGrams : undefined)) : undefined
+  const sameBasis = basis === draft.basis && (basis === 'per100' || basisGrams === draft.basisGrams)
+  const convert = (v: number): number | undefined =>
+    sameBasis ? v : fromPer100(toPer100(v, draft.basis, draft.basisGrams), basis, basisGrams)
+
+  const cleared: Array<NutrientKey | 'energy'> = []
+  const stated = source.nutrients
+  const values: Partial<Record<NutrientKey, number>> = {}
+  // Salt och natrium hör ihop – står bara det ena på etiketten tas det andra bort.
+  const drop = new Set<NutrientKey>()
+  if (stated.salt !== undefined && stated.sodium === undefined) drop.add('sodium')
+  if (stated.sodium !== undefined && stated.salt === undefined) drop.add('salt')
+  for (const [key, value] of Object.entries(draft.values) as Array<[NutrientKey, number | undefined]>) {
+    if (value === undefined || drop.has(key) || stated[key] !== undefined) continue
+    const v = convert(value)
+    if (v === undefined) cleared.push(key)
+    else values[key] = round(v)
+  }
+  for (const [key, value] of Object.entries(stated) as Array<[NutrientKey, number | undefined]>) {
+    if (key === 'kcal' || value === undefined || !Number.isFinite(value)) continue
+    values[key] = round(value)
+  }
+
+  const next: CustomFoodDraft = { ...draft, values, basis, basisGrams: basis === 'portion' ? basisGrams : undefined }
+
+  // Den valda enheten om den står på etiketten, annars den som står (bara kJ fylls i som kJ –
+  // formuläret visar kcal bredvid).
+  const energy: [EnergyInputUnit, number | undefined] =
+    draft.energyUnit === 'kJ' && source.kJ !== undefined
+      ? ['kJ', source.kJ]
+      : source.kcal !== undefined
+        ? ['kcal', source.kcal]
+        : source.kJ !== undefined
+          ? ['kJ', source.kJ]
+          : ['kcal', stated.kcal]
+  if (energy[1] !== undefined && Number.isFinite(energy[1])) {
+    next.energyUnit = energy[0]
+    next.energy = round(energy[1], 1)
+  } else if (draft.energy !== undefined) {
+    const v = convert(draft.energy)
+    if (v === undefined) cleared.push('energy')
+    next.energy = v === undefined ? undefined : round(v, 1)
+  }
+
+  if (label.unit === 'ml') next.liquid = true
+
+  const portions = [...draft.portions]
+  const addPortion = (portionLabel: string, grams: number) => {
+    if (!portions.some((p) => p.grams !== undefined && Math.abs(p.grams - grams) < 0.01)) portions.push(newPortionDraft(portionLabel, grams))
+  }
+  // Formulärets portion när värdena gällde per portion – den blir ett mått.
+  const keepsPortion = draft.basis === 'portion' && basis === 'portion' && basisGrams === draft.basisGrams
+  if (draft.basis === 'portion' && draft.basisGrams !== undefined && draft.basisGrams > 0 && !keepsPortion) {
+    addPortion(draft.basisLabel.trim() || '1 portion', draft.basisGrams)
+  }
+  if (basis === 'portion' && column.kind === 'portion') {
+    // Portionens namn från rubriken ("1 bar") – om det inte är samma portion som användaren redan har namngett.
+    next.basisLabel = keepsPortion && draft.basisLabel.trim() ? draft.basisLabel : column.label
+  } else if (label.portion) {
+    addPortion(label.portion.label, label.portion.grams)
+  }
+  next.portions = portions
+  return { draft: next, cleared }
+}
+
+/** "Fibrer och salt var ifyllda per 100 g …" – när formulärets värden har tömts (se `applyLabelToDraft`). */
+export function clearedMessage(cleared: ReadonlyArray<NutrientKey | 'energy'>, from: InputBasis): string | undefined {
+  if (cleared.length === 0) return undefined
+  const names = cleared.map((k) => (k === 'energy' ? 'energi' : NUTRIENTS[k].name.charAt(0).toLowerCase() + NUTRIENTS[k].name.slice(1)))
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} och ${names[names.length - 1]}`
+  const [fromText, toText] = from === 'per100' ? ['per 100\u00a0g', 'per portion'] : ['per portion', 'per 100\u00a0g']
+  const one = names.length === 1
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)} var ${one ? 'ifyllt' : 'ifyllda'} ${fromText} och gick inte att räkna om till ${toText} utan portionens vikt – ${one ? 'fältet' : 'fälten'} har tömts.`
+}
+
+/** true om den tolkade etiketten fyller i något av de övriga näringsämnena (vitaminer m.m.). */
+export function labelFillsExtras(label: NutritionLabelResult): boolean {
+  const n = (label.per100 ?? label.stated).nutrients
+  return EXTRA_KEYS.some((k) => n[k] !== undefined)
 }

@@ -1,7 +1,9 @@
 /**
- * Eget livsmedel – /nytt-livsmedel?streckkod=&namn=&kopia= och /livsmedel/:id/redigera
+ * Eget livsmedel – /nytt-livsmedel?streckkod=&namn=&kopia=&etikett=1 och /livsmedel/:id/redigera
  *
- * Skriv av näringsdeklarationen från förpackningen: per 100 g eller per portion (räknas om),
+ * "Fyll i från förpackningen" (`LabelTextImport`, öppen med `etikett=1`) tolkar
+ * näringsdeklarationen som text – inskannad med telefonens textigenkänning eller inklistrad – och
+ * fyller i formuläret. Eller skriv av den för hand: per 100 g eller per portion (räknas om),
  * energi i kcal eller kJ, fält i samma ordning som på förpackningen, egna portioner och mått,
  * streckkod och märkningar. En rimlighetskontroll varnar om energin inte stämmer med makronäringsämnena.
  * Allt sparas bara på enheten.
@@ -9,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { AlertTriangle, ChevronDown, Plus, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Plus, Save, Trash2, X } from 'lucide-react'
 import type { Food, FoodCategory, NutrientKey } from '../../types'
 import { FOOD_CATEGORIES } from '../../types'
 import {
@@ -28,6 +30,7 @@ import {
   confirmDialog,
   cx,
   toast,
+  useToastStore,
 } from '../../components/ui'
 import { CATEGORY_META } from '../../components/domain'
 import { useFood } from '../../hooks/useFood'
@@ -40,15 +43,19 @@ import { ALL_TAGS, TAG_LABELS, decodeFoodId, foodDetailHref, isISODate, isMealId
 import {
   EXTRA_GROUPS,
   EXTRA_KEYS,
+  LABEL_PANEL_PARAM,
   MAIN_LABELS,
   MAIN_NUTRIENTS,
   SUB_NUTRIENTS,
+  applyLabelToDraft,
+  clearedMessage,
   draftFromFood,
   draftSignature,
   draftToFood,
   draftWarnings,
   emptyDraft,
   energyToKcal,
+  labelFillsExtras,
   newCustomFoodId,
   newPortionDraft,
   toPer100,
@@ -57,6 +64,8 @@ import {
   type DraftErrors,
 } from './customFood'
 import { useLeave } from './components'
+import { LabelTextImport } from './LabelTextImport'
+import type { NutritionLabelResult } from '../../lib/nutritionLabel'
 
 type Mode = 'new' | 'copy' | 'edit'
 
@@ -113,6 +122,9 @@ export default function CustomFoodPage() {
 // Formulär
 // ---------------------------------------------------------------------------
 
+/** Fältet "Portionens vikt" – dit flyttas fokus när en etikett per portion saknar vikten. */
+const BASIS_GRAMS_ID = 'custom-food-basis-grams'
+
 const CATEGORY_OPTIONS = FOOD_CATEGORIES.map((c) => ({ value: c, label: `${CATEGORY_META[c].emoji} ${CATEGORY_META[c].label}` })).sort((a, b) =>
   a.value === 'ovrigt' ? 1 : b.value === 'ovrigt' ? -1 : CATEGORY_META[a.value].label.localeCompare(CATEGORY_META[b.value].label, 'sv'),
 )
@@ -130,7 +142,12 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
   const [initialSig] = useState(() => draftSignature(initial))
   const [tried, setTried] = useState(false)
   const [extrasOpen, setExtrasOpen] = useState(() => EXTRA_KEYS.some((k) => initial.values[k] !== undefined))
+  /** Det som ska kontrolleras efter "Fyll i från förpackningen" – står kvar tills man döljer det. */
+  const [labelCheck, setLabelCheck] = useState<string[]>([])
+  const labelToast = useRef<string | undefined>(undefined)
+  const labelTarget = useRef<'weight' | 'card' | undefined>(undefined)
   const savedRef = useRef(false)
+  const fromScan = params.get(LABEL_PANEL_PARAM) === '1'
 
   const set = <K extends keyof CustomFoodDraft>(key: K, value: CustomFoodDraft[K]) => setDraft((d) => ({ ...d, [key]: value }))
   const setValue = (key: NutrientKey, value: number | undefined) =>
@@ -193,6 +210,8 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
     // efter provperioden precis som Nytt livsmedel. Att ändra ett eget livsmedel går alltid.
     if (mode !== 'edit' && !requireAccess('livsmedel')) return
     savedRef.current = true
+    // "Värdena är ifyllda – granska dem" ska inte ligga kvar ovanpå "Sparat".
+    if (labelToast.current) useToastStore.getState().dismiss(labelToast.current)
     if (mode === 'edit' && source) {
       const { id: _id, createdAt: _c, ...patch } = draftToFood(draft, { id: source.id, createdAt: source.createdAt, from: source })
       updateCustomFood(source.id, patch)
@@ -226,6 +245,32 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
     else navigate('/lagg-till?flik=mina', { replace: true })
   }
 
+  // --- Fyll i från förpackningen ---------------------------------------------
+  const labelTargetElement = () =>
+    labelTarget.current === 'weight' ? document.getElementById(BASIS_GRAMS_ID) : document.getElementById('custom-food-nutrients')
+
+  const applyLabel = (result: NutritionLabelResult) => {
+    const { draft: next, cleared } = applyLabelToDraft(draft, result)
+    setDraft(next)
+    const clearedText = clearedMessage(cleared, draft.basis)
+    setLabelCheck([...result.warnings, ...(clearedText ? [clearedText] : [])])
+    if (labelFillsExtras(result)) setExtrasOpen(true)
+    labelToast.current = toast('Värdena är ifyllda – granska dem och spara.', { tone: 'success' })
+    // Saknas portionens vikt är den nästa steg – annars kortet med värdena.
+    labelTarget.current = next.basis === 'portion' && next.basisGrams === undefined ? 'weight' : 'card'
+    // Fokus flyttas direkt (knappen försvinner), men sidan rullas först när panelen har fällts ihop.
+    requestAnimationFrame(() => labelTargetElement()?.focus({ preventScroll: true }))
+  }
+
+  const afterLabelApplied = () => {
+    const el = labelTargetElement()
+    el?.scrollIntoView?.({ block: labelTarget.current === 'weight' ? 'center' : 'start', behavior: reduce ? 'auto' : 'smooth' })
+    labelTarget.current = undefined
+  }
+
+  // Från skanningen (etikett=1) står panelen först, direkt under rubriken.
+  const labelPanel = <LabelTextImport defaultOpen={fromScan} onApply={applyLabel} onApplied={afterLabelApplied} />
+
   const kcalPreview = energyToKcal(draft.energy, draft.energyUnit)
   const per100Kcal = toPer100(kcalPreview, draft.basis, draft.basisGrams)
   const title = mode === 'edit' ? 'Redigera livsmedel' : mode === 'copy' ? 'Kopiera livsmedel' : 'Nytt livsmedel'
@@ -235,7 +280,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
       <PageHeader
         back
         title={title}
-        subtitle={mode === 'copy' ? 'Du ändrar en egen kopia – originalet påverkas inte.' : 'Skriv av näringsdeklarationen. Allt sparas bara på din enhet.'}
+        subtitle={mode === 'copy' ? 'Du ändrar en egen kopia – originalet påverkas inte.' : 'Skanna in eller skriv av näringsdeklarationen. Allt sparas bara på din enhet.'}
         actions={
           <Button size="sm" variant="soft" iconLeft={Save} onClick={() => submit()}>
             Spara
@@ -244,6 +289,9 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
       />
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        {/* Fyll i från förpackningen (textigenkänning eller inklistrad text) */}
+        {fromScan && labelPanel}
+
         {/* Grunduppgifter */}
         <Card title="Grunduppgifter" padding="lg">
           <div className="flex flex-col gap-4">
@@ -279,9 +327,25 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
           </div>
         </Card>
 
+        {!fromScan && labelPanel}
+
         {/* Näringsvärden */}
-        <Card title="Näringsvärden" padding="lg">
+        <Card title="Näringsvärden" padding="lg" id="custom-food-nutrients" tabIndex={-1} className="scroll-mt-4">
           <div className="flex flex-col gap-4">
+            {labelCheck.length > 0 && (
+              <div role="status" className="flex items-start gap-2.5 rounded-2xl bg-hjortron-soft py-3 pl-4 pr-1.5 text-sm text-ink print:hidden">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-hjortron" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Att kontrollera mot förpackningen</p>
+                  <ul className="mt-1 flex flex-col gap-1">
+                    {labelCheck.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+                <IconButton icon={X} size="sm" aria-label="Dölj det som ska kontrolleras" onClick={() => setLabelCheck([])} className="-mt-1.5 shrink-0" />
+              </div>
+            )}
             <SegmentedControl
               fullWidth
               value={draft.basis}
@@ -303,6 +367,7 @@ function CustomFoodForm({ mode, source, initial }: { mode: Mode; source: Food | 
                 >
                   <div className="grid grid-cols-2 gap-3 pb-1">
                     <NumberField
+                      id={BASIS_GRAMS_ID}
                       label="Portionens vikt"
                       value={draft.basisGrams}
                       onChange={(v) => set('basisGrams', v)}

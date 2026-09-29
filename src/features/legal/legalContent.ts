@@ -453,6 +453,19 @@ const RECIPE_ITEM =
 const PHOTOS_CAMERA_TEXT =
   'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara på din enhet (se ”Din dagbok finns bara på din enhet”).'
 
+/**
+ * "Fyll i från förpackningen" (src/lib/nutritionLabel.ts): telefonens egen textigenkänning ger
+ * bara text, som tolkas på enheten och inte sparas. Ingen egen kamera- eller OCR-kod i Lagom.
+ * Webben och Android lovar inget om själva textigenkänningen – på Android kan den vara t.ex.
+ * Google Lens, som Lagom inte kan gå i god för. Live Text på iPhone arbetar på telefonen.
+ */
+const LABEL_TEXT_WEB =
+  'Du kan också fylla i ett eget livsmedel från förpackningen genom att läsa av näringsdeklarationen med telefonens egen textigenkänning (till exempel Skanna text på iPhone) eller klistra in texten. Textigenkänningen är telefonens egen funktion och ingen del av Lagom – Lagom får bara texten, som tolkas direkt på enheten och inte sparas. Bara de värden du själv väljer att spara hamnar i det egna livsmedlet.'
+const LABEL_TEXT_IOS =
+  'Du kan också fylla i ett eget livsmedel från förpackningen genom att välja Skanna text i textrutan eller klistra in texten från näringsdeklarationen. Textigenkänningen sköts av din iPhone och Lagom får bara texten, som tolkas direkt på telefonen och inte sparas – bara de värden du själv väljer att spara hamnar i det egna livsmedlet.'
+const LABEL_TEXT_PLAY =
+  'Du kan också fylla i ett eget livsmedel från förpackningen genom att kopiera texten i näringsdeklarationen med telefonens textigenkänning och klistra in den. Textigenkänningen är telefonens egen funktion och ingen del av Lagom – Lagom får bara texten, som tolkas direkt på telefonen och inte sparas. Bara de värden du själv väljer att spara hamnar i det egna livsmedlet.'
+
 /** Delade recept och måltider (src/lib/shareLink.ts) – samma text överallt, den nämner ingen plattform. */
 const SHARE_TEXT =
   'Du kan dela ett eget recept eller en sparad måltid som länk eller fil. Då följer bara det du har valt med: namn, ingredienser eller livsmedel och mängder och – för recept – portioner, emoji, tid, märkningar, instruktioner och länk till källan. För livsmedel som inte finns i Lagoms egen lista (egna livsmedel och produkter från Open Food Facts eller Livsmedelsverket) följer även märke, kategori, näringsvärden per 100 g och portioner med. Ingenting ur din dagbok, din profil, dina mål eller dina allergiinställningar följer med, och inte heller uppgifter om allergener.'
@@ -736,17 +749,20 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     paragraphs: [
       'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.',
       'I apparna används telefonens egen streckkodsläsare: Apples inbyggda bildanalys på iPhone och den öppna läsaren ZXing, som ingår i appen, på Android. Båda läser koden på telefonen och skickar ingenting vidare.',
+      LABEL_TEXT_WEB,
       PHOTOS_CAMERA_TEXT,
     ],
     appStore: {
       paragraphs: [
         'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.',
+        LABEL_TEXT_IOS,
         'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din iPhone (se ”Din dagbok finns bara på din enhet”).',
       ],
     },
     play: {
       paragraphs: [
         'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.',
+        LABEL_TEXT_PLAY,
         'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din telefon (se ”Din dagbok finns bara på din enhet”).',
       ],
     },

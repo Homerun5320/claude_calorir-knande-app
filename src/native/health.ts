@@ -751,10 +751,9 @@ async function importSteps(ctx: SyncContext): Promise<number | undefined> {
   const changes = planSteps(perDay, useDiaryStore.getState().days, state.ledger.steps)
   if (changes.length > 0) {
     const owned = { ...state.ledger.steps }
-    for (const { date, steps } of changes) {
-      useDiaryStore.getState().setDayMeta(date, { steps })
-      owned[date] = steps
-    }
+    // En enda skrivning för alla dagar – varje set() skriver om hela dagboken (docs/LAGRING.md).
+    useDiaryStore.getState().setDayMetas(changes.map(({ date, steps }) => ({ date, patch: { steps } })))
+    for (const { date, steps } of changes) owned[date] = steps
     summary.stepDays += changes.length
     update({ ledger: { ...state.ledger, steps: owned } })
   }

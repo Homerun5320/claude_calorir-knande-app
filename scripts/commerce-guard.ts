@@ -371,6 +371,14 @@ export const WEB_PURCHASE_MARKERS: readonly WebPurchaseMarker[] = [
   { text: '/api/license-revocations', what: 'spärrlistan för licensnycklar (refreshRevocations)', stores: ['appstore'] },
 ]
 
+/**
+ * Spår av röstsökningen (src/lib/voiceSearch.ts): Web Speech API:s konstruktor och kravet på
+ * igenkänning på enheten. Apparna har ingen röstsökning, och koden tas bort ur butiksbyggena med
+ * `VOICE_SEARCH_BUILD` (lokal konstant i src/features/add/VoiceSearchButton.tsx) – den ska inte
+ * ligga dold i paketet (integritetspolicyn säger att apparna inte använder mikrofonen).
+ */
+export const VOICE_SEARCH_MARKERS: readonly string[] = ['SpeechRecognition', 'processLocally']
+
 /** En fil i det färdiga paketet (JavaScript eller HTML). */
 export interface BundleFile {
   name: string
@@ -392,4 +400,13 @@ export function findWebPurchaseCode(files: readonly BundleFile[], distribution: 
     }
   }
   return found
+}
+
+/**
+ * Hitta röstsökningens spår i ett butiksbygge ("assets/x.js: SpeechRecognition"), eller en tom
+ * lista. Webbygget (och okända värden) ger alltid en tom lista.
+ */
+export function findVoiceSearchCode(files: readonly BundleFile[], distribution: string | undefined): string[] {
+  if (distribution !== 'appstore' && distribution !== 'play') return []
+  return files.flatMap((file) => VOICE_SEARCH_MARKERS.filter((m) => file.code.includes(m)).map((m) => `${file.name}: ${m}`))
 }

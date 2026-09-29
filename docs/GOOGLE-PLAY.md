@@ -305,13 +305,85 @@ Så beter sig appen:
   Google. Appen kvitterar direkt efter köpet och varje gång köpen hämtas (vid start, när appen
   öppnas igen och vid *Återställ köp*) – även ett väntande köp som blev klart senare.
 - **Återbetalning:** återbetala och återkalla i *Play Console → Beställningshantering*. Köpet
-  försvinner då ur telefonens köp och licensen slutar gälla nästa gång appen hämtar köpen.
+  försvinner då ur telefonens köp och licensen slutar gälla nästa gång appen hämtar köpen. Googles
+  Voided Purchases API behövs inte – se [Återbetalningar och återkallade köp](#återbetalningar-och-återkallade-köp).
 - **Priserna i appen kommer från Google Play** (lokaliserat, t.ex. "349,00 kr") – inga kronbelopp
   är inskrivna i appbygget.
 - Någon produkt för provperioden behövs inte i Google Play – de 14 dagarna räknas i appen
   (`prov14` finns bara i App Store).
 - Licensnycklar från webbköp kan aktiveras i Play-appen (Inställningar → Licens), men appen
   hänvisar aldrig till webbköpet.
+
+### Återbetalningar och återkallade köp
+
+**Slutsats (utredd 2026-09-29): Lagom behöver inte Googles Voided Purchases API** – varken för
+köpen i Play-appen eller för licensnycklarna från webben. Ingen server och ingen ny kod behövs för
+återbetalningar i Google Play. Det gäller också när du återbetalar *utan* att ta bort rätten: då
+ska kunden behålla licensen, och ett sådant köp räknas inte ens som återkallat (se nedan).
+
+| Händelse | Vad Google Play gör med köpet | Vad som händer i Lagom |
+| --- | --- | --- |
+| Du återbetalar i *Beställningshantering* **och tar bort rätten** (valet att återkalla köpet i återbetalningsrutan) | Köpet blir återkallat (*voided*) och ägs inte längre av kunden | Köpet saknas nästa gång appen hämtar köpen – licensen slutar gälla |
+| Google återbetalar (t.ex. kundens återbetalningsbegäran i Google Play) eller kunden får pengarna tillbaka via banken (*chargeback*) | Köpet blir återkallat (*voided*) | Samma som ovan |
+| Du återbetalar **utan** att ta bort rätten (t.ex. av goodwill) | Köpet ägs fortfarande och är betalt (`PURCHASED`) – det räknas inte som återkallat | Licensen gäller – det är vad valet betyder |
+
+Därför behövs API:et inte:
+
+1. **Telefonen frågar Google Play själv.** Köpen hämtas med Play Billing (`getPurchases` i
+   `@capgo/native-purchases`, som anropar `BillingClient.queryPurchasesAsync`, se
+   `src/native/purchases.ts`). Enligt Googles referens ger den bara *"currently owned items"* –
+   *"Only active subscriptions and non-consumed one-time purchases are returned"*. Ett återkallat
+   köp ägs inte längre och finns alltså inte med. Googles testguide bekräftar samma sak från andra
+   hållet: för att kunna testköpa en engångsprodukt igen *"you can refund and revoke purchases
+   using Google Play Console"*. Lagom ger bara tillgång för köp i läget `PURCHASED`.
+2. **Den sparade rätten ersätts varje gång Play svarar.** Appen hämtar köpen vid start, när den
+   återfår fokus, en gång i timmen medan den är öppen och vid *Återställ köp*. Den senast kända
+   listan i telefonen (`lagom-butikskop` i localStorage, `STORE_CACHE_KEY` i
+   `src/hooks/useAccess.ts`) skrivs över med Plays svar – ett återkallat köp försvinner då även
+   därifrån. Går Play inte att nå (t.ex. utan uppkoppling) gäller den sparade listan tills nästa
+   svar, och appen försöker igen efter 15 s, 1 min och 5 min. Tillägget avvisar anropet i stället
+   för att ge en tom lista när Play svarar med fel, så ett tillfälligt fel tar aldrig bort en
+   betald licens.
+3. **Voided Purchases API är ett server-API** (Google Play Developer API med ett tjänstekonto) för
+   appar som håller rätten i en egen databas eller säljer förbrukningsvaror, t.ex. spelvaluta som
+   ska tas tillbaka (*claw back*). Lagom har inga konton, ingen databas över köp och inga
+   förbrukningsvaror – årslicensen `ar` förbrukas först när den har gått ut och ett nytt år köps.
+   En server når inte heller en telefon som är offline, så API:et skulle inte täppa till den enda
+   luckan (en telefon som aldrig kopplar upp sig behåller den sparade rätten – samma avvägning som
+   spärrlistan för webbens nycklar, se docs/BETALNING.md, *Begränsningar*). Det skulle däremot
+   kräva en server, ett tjänstekonto med tillgång till Play Console och att köpens tokens skickas
+   dit – med nya uppgifter i Data safety (*Köphistorik*) och integritetspolicyn.
+4. **Återbetalning utan att ta bort rätten syns inte i API:et heller.** Google räknar en
+   återbetalning från utvecklaren som återkallad (*voided*) bara när man väljer att återkalla köpet
+   i Play Console (*"cancels or refunds a user order and checks the 'revoke' option in the
+   console"*, *Fight fraud and abuse*). API:et skulle alltså inte ha något att rapportera, och
+   kunden ska ändå behålla licensen.
+
+**Webbens licensnycklar påverkas inte.** De köps med Stripe och spärras vid full återbetalning eller
+tvist via spärrlistan (`/api/license-revocations`, se docs/BETALNING.md, *Återbetalda köp och
+spärrlistan*). Ett köp i Google Play ger aldrig någon licensnyckel, och en återbetalning i Play
+påverkar aldrig en nyckel – en nyckel som har aktiverats i Play-appen kontrolleras mot spärrlistan
+precis som på webben. Granskarnas nyckel ([avsnitt 9](#9-app-access--instruktioner-till-granskarna))
+påverkas inte heller.
+
+**Återkrav (chargeback) som Google vill ha synpunkter på:** Google kan skicka en
+`PendingRefundReviewNotification` (realtidsnotis, RTDN) och låta utvecklaren svara inom 24 timmar
+med ReviewRefund API. Det kräver en server med RTDN (Google Cloud Pub/Sub) och Play Developer API –
+Lagom använder det inte, och då avgör Google utan Lagoms synpunkter. Det är frivilligt.
+
+**Då behövs API:et (och RTDN):** om Lagom någon gång håller Play-köp på en server – t.ex. licenser
+som knyts till ett konto i Lagom Moln eller delas mellan iPhone, Android och webben – eller börjar
+sälja förbrukningsvaror. Då ska servern prenumerera på RTDN för återkallade köp och stämma av med
+Voided Purchases API, och Data safety och integritetspolicyn uppdateras före inskickningen.
+
+> **Källor och reservation:** developer.android.com gick att nå 2026-09-29: *Integrate the Google
+> Play Billing Library*, *One-time purchase lifecycle*, *Fight fraud and abuse* (avsnittet *Detect
+> and handle voided purchases*), *Test your Google Play Billing Library integration* och referensen
+> för `BillingClient.queryPurchasesAsync`. Referensen för Voided Purchases API
+> (developers.google.com) och Play Console-hjälpen (support.google.com) gick **inte** att nå från
+> byggmiljön. Vad kryssrutan heter i återbetalningsrutan och exakt hur fort ett återkallat köp
+> försvinner från telefonen (Play Butik har en egen cache) ska därför kontrolleras med
+> licenstestare före produktion – se steg 4 nedan.
 
 ### Testa köpen med licenstestare
 
@@ -323,8 +395,15 @@ Så beter sig appen:
    always approves* och *Test card, always declines* (och kort som godkänns eller nekas efter en
    stund – bra för väntande köp).
 4. Prova: köp `ar`, köp `livstid`, avbryt ett köp, ett nekat kort, ett väntande köp som blir klart
-   när appen är stängd, *Återställ köp* efter att appen har avinstallerats, och en återbetalning.
-   Kontrollera i *Beställningshantering* att köpen är kvitterade.
+   när appen är stängd, *Återställ köp* efter att appen har avinstallerats, och återbetalningar.
+   Kontrollera i *Beställningshantering* att köpen är kvitterade. Återbetalningarna
+   ([Återbetalningar och återkallade köp](#återbetalningar-och-återkallade-köp)):
+   - Återbetala ett köp **och ta bort rätten**. Stäng Lagom helt och öppna appen igen (eller tryck
+     *Återställ köp*): licensen ska vara borta och all data finnas kvar. Anteckna hur lång tid det
+     tog innan köpet försvann.
+   - Återbetala ett annat köp **utan** att ta bort rätten: licensen ska gälla som förut.
+   - Valfritt: köp med testkortet *Test card, approves then charges back* (simulerat återkrav). När
+     Google har avgjort återkravet ska licensen försvinna på samma sätt.
 5. `NATIVE_PURCHASES_READY` i `src/lib/storePurchases.ts` är satt till true men räknas som klar
    först när det här fungerar på en riktig telefon. Fungerar något inte: sätt den till false och
    bygg om, så stoppar byggkontrollen butiksbyggena tills det är rättat.
@@ -677,7 +756,8 @@ Behövs bara för att molnbygget ska ladda upp till intern testning själv:
 - [ ] Uppladdningsnyckeln skapad och säkerhetskopierad på två ställen; hemligheterna inlagda; Play App Signing aktiverat och fingeravtrycket kontrollerat.
 - [ ] Första AAB:n uppladdad för hand till intern testning; molnbygget laddar upp nästa.
 - [ ] 16 KB-kontrollen grön i molnbygget.
-- [ ] Produkterna `livstid` och `ar` (engångsprodukter, 699 kr och 349 kr, bara Sverige) aktiva och testade med licenstestare: köp, avbrutet köp, väntande köp, Återställ köp, återbetalning.
+- [ ] Produkterna `livstid` och `ar` (engångsprodukter, 699 kr och 349 kr, bara Sverige) aktiva och testade med licenstestare: köp, avbrutet köp, väntande köp, Återställ köp, återbetalning med och utan borttagen rätt.
+- [x] Återbetalda Play-köp: Voided Purchases API behövs inte – telefonen hämtar köpen från Play och ett återkallat köp försvinner ([avsnitt 7](#återbetalningar-och-återkallade-köp)).
 - [ ] Testat på en riktig telefon: exempeldata, egen profil, streckkodsläsaren, export/delning, påminnelser, Health Connect, bakåtknappen, utan uppkoppling.
 - [x] Streckkodsläsaren på Android läser med ZXing – Data safety och integritetspolicyn stämmer med det ([avsnitt 8](#datasäkerhet-data-safety)).
 - [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).

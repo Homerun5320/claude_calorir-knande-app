@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyLabelToDraft,
   atwaterCheck,
+  clearedMessage,
   basisFactor,
   draftFromFood,
   draftNutrients,
@@ -9,14 +11,18 @@ import {
   draftWarnings,
   emptyDraft,
   energyToKcal,
+  fromPer100,
   isDerivedSodium,
+  labelFillsExtras,
   MAIN_NUTRIENTS,
   newPortionDraft,
   toPer100,
   validateDraft,
+  withLabelPanel,
   type CustomFoodDraft,
 } from './customFood'
 import { bulle, havredryckSnitt, kycklingbrost, mjolk, offBar } from './testFoods'
+import { parseNutritionLabel } from '../../lib/nutritionLabel'
 
 function draft(patch: Partial<CustomFoodDraft> = {}): CustomFoodDraft {
   return { ...emptyDraft(), name: 'Proteinbar', energy: 200, ...patch }
@@ -228,5 +234,132 @@ describe('draftSignature', () => {
     expect(a.portions[0].key).not.toBe(b.portions[0].key)
     expect(draftSignature(a)).toBe(draftSignature(b))
     expect(draftSignature({ ...a, name: 'Annat' })).not.toBe(draftSignature(b))
+  })
+})
+
+describe('Fyll i från förpackningen', () => {
+  const LABEL = `Näringsvärde   per 100 g   per portion (30 g)   %RI*
+Energi   1550 kJ / 370 kcal   465 kJ / 111 kcal   6 %
+Fett   12 g   3,6 g   5 %
+varav mättat fett   3,5 g   1,1 g   5 %
+Kolhydrat   55 g   17 g   6 %
+varav sockerarter   20 g   6,0 g   7 %
+Fiber   6,0 g   1,8 g
+Protein   8,0 g   2,4 g   5 %
+Salt   0,50 g   0,15 g   3 %`
+
+  it('öppnar panelen via en URL-parameter', () => {
+    expect(withLabelPanel('/nytt-livsmedel')).toBe('/nytt-livsmedel?etikett=1')
+    expect(withLabelPanel('/nytt-livsmedel?streckkod=7310865000637')).toBe('/nytt-livsmedel?streckkod=7310865000637&etikett=1')
+  })
+
+  it('fyller i värdena per 100 g, energin i vald enhet och portionen som mått', () => {
+    const start = { ...emptyDraft({ name: 'Müslibar', barcode: '7310865000637' }), note: 'Från Coop' }
+    const { draft: d, cleared } = applyLabelToDraft(start, parseNutritionLabel(LABEL))
+    expect(cleared).toEqual([])
+    expect(d).toMatchObject({ name: 'Müslibar', barcode: '7310865000637', note: 'Från Coop', basis: 'per100', energyUnit: 'kcal', energy: 370 })
+    expect(d.values).toEqual({ fat: 12, satFat: 3.5, carbs: 55, sugars: 20, fiber: 6, protein: 8, salt: 0.5 })
+    expect(d.portions.map((p) => [p.label, p.grams])).toEqual([['1 portion', 30]])
+    expect(Object.keys(validateDraft(d))).toHaveLength(0)
+    expect(draftWarnings(d)).toEqual([])
+    const food = draftToFood(d, { id: 'custom:x', now: 1 })
+    expect(food.nutrients).toMatchObject({ kcal: 370, protein: 8, salt: 0.5 })
+    expect(food.nutrients.sodium).toBeCloseTo(200)
+  })
+
+  it('använder kJ när användaren föredrar kJ och etiketten har kJ', () => {
+    const { draft: d } = applyLabelToDraft(emptyDraft({ energyUnit: 'kJ' }), parseNutritionLabel(LABEL))
+    expect(d).toMatchObject({ energyUnit: 'kJ', energy: 1550 })
+    // Bara kJ på etiketten: fylls i som kJ även när kcal är valt.
+    const { draft: onlyKj } = applyLabelToDraft(emptyDraft(), parseNutritionLabel('Per 100 g\nEnergi 1550 kJ\nFett 12 g'))
+    expect(onlyKj).toMatchObject({ energyUnit: 'kJ', energy: 1550 })
+  })
+
+  it('lägger inte till portionen två gånger och behåller egna värden som etiketten inte nämner', () => {
+    const start = draft({ values: { vitD: 1.5, protein: 3 }, portions: [newPortionDraft('1 bar', 30)] })
+    const { draft: d } = applyLabelToDraft(start, parseNutritionLabel(LABEL))
+    expect(d.portions).toHaveLength(1)
+    expect(d.values.vitD).toBe(1.5)
+    expect(d.values.protein).toBe(8)
+  })
+
+  it('salt och natrium: anger etiketten bara det ena tas det andra bort (åt båda hållen)', () => {
+    const { draft: d } = applyLabelToDraft(draft({ values: { sodium: 900 } }), parseNutritionLabel('Per 100 g: Energi 400 kJ/95 kcal, Salt 1 g'))
+    expect(d.values.sodium).toBeUndefined()
+    expect(d.values.salt).toBe(1)
+    const { draft: natrium } = applyLabelToDraft(draft({ values: { salt: 2 } }), parseNutritionLabel('Per 100 g: Energi 400 kJ/95 kcal, Natrium 0,4 g'))
+    expect(natrium.values).toEqual({ sodium: 400 })
+    // Saltet räknas fram ur natriumet när livsmedlet sparas.
+    expect(draftToFood(natrium, { id: 'custom:n' }).nutrients.salt).toBeCloseTo(1)
+  })
+
+  it('per portion med vikt: fylls i som på förpackningen ("Per portion", 40 g) och räknas om när man sparar', () => {
+    const label = parseNutritionLabel('Per portion (40 g): Energi 836 kJ/200 kcal, Fett 8 g, Kolhydrat 18 g, Protein 16 g')
+    const { draft: d } = applyLabelToDraft(emptyDraft({ name: 'Bar' }), label)
+    expect(d).toMatchObject({ basis: 'portion', basisGrams: 40, basisLabel: '1 portion', energy: 200 })
+    expect(d.values).toMatchObject({ fat: 8, carbs: 18, protein: 16 })
+    const food = draftToFood(d, { id: 'custom:b' })
+    expect(food.nutrients).toMatchObject({ kcal: 500, fat: 20, carbs: 45, protein: 40 })
+    expect(food.portions).toEqual([{ id: 'portion', label: '1 portion', grams: 40 }])
+  })
+
+  it('räknar om formulärets övriga värden när basen byts (kopia per 100 g + etikett per portion)', () => {
+    // En kopia av en Open Food Facts-produkt (per 100 g) med fler värden än etiketten.
+    const start = draftFromFood({ ...offBar, nutrients: { ...offBar.nutrients, fiber: 6, salt: 0.5, sugars: 20 } })
+    const { draft: d, cleared } = applyLabelToDraft(start, parseNutritionLabel('Per bar (40 g): Energi 200 kcal, Fett 8 g, Kolhydrat 18 g, Protein 16 g'))
+    expect(cleared).toEqual([])
+    expect(d).toMatchObject({ basis: 'portion', basisGrams: 40, basisLabel: '1 bar', energy: 200 })
+    // 6 g fibrer per 100 g är 2,4 g per bar – inte 6.
+    expect(d.values).toMatchObject({ fat: 8, carbs: 18, protein: 16, fiber: 2.4, salt: 0.2, sugars: 8 })
+    const food = draftToFood(d, { id: 'custom:c' })
+    expect(food.nutrients).toMatchObject({ kcal: 500, fiber: 6, salt: 0.5, sugars: 20 })
+  })
+
+  it('tömmer värden som inte går att räkna om när portionens vikt saknas – och säger det', () => {
+    const start = draftFromFood({ ...offBar, nutrients: { ...offBar.nutrients, fiber: 6, salt: 0.5, sugars: 20 } })
+    const { draft: d, cleared } = applyLabelToDraft(start, parseNutritionLabel('Per bar: Energi 200 kcal, Fett 8 g, Kolhydrat 18 g, Protein 16 g'))
+    expect(d).toMatchObject({ basis: 'portion', basisGrams: undefined, energy: 200 })
+    expect(d.values).toEqual({ fat: 8, carbs: 18, protein: 16 })
+    expect(cleared).toEqual(['sugars', 'fiber', 'salt'])
+    expect(clearedMessage(cleared, 'per100')).toBe(
+      'Sockerarter, fibrer och salt var ifyllda per 100\u00a0g och gick inte att räkna om till per portion utan portionens vikt – fälten har tömts.',
+    )
+    expect(clearedMessage([], 'per100')).toBeUndefined()
+  })
+
+  it('från per portion till per 100 g: värden och energi räknas om och portionen blir ett mått', () => {
+    const start = draft({ basis: 'portion', basisGrams: 30, basisLabel: '1 skiva', energy: 111, values: { fiber: 1.8, vitD: 0.3 } })
+    const { draft: d, cleared } = applyLabelToDraft(start, parseNutritionLabel('Per 100 g: Fett 12 g, Kolhydrat 55 g, Protein 8 g'))
+    expect(cleared).toEqual([])
+    expect(d).toMatchObject({ basis: 'per100', basisGrams: undefined, energy: 370 })
+    expect(d.values).toMatchObject({ fat: 12, fiber: 6, vitD: 1 })
+    expect(d.portions.map((p) => [p.label, p.grams])).toEqual([['1 skiva', 30]])
+    expect(fromPer100(6, 'portion', 30)).toBeCloseTo(1.8)
+    expect(fromPer100(6, 'portion', undefined)).toBeUndefined()
+  })
+
+  it('per portion utan vikt: formuläret ställs på "Per portion" och frågar efter vikten', () => {
+    const { draft: d } = applyLabelToDraft(draft(), parseNutritionLabel('Per portion: Energi 200 kcal, Fett 8 g, Protein 16 g'))
+    expect(d).toMatchObject({ basis: 'portion', basisGrams: undefined, basisLabel: '1 portion', energy: 200 })
+    expect(d.values).toMatchObject({ fat: 8, protein: 16 })
+    expect(validateDraft(d).basisGrams).toBeDefined()
+    const saved = draftToFood({ ...d, basisGrams: 50 }, { id: 'custom:p' })
+    expect(saved.nutrients).toMatchObject({ kcal: 400, fat: 16, protein: 32 })
+    expect(saved.portions).toEqual([{ id: 'portion', label: '1 portion', grams: 50 }])
+  })
+
+  it('markerar värden per 100 ml som flytande och öppnar övriga näringsämnen vid vitaminer', () => {
+    const label = parseNutritionLabel('Näringsvärde per 100 ml: Energi 197 kJ/47 kcal, Fett 1,5 g, Kolhydrat 6,7 g, Protein 1,0 g, Vitamin D 1,1 µg')
+    const { draft: d } = applyLabelToDraft(emptyDraft(), label)
+    expect(d.liquid).toBe(true)
+    expect(d.values.vitD).toBe(1.1)
+    expect(labelFillsExtras(label)).toBe(true)
+    expect(labelFillsExtras(parseNutritionLabel(LABEL))).toBe(false)
+  })
+
+  it('ändrar ingenting när inget hittades', () => {
+    const start = draft({ values: { protein: 3 } })
+    expect(applyLabelToDraft(start, parseNutritionLabel('Inget här'))).toEqual({ draft: start, cleared: [] })
+    expect(applyLabelToDraft(start, parseNutritionLabel('Inget här')).draft).toBe(start)
   })
 })

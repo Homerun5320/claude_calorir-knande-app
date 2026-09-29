@@ -35,8 +35,7 @@ export function copyPreviousDay(date: ISODate): number {
     action: {
       label: 'Ångra',
       onClick: () => {
-        const store = useDiaryStore.getState()
-        for (const id of ids) store.removeEntry(date, id)
+        useDiaryStore.getState().removeEntries(ids.map((id) => ({ date, id })))
       },
     },
   })

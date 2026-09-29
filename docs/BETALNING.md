@@ -403,7 +403,8 @@ Ett köp med Stripes testkort (`4242 …`) får aldrig bli en giltig licens i de
 Stripe används **inte** i apparna från App Store och Google Play. Där görs köpet i appen (Apple In-App Purchase respektive Google Play Billing) och priset kommer från butiken. Servern vägrar starta ett Stripe-köp från iPhone-appen (403 `ej-i-appen`).
 
 - **iPhone (App Store):** se [`docs/APP-STORE.md`](APP-STORE.md). Licensnycklar kan inte aktiveras i App Store-appen; köp i appen återställs via Apple-ID med _Återställ köp_ på en ny telefon. Den som har köpt på webben och vill använda iPhone-appen får en **erbjudandekod** (offer code) via supporten.
-- **Google Play:** se [`docs/GOOGLE-PLAY.md`](GOOGLE-PLAY.md). Play-appen visar webbversionen (TWA); köp görs med Google Play Billing, som kräver `payment=(self)` i `Permissions-Policy` i `netlify.toml`.
+- **Google Play:** se [`docs/GOOGLE-PLAY.md`](GOOGLE-PLAY.md). Play-appen är en inbyggd Capacitor-app med hela webbdelen i appen (`VITE_DISTRIBUTION=play`, se [`docs/NATIVE.md`](NATIVE.md)); köp görs med Google Play Billing i appen (`src/native/purchases.ts`), direkt mellan telefonen och Google Play. Licensnycklar från webbköp kan aktiveras i Play-appen, men appen hänvisar aldrig till webbköpet.
+- **Återbetalningar i butikerna** görs i butiken, inte i Stripe, och påverkar aldrig licensnycklarna eller spärrlistan (ett köp i appen ger ingen licensnyckel). **Google Play:** återbetala i *Play Console → Beställningshantering* och välj att ta bort rätten – köpet försvinner då ur telefonens köp och licensen slutar gälla nästa gång appen hämtar köpen. Googles Voided Purchases API behövs inte (utrett 2026-09-29, se [Återbetalningar och återkallade köp](GOOGLE-PLAY.md#återbetalningar-och-återkallade-köp)); återbetalar du utan att ta bort rätten behåller kunden licensen. **App Store:** Apple sköter återbetalningarna; ett återbetalt köp får `revocationDate` och räknas inte (StoreKit 2 meddelar appen, se `src/native/purchases.ts`).
 - Serverfunktionerna godtar anrop från iPhone-appen (`capacitor://localhost`, se `ALLOWED_NATIVE_ORIGINS`) för t.ex. receptimporten.
 
 ---
@@ -484,7 +485,7 @@ node scripts/issue-license.mjs --plan ar --days 30 --id forlangt_prov
 
 Kör skriptet på din egen dator och rensa terminalhistoriken efteråt om du klistrade in nyckeln direkt på kommandoraden.
 
-**Återbetalning** görs i Stripe (**Payments → Refund**). Vid full återbetalning spärras licensen automatiskt (se [spärrlistan](#återbetalda-köp-och-spärrlistan)); vid delvis återbetalning (prisavdrag) gäller den fortfarande. Vill du återbetala men låta kunden behålla licensen: sätt `lagom_revoked = 0` på betalningen (före eller efter återbetalningen).
+**Återbetalning** görs i Stripe (**Payments → Refund**). Vid full återbetalning spärras licensen automatiskt (se [spärrlistan](#återbetalda-köp-och-spärrlistan)); vid delvis återbetalning (prisavdrag) gäller den fortfarande. Vill du återbetala men låta kunden behålla licensen: sätt `lagom_revoked = 0` på betalningen (före eller efter återbetalningen). Köp i appen återbetalas i butiken, inte här – se [Appbutikerna](#appbutikerna).
 
 ---
 
@@ -496,6 +497,7 @@ Medvetna avvägningar för en app utan konton där all data stannar på enheten:
 - **Klockan.** Provperioden och årslicensen räknas mot enhetens klocka. Den som ställer tillbaka klockan får också dagboken på fel datum, så det är ingen praktisk väg runt spärren.
 - **Spärren finns i appen.** Allt ligger lokalt, så den som ändrar i webbläsarens lagring (eller redigerar en säkerhetskopia och läser in den) kan lägga in data utan licens. Import och export spärras medvetet aldrig – användarens data ska alltid gå att flytta.
 - **Spärrlistan når bara appar som är online.** En enhet som aldrig kopplar upp sig (eller blockerar anropet) fortsätter att godta en återbetald nyckel. En nyckel som delas vidare fungerar hos andra tills köpet återbetalas eller köp-id:t läggs i `LICENSE_REVOKED_IDS`.
+- **Köp i appen kontrolleras bara när butiken svarar.** Apparna sparar de senast kända köpen i telefonen (`lagom-butikskop`, utan kvitton eller tokens) och skriver över dem varje gång App Store eller Google Play svarar. En telefon som aldrig kopplar upp sig behåller därför ett köp som har återbetalats. En egen server (t.ex. med Googles Voided Purchases API) skulle inte ändra det – den når inte heller en telefon som är offline.
 - **Testköp och skarpa licenser måste ha olika nyckelpar.** Signerar servern med det skarpa nyckelparet medan `STRIPE_SECRET_KEY` är en testnyckel, blir köp med Stripes testkort (4242 …) giltiga licenser i den skarpa appen. Använd därför ett eget testnyckelpar för förhandsversioner och Stripes testläge, och skapa det skarpa paret först när du går live (se checklistan).
 - **Begränsningen av antal anrop** i funktionerna gäller per funktionsinstans och är ett enkelt skydd. Netlifys rate limiting (se [Anropsbegränsning](#anropsbegränsning)) ger ett hårdare.
 - **"Hämta min licensnyckel igen"** hittar köpet på e-postadressen så som den skrevs vid köpet (Stripe jämför exakt). Servern provar både som den skrivs och med små bokstäver; annars hjälper supporten till.

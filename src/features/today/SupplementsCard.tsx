@@ -57,10 +57,9 @@ export const SupplementsCard = memo(function SupplementsCard({ today }: { today:
     const taken = takenEntries(entries, food)
     if (taken.length > 0) {
       // Ta bort dagens tablett(er) – med Ångra.
-      const store = useDiaryStore.getState()
-      const removed = taken.map((e) => store.removeEntry(e.date, e.id)).filter((e): e is DiaryEntry => e !== undefined)
+      const removed = useDiaryStore.getState().removeEntries(taken)
       toast(`${food.name} är avbockat`, {
-        action: { label: 'Ångra', onClick: () => removed.forEach((e) => useDiaryStore.getState().restoreEntry(e)) },
+        action: { label: 'Ångra', onClick: () => useDiaryStore.getState().restoreEntries(removed) },
       })
       return
     }

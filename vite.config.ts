@@ -6,7 +6,7 @@ import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from 'vite'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import { checkCommerceBuild, findWebPurchaseCode, type BundleFile } from './scripts/commerce-guard.ts'
+import { checkCommerceBuild, findVoiceSearchCode, findWebPurchaseCode, type BundleFile } from './scripts/commerce-guard.ts'
 import { NATIVE_PURCHASES_READY } from './src/lib/storePurchases.ts'
 import { fillSellerPlaceholders, missingSellerPlaceholders } from './src/features/legal/staticSeller.ts'
 
@@ -47,7 +47,9 @@ function commerceGuard(): Plugin {
  * och i App Store-bygget aktiveringen av licensnycklar) har kommit tillbaka i paketet. Koden tas
  * bort med byggkonstanter (`__LAGOM_DISTRIBUTION__` nedan, WEB_PURCHASES_BUILD i
  * src/config/platform.ts) – den här kontrollen säger till om ett villkor inte längre går att
- * avgöra när appen byggs. Se `findWebPurchaseCode` i scripts/commerce-guard.ts.
+ * avgöra när appen byggs. Se `findWebPurchaseCode` i scripts/commerce-guard.ts. Röstsökningen
+ * (Web Speech API) får inte heller finnas i apparna (`findVoiceSearchCode`, VOICE_SEARCH_BUILD i
+ * src/lib/voiceSearch.ts).
  */
 function storeBundleGuard(distribution: string): Plugin {
   return {
@@ -68,6 +70,13 @@ function storeBundleGuard(distribution: string): Plugin {
         this.error(
           `Lagom: koden för webbköp finns kvar i butiksbygget (${distribution}). Lägg villkoret bakom en byggkonstant i samma modul ` +
             `(se WEB_PURCHASES_BUILD i src/config/platform.ts):\n- ${found.join('\n- ')}`,
+        )
+      }
+      const voice = findVoiceSearchCode(files, distribution)
+      if (voice.length > 0) {
+        this.error(
+          `Lagom: röstsökningen finns kvar i butiksbygget (${distribution}). Lägg villkoret bakom en byggkonstant i samma modul ` +
+            `(se VOICE_SEARCH_BUILD i src/lib/voiceSearch.ts):\n- ${voice.join('\n- ')}`,
         )
       }
     },

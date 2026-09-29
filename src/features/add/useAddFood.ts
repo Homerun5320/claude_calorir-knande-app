@@ -133,8 +133,8 @@ function undoer(entries: readonly DiaryEntry[], fx: FoodEffects): () => void {
   return () => {
     if (done) return
     done = true
-    const { removeEntry } = useDiaryStore.getState()
-    for (const e of entries) removeEntry(e.date, e.id)
+    // En enda skrivning av dagboken, även för en hel måltid.
+    useDiaryStore.getState().removeEntries(entries)
     revertFoodEffects(fx)
   }
 }

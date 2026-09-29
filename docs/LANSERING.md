@@ -55,9 +55,11 @@ Steg för steg med alla detaljer: [NATIVE.md §10](NATIVE.md#10-steg-för-steg-f
    Play Console (efter första uppladdningen till intern testning).
 7. **Första byggena och testet:** TestFlight och intern testning. Prova köp (sandlådan och
    licenstestare): provperioden med "Starta 14 dagar gratis" på iPhone, `ar` och `livstid`, ett
-   avbrutet köp, Återställ köp efter ominstallation, förnyelse i förväg och flygplansläge – och
-   Apple Hälsa/Health Connect, påminnelser, streckkodsläsaren, export och radering på riktiga
-   telefoner. **Köpen måste fungera här innan något skickas in för granskning**
+   avbrutet köp, Återställ köp efter ominstallation, förnyelse i förväg, flygplansläge och i Play
+   en återbetalning med och utan återkallad rätt ([GOOGLE-PLAY.md §7](GOOGLE-PLAY.md#återbetalningar-och-återkallade-köp)
+   – Voided Purchases API behövs inte) – och Apple Hälsa/Health Connect, påminnelser,
+   streckkodsläsaren, "Fyll i från förpackningen" (Skanna text på iPhone, kamerans
+   textigenkänning på Android), export och radering på riktiga telefoner. **Köpen måste fungera här innan något skickas in för granskning**
    (`NATIVE_PURCHASES_READY` sätts annars till false). Molnbyggena laddar bara upp till TestFlight
    och intern testning – själva inskickningen gör du för hand.
 8. **Streckkodsläsaren på Android:** läser nu med ZXing, och ML Kits startprovider är borttagen
@@ -76,6 +78,14 @@ Steg för steg med alla detaljer: [NATIVE.md §10](NATIVE.md#10-steg-för-steg-f
     Data safety, Health apps-deklarationen, IARC, målgrupp 18+ och appåtkomst i Play Console.
 12. **Butiksmaterial:** texter, ikon och skärmdumpar från butiksbygget.
 13. **Skicka in** i App Store och ansök om produktion i Google Play.
+
+## Efter lanseringen
+
+- **Dagbokens lagring:** i dag skrivs hela dagboken om vid varje ändring. Det går snabbt de första
+  månaderna men blir märkbart trögt på en mellanklasstelefon efter ungefär ett år (0,25 s per
+  tryck, 0,45 s efter två år). Dela upp den i en nyckel per månad inom ungefär ett halvår efter
+  lanseringen, i två appversioner (läsare först, skrivare sedan), och mät först på en riktig iPhone
+  och en mellanklass-Android – underlag och plan i [LAGRING.md](LAGRING.md).
 
 ## Ungefärlig tidsplan
 
