@@ -70,6 +70,22 @@ const problems = (food: Food): string[] => {
 }
 
 describe('inbyggd livsmedelsdatabas', () => {
+  it('består av de registrerade datafilerna, i samma ordning', () => {
+    expect(Object.keys(BUILTIN_FOOD_FILES)).toEqual([
+      'mejeri-agg',
+      'brod-spannmal',
+      'kott-fagel-chark',
+      'fisk-skaldjur',
+      'frukt-gronsaker',
+      'fika-sotsaker-snacks',
+      'drycker',
+      'fett-sas-notter-vego',
+      'fardigratter-snabbmat',
+      'restauranger',
+    ])
+    expect(BUILTIN_FOODS.map((f) => f.id)).toEqual(Object.values(BUILTIN_FOOD_FILES).flatMap((foods) => foods.map((f) => f.id)))
+  })
+
   it('har unika id:n', () => {
     const seen = new Map<string, number>()
     for (const f of BUILTIN_FOODS) seen.set(f.id, (seen.get(f.id) ?? 0) + 1)

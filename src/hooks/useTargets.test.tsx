@@ -1,10 +1,12 @@
 /**
  * useTargets: adaptiv förbrukning ignoreras vid graviditet, amning och under 18 år, viktmålet
  * bedöms mot trendvikten (BMI-gränsen även mot senaste vägningen), träningen läggs inte till två
- * gånger med adaptiva mål och trasiga eller framtida värden styr aldrig dagens mål.
+ * gånger med adaptiva mål och trasiga eller framtida värden styr aldrig dagens mål. Veckobudgeten
+ * ger rätt mål per datum och följer golvet varje dag.
  */
 import { renderHook, waitFor } from '@testing-library/react'
-import { addDays, todayISO } from '../lib/dates'
+import { addDays, startOfWeek, todayISO } from '../lib/dates'
+import { presetShift } from '../lib/weeklyBudget'
 import { useBodyStore } from '../stores/bodyStore'
 import { useDiaryStore } from '../stores/diaryStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../stores/profileStore'
@@ -168,5 +170,99 @@ describe('useTargets', () => {
     expect(result.current.adaptiveBlocked).toMatch(/under det som räknas som hälsosamt/)
     expect(result.current.targets.kcal).toBeGreaterThan(1500)
     expect(result.current.exerciseAddBack.includedInTarget).toBe(false)
+  })
+})
+
+describe('useTargets – veckobudget och mål per datum', () => {
+  const FREDAGSMYS = { enabled: true, shift: presetShift('fredagsmys', 300) }
+  const monday = startOfWeek(todayISO())
+  const friday = addDays(monday, 4)
+  const saturday = addDays(monday, 5)
+  const sunday = addDays(monday, 6)
+
+  const withBudget = (weeklyBudget = FREDAGSMYS, profile: Profile = PROFILE) =>
+    useProfileStore.setState((s) => ({ profile: { ...profile }, settings: { ...s.settings, adaptiveTargets: false, weeklyBudget } }))
+
+  it('utan datum: basmålen – med datum: veckodagens mål', () => {
+    withBudget()
+    const today = todayISO()
+    const base = renderHook(() => useTargets(today)).result.current
+    expect(base.targets).toBe(base.baseTargets)
+    expect(base.weeklyPlan).not.toBeNull()
+    const fri = renderHook(() => useTargets(today, friday)).result.current
+    const mon = renderHook(() => useTargets(today, monday)).result.current
+    expect(fri.targets.kcal).toBe(base.baseTargets.kcal + 300)
+    expect(mon.targets.kcal).toBe(base.baseTargets.kcal - 120)
+    expect(fri.baseTargets).toEqual(base.baseTargets)
+    // Protein och fibrer behålls – fett och kolhydrater följer energin.
+    expect(fri.targets.proteinG).toBe(base.baseTargets.proteinG)
+    expect(mon.targets.fiberG).toBe(base.baseTargets.fiberG)
+    expect(fri.targets.carbsG).toBeGreaterThan(base.baseTargets.carbsG)
+    // targetsFor ger samma mål som `date`, och veckan blir densamma som sju jämna dagar.
+    expect(base.targetsFor(saturday)).toEqual(fri.targets)
+    const week = Array.from({ length: 7 }, (_, i) => base.targetsFor(addDays(monday, i)).kcal)
+    expect(week.reduce((a, b) => a + b, 0)).toBe(7 * base.baseTargets.kcal)
+    expect(base.targetsFor(sunday).kcal).toBe(base.baseTargets.kcal - 120)
+  })
+
+  it('förskjutningen läggs ovanpå ett eget energimål', () => {
+    withBudget()
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, targetOverrides: { kcal: 2100 } } }))
+    const today = todayISO()
+    const { result } = renderHook(() => useTargets(today, friday))
+    expect(result.current.baseTargets.kcal).toBe(2100)
+    expect(result.current.targets.kcal).toBe(2400)
+    // Träningen följer fortfarande inställningen (det egna målet används).
+    expect(result.current.exerciseAddBack.includedInTarget).toBe(false)
+  })
+
+  it('ingen dag under golvet – även med en fördelning som inte längre ryms', () => {
+    // 76 kg och 0,5 kg i veckan: basmålet ligger bara en bit över golvet för egna mål.
+    withBudget({ enabled: true, shift: [-1500, -1500, -1500, 1500, 1500, 1500, 0] }, { ...PROFILE, startWeightKg: 76, goal: 'ga_ner' })
+    const today = todayISO()
+    const { result } = renderHook(() => useTargets(today))
+    const floor = result.current.energy?.overrideFloor.kcal ?? 0
+    expect(floor).toBeGreaterThanOrEqual(1200)
+    expect(result.current.weeklyPlan?.clamped).toBe(true)
+    for (let i = 0; i < 7; i++) expect(result.current.targetsFor(addDays(monday, i)).kcal).toBeGreaterThanOrEqual(floor)
+  })
+
+  it('ingen veckobudget vid graviditet, amning eller under 18 år', () => {
+    const today = todayISO()
+    for (const patch of [{ lifeStage: 'gravid' as const }, { lifeStage: 'ammar' as const }, { birthYear: Number(today.slice(0, 4)) - 17 }]) {
+      withBudget(FREDAGSMYS, { ...PROFILE, ...patch })
+      const { result, unmount } = renderHook(() => useTargets(today, friday))
+      expect(result.current.weeklyPlan).toBeNull()
+      expect(result.current.weeklyBlocked).toMatch(/jämn energi varje dag/)
+      expect(result.current.targets).toBe(result.current.baseTargets)
+      expect(result.current.targetsFor(monday)).toBe(result.current.baseTargets)
+      unmount()
+    }
+  })
+
+  it('avstängd veckobudget: samma mål alla dagar', () => {
+    withBudget({ ...FREDAGSMYS, enabled: false })
+    const today = todayISO()
+    const { result } = renderHook(() => useTargets(today, friday))
+    expect(result.current.weeklyPlan).toBeNull()
+    expect(result.current.weeklyBlocked).toBeNull()
+    expect(result.current.targets).toBe(result.current.baseTargets)
+  })
+
+  it('utan profil används ingen veckobudget', () => {
+    useProfileStore.setState((s) => ({ profile: null, settings: { ...s.settings, weeklyBudget: FREDAGSMYS } }))
+    const { result } = renderHook(() => useTargets(todayISO(), friday))
+    expect(result.current.weeklyPlan).toBeNull()
+    expect(result.current.targets.kcal).toBe(2000)
+  })
+
+  it('samma objekt mellan renderingar så länge målen inte ändras', () => {
+    withBudget()
+    const today = todayISO()
+    const { result, rerender } = renderHook(() => useTargets(today, friday))
+    const first = result.current
+    rerender()
+    expect(result.current).toBe(first)
+    expect(result.current.targetsFor).toBe(first.targetsFor)
   })
 })

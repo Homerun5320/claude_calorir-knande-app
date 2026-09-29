@@ -32,6 +32,7 @@ import type { PlateVariant } from '../../lib/plate'
 import type { Food } from '../../types'
 import { isSupplementFood } from '../../data/supplements'
 import { focusGoal } from '../../lib/focusGoals'
+import { weeklyDayNote } from '../../lib/weeklyBudget'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
@@ -123,7 +124,8 @@ export default function TodayPage() {
   const hydrated = useHydrated()
   const today = useToday()
   const wide = useMediaQuery('(min-width: 768px)')
-  const { targets, energy, exerciseAddBack } = useTargets(today)
+  // Dagens mål (med veckobudgetens förskjutning för idag) och basmålet för veckokortets snittlinje.
+  const { targets, baseTargets, energy, exerciseAddBack, weeklyPlan } = useTargets(today, today)
   const goalPause = energy?.goalPause ?? null
 
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
@@ -142,6 +144,7 @@ export default function TodayPage() {
   const { pct: addBackPct, includedInTarget: exerciseInTarget } = exerciseAddBack
 
   const plateVariant: PlateVariant = activityLevel === 'aktiv' || activityLevel === 'mycket_aktiv' ? 'aktiv' : 'vanlig'
+  const weeklyNote = weeklyDayNote(weeklyPlan, today, { unit, mindful })
 
   const sections: Record<SectionId, ReactNode> = {
     welcome: firstDay ? <WelcomeCard today={today} meals={meals} /> : null,
@@ -154,6 +157,7 @@ export default function TodayPage() {
         addBackPct={addBackPct}
         showFiber={showFiber}
         wide={wide}
+        weeklyNote={weeklyNote}
       />
     ),
     meals: <MealsOverview today={today} meals={meals} mindful={mindful} />,
@@ -162,7 +166,9 @@ export default function TodayPage() {
     supplements: hasSupplements ? <SupplementsCard today={today} /> : null,
     plate: <PlateCard today={today} variant={plateVariant} />,
     focus: hasFocus ? <FocusCard today={today} mindful={mindful} /> : null,
-    week: firstDay ? null : <WeekCard today={today} targetKcal={targets.kcal} addBackPct={addBackPct} mindful={mindful} unit={unit} />,
+    week: firstDay ? null : (
+      <WeekCard today={today} targetKcal={baseTargets.kcal} weeklyPlan={weeklyPlan} addBackPct={addBackPct} mindful={mindful} unit={unit} />
+    ),
     // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt). Är viktmålet
     // pausat för att vikten redan är låg visas ändå en varsam notis, utan siffror.
     weight: mindful ? goalPause === 'lowBmi' ? <GoalCareCard today={today} /> : null : <WeightCard today={today} goalPause={goalPause} />,

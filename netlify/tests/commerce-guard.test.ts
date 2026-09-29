@@ -5,7 +5,9 @@
  * uppgifter måste finnas före försäljning och butiksbyggen måste nå serverfunktionerna.
  */
 import { beforeAll, describe, expect, it } from 'vitest'
-import { checkCommerceBuild, isExampleEmail, isP256PublicKey } from '../../scripts/commerce-guard.ts'
+import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { WEB_PURCHASE_MARKERS, checkCommerceBuild, findWebPurchaseCode, isExampleEmail, isP256PublicKey } from '../../scripts/commerce-guard.ts'
 import { licenseKeyPair } from './fakeStripe.ts'
 
 let keys: { priv: string; pub: string }
@@ -309,5 +311,54 @@ describe('flera publika licensnycklar', () => {
     const res = checkCommerceBuild({ ...complete(), VITE_LICENSE_PUBLIC_KEYS: keys2.pub })
     expect(res.errors).toEqual([])
     expect(res.warnings.join(' ')).toContain('VITE_LICENSE_PUBLIC_KEY används inte')
+  })
+})
+
+describe('webbköpen i butiksappens paket (findWebPurchaseCode)', () => {
+  const webbkop = [
+    { name: 'assets/premiumLogic-abc.js', code: 'fetch(`${a}/api/create-checkout`);fetch(`${a}/api/recover-license`)' },
+    { name: 'assets/components-abc.js', code: 'children:`Tappat nyckeln?`},{hint:`Klistra in hela nyckeln – den börjar med LAGOM1.`}' },
+    { name: 'assets/useAccess-abc.js', code: 'fetch(`${a}/api/license-revocations`)' },
+    { name: 'index.html', code: '<!doctype html><title>Lagom</title>' },
+  ]
+
+  it('webbygget kontrolleras inte – där hör webbköpen hemma', () => {
+    expect(findWebPurchaseCode(webbkop, 'web')).toEqual([])
+    expect(findWebPurchaseCode(webbkop, undefined)).toEqual([])
+  })
+
+  it('App Store: webbköp, aktivering av licensnycklar och spärrlistan ger en rad per fund med filnamn', () => {
+    const found = findWebPurchaseCode(webbkop, 'appstore')
+    expect(found).toEqual([
+      expect.stringMatching(/^assets\/premiumLogic-abc\.js: "\/api\/create-checkout" – köpstarten i Stripe Checkout/),
+      expect.stringMatching(/^assets\/premiumLogic-abc\.js: "\/api\/recover-license"/),
+      expect.stringMatching(/^assets\/components-abc\.js: "Tappat nyckeln\?"/),
+      expect.stringMatching(/^assets\/components-abc\.js: "Klistra in hela nyckeln" – aktiveringen av licensnycklar/),
+      expect.stringMatching(/^assets\/useAccess-abc\.js: "\/api\/license-revocations"/),
+    ])
+  })
+
+  it('Google Play: licensnycklar och spärrlistan får finnas, webbköpen inte', () => {
+    const found = findWebPurchaseCode(webbkop, 'play')
+    expect(found).toHaveLength(3)
+    expect(found.join('\n')).not.toMatch(/Klistra in hela nyckeln|license-revocations/)
+  })
+
+  it('ett paket utan webbköp godkänns', () => {
+    const clean = [{ name: 'assets/index.js', code: 'const a=`Köp i appen`;fetch(`${b}/api/recipe-fetch`)' }]
+    expect(findWebPurchaseCode(clean, 'appstore')).toEqual([])
+    expect(findWebPurchaseCode(clean, 'play')).toEqual([])
+  })
+
+  it('varje spår finns i appens källkod – en ändrad adress eller knapptext får inte göra kontrollen tom', () => {
+    const src = fileURLToPath(new URL('../../src/', import.meta.url))
+    const code = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+      .map((f) => readFileSync(`${src}${f}`, 'utf8'))
+      .join('\n')
+    for (const m of WEB_PURCHASE_MARKERS) {
+      expect(m.stores.length, m.text).toBeGreaterThan(0)
+      expect(code, `"${m.text}" finns inte längre i src/ – uppdatera WEB_PURCHASE_MARKERS`).toContain(m.text)
+    }
   })
 })

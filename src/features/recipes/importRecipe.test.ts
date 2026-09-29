@@ -6,6 +6,7 @@ import {
   ingredientQuery,
   parseIngredientLines,
   parseIsoDuration,
+  parseRecipeDuration,
   parseRecipeJsonLd,
   parseRecipeQuantity,
   parseYield,
@@ -268,5 +269,311 @@ describe('ingredientAmount', () => {
     expect(ingredientAmount({ ...mjol, density: undefined }, { amount: 2, unit: 'dl' })).toBeUndefined()
     expect(ingredientAmount(vitlok, { amount: 1, unit: 'burk' })).toBeUndefined()
     expect(ingredientAmount(mjol, { amount: 2 })).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Svenska receptsajter och matkassar
+// ---------------------------------------------------------------------------
+
+/**
+ * Egna, påhittade recept som efterliknar hur olika svenska receptsajter och matkassar märker upp
+ * sina recept (struktur, inte innehåll): ett ensamt Recipe-objekt, @graph med @id, grupper
+ * (HowToSection), recipeYield som tal, text, lista eller objekt, ingredienser som objekt, HTML i
+ * strängar, ogiltig JSON och serverns block för sidor med mikrodata.
+ */
+const ld = (json: string) => `<!doctype html><html lang="sv"><head><script type="application/ld+json">${json}</script></head><body></body></html>`
+
+const SAJTER: Record<string, { html: string; recipe: Record<string, unknown>; ingredients?: string[]; lines: Array<[string, Record<string, unknown>]> }> = {
+  'ett ensamt Recipe-objekt med HowToStep (som ICA)': {
+    html: ld(`{
+      "@context": "https://schema.org/",
+      "@type": "Recipe",
+      "name": "Fiskbullar i dillsås",
+      "url": "https://recept.example.se/recept/fiskbullar-i-dillsas-100001/",
+      "author": { "@type": "Organization", "name": "Exempelköket" },
+      "totalTime": "PT40M",
+      "recipeCategory": "Huvudrätt,Middag",
+      "recipeYield": "4",
+      "nutrition": { "@type": "NutritionInformation", "servingSize": "4 Servings", "calories": "500 calories" },
+      "recipeIngredient": [
+        "800 g fast potatis",
+        "2 1/2 dl matlagningsgrädde",
+        "ca 500 g fiskfärs eller torskfilé",
+        "1/2 förp färsk dill (à 20 g)",
+        "2 förp tonfisk i vatten (à 150 g)",
+        "smör (till stekning)",
+        "ev majsstärkelse",
+        "4 port ris"
+      ],
+      "recipeInstructions": [{ "@type": "HowToStep", "text": "Koka potatisen." }]
+    }`),
+    recipe: { name: 'Fiskbullar i dillsås', servings: 4, totalMinutes: 40, url: 'https://recept.example.se/recept/fiskbullar-i-dillsas-100001/' },
+    lines: [
+      ['800 g fast potatis', { amount: 800, unit: 'g', name: 'fast potatis' }],
+      ['2 1/2 dl matlagningsgrädde', { amount: 2.5, unit: 'dl', name: 'matlagningsgrädde' }],
+      ['ca 500 g fiskfärs eller torskfilé', { amount: 500, unit: 'g', name: 'fiskfärs' }],
+      ['1/2 förp färsk dill (à 20 g)', { amount: 10, unit: 'g', name: 'dill' }],
+      ['2 förp tonfisk i vatten (à 150 g)', { amount: 300, unit: 'g', name: 'tonfisk i vatten' }],
+      ['smör (till stekning)', { name: 'smör', check: true }],
+      ['ev majsstärkelse', { name: 'majsstärkelse', check: true }],
+      ['4 port ris', { amount: 4, unit: 'portion', name: 'ris' }],
+    ],
+  },
+  'HowToSection i instruktionerna och "4 portioner" (som Arla)': {
+    html: ld(`{
+      "@context": "http://schema.org",
+      "@type": "Recipe",
+      "name": "Havregrynsgröt med äpple",
+      "recipeYield": "4 portioner",
+      "prepTime": "PT5M",
+      "cookTime": "PT10M",
+      "recipeIngredient": ["1 ½ dl havregryn", "½ gurka", "1 msk + 1 tsk rapsolja", "2 krm salt"],
+      "recipeInstructions": [{ "@type": "HowToSection", "name": "Gör så här", "itemListElement": [{ "@type": "HowToStep", "text": "Koka upp." }] }]
+    }`),
+    recipe: { name: 'Havregrynsgröt med äpple', servings: 4, totalMinutes: 15 },
+    lines: [
+      ['1 ½ dl havregryn', { amount: 1.5, unit: 'dl', name: 'havregryn' }],
+      ['½ gurka', { amount: 0.5, name: 'gurka' }],
+      ['1 msk + 1 tsk rapsolja', { amount: 4, unit: 'tsk', name: 'rapsolja' }],
+      ['2 krm salt', { amount: 2, unit: 'krm', name: 'salt' }],
+    ],
+  },
+  '@graph med @id, recipeYield som lista och ingredienser i grupper (som Köket.se)': {
+    html: ld(`{
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "WebSite", "@id": "https://kok.example/#site", "name": "Exempelkök" },
+        { "@type": "WebPage", "@id": "https://kok.example/linsgryta", "mainEntity": { "@id": "https://kok.example/linsgryta#recept" } },
+        {
+          "@type": ["Recipe"],
+          "@id": "https://kok.example/linsgryta#recept",
+          "name": "Linsgryta med kokos",
+          "image": ["https://kok.example/a.jpg", "https://kok.example/b.jpg"],
+          "recipeYield": ["4", "4 portioner"],
+          "cookTime": "PT1H30M0S",
+          "recipeIngredient": [
+            { "@type": "HowToSection", "name": "Gryta", "itemListElement": ["2 dl röda linser", "1 burk kokosmjölk (400 ml)"] },
+            { "@type": "HowToSection", "name": "Till servering", "itemListElement": [{ "@type": "HowToSupply", "name": "koriander" }, { "@type": "ListItem", "item": { "name": "1 lime" } }] }
+          ]
+        }
+      ]
+    }`),
+    recipe: { name: 'Linsgryta med kokos', servings: 4, totalMinutes: 90, url: 'https://kok.example/linsgryta#recept' },
+    lines: [
+      ['2 dl röda linser', { amount: 2, unit: 'dl', name: 'röda linser' }],
+      ['1 burk kokosmjölk (400 ml)', { amount: 400, unit: 'ml', name: 'kokosmjölk' }],
+      ['koriander', { name: 'koriander', check: true }],
+      ['1 lime', { amount: 1, name: 'lime' }],
+    ],
+  },
+  'recipeYield som tal, stor bokstav och decimalpunkt (som HelloFresh)': {
+    html: ld(`{
+      "@context": "http://schema.org",
+      "@type": "Recipe",
+      "name": "Krämig kycklingpasta",
+      "recipeYield": 2,
+      "totalTime": "PT35M",
+      "recipeIngredient": ["1 st Gul lök", "0.5 st Grönsaksbuljongtärning", "150 g Kycklingbröst", "1 förpackning Crème fraiche (2 dl)", "2 x 125 g Mozzarella", "Salt", "Peppar"],
+      "recipeInstructions": [{ "@type": "HowToStep", "text": "<p>Skala och hacka löken.</p>" }]
+    }`),
+    recipe: { name: 'Krämig kycklingpasta', servings: 2, totalMinutes: 35 },
+    lines: [
+      ['1 st Gul lök', { amount: 1, unit: 'st', name: 'Gul lök' }],
+      ['0.5 st Grönsaksbuljongtärning', { amount: 0.5, unit: 'st', name: 'Grönsaksbuljongtärning' }],
+      ['150 g Kycklingbröst', { amount: 150, unit: 'g', name: 'Kycklingbröst' }],
+      ['1 förpackning Crème fraiche (2 dl)', { amount: 2, unit: 'dl', name: 'Crème fraiche' }],
+      ['2 x 125 g Mozzarella', { amount: 250, unit: 'g', name: 'Mozzarella' }],
+      ['Salt', { name: 'Salt', check: true }],
+      ['Peppar', { name: 'Peppar', check: true }],
+    ],
+  },
+  'ogiltig JSON med radbrytningar och avslutande kommatecken (som Linas Matkasse)': {
+    html: ld(`{
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Kyckling
+i ugn",
+      "recipeYield": "4 port",
+      "recipeIngredient": ["300 g kycklingfilé (ca 2 st)", "1⁄2 tsk chiliflakes", "Gul lök, 1 st", "Kycklingbuljong 2 dl",],
+    }`),
+    recipe: { name: 'Kyckling i ugn', servings: 4 },
+    lines: [
+      ['300 g kycklingfilé (ca 2 st)', { amount: 300, unit: 'g', name: 'kycklingfilé' }],
+      ['1⁄2 tsk chiliflakes', { amount: 0.5, unit: 'tsk', name: 'chiliflakes' }],
+      ['Gul lök, 1 st', { amount: 1, unit: 'st', name: 'Gul lök' }],
+      ['Kycklingbuljong 2 dl', { amount: 2, unit: 'dl', name: 'Kycklingbuljong' }],
+    ],
+  },
+  'mainEntity, tid som text, portioner som objekt och ingredienser som HowToSupply (som Mathem)': {
+    html: ld(`{
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "mainEntity": {
+        "@type": "Recipe",
+        "name": "Tomatsoppa",
+        "totalTime": "30 minuter",
+        "recipeYield": { "@type": "QuantitativeValue", "value": 4, "unitText": "portioner" },
+        "recipeIngredient": [
+          { "@type": "HowToSupply", "name": "krossade tomater", "requiredQuantity": { "@type": "QuantitativeValue", "value": 400, "unitText": "g" } },
+          { "@type": "HowToSupply", "name": "grönsaksbuljong", "requiredQuantity": { "@type": "QuantitativeValue", "value": 2.5, "unitText": "dl" } },
+          { "@type": "HowToSupply", "name": "1 gul lök" }
+        ]
+      }
+    }`),
+    recipe: { name: 'Tomatsoppa', servings: 4, totalMinutes: 30 },
+    lines: [
+      ['400 g krossade tomater', { amount: 400, unit: 'g', name: 'krossade tomater' }],
+      ['2,5 dl grönsaksbuljong', { amount: 2.5, unit: 'dl', name: 'grönsaksbuljong' }],
+      ['1 gul lök', { amount: 1, name: 'gul lök' }],
+    ],
+  },
+  'HTML-entiteter, <br> i en sträng och lång ISO-tid (som Tasteline)': {
+    html: ld(`{
+      "@context": "https://schema.org",
+      "@type": "Recipe",
+      "name": "Kanelbullar &amp; vaniljbullar",
+      "totalTime": "P0Y0M0DT1H30M0.000S",
+      "recipeYield": "ca 30 st",
+      "recipeIngredient": "25 g j&auml;st<br>2 1/2 dl mjölk<br />75 g smör"
+    }`),
+    recipe: { name: 'Kanelbullar & vaniljbullar', servings: 30, totalMinutes: 90 },
+    lines: [
+      ['25 g jäst', { amount: 25, unit: 'g', name: 'jäst' }],
+      ['2 1/2 dl mjölk', { amount: 2.5, unit: 'dl', name: 'mjölk' }],
+      ['75 g smör', { amount: 75, unit: 'g', name: 'smör' }],
+    ],
+  },
+  'schema:Recipe, "4 personer" och punkttecken (som Godfredo)': {
+    html: ld(`[{ "@type": "schema:Recipe", "name": "Vegetarisk curry", "recipeYield": "4 personer", "recipeIngredient": ["• 2 dl kokosmjölk", "– 1 tsk currypulver", "smör/margarin"] }]`),
+    recipe: { name: 'Vegetarisk curry', servings: 4 },
+    ingredients: ['• 2 dl kokosmjölk', '– 1 tsk currypulver', 'smör/margarin'],
+    lines: [
+      ['2 dl kokosmjölk', { amount: 2, unit: 'dl', name: 'kokosmjölk' }],
+      ['1 tsk currypulver', { amount: 1, unit: 'tsk', name: 'currypulver' }],
+      ['smör/margarin', { name: 'smör', check: true }],
+    ],
+  },
+  'serverns block för en sida med mikrodata': {
+    html: `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Recipe","name":"Mormors fiskgratäng","recipeYield":"4 portioner","totalTime":"PT50M","recipeIngredient":["600 g torskfilé","2&nbsp;dl vispgrädde","\\u003cb\\u003e1\\u003c/b\\u003e msk senap"]}</script>`,
+    recipe: { name: 'Mormors fiskgratäng', servings: 4, totalMinutes: 50 },
+    lines: [
+      ['600 g torskfilé', { amount: 600, unit: 'g', name: 'torskfilé' }],
+      ['2 dl vispgrädde', { amount: 2, unit: 'dl', name: 'vispgrädde' }],
+      ['1 msk senap', { amount: 1, unit: 'msk', name: 'senap' }],
+    ],
+  },
+}
+
+describe('receptsajter och matkassar', () => {
+  it.each(Object.entries(SAJTER))('%s', (_name, { html, recipe, ingredients: expectedIngredients, lines }) => {
+    const found = parseRecipeJsonLd(html)
+    expect(found).toHaveLength(1)
+    const { ingredients, ...rest } = found[0]
+    expect(rest).toEqual(recipe)
+    expect(ingredients).toEqual(expectedIngredients ?? lines.map(([raw]) => raw))
+    const parsed = parseIngredientLines(ingredients.join('\n'))
+    expect(parsed).toHaveLength(lines.length)
+    lines.forEach(([raw, expected], i) => expect(parsed[i], raw).toMatchObject({ raw, check: false, ...expected }))
+  })
+
+  it('djupt nästlade värden spränger inte tolkningen', () => {
+    const deep = (n: number, leaf: string) => '{"text":'.repeat(n) + leaf + '}'.repeat(n)
+    const html = ld(`{"@type":"Recipe","name":${deep(20_000, '"x"')},"recipeYield":${deep(20_000, '4')},"recipeIngredient":[{"name":"ägg","requiredQuantity":${deep(20_000, '2')}}]}`)
+    expect(parseRecipeJsonLd(html)).toEqual([{ name: 'Importerat recept', ingredients: ['ägg'] }])
+  })
+
+  it('hittar receptet även bland flera block, med ett trasigt block först', () => {
+    const html = `<script type="application/ld+json">{ "@type": "Recipe", "name": "Trasig" </script>${SAJTER['schema:Recipe, "4 personer" och punkttecken (som Godfredo)'].html}`
+    expect(parseRecipeJsonLd(html).map((r) => r.name)).toEqual(['Vegetarisk curry'])
+  })
+})
+
+describe('portioner och tider i olika former', () => {
+  it('portioner går före styck, och styck före första talet', () => {
+    expect(parseYield('1 långpanna (ca 24 bitar)')).toBe(24)
+    expect(parseYield('4 portioner (8 st)')).toBe(4)
+    expect(parseYield(['1 sats', '6 portioner'])).toBe(6)
+    expect(parseYield({ '@type': 'QuantitativeValue', value: 6, unitText: 'portioner' })).toBe(6)
+    expect(parseYield('Serves 2')).toBe(2)
+    expect(parseYield('2 limpor')).toBe(2)
+    expect(parseYield(2.5)).toBe(3)
+    expect(parseYield(0)).toBeUndefined()
+  })
+
+  it('ISO 8601 med år, månader, veckor och decimaler', () => {
+    expect(parseIsoDuration('P0Y0M0DT0H45M0.000S')).toBe(45)
+    expect(parseIsoDuration('PT1H30M0S')).toBe(90)
+    expect(parseIsoDuration('PT0.5H')).toBe(30)
+    expect(parseIsoDuration('P1W')).toBe(10080)
+    // En månad eller ett år är ingen tillagningstid.
+    expect(parseIsoDuration('P1M')).toBeUndefined()
+    expect(parseIsoDuration('PT')).toBeUndefined()
+  })
+
+  it('tid som tal eller svensk text', () => {
+    expect(parseRecipeDuration('30 minuter')).toBe(30)
+    expect(parseRecipeDuration('1 tim 15 min')).toBe(75)
+    expect(parseRecipeDuration('ca 1 h')).toBe(60)
+    expect(parseRecipeDuration('1,5 timmar')).toBe(90)
+    expect(parseRecipeDuration('45')).toBe(45)
+    expect(parseRecipeDuration(20)).toBe(20)
+    expect(parseRecipeDuration('PT20M')).toBe(20)
+    expect(parseRecipeDuration('snabbt')).toBeUndefined()
+  })
+})
+
+describe('sammansatta mängder', () => {
+  const q = (text: string) => {
+    const { amount, unit, name } = parseRecipeQuantity(text)
+    return { amount, unit, name }
+  }
+
+  it('lägger ihop två mått av samma slag i ett jämnt mått', () => {
+    expect(q('1 msk + 1 tsk olja')).toEqual({ amount: 4, unit: 'tsk', name: 'olja' })
+    expect(q('1 dl + 2 msk vatten')).toEqual({ amount: 1.3, unit: 'dl', name: 'vatten' })
+    expect(q('2 msk + 1 krm salt')).toEqual({ amount: 6.2, unit: 'tsk', name: 'salt' })
+    expect(q('1 kg och 200 g potatis')).toEqual({ amount: 1.2, unit: 'kg', name: 'potatis' })
+    // Volym och vikt går inte att lägga ihop – då gäller den första mängden.
+    expect(q('1 dl + 100 g ris')).toMatchObject({ amount: 1, unit: 'dl' })
+  })
+
+  it('multiplicerar "2 x 400 g"', () => {
+    expect(q('2 x 400 g krossade tomater')).toEqual({ amount: 800, unit: 'g', name: 'krossade tomater' })
+    expect(q('2 st × 125 g mozzarella')).toEqual({ amount: 250, unit: 'g', name: 'mozzarella' })
+  })
+
+  it('första alternativet blir sökordet', () => {
+    expect(ingredientQuery('blandfärs eller nötfärs (ärt- och nötfärs)')).toBe('blandfärs')
+    expect(ingredientQuery('smör/margarin till stekning')).toBe('smör')
+    expect(ingredientQuery('salt + 1 krm peppar')).toBe('salt')
+  })
+})
+
+describe('ett helt inklistrat recept', () => {
+  it('hoppar över rubriker, uppgifter och steg – och slutar vid instruktionerna', () => {
+    const text = `Pannbiff med lök
+4 portioner
+Portioner: 4
+Tid: 45 min
+Ingredienser
+Pannbiff:
+500 g nötfärs
+1 dl ströbröd
+Sås
+2 dl grädde
+Till servering
+kokt potatis
+1. Blanda färs och ströbröd.
+Gör så här
+Forma biffarna och stek dem i smör.
+1 ägg`
+    expect(parseIngredientLines(text).map((l) => l.raw)).toEqual(['Pannbiff med lök', '500 g nötfärs', '1 dl ströbröd', '2 dl grädde', 'kokt potatis'])
+  })
+
+  it('en lång mening som slutar med punkt är en instruktion', () => {
+    expect(parseIngredientLines('Sätt ugnen på 200 grader och låt den bli ordentligt varm innan du börjar.\n2 dl mjölk')).toEqual([
+      { raw: '2 dl mjölk', amount: 2, unit: 'dl', name: 'mjölk', check: false },
+    ])
   })
 })

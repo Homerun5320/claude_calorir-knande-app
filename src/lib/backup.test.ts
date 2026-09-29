@@ -434,6 +434,30 @@ describe('backup', () => {
       expect(backup.repairs?.skipped).toMatchObject({ entries: 1, customFoods: 1, usage: 1 })
     })
 
+    it('behåller allergennycklarna från Open Food Facts men bara kända nycklar', () => {
+      const off = (id: string, extra: unknown) => ({ ...mjolk, id, source: 'openfoodfacts', extra })
+      const backup = parseBackup(
+        file({
+          ...sections,
+          food: {
+            cachedFoods: {
+              'off:1': off('off:1', { allergens: ['mjölk'], allergenKeys: ['mjolk'], traceKeys: ['notter', 'jordnotter'] }),
+              'off:2': off('off:2', { allergenKeys: ['mjolk', 'okand', 'mjolk'], traceKeys: 'notter' }),
+              // Tomma listor betyder "inlästa, inga angivna" och behålls.
+              'off:3': off('off:3', { allergenKeys: [], traceKeys: [], unreadAllergenTags: true }),
+            },
+          },
+        }),
+        NOW,
+      )
+      const cached = backup.data.food.cachedFoods
+      expect(cached['off:1'].extra).toEqual({ allergens: ['mjölk'], allergenKeys: ['mjolk'], traceKeys: ['notter', 'jordnotter'] })
+      // En okänd nyckel: Lagom säger då aldrig att Open Food Facts inte anger något.
+      expect(cached['off:2'].extra).toEqual({ allergenKeys: ['mjolk'], unreadAllergenTags: true })
+      expect(cached['off:3'].extra).toEqual({ allergenKeys: [], traceKeys: [], unreadAllergenTags: true })
+      expect(summarizeBackup(backup)).toMatchObject({ skipped: 0, repaired: 1 })
+    })
+
     it('behåller receptlänk och veckans fokus men rensar bort ogiltiga värden', () => {
       const recipe = (id: string, sourceUrl: unknown) => ({ id, name: 'Gröt', servings: 2, ingredients: [], sourceUrl, createdAt: NOW, updatedAt: NOW })
       const withFocus = (weeklyFocus: unknown) =>

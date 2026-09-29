@@ -38,12 +38,19 @@ describe('netlify.toml', () => {
   it('varje funktion har en egen adress under /api/ – och de publika en anropsbegränsning som inte går att kringgå', () => {
     // Med `path` i funktionens config nås den inte via /.netlify/functions/<namn>, där en
     // [[redirects]]-regel med rate_limit inte gäller.
-    const limited: Record<string, { windowLimit: number; aggregateBy: string[] }> = {
-      'create-checkout': { windowLimit: 10, aggregateBy: ['ip', 'domain'] },
-      'verify-purchase': { windowLimit: 30, aggregateBy: ['ip', 'domain'] },
-      'recover-license': { windowLimit: 20, aggregateBy: ['domain'] },
-      'recipe-fetch': { windowLimit: 10, aggregateBy: ['ip', 'domain'] },
-      'license-revocations': { windowLimit: 60, aggregateBy: ['ip', 'domain'] },
+    //
+    // Netlifys paketering (@netlify/zip-it-and-ship-it) läser `rateLimit` som
+    // { windowLimit, windowSize, aggregateBy?, action?, to?, algorithm? } och hoppar TYST över hela
+    // regeln om något fält är fel (felstavat, fel typ) – därför kontrolleras formen exakt här. En
+    // ensam sträng i `aggregateBy` blir dessutom ['domain'], dvs. en gräns för hela webbplatsen.
+    // Kontrollerat 2026-09-29 mot @netlify/zip-it-and-ship-it 16.2.3 (funktionerna här gav
+    // trafficRules i manifestet) och typen RateLimitConfig i @netlify/functions 6.0.0.
+    const limited: Record<string, { windowLimit: number; windowSize: number }> = {
+      'create-checkout': { windowLimit: 10, windowSize: 60 },
+      'verify-purchase': { windowLimit: 30, windowSize: 60 },
+      'recover-license': { windowLimit: 5, windowSize: 180 },
+      'recipe-fetch': { windowLimit: 10, windowSize: 60 },
+      'license-revocations': { windowLimit: 60, windowSize: 60 },
     }
     for (const file of readdirSync(`${root}netlify/functions`)) {
       const name = file.replace(/\.mts$/, '')
@@ -60,10 +67,13 @@ describe('netlify.toml', () => {
       const rate = /rateLimit: \{ windowLimit: (\d+), windowSize: (\d+), aggregateBy: \[([^\]]*)\] \}/.exec(config ?? '')
       expect(rate, `${file}: rateLimit saknas eller är skriven på ett annat sätt`).not.toBeNull()
       expect(Number(rate?.[1])).toBe(want.windowLimit)
+      expect(Number(rate?.[2])).toBe(want.windowSize)
       // Netlify godtar fönster på 1–180 sekunder.
       expect(Number(rate?.[2])).toBeGreaterThanOrEqual(1)
       expect(Number(rate?.[2])).toBeLessThanOrEqual(180)
-      expect(rate?.[3].split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(want.aggregateBy)
+      // Per besökare (IP-adress) på webbplatsen – det enda som finns i alla Netlify-planer. En
+      // gräns för hela webbplatsen (['domain'] ensamt) kräver Enterprise med High-Performance Edge.
+      expect(rate?.[3].split(',').map((s) => s.trim().replace(/'/g, ''))).toEqual(['ip', 'domain'])
     }
     // Inga omskrivningar till /.netlify/functions – de skulle peka på adresser som inte finns.
     expect(toml).not.toMatch(/^\s*to = "\/\.netlify\/functions/m)
@@ -98,6 +108,8 @@ describe('netlify.toml', () => {
     expect(directive('form-action')).toContain('https://checkout.stripe.com')
     // Kameran behövs för streckkodsläsaren.
     expect(toml).toMatch(/Permissions-Policy = "camera=\(self\)/)
+    // Mikrofonen behövs för röstsökningen (bara taligenkänning på enheten, src/lib/voiceSearch.ts).
+    expect(toml).toMatch(/microphone=\(self\)/)
   })
 
   it('externa adresser som appen anropar finns med i connect-src', () => {

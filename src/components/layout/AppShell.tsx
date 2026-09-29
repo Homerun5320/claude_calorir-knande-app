@@ -17,6 +17,9 @@ import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGa
 import { requireAccess } from '../../features/premium/requireAccess'
 import { storeName } from '../../features/premium/premiumLogic'
 import { initNative } from '../../native'
+// Direkt från filen, så att resten av signaturgrafiken inte följer med i huvudpaketet.
+import { Confetti } from '../signature/Confetti'
+import { useMilestoneCelebration } from '../../features/more/useMilestoneCelebration'
 
 interface NavItem {
   to: string
@@ -78,12 +81,15 @@ const ROUTE_TITLES: ReadonlyArray<[RegExp, string]> = [
   [/^\/recept\/importera/, 'Importera recept'],
   [/^\/recept\/[^/]+\/redigera/, 'Redigera recept'],
   [/^\/recept/, 'Recept'],
+  [/^\/dela/, 'Öppna delat'],
+  [/^\/vikt\/bilder/, 'Framstegsbilder'],
   [/^\/vikt/, 'Vikt & mått'],
   [/^\/insikter/, 'Insikter'],
   [/^\/rapport/, 'Rapport'],
   [/^\/traning/, 'Träning'],
   [/^\/dryck/, 'Dryck'],
   [/^\/fasta/, 'Fasta'],
+  [/^\/mer\/milstolpar/, 'Milstolpar'],
   [/^\/mer/, 'Mer'],
   [/^\/om/, 'Om Lagom'],
   [/^\/matkalender/, 'Matkalender'],
@@ -285,6 +291,9 @@ export function AppShell() {
 
   useFocusOnNavigate(pathname)
 
+  // Milstolpar: en varm notis och konfetti första gången en milstolpe nås (aldrig för exempeldata).
+  const milestoneBurst = useMilestoneCelebration()
+
   // Be en gång om beständig lagring, så att webbläsaren (t.ex. Safari efter sju dagar utan besök)
   // inte rensar dagboken automatiskt. Tyst – inget visas om det inte går.
   useEffect(() => {
@@ -368,6 +377,7 @@ export function AppShell() {
         </nav>
       )}
       <ToastViewport />
+      <Confetti fire={milestoneBurst} fullscreen />
       <DialogHost />
       <AccessSync />
       <AccessBlockedDialog />

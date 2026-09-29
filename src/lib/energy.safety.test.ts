@@ -20,6 +20,10 @@
  *    är egna. Då visar Mål och makron en notis.
  * 7. Koffein högst 400 mg, 200 mg vid graviditet/amning och 3 mg/kg under 18 år.
  * 8. Alla mål är ändliga tal (aldrig NaN).
+ * 9. Veckobudgeten (lib/weeklyBudget): regel 1–8 gäller VARJE veckodag med alla förval och även
+ *    med extrema eller trasiga fördelningar. Vid graviditet, amning och under 18 år används ingen
+ *    veckobudget alls. Veckans summa blir aldrig lägre än sju jämna dagar, och de fördelningar som
+ *    gränssnittet kan skapa (förvalen och "Egen") når aldrig golvet.
  */
 import { describe, expect, it } from 'vitest'
 import type { ActivityLevel, ExerciseEntry, GoalType, LifeStage, Profile, Sex, Targets } from '../types'
@@ -27,6 +31,8 @@ import { ACTIVITY_LEVELS } from '../types'
 import { caffeineMaxMg, computeEnergy, computeTargets, kcalOverrideFloor, type EnergyOptions } from './energy'
 import { dailyBudget, exerciseAddBack } from './diary'
 import { STANDARD_DRINK_G, standardDrinks } from './nutrients'
+import { addDays } from './dates'
+import { MAX_DAY_SHIFT, adjustDay, maxPresetExtra, minShiftFor, presetShift, resolveWeeklyBudget, targetsForDate, type FixedPresetId } from './weeklyBudget'
 
 // ---------------------------------------------------------------------------
 // Oberoende referens för reglerna
@@ -352,6 +358,196 @@ describe('säkerhetsmatris för dagsmålet', () => {
     })()
     const { found } = collect(cases)
     expect(found).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Veckobudgeten: golvet och reglerna gäller varje veckodag
+// ---------------------------------------------------------------------------
+
+/** Måndag till söndag (index 0–6) i en vecka nära `today`. */
+function weekOf(today: string): string[] {
+  const d = new Date(`${today}T12:00:00`)
+  const monday = addDays(today, -((d.getDay() + 6) % 7))
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+}
+
+/** Fördelningar som beräkningen ska klara – även sådana som gränssnittet aldrig skapar. */
+const RAW_SHIFTS: number[][] = [
+  presetShift('fredagsmys', 300),
+  presetShift('fredagsmys', 1500),
+  presetShift('helg', 300),
+  presetShift('helg', 1000),
+  [-1500, -1500, -1500, 1500, 1500, 1500, 0],
+  [1500, -250, -250, -250, -250, -250, -250],
+  [-1500, 250, 250, 250, 250, 250, 250],
+  [50, -50, 100, -100, 0, 0, 0],
+]
+
+/** Fördelningar som gränssnittet skapar mot golvet (förval med högsta extra och "Egen"). */
+function uiShifts(minShift: number): number[][] {
+  const out: number[][] = []
+  for (const id of ['fredagsmys', 'helg'] as FixedPresetId[]) {
+    out.push(presetShift(id, 300, minShift), presetShift(id, maxPresetExtra(id, minShift), minShift), presetShift(id, 5000, minShift))
+  }
+  // "Egen": tryck + på fredag tills det tar stopp, och − på måndag tills det tar stopp.
+  let v: number[] = presetShift('fredagsmys', 300, minShift)
+  for (let i = 0; i < 40; i++) v = adjustDay(v, 4, 50, minShift)
+  out.push(v)
+  let w: number[] = [0, 0, 0, 0, 0, 0, 0]
+  for (let i = 0; i < 40; i++) w = adjustDay(w, 0, -50, minShift)
+  out.push(w)
+  return out
+}
+
+/** Regelbrott för veckobudgeten i ett fall (tom lista = inga). */
+function weeklyViolations(c: Case, shifts: readonly number[][], fromUi: boolean): string[] {
+  const ref = reference(c)
+  const { energy, targets: base, floor } = run(c)
+  const out: string[] = []
+  const fail = (rule: string, detail: string) => out.push(`${rule}: ${detail}`)
+  const week = weekOf(c.today)
+  for (const shift of shifts) {
+    const { plan, blocked } = resolveWeeklyBudget({ profile: c.profile, energy, baseKcal: base.kcal, setting: { enabled: true, shift }, today: c.today })
+    if (ref.special && (plan !== null || blocked === null)) fail('veckobudget vid graviditet/amning/under 18', `plan ${plan ? 'används' : 'saknas'}, blocked ${blocked}`)
+    if (!ref.special && (plan === null || blocked !== null)) fail('veckobudget för vuxna', `ingen plan (${blocked})`)
+    if (fromUi && plan?.clamped) fail('gränssnittet', `fördelningen ${shift.join(',')} går under golvet ${floor.kcal} (bas ${base.kcal})`)
+    let weekKcal = 0
+    for (const date of week) {
+      const t = targetsForDate(base, plan, date, c.overrides)
+      weekKcal += t.kcal
+      const day = `${date}, förskjutning ${shift.join(',')}`
+      if (ref.special && t !== base) fail('graviditet/amning/under 18', `${day}: målet ändrades`)
+      for (const [k, v] of Object.entries(t)) if (!finite(v) || v < 0) fail('ändligt', `${day}: ${k} = ${v}`)
+      if (!(t.kcal >= FLOOR[c.profile.sex])) fail('golv', `${day}: ${t.kcal} < ${FLOOR[c.profile.sex]}`)
+      if (!(t.kcal >= floor.kcal)) fail('golv för egna mål', `${day}: ${t.kcal} < ${floor.kcal}`)
+      if (ref.special && !(t.kcal >= ref.formulaTdee + ref.life - ROUND)) fail('graviditet/amning/under 18', `${day}: ${t.kcal} < formelns ${Math.round(ref.formulaTdee + ref.life)}`)
+      if ((ref.lowBmi || ref.atOrBelowTarget) && !(t.kcal >= ref.maintenance - ROUND)) fail('lågt BMI/målvikt', `${day}: ${t.kcal} < underhåll ${Math.round(ref.maintenance)}`)
+      if (!(t.kcal >= ref.maintenance - ref.cap - ROUND)) fail('takt/underskott', `${day}: ${t.kcal} < ${Math.round(ref.maintenance - ref.cap)}`)
+      if (t.kcal > base.kcal + MAX_DAY_SHIFT) fail('högst 1 500 kcal extra', `${day}: ${t.kcal} > ${base.kcal} + 1 500`)
+      // Protein, fibrer, vatten, salt och koffein är desamma varje dag (proteinet sänks bara om
+      // det annars skulle ta mer än hela dagens energi).
+      if (t.proteinG !== base.proteinG && !(t.proteinG === Math.floor(t.kcal / 4) && base.proteinG * 4 > t.kcal)) fail('protein per dag', `${day}: ${t.proteinG} ≠ ${base.proteinG}`)
+      if (t.fiberG !== base.fiberG || t.waterMl !== base.waterMl || t.saltMaxG !== base.saltMaxG || t.caffeineMaxMg !== base.caffeineMaxMg) fail('övriga mål per dag', day)
+      // Makrona: rymdes de i basmålet ryms de i dagens mål (högst avrundningen till hela gram) –
+      // utom när egna mål själva tar mer än dagens energi. Egna mål för fett och kolhydrater ändras
+      // aldrig; då har det andra (beräknade) makrot redan gått ned till 0.
+      const baseSum = base.proteinG * 4 + base.carbsG * 4 + base.fatG * 9
+      const daySum = t.proteinG * 4 + t.carbsG * 4 + t.fatG * 9
+      const own = (v: unknown) => finite(v) && (v as number) >= 0
+      const ownProtein = own(c.overrides.proteinG)
+      const ownFat = own(c.overrides.fatG)
+      const ownCarbs = own(c.overrides.carbsG)
+      if (ownFat && t.fatG !== base.fatG) fail('eget fett per dag', `${day}: ${t.fatG} ≠ ${base.fatG}`)
+      if (ownCarbs && t.carbsG !== base.carbsG) fail('egna kolhydrater per dag', `${day}: ${t.carbsG} ≠ ${base.carbsG}`)
+      const ownTakesAll = (ownFat || ownCarbs) && (ownFat || t.fatG === 0) && (ownCarbs || t.carbsG === 0)
+      if (baseSum <= base.kcal + 2 && !(ownProtein && t.proteinG * 4 > t.kcal) && !ownTakesAll && daySum > t.kcal + 2) fail('makron per dag', `${day}: ${daySum} kcal > ${t.kcal}`)
+    }
+    // Golvet kan bara höja dagar: veckans summa blir aldrig lägre än sju jämna dagar.
+    if (weekKcal < 7 * base.kcal) fail('veckans summa', `${weekKcal} < 7 × ${base.kcal}`)
+    if (plan && weekKcal !== plan.weekKcal) fail('veckans summa', `${weekKcal} ≠ planens ${plan.weekKcal}`)
+    if (plan && !plan.clamped && weekKcal !== 7 * base.kcal) fail('samma energi över veckan', `${weekKcal} ≠ 7 × ${base.kcal}`)
+  }
+  return out
+}
+
+function collectWeekly(cases: Iterable<Case>, max = 12) {
+  const found: string[] = []
+  let n = 0
+  for (const c of cases) {
+    n++
+    const { energy, targets } = run(c)
+    const minShift = minShiftFor(targets.kcal, kcalOverrideFloor(c.profile, energy, c.today).kcal)
+    const v = [...weeklyViolations(c, RAW_SHIFTS, false), ...weeklyViolations(c, uiShifts(minShift), true)]
+    if (v.length && found.length < max) found.push(`${v.slice(0, 4).join(' | ')}\n    ${describeCase(c)}`)
+  }
+  return { n, found }
+}
+
+describe('veckobudgeten – golvet och reglerna gäller varje veckodag', () => {
+  it('slumpade kombinationer (6 000 fall × alla förval och extrema fördelningar × 7 dagar)', () => {
+    const r = prng(20260929)
+    const all = Array.from({ length: 6000 }, () => randomCase(r))
+    const { n, found } = collectWeekly(all)
+    expect(n).toBe(6000)
+    expect(found).toEqual([])
+    // Matrisen prövar verkligen golvet, spärren och klämningen.
+    const hits = { spärrad: 0, klämd: 0, golvUtanUtrymme: 0 }
+    for (const c of all) {
+      const { energy, targets } = run(c)
+      const { plan, blocked } = resolveWeeklyBudget({ profile: c.profile, energy, baseKcal: targets.kcal, setting: { enabled: true, shift: RAW_SHIFTS[1] }, today: c.today })
+      if (blocked) hits.spärrad++
+      if (plan?.clamped) hits.klämd++
+      if (plan && plan.minShift === 0) hits.golvUtanUtrymme++
+    }
+    for (const [rule, count] of Object.entries(hits)) expect({ rule, enough: count > 200 }).toEqual({ rule, enough: true })
+  })
+
+  it('fullständig korsning av livsstadium, ålder runt 18, 31 december, mål, takt och eget energimål', () => {
+    const cases = (function* () {
+      for (const today of ['2026-09-27', '2026-12-31'])
+        for (const lifeStage of LIFE)
+          for (const age of [16, 17, 18, 19])
+            for (const goal of GOALS)
+              for (const kcal of [undefined, 1200, 2000])
+                for (const adaptiveTdee of [undefined, 3000]) {
+                  const profile: Profile = {
+                    sex: 'kvinna',
+                    birthYear: 2026 - age,
+                    heightCm: 165,
+                    startWeightKg: 60,
+                    activityLevel: 'latt',
+                    goal,
+                    weeklyRateKg: 1,
+                    lifeStage,
+                    diet: 'allatare',
+                    macroPreset: 'nnr',
+                    createdAt: 0,
+                  }
+                  yield { today, profile, weightKg: 60, overrides: kcal === undefined ? {} : { kcal }, adaptiveTdee }
+                }
+    })()
+    const { found } = collectWeekly(cases)
+    expect(found).toEqual([])
+  })
+
+  it('BMI-gränsen, nådd målvikt och golvet 1 200/1 500 kcal – för alla veckodagar och förval', () => {
+    const cases = (function* () {
+      for (const sex of SEXES)
+        for (const bmiValue of [17, 18.4, 18.6, 22, 30])
+          for (const delta of [undefined, -5, 0, 5])
+            for (const goal of GOALS)
+              for (const kcal of [undefined, 1, 1200, 1500, 1700]) {
+                const weightKg = Math.round(bmiValue * 1.6 * 1.6 * 10) / 10
+                const profile: Profile = {
+                  sex,
+                  birthYear: 1980,
+                  heightCm: 160,
+                  startWeightKg: weightKg,
+                  activityLevel: 'stillasittande',
+                  goal,
+                  weeklyRateKg: 1,
+                  targetWeightKg: delta === undefined ? undefined : weightKg + delta,
+                  lifeStage: 'ingen',
+                  diet: 'allatare',
+                  macroPreset: 'lchf',
+                  createdAt: 0,
+                }
+                yield { today: '2026-09-27', profile, weightKg, overrides: kcal === undefined ? {} : { kcal } }
+              }
+    })()
+    const { found } = collectWeekly(cases)
+    expect(found).toEqual([])
+  })
+
+  it('en avstängd eller trasig veckobudget ändrar aldrig dagsmålet', () => {
+    const c = randomCase(prng(7))
+    const { energy, targets } = run(c)
+    for (const setting of [undefined, { enabled: false, shift: RAW_SHIFTS[0] }]) {
+      const { plan } = resolveWeeklyBudget({ profile: c.profile, energy, baseKcal: targets.kcal, setting, today: c.today })
+      expect(plan).toBeNull()
+      for (const date of weekOf(c.today)) expect(targetsForDate(targets, plan, date, c.overrides)).toBe(targets)
+    }
   })
 })
 

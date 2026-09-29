@@ -21,6 +21,7 @@ import { fikaSotsakerSnacksAliases } from './fika-sotsaker-snacks'
 import { dryckerAliases } from './drycker'
 import { fettSasNotterVegoAliases } from './fett-sas-notter-vego'
 import { fardigratterSnabbmatAliases } from './fardigratter-snabbmat'
+import { restaurangerAliases } from './restauranger'
 
 /** Aliasen per datafil (samma nycklar som `BUILTIN_FOOD_FILES`). */
 export const FOOD_ALIAS_FILES = {
@@ -33,6 +34,7 @@ export const FOOD_ALIAS_FILES = {
   drycker: dryckerAliases,
   'fett-sas-notter-vego': fettSasNotterVegoAliases,
   'fardigratter-snabbmat': fardigratterSnabbmatAliases,
+  restauranger: restaurangerAliases,
 } as const satisfies Record<string, readonly FoodAlias[]>
 
 /** Alla alias som en lista, med de gamla portionerna (`legacy-portions.ts`) där sådana finns. */

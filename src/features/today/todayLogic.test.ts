@@ -213,6 +213,14 @@ describe('veckan', () => {
     expect(weekAverage(weekSeries(dates, {}, {}, 2000, 0), '2026-09-26')).toBeUndefined()
   })
 
+  it('med veckobudget får varje dag sitt eget mål', () => {
+    // 2026-09-25 är en fredag: +300 kcal den dagen.
+    const s = weekSeries(dates, entries, ex, (d) => (d === '2026-09-25' ? 2300 : 1880), 50)
+    expect(s.map((d) => d.budget)).toEqual([1880 + 150, 2300, 1880])
+    const text = weekChartSummary(s, '2026-09-26', false, 2000, 'kcal', true).replace(/\u00a0/g, ' ')
+    expect(text).toContain('Mål i snitt 2 000 kcal per dag, fördelat med veckobudgeten.')
+  })
+
   it('läser upp samma snitt som visas under diagrammet', () => {
     const s = weekSeries(dates, entries, ex, 2000, 50)
     const text = weekChartSummary(s, '2026-09-26', false, 2000).replace(/\u00a0/g, ' ')

@@ -53,12 +53,15 @@ export interface DayStat {
   exerciseKcal: number
 }
 
-/** En sammanfattning per dag i perioden. */
+/**
+ * En sammanfattning per dag i perioden. `targetKcal` är dagsmålet – eller, med veckobudget, en
+ * funktion som ger dagsmålet för varje datum (`InsightsData.targetKcalFor`).
+ */
 export function buildDayStats(
   dates: readonly ISODate[],
   entriesByDate: EntriesByDate,
   exerciseByDate: ExerciseByDate,
-  targetKcal: number,
+  targetKcal: number | ((date: ISODate) => number),
   addBackPct: number,
 ): DayStat[] {
   return dates.map((date) => {
@@ -66,13 +69,14 @@ export function buildDayStats(
     const exercise = exerciseByDate[date]
     const logged = list.length > 0
     const t = logged ? totals(list) : {}
+    const target = typeof targetKcal === 'function' ? targetKcal(date) : targetKcal
     return {
       date,
       logged,
       entryCount: list.length,
       totals: t,
       kcal: logged ? (t.kcal ?? 0) : undefined,
-      budget: dailyBudget(targetKcal, exercise, addBackPct),
+      budget: dailyBudget(target, exercise, addBackPct),
       exerciseKcal: exerciseKcal(exercise),
     }
   })

@@ -14,6 +14,8 @@ export interface ReportInput {
   summary: DaysSummary
   averages: Nutrients
   targets: { kcal: number; proteinG: number; fiberG: number }
+  /** Med veckobudget har dagarna olika mål – då är energimålet veckans snitt. */
+  weeklyBudget?: boolean
   verdicts: readonly MacroVerdict[]
   unit: 'kcal' | 'kJ'
   mindful: boolean
@@ -56,7 +58,9 @@ export function buildReport(input: ReportInput): Report {
       const inRange = verdicts.filter((v) => v.status === 'inom').map((v) => v.label.toLowerCase())
       if (inRange.length > 0) lines.push(`Inom NNR:s intervall: ${inRange.join(', ')}`)
     } else {
-      lines.push(`Energi: i snitt ${formatEnergy(summary.avgKcal, unit)} per dag (mål ${formatEnergy(targets.kcal, unit)})`)
+      lines.push(
+        `Energi: i snitt ${formatEnergy(summary.avgKcal, unit)} per dag (mål ${input.weeklyBudget ? 'i snitt ' : ''}${formatEnergy(targets.kcal, unit)}${input.weeklyBudget ? ' med veckobudget' : ''})`,
+      )
       lines.push(
         `Protein: ${formatNutrient('protein', averages.protein)} · Fibrer: ${formatNutrient('fiber', averages.fiber)} per dag`,
       )

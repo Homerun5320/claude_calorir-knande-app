@@ -84,7 +84,7 @@ Den här guiden beskriver hur betalningen på **webben** sätts upp med **Stripe
 | `netlify.toml` | Bygge, `/api/*`, anropsbegränsning, säkerhetsheaders (CSP) och cache |
 | `scripts/generate-license-keys.mjs` | Skapar nyckelparet för licenser |
 | `scripts/issue-license.mjs` | Utfärdar en licens manuellt |
-| `scripts/commerce-guard.ts` | Byggkontroll (via `vite.config.ts`): stoppar skarpa byggen och butiksbyggen utan giltig publik nyckel eller säljaruppgifter, och hemligheter i `VITE_`-variabler |
+| `scripts/commerce-guard.ts` | Byggkontroll (via `vite.config.ts`): stoppar skarpa byggen och butiksbyggen utan giltig publik nyckel eller säljaruppgifter, hemligheter i `VITE_`-variabler och butiksbyggen där koden för webbköp (Stripe Checkout, tacksidan, "Tappat nyckeln?", i App Store-bygget även aktiveringen av licensnycklar) finns kvar i paketet (`findWebPurchaseCode`, körs av `vite.config.ts`) |
 | `.env.example` | Alla miljövariabler med förklaringar |
 
 ---
@@ -238,25 +238,41 @@ LICENSE_PRIVATE_KEY=… VITE_LICENSE_PUBLIC_KEY=… node scripts/issue-license.m
 
 #### Anropsbegränsning
 
-Funktionerna har en enkel begränsning per IP-adress i minnet, men Netlify kan köra flera kopior samtidigt. Det hårdare skyddet är Netlifys **rate limiting**, som står i varje funktion (`export const config = { path, rateLimit }` i `netlify/functions/*.mts`). En funktion med egen `path` nås **bara** på `/api/<namn>` – inte via `/.netlify/functions/<namn>` – så gränserna går inte att kringgå. Över gränsen svarar Netlify `429`.
+Netlifys **rate limiting** står i varje funktion (`export const config = { path, rateLimit }` i `netlify/functions/*.mts`) och räknas i Netlifys nätverk innan funktionen anropas – över alla kopior av funktionen. En funktion med egen `path` nås **bara** på `/api/<namn>` – inte via `/.netlify/functions/<namn>` – så gränserna går inte att kringgå. Över gränsen svarar Netlify `429`. Funktionerna har dessutom en enkel begränsning i minnet (per kopia) som extra skydd.
 
-| Adress | Gräns | Varför |
+Gränserna räknas per besökare (IP-adress) på webbplatsen: `aggregateBy: ['ip', 'domain']`, som finns i alla Netlify-planer. En gemensam gräns för hela webbplatsen (`['domain']` ensamt) kräver Enterprise med High-Performance Edge och används inte. Fönstret (`windowSize`) får vara 1–180 sekunder.
+
+| Adress | Gräns i Netlify | Varför |
 | --- | --- | --- |
 | `/api/create-checkout` | 10 per minut och IP-adress | Skapar köp i Stripe |
 | `/api/verify-purchase` | 30 per minut och IP-adress | Tacksidan frågar flera gånger medan betalningen blir klar |
-| `/api/recover-license` | 20 per 3 minuter för **hela webbplatsen** (plus 5 per 10 minuter per IP-adress och 10 per timme per e-postadress i funktionen) | Skyddar mot att någon provar sig fram med e-post och kvittonummer – även från många adresser |
+| `/api/recover-license` | 5 per 3 minuter och IP-adress (i funktionen dessutom 5 per 10 minuter per IP-adress, 10 per timme per e-postadress och minst 1,5 sekunder per svar utan licens) | Skyddar mot att någon provar sig fram med e-post och kvittonummer |
 | `/api/recipe-fetch` | 10 per minut och IP-adress | Hämtar andra webbplatser åt appen. Kräver dessutom appens ursprung (Origin) – anrop från curl och skript nekas. |
 | `/api/license-revocations` | 60 per minut och IP-adress | Spärrlistan (svaret cachas en timme) |
 | `/api/stripe-webhook` | ingen | Stripe skickar händelser i klump; signaturen kontrolleras alltid |
 
-**Kontrollera efter första driftsättningen** (byt `<din adress>`):
+**"Tappat nyckeln?" har ingen gemensam gräns för hela webbplatsen.** Tidigare gällde 20 försök per 3 minuter för alla besökare tillsammans (`aggregateBy: ['domain']`). Den regeln togs bort 2026-09-29 eftersom en gräns bara per domän enligt uppgift kräver Enterprise med High-Performance Edge – **uppgiften kunde inte kontrolleras** (Netlifys dokumentation gick inte att nå från byggmiljön). Nu gäller 5 försök per 3 minuter och IP-adress i Netlify, plus gränserna i funktionens minne (per kopia). Med många IP-adresser går det alltså att prova fler kombinationer av e-post och kvittonummer än förut. Risken bedöms som låg: kvittonumret har 8 siffror (100 miljoner möjligheter per e-postadress), fel e-post och fel nummer ger samma svar och samma svarstid, och det enda som går att vinna är en licens. En egen räknare för hela webbplatsen (t.ex. i Netlify Blobs) kräver ett nytt paket och ägarens godkännande, och en gemensam gräns gör det dessutom möjligt för vem som helst att stänga av "Tappat nyckeln?" för alla genom att fylla kvoten. **Att göra före lansering:** kontrollera i Netlifys UI (eller med Netlifys support) om planen godtar en regel med bara `aggregateBy: ['domain']`. Gör den det kan `config.rateLimit` i `netlify/functions/recover-license.mts` bytas till `{ windowLimit: 20, windowSize: 180, aggregateBy: ['domain'] }` (ändra samtidigt `netlify/tests/netlify-toml.test.ts`) – gränsen per IP-adress i funktionens minne gäller ändå.
+
+> **Obs:** Netlify hoppar **tyst** över en `rateLimit` som är felskriven (ett felstavat fält eller fel typ) – det syns inte i driftsättningsloggen. En ensam sträng i `aggregateBy` (`'ip'` i stället för `['ip', 'domain']`) blir dessutom en gräns för hela webbplatsen. Testet `netlify/tests/netlify-toml.test.ts` kontrollerar därför formen och gränserna exakt – ändra dem där samtidigt. Prova alltid i en förhandsvisning.
+
+**Kontrollera i en förhandsvisning (deploy preview).** Reglerna följer med varje driftsättning, även förhandsvisningar. Byt `<adress>` mot förhandsvisningens adress, t.ex. `https://deploy-preview-12--lagom.netlify.app`:
 
 ```bash
-curl -i https://<din adress>/.netlify/functions/recover-license   # ska ge 404
-curl -i https://<din adress>/api/license-revocations?x=1          # ska ge 400
+URL=https://<adress>
+# 1. Adresserna: den gamla ska inte finnas, den nya svarar (400 = fel parameter, som väntat).
+curl -s -o /dev/null -w "%{http_code}\n" "$URL/.netlify/functions/recover-license"   # 404
+curl -s -o /dev/null -w "%{http_code}\n" "$URL/api/license-revocations?x=1"          # 400
+
+# 2. Gränsen: sex ogiltiga försök i rad mot "Tappat nyckeln?" (inget anrop till Stripe görs).
+for i in 1 2 3 4 5 6; do
+  curl -s -o svar.txt -w "%{http_code} " -X POST -H "Content-Type: application/json" -d '{}' "$URL/api/recover-license"
+  head -c 80 svar.txt; echo
+done
 ```
 
-Om din Netlify-plan har ett tak för antalet regler, eller inte godtar en regel: driftsättningsloggen säger det. Ta då bort `rateLimit` ur den funktion det gäller (adressen `path` ska stå kvar) – begränsningen i funktionernas minne gäller alltid. Lägg inga `[[redirects]]` för `/api/` i `netlify.toml`: de skulle peka på `/.netlify/functions/…`, som inte längre finns.
+De fem första ska ge `400` (`{"code":"ogiltig-epost",…}`), eller `503` om förhandsvisningen saknar Stripe- och licensnycklarna. Det sjätte ska ge `429` **utan** Lagoms JSON (`"code":"for-manga"`) – då kom svaret från Netlify innan funktionen anropades, och funktionsloggen (Logs → Functions) visar bara fem anrop. Ger det sjätte `429` med `"for-manga"`, eller `400`/`503`, gäller inte Netlifys regel: kontrollera `config` i funktionen och kör testet ovan. Vänta 3 minuter innan du provar igen (gränsen gäller din IP-adress).
+
+Om din Netlify-plan har ett tak för antalet regler (Lagom har fem), eller inte godtar en regel, säger driftsättningen eller provet ovan till. Ta då först bort `rateLimit` ur `license-revocations`, sedan ur `verify-purchase` – adressen `path` ska stå kvar, och begränsningen i funktionernas minne gäller alltid. Lägg inga `[[redirects]]` för `/api/` i `netlify.toml`: de skulle peka på `/.netlify/functions/…`, som inte längre finns.
 
 ### 7. Webhook (rekommenderad)
 
@@ -483,7 +499,7 @@ Medvetna avvägningar för en app utan konton där all data stannar på enheten:
 - **Testköp och skarpa licenser måste ha olika nyckelpar.** Signerar servern med det skarpa nyckelparet medan `STRIPE_SECRET_KEY` är en testnyckel, blir köp med Stripes testkort (4242 …) giltiga licenser i den skarpa appen. Använd därför ett eget testnyckelpar för förhandsversioner och Stripes testläge, och skapa det skarpa paret först när du går live (se checklistan).
 - **Begränsningen av antal anrop** i funktionerna gäller per funktionsinstans och är ett enkelt skydd. Netlifys rate limiting (se [Anropsbegränsning](#anropsbegränsning)) ger ett hårdare.
 - **"Hämta min licensnyckel igen"** hittar köpet på e-postadressen så som den skrevs vid köpet (Stripe jämför exakt). Servern provar både som den skrivs och med små bokstäver; annars hjälper supporten till.
-- **Receptimporten** hämtar sidor åt appen. Den godtar bara publika https-adresser (inte interna nät), högst tre omdirigeringar, 5 sekunder och 2 MB, och svarar bara med sidans receptdata (JSON-LD).
+- **Receptimporten** hämtar sidor åt appen. Den godtar bara publika https-adresser (inte interna nät) och ansluter bara till de adresser som dess eget DNS-uppslag har kontrollerat – även efter omdirigeringar – så DNS-rebinding fungerar inte. Den följer högst tre omdirigeringar, väntar högst 5 sekunder, läser högst 2 MB (större sidor läses bara till gränsen) och svarar bara med sidans receptdata (JSON-LD, eller ett JSON-LD-block byggt av sidans mikrodata). Sidor som visar receptet först i webbläsaren (t.ex. Coop) går inte att läsa – där klistrar användaren in ingredienserna i appen.
 - **Ingen egen databas.** Köpen finns i Stripe och licensnycklarna i betalningarnas metadata.
 
 ---
@@ -551,10 +567,10 @@ Kropp: `{ "url": "https://…" }`. Används av receptimporten i appen.
 
 | Status | Kod | När |
 | --- | --- | --- |
-| 200 | – | `{ "html": "<script type=\"application/ld+json\">…</script>" }` – bara sidans receptdata |
-| 400 | `ogiltig` | Inte https, fel port, inloggningsuppgifter i adressen eller en intern adress |
-| 422 | `inget-recept` | Sidan saknar recept (eller är ingen HTML-sida) |
-| 502 | `hamtning` | Sidan kunde inte hämtas: fel, för stor (över 2 MB), för långsam (över 5 s) eller för många omdirigeringar |
+| 200 | – | `{ "html": "<script type=\"application/ld+json\">…</script>" }` – bara sidans receptdata (JSON-LD, eller ett block byggt av sidans mikrodata) |
+| 400 | `ogiltig` | Inte https, fel port, inloggningsuppgifter i adressen eller en intern adress – även efter en omdirigering eller ett nytt DNS-svar |
+| 422 | `inget-recept` | Sidan saknar recept (eller är ingen HTML-sida). Stora sidor läses bara till 2 MB. |
+| 502 | `hamtning` | Sidan kunde inte hämtas: fel, ogiltigt certifikat, okänd packning, för långsam (över 5 s) eller för många omdirigeringar |
 | 429 | `for-manga` | Högst 10 per minut och IP-adress |
 
 ### `POST /api/stripe-webhook`

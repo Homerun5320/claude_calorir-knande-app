@@ -146,18 +146,22 @@ export interface WeekDay {
   budget: number
 }
 
-/** Energiintag och budget per dag för de angivna datumen. */
+/**
+ * Energiintag och budget per dag för de angivna datumen. `targetKcal` är dagsmålet – eller, med
+ * veckobudget, en funktion som ger dagsmålet för varje datum (`kcalForDate`).
+ */
 export function weekSeries(
   dates: readonly ISODate[],
   entriesByDate: Record<ISODate, readonly DiaryEntry[] | undefined>,
   exerciseByDate: Record<ISODate, readonly ExerciseEntry[] | undefined>,
-  targetKcal: number,
+  targetKcal: number | ((date: ISODate) => number),
   addBackPct: number,
 ): WeekDay[] {
   return dates.map((date) => {
     const list = entriesByDate[date]
     const kcal = list && list.length > 0 ? (totals(list).kcal ?? 0) : undefined
-    return { date, kcal, budget: dailyBudget(targetKcal, exerciseByDate[date], addBackPct) }
+    const target = typeof targetKcal === 'function' ? targetKcal(date) : targetKcal
+    return { date, kcal, budget: dailyBudget(target, exerciseByDate[date], addBackPct) }
   })
 }
 
@@ -183,6 +187,8 @@ export function weekChartSummary(
   todayComplete: boolean,
   targetKcal: number,
   unit: 'kcal' | 'kJ' = 'kcal',
+  /** Med veckobudget är målet ett snitt – dagarna har olika mål. */
+  weekly = false,
 ): string {
   const title = 'Energi per dag de senaste sju dagarna'
   const logged = series.filter((d): d is WeekDay & { kcal: number } => d.kcal !== undefined)
@@ -197,7 +203,7 @@ export function weekChartSummary(
   }
   const top = logged.reduce((a, b) => (b.kcal > a.kcal ? b : a))
   parts.push(`Högst ${e(top.kcal)} (${top.date === today ? 'idag' : formatDayShort(top.date)}).`)
-  parts.push(`Mål ${e(targetKcal)}.`)
+  parts.push(weekly ? `Mål i snitt ${e(targetKcal)} per dag, fördelat med veckobudgeten.` : `Mål ${e(targetKcal)}.`)
   return parts.join(' ')
 }
 

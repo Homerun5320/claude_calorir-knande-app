@@ -1,18 +1,53 @@
 /**
- * Inställningar → Mål och makron: hur dagsmålet räknas fram, adaptiv förbrukning,
- * makrofördelning (förinställningar eller egen), egna mål som skriver över de beräknade,
- * veckans fokus (ett litet mål byggt på kostråden) och kosttillskott med en daglig bock på Idag.
+ * Inställningar → Mål och makron: hur dagsmålet räknas fram, adaptiv förbrukning, veckobudget
+ * (samma energi över veckan, fördelad t.ex. för fredagsmys), makrofördelning (förinställningar
+ * eller egen), egna mål som skriver över de beräknade, veckans fokus (ett litet mål byggt på
+ * kostråden) och kosttillskott med en daglig bock på Idag.
  */
 import { useMemo, useState } from 'react'
-import { Activity, EyeOff, Pill, Plus, RotateCcw, SlidersHorizontal, Sprout, Trash2 } from 'lucide-react'
-import { Badge, Button, Card, Chip, EmptyState, IconButton, NumberField, Select, Sheet, Slider, Switch, toast } from '../../../components/ui'
+import { Activity, CalendarRange, EyeOff, Pill, Plus, RotateCcw, SlidersHorizontal, Sprout, Trash2 } from 'lucide-react'
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  IconButton,
+  NumberField,
+  SegmentedControl,
+  Select,
+  Sheet,
+  Slider,
+  StepButton,
+  Stepper,
+  Switch,
+  cx,
+  toast,
+} from '../../../components/ui'
 import { useEnergyUnit } from '../../../components/domain/EnergyValue'
 import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
-import { addDays } from '../../../lib/dates'
+import { WEEKDAYS, addDays, capitalize, weekdayIndex } from '../../../lib/dates'
 import { totals } from '../../../lib/diary'
-import { MACRO_PRESETS, macroPercents, type EnergyBreakdown } from '../../../lib/energy'
+import { MACRO_PRESETS, kcalFloorReasonText, macroPercents, weeklyBudgetBlockReasonFor, type EnergyBreakdown } from '../../../lib/energy'
 import { formatEnergy, formatNumber, parseSwedishNumber } from '../../../lib/format'
+import {
+  DEFAULT_EXTRA,
+  SHIFT_STEP,
+  WEEKLY_PRESETS,
+  WEEKLY_PRESET_IDS,
+  ZERO_SHIFT,
+  adjustDay,
+  canAdjustDay,
+  detectPreset,
+  maxPresetExtra,
+  minShiftFor,
+  normalizeShift,
+  presetShift,
+  weeklyPlan,
+  type FixedPresetId,
+  type WeeklyPresetId,
+} from '../../../lib/weeklyBudget'
 import { KJ_PER_KCAL, NUTRIENTS, type NutrientKey } from '../../../lib/nutrients'
 import { FOCUS_GOALS, focusGoal, focusSince } from '../../../lib/focusGoals'
 import {
@@ -32,7 +67,7 @@ import { useBodyStore } from '../../../stores/bodyStore'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { useFoodStore } from '../../../stores/foodStore'
 import { useProfileStore } from '../../../stores/profileStore'
-import type { MacroPreset, Profile, Targets } from '../../../types'
+import type { ISODate, MacroPreset, Profile, Targets, WeeklyBudgetSettings } from '../../../types'
 import { requireAccess } from '../../premium/requireAccess'
 import { Note } from '../../onboarding/AboutFields'
 import { ChoiceCard, ChoiceGroup } from '../../onboarding/ChoiceCard'
@@ -67,7 +102,8 @@ export function GoalsSection() {
   const profile = useProfileStore((s) => s.profile)
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const today = useToday()
-  const { targets, energy, weightKg } = useTargets(today)
+  // Basmålen: dagsmålet utan veckobudget (veckans snittdag).
+  const { baseTargets: targets, energy, weightKg, weeklyPlan: plan } = useTargets(today)
 
   if (!profile || !energy || weightKg === null) {
     return (
@@ -88,9 +124,14 @@ export function GoalsSection() {
         </Note>
       )}
       <Card eyebrow="Energi" title="Så räknas ditt dagsmål">
-        <TargetsSummary energy={energy} targets={targets} />
+        <TargetsSummary
+          energy={energy}
+          targets={targets}
+          extraNotes={plan ? ['Med veckobudgeten varierar dagsmålet mellan veckodagarna – veckans summa är densamma. Se Veckobudget nedan.'] : []}
+        />
       </Card>
       <AdaptiveCard />
+      <WeeklyBudgetCard profile={profile} energy={energy} baseKcal={targets.kcal} mindful={mindful} />
       <MacroCard profile={profile} kcal={targets.kcal} />
       <OverridesCard profile={profile} weightKg={weightKg} energy={energy} targets={targets} />
       <WeeklyFocusCard />
@@ -355,6 +396,249 @@ function AdaptiveCard() {
         </div>
       )}
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Veckobudget
+// ---------------------------------------------------------------------------
+
+/** "+300 kcal", "−120 kcal" – förskjutningen med tecken (typografiskt minus). */
+function signedEnergy(kcal: number, unit: 'kcal' | 'kJ'): string {
+  if (kcal === 0) return 'Som vanligt'
+  return `${kcal > 0 ? '+' : '−'}${formatEnergy(Math.abs(kcal), unit)}`
+}
+
+/**
+ * Veckobudget: samma energi över veckan, fördelad så som livet ser ut. Förvalen och "Egen" kan
+ * aldrig ge en dag under golvet (`kcalOverrideFloor`), och vid graviditet, amning och under 18 år
+ * används ingen veckobudget alls – det förklaras vänligt i stället.
+ *
+ * Medvetet läge: inga siffror – bara reglaget och förvalen (Fredagsmys och Helg med den extra som
+ * redan är vald). Tabellen, stegen och summorna visas när medvetet läge är av.
+ */
+function WeeklyBudgetCard({ profile, energy, baseKcal, mindful }: { profile: Profile; energy: EnergyBreakdown; baseKcal: number; mindful: boolean }) {
+  const today = useToday()
+  const unit = useEnergyUnit()
+  const setting = useProfileStore((s) => s.settings.weeklyBudget)
+  const updateSettings = useProfileStore((s) => s.updateSettings)
+  const blocked = weeklyBudgetBlockReasonFor(profile, today)
+  const floor = kcalOverrideFloor(profile, energy, today)
+  const minShift = minShiftFor(baseKcal, floor.kcal)
+  const saved = setting?.shift
+  const shift = useMemo(() => normalizeShift(saved), [saved])
+  const plan = useMemo(() => weeklyPlan(baseKcal, floor.kcal, shift), [baseKcal, floor.kcal, shift])
+  const detected = useMemo(() => detectPreset(shift), [shift])
+  // Förvalet sparas inte – det läses ut ur fördelningen. "Egen" gäller tills man väljer ett förval.
+  const [chosen, setChosen] = useState<WeeklyPresetId | null>(null)
+  const preset: WeeklyPresetId = chosen ?? detected.id
+  const enabled = setting?.enabled === true
+  const todayIndex = weekdayIndex(today)
+  const noRoom = minShift === 0
+
+  // `since`: dagen veckobudgeten slogs på – dagar före den behåller det jämna dagsmålet (lib/weeklyBudget).
+  const write = (next: number[], on: boolean, since: ISODate | undefined) => {
+    const value: WeeklyBudgetSettings = { enabled: on, shift: next }
+    if (since) value.since = since
+    updateSettings({ weeklyBudget: value })
+  }
+  /** En ny fördelning medan veckobudgeten är på – den gäller från dagen den slogs på. */
+  const save = (next: number[]) => write(next, true, setting?.since ?? today)
+
+  const toggle = (on: boolean) => {
+    if (!on) {
+      write(shift, false, setting?.since)
+      return
+    }
+    // Börja från den sparade fördelningen (anpassad till golvet) – annars Fredagsmys. Gäller från idag.
+    const current = normalizeShift(saved, minShift)
+    const keep = current.some((v) => v !== 0)
+    setChosen(keep ? null : 'fredagsmys')
+    write(keep ? current : presetShift('fredagsmys', DEFAULT_EXTRA, minShift), true, today)
+  }
+
+  const choosePreset = (id: WeeklyPresetId) => {
+    setChosen(id)
+    if (id === 'egen') return
+    const extra = detected.id !== 'egen' && detected.extra > 0 ? detected.extra : DEFAULT_EXTRA
+    save(presetShift(id, extra, minShift))
+  }
+
+  const extra = preset !== 'egen' && detected.id === preset ? detected.extra : 0
+  const maxExtra = preset !== 'egen' ? maxPresetExtra(preset as FixedPresetId, minShift) : 0
+
+  if (blocked) {
+    return (
+      <Card eyebrow="Veckan" title="Veckobudget" action={<CalendarRange aria-hidden className="size-5 text-ink-3" />}>
+        <Switch label="Veckobudget" description="Inte tillgängligt just nu – dagsmålet är detsamma alla dagar." checked={false} disabled />
+        <p className="mt-3 rounded-2xl bg-surface-2 p-3.5 text-[0.875rem] leading-relaxed text-ink-2">{blocked}</p>
+      </Card>
+    )
+  }
+
+  return (
+    <Card eyebrow="Veckan" title="Veckobudget" action={<CalendarRange aria-hidden className="size-5 text-gran" />}>
+      <p className="-mt-1 mb-3 text-[0.875rem] leading-relaxed text-ink-2">
+        Samma energi över veckan – bara fördelad så som ditt liv ser ut. Lite mer till fredagsmyset eller helgen, lite mindre de andra dagarna.
+      </p>
+      <Switch
+        label="Veckobudget"
+        description="Flytta energi mellan veckans dagar. Protein och fibrer är desamma varje dag."
+        checked={enabled}
+        onChange={toggle}
+      />
+      {enabled && (
+        <div className="mt-4 flex flex-col gap-4">
+          <SegmentedControl<WeeklyPresetId>
+            aria-label="Fördelning"
+            fullWidth
+            value={preset}
+            onChange={choosePreset}
+            options={WEEKLY_PRESET_IDS.map((id) => ({ value: id, label: WEEKLY_PRESETS[id].label }))}
+          />
+          {mindful ? (
+            <p className="-mt-2 rounded-2xl bg-surface-2 p-3.5 text-[0.875rem] leading-relaxed text-ink-2">
+              {preset === 'egen'
+                ? 'Din egen fördelning gäller som du har valt den. Siffrorna vilar i medvetet läge – stäng av det under Utseende om du vill ändra dagarna.'
+                : `${WEEKLY_PRESETS[preset].description} Siffrorna vilar i medvetet läge – dagsmålet fördelas som du har valt, utan att du behöver tänka på det.`}
+            </p>
+          ) : (
+            <>
+              <p className="-mt-2 text-[0.8125rem] leading-relaxed text-ink-3">{WEEKLY_PRESETS[preset].description}</p>
+
+              {noRoom && (
+                <Note>
+                  Just nu finns inget utrymme att flytta energi från de andra dagarna: ditt dagsmål ligger redan på det lägsta Lagom rekommenderar
+                  för dig ({formatEnergy(floor.kcal, unit)}) – {kcalFloorReasonText(floor.reason)}
+                </Note>
+              )}
+
+              {preset !== 'egen' && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-[0.9375rem] font-medium text-ink">Extra per dag</span>
+                  <Stepper
+                    label="Extra per dag"
+                    value={Math.min(extra, maxExtra)}
+                    onChange={(v) => {
+                      // Håll kvar förvalet även när extra blir 0 (då ser fördelningen ut som en jämn vecka).
+                      setChosen(preset)
+                      save(presetShift(preset as FixedPresetId, v, minShift))
+                    }}
+                    min={0}
+                    max={maxExtra}
+                    step={SHIFT_STEP}
+                    format={(v) => `+${formatEnergy(v, unit)}`}
+                    disabled={maxExtra === 0}
+                    size="sm"
+                  />
+                </div>
+              )}
+
+              <WeekTable
+                plan={plan}
+                unit={unit}
+                todayIndex={todayIndex}
+                editable={preset === 'egen'}
+                canStep={(i, dir) => canAdjustDay(shift, i, dir * SHIFT_STEP, minShift)}
+                onStep={(i, dir) => save(adjustDay(shift, i, dir * SHIFT_STEP, minShift))}
+              />
+
+              <p className="text-[0.875rem] leading-relaxed text-ink-2">
+                Veckans summa: <strong className="font-semibold text-ink tabular-nums">{formatEnergy(plan.weekKcal, unit)}</strong>
+                {plan.clamped ? ' – lite mer än med ett jämnt dagsmål, eftersom ingen dag går under golvet.' : ` – samma som sju dagar à ${formatEnergy(baseKcal, unit)}.`}
+              </p>
+
+              {plan.clamped && (
+                <Note>
+                  Fördelningen gjordes när ditt dagsmål var ett annat. Ingen dag går under {formatEnergy(floor.kcal, unit)}, så de lättare dagarna har höjts
+                  en aning.
+                  <div className="mt-2">
+                    <Button size="sm" variant="soft" onClick={() => save(normalizeShift(shift, minShift))}>
+                      Anpassa fördelningen
+                    </Button>
+                  </div>
+                </Note>
+              )}
+
+              {preset === 'egen' && shift.some((v) => v !== 0) && (
+                <div>
+                  <Button size="sm" variant="ghost" iconLeft={RotateCcw} onClick={() => save([...ZERO_SHIFT])}>
+                    Jämn vecka
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-[0.8125rem] leading-relaxed text-ink-3">
+                Ingen dag går under {formatEnergy(floor.kcal, unit)} – {kcalFloorReasonText(floor.reason)} Träning läggs till som vanligt på den dag du
+                tränar. Det jämnar ut sig över veckan – och en dag över är helt okej.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function WeekTable({
+  plan,
+  unit,
+  todayIndex,
+  editable,
+  canStep,
+  onStep,
+}: {
+  plan: ReturnType<typeof weeklyPlan>
+  unit: 'kcal' | 'kJ'
+  todayIndex: number
+  editable: boolean
+  canStep: (index: number, dir: 1 | -1) => boolean
+  onStep: (index: number, dir: 1 | -1) => void
+}) {
+  return (
+    <table className="w-full border-collapse text-left text-[0.875rem]">
+      <caption className="sr-only">Dagsmål per veckodag med veckobudgeten</caption>
+      <thead>
+        <tr className="text-[0.75rem] text-ink-3">
+          <th scope="col" className="pb-1.5 font-medium">
+            Dag
+          </th>
+          <th scope="col" className={cx('pb-1.5 font-medium', editable ? 'text-center' : 'text-right')}>
+            Ändring
+          </th>
+          <th scope="col" className="pb-1.5 text-right font-medium">
+            Dagsmål
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {WEEKDAYS.map((name, i) => {
+          const s = plan.applied[i]
+          const isToday = i === todayIndex
+          const day = capitalize(name)
+          return (
+            <tr key={name} className={cx('border-t border-line/70', isToday && 'bg-gran-soft/60')}>
+              <th scope="row" className={cx('py-1.5 pl-1 font-medium', isToday ? 'text-gran' : 'text-ink')}>
+                {day}
+                {isToday && <span className="sr-only"> (idag)</span>}
+              </th>
+              <td className={cx('py-1 tabular-nums', editable ? 'text-center' : 'text-right', s === 0 ? 'text-ink-3' : 'text-ink-2')}>
+                {editable ? (
+                  <span className="inline-flex items-center gap-1">
+                    <StepButton direction={-1} size="sm" variant="plain" label={`Mindre energi på ${name}`} disabled={!canStep(i, -1)} onStep={() => onStep(i, -1)} />
+                    <span className="min-w-[4.75rem] text-center">{signedEnergy(s, unit)}</span>
+                    <StepButton direction={1} size="sm" variant="plain" label={`Mer energi på ${name}`} disabled={!canStep(i, 1)} onStep={() => onStep(i, 1)} />
+                  </span>
+                ) : (
+                  signedEnergy(s, unit)
+                )}
+              </td>
+              <td className="py-1.5 pr-1 text-right font-semibold tabular-nums text-ink">{formatEnergy(plan.dayKcal[i], unit)}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 

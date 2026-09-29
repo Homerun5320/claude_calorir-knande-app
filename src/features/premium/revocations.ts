@@ -16,9 +16,12 @@
  *
  * Licensen känns igen på köp-id:ts hash (`purchaseIdHash`, listans format v2), på köp-id:t i
  * klartext (äldre listor, v1) eller på nyckelns hash (`licenseKeyHash`).
+ *
+ * I App Store-bygget räknas licensnycklar aldrig (bara köp i appen) – där hämtas listan inte, och
+ * hämtningen följer inte med i paketet (`KEY_ENTRY`, se KEY_ENTRY_BUILD i src/config/platform.ts).
  */
 import { API_BASE, COMMERCE_MODE, LICENSE_PUBLIC_KEYS } from '../../config/commerce'
-import { IS_STORE_BUILD } from '../../config/platform'
+import { IS_STORE_BUILD, KEY_ENTRY_BUILD } from '../../config/platform'
 import {
   REVOCATION_PREFIX,
   base64UrlEncode,
@@ -30,6 +33,12 @@ import {
   verifyRevocationList,
   type LicensePayload,
 } from '../../lib/license'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/** Licensnycklar räknas i bygget (webben och Google Play, inte App Store) – en konstant i samma modul. */
+const KEY_ENTRY: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : KEY_ENTRY_BUILD
 
 /** Nyckeln i localStorage där den senaste verifierade listan sparas. */
 export const REVOCATION_STORAGE_KEY = 'lagom-sparrlista'
@@ -219,7 +228,7 @@ function isOffline(): boolean {
  * `force`, t.ex. vid aktivering). Returnerar true om en ny lista sparades. Kastar aldrig.
  */
 export function refreshRevocations(opts: { force?: boolean; now?: number } = {}): Promise<boolean> {
-  if (!revocationChecksEnabled() || isOffline()) return Promise.resolve(false)
+  if (!KEY_ENTRY || !revocationChecksEnabled() || isOffline()) return Promise.resolve(false)
   const now = opts.now ?? Date.now()
   if (!opts.force) {
     if (cache && now - cache.fetchedAt < DAY_MS) return Promise.resolve(false)

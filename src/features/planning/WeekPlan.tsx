@@ -32,7 +32,8 @@ export interface WeekPlanProps {
   weekStart: ISODate
   today: ISODate
   days: Array<{ date: ISODate; items: PlanItem[] }>
-  targets: Targets
+  /** Målen för ett datum (med veckobudgetens förskjutning för veckodagen). */
+  targetsFor: (date: ISODate) => Targets
   resolve: RecipeResolver
   entries: Record<ISODate, DiaryEntry[]>
   onAdd: (date: ISODate) => void
@@ -40,7 +41,7 @@ export interface WeekPlanProps {
   onLog: (item: PlanItem) => void
 }
 
-export function WeekPlan({ weekStart, today, days, targets, resolve, entries, onAdd, onEdit, onLog }: WeekPlanProps) {
+export function WeekPlan({ weekStart, today, days, targetsFor, resolve, entries, onAdd, onEdit, onLog }: WeekPlanProps) {
   const reduce = useReducedMotion()
   const count = days.reduce((n, d) => n + d.items.length, 0)
 
@@ -124,7 +125,7 @@ export function WeekPlan({ weekStart, today, days, targets, resolve, entries, on
               date={day.date}
               today={today}
               items={day.items}
-              targets={targets}
+              targets={targetsFor(day.date)}
               resolve={resolve}
               dayEntries={entries[day.date]}
               onAdd={onAdd}

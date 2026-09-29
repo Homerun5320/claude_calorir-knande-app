@@ -148,8 +148,9 @@ export async function readJsonObject(req: Request, maxBytes: number, headers: Re
 
 /**
  * Enkel begränsning per IP-adress och fönster. Den lever i funktionsinstansens minne och är därför
- * ett skydd mot enkel överbelastning, inte en exakt gräns (Netlify kan köra flera instanser).
- * Använd Netlifys inbyggda rate limiting för hårdare skydd (se docs/BETALNING.md).
+ * ett extra skydd mot enkel överbelastning, inte en exakt gräns (Netlify kan köra flera instanser).
+ * Den hårda gränsen är Netlifys rate limiting, som räknas i Netlifys nätverk innan funktionen
+ * anropas (`config.rateLimit` i netlify/functions/*.mts, se docs/BETALNING.md).
  */
 export class RateLimiter {
   readonly limit: number

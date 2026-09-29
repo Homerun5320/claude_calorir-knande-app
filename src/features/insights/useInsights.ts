@@ -5,12 +5,16 @@
  * Snitten räknas bara på förflutna dagar – och dagens (ofta ofullständiga) registrering bara när
  * dagen är markerad som klar (`withCountedDays`, samma regel som veckokortet på Idag). `period`
  * i datan är därför perioden med de dagar som räknas.
+ *
+ * Med veckobudget har varje veckodag sitt eget mål: dagarnas budget (`DayStat.budget`) räknas med
+ * `targetKcalFor`, medan `targets` är basmålet – veckans snittdag – för sammanfattningar.
  */
 import { useMemo } from 'react'
 import type { DayMeta, DiaryEntry, DietType, ExerciseEntry, ISODate, LifeStage, MealConfig, Sex, Targets } from '../../types'
 import { useTargets } from '../../hooks/useTargets'
 import { ageFromBirthYear } from '../../lib/dates'
 import { MIN_KCAL } from '../../lib/energy'
+import { averageKcalFor, kcalForDate, type WeeklyPlan } from '../../lib/weeklyBudget'
 import { periodAverages, referenceIntakes, type PeriodAverages, type ReferenceMap } from '../../lib/nnr'
 import type { PlateVariant } from '../../lib/plate'
 import { useDiaryStore } from '../../stores/diaryStore'
@@ -47,7 +51,17 @@ export interface InsightsData {
   avg: PeriodAverages
   /** Alla poster under de dagar som räknas. */
   entries: DiaryEntry[]
+  /** Dagsmålen utan veckobudget – veckans snittdag. */
   targets: Targets
+  /** Dagsmålets energi (kcal, utan träning) för ett datum – med veckobudgetens förskjutning. */
+  targetKcalFor: (date: ISODate) => number
+  /**
+   * Energimålet för sammanfattningar och linjen i diagrammen: dagsmålet, eller veckans snittmål med
+   * veckobudget (högre än basmålet om någon dag har höjts till golvet).
+   */
+  goalKcal: number
+  /** Veckobudgeten, eller null (då är målet detsamma alla dagar). */
+  weeklyPlan: WeeklyPlan | null
   refs: ReferenceMap
   refProfile: RefProfile
   mindful: boolean
@@ -72,7 +86,8 @@ export function useInsights(basePeriod: Period, today: ISODate): InsightsData {
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
   const unit = useProfileStore((s) => s.settings.energyUnit)
   const meals = useProfileStore((s) => s.settings.meals)
-  const { targets, weightKg, exerciseAddBack } = useTargets(today)
+  const { targets, weightKg, exerciseAddBack, weeklyPlan } = useTargets(today)
+  const targetKcalFor = useMemo(() => (d: ISODate) => kcalForDate(targets.kcal, weeklyPlan, d), [targets.kcal, weeklyPlan])
   // Samma regel som Idag och Dagbok: med adaptiv förbrukning läggs träningen inte till igen.
   const addBackPct = exerciseAddBack.pct
   const todayComplete = metaByDate[today]?.complete === true
@@ -84,8 +99,8 @@ export function useInsights(basePeriod: Period, today: ISODate): InsightsData {
   const countedEnd = period.elapsed.length > 0 ? period.elapsed[period.elapsed.length - 1] : period.start
 
   const chartDays = useMemo(
-    () => buildDayStats(period.dates, entriesByDate, exerciseByDate, targets.kcal, addBackPct),
-    [period.dates, entriesByDate, exerciseByDate, targets.kcal, addBackPct],
+    () => buildDayStats(period.dates, entriesByDate, exerciseByDate, targetKcalFor, addBackPct),
+    [period.dates, entriesByDate, exerciseByDate, targetKcalFor, addBackPct],
   )
   const days = useMemo(() => {
     const counted = new Set(period.elapsed)
@@ -143,6 +158,9 @@ export function useInsights(basePeriod: Period, today: ISODate): InsightsData {
     avg,
     entries,
     targets,
+    targetKcalFor,
+    goalKcal: averageKcalFor(targets.kcal, weeklyPlan),
+    weeklyPlan,
     refs,
     refProfile,
     mindful,

@@ -5,6 +5,11 @@
  * Stripe, kronpriser och webbens köpvillkor visas bara när `sellsOnWeb()`. I butiksapparna visas
  * i stället `StorePurchasePanel` (köp i appen, priset från butiken) och butiksvarianten av
  * villkoren; när webbförsäljningen är avstängd visas länkar till appbutikerna (`StoreLinksPanel`).
+ *
+ * Webbköpens delar (planerna med kronpriser, köparket, säljarraden, testläget, länkarna till
+ * appbutikerna och "Tappat nyckeln?") ritar ingenting i butiksbyggena och tas bort ur deras paket
+ * (`WEB_PURCHASES`), liksom aktiveringen av licensnycklar i App Store-bygget (`KEY_ENTRY`).
+ * Därför är de tunna omslag runt komponenter med hooks.
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -49,7 +54,7 @@ import {
   type Plan,
   type PlanId,
 } from '../../config/commerce'
-import { IS_STORE_BUILD, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
+import { IS_STORE_BUILD, KEY_ENTRY_BUILD, WEB_PURCHASES_BUILD, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
 import { formatNumber } from '../../lib/format'
 import { getStorePurchases, type StoreProduct, type StoreProductId } from '../../lib/storePurchases'
 import { haptic } from '../../native'
@@ -75,6 +80,15 @@ import {
 } from './premiumLogic'
 import { RestorePurchasesButton } from './RestorePurchasesButton'
 
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/** Webbköpen finns i bygget (bara webbygget) – en konstant i samma modul, se WEB_PURCHASES_BUILD. */
+const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
+
+/** Licensnycklar kan aktiveras i bygget (webben och Google Play, inte App Store) – se KEY_ENTRY_BUILD. */
+const KEY_ENTRY: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : KEY_ENTRY_BUILD
+
 /**
  * Etiketten på det framlyfta alternativet. Ärlig: med 349 kr/år och 699 kr för livstid blir
  * livstidslicensen billigare från det tredje året.
@@ -87,7 +101,7 @@ export const FEATURED_LABEL = 'Bäst värde'
 
 export function TestModeBanner({ className }: { className?: string }) {
   // Butiksappar verifierar alltid som i skarpt läge, och utan webbköp finns ingen köpknapp att testa.
-  if (COMMERCE_MODE !== 'test' || IS_STORE_BUILD || !sellsOnWeb()) return null
+  if (!WEB_PURCHASES || COMMERCE_MODE !== 'test' || IS_STORE_BUILD || !sellsOnWeb()) return null
   return (
     <div role="note" className={cx('flex items-start gap-3 rounded-2xl bg-hjortron-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink', className)}>
       <FlaskConical className="mt-0.5 size-5 shrink-0 text-hjortron" aria-hidden />
@@ -178,7 +192,14 @@ export function FeatureList() {
 // Planer
 // ---------------------------------------------------------------------------
 
-export function PlanCard({ plan, onChoose, cta }: { plan: Plan; onChoose: (plan: Plan) => void; cta?: string }) {
+type PlanCardProps = { plan: Plan; onChoose: (plan: Plan) => void; cta?: string }
+
+/** En plan med kronpris (webbköp). Ritar ingenting i butiksbyggena. */
+export function PlanCard(props: PlanCardProps) {
+  return WEB_PURCHASES ? <WebPlanCard {...props} /> : null
+}
+
+function WebPlanCard({ plan, onChoose, cta }: PlanCardProps) {
   const headingId = useId()
   const perMonth = perMonthText(plan)
   return (
@@ -340,8 +361,9 @@ const TEXT_LINK = 'inline-flex min-h-11 items-center gap-1.5 self-start text-[0.
  */
 export function TermsContent({ headingLevel = 3, inSheet = false }: { headingLevel?: 3 | 4; inSheet?: boolean }) {
   const H = headingLevel === 3 ? 'h3' : 'h4'
-  const web = sellsOnWeb()
-  const terms = web ? webTerms() : storeTerms()
+  const web = WEB_PURCHASES && sellsOnWeb()
+  // Konstanten står med i villkoren, så att webbens villkor (Stripe) tas bort ur butiksbyggena.
+  const terms = WEB_PURCHASES && web ? webTerms() : storeTerms()
   return (
     <div className="flex flex-col gap-4">
       {terms.map((t) => (
@@ -366,7 +388,7 @@ export function TermsContent({ headingLevel = 3, inSheet = false }: { headingLev
             Integritetspolicy
           </Link>
         )}
-        {web && TERMS_URL && (
+        {WEB_PURCHASES && web && TERMS_URL && (
           <ExternalLink href={TERMS_URL} showIcon={false} className={TEXT_LINK}>
             Hela köpvillkoren på webbplatsen
             <ExternalLinkIcon aria-hidden className="size-4" />
@@ -399,14 +421,7 @@ function SellerRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function CheckoutSheet({
-  plan,
-  open,
-  onClose,
-  onConfirm,
-  busy,
-  error,
-}: {
+interface CheckoutSheetProps {
   plan: Plan | null
   open: boolean
   onClose: () => void
@@ -414,7 +429,14 @@ export function CheckoutSheet({
   onConfirm: (plan: Plan) => void
   busy: boolean
   error: string | null
-}) {
+}
+
+/** Köparket för webbköp (Stripe). Ritar ingenting i butiksbyggena. */
+export function CheckoutSheet(props: CheckoutSheetProps) {
+  return WEB_PURCHASES ? <WebCheckoutSheet {...props} /> : null
+}
+
+function WebCheckoutSheet({ plan, open, onClose, onConfirm, busy, error }: CheckoutSheetProps) {
   const [consent, setConsent] = useState(false)
   const [consentError, setConsentError] = useState(false)
   const checkboxRef = useRef<HTMLInputElement>(null)
@@ -617,8 +639,17 @@ export function LicenseManage() {
   )
 }
 
-/** Klistra in en licensnyckel och aktivera den på enheten. */
-export function LicenseActivation({ onActivated, submitLabel = 'Aktivera licensen' }: { onActivated?: (result: Extract<ActivationResult, { ok: true }>) => void; submitLabel?: string }) {
+type LicenseActivationProps = { onActivated?: (result: Extract<ActivationResult, { ok: true }>) => void; submitLabel?: string }
+
+/**
+ * Klistra in en licensnyckel och aktivera den på enheten. Ritar ingenting i App Store-bygget, där
+ * licensnycklar inte kan aktiveras (`allowsLicenseKeyEntry()`).
+ */
+export function LicenseActivation(props: LicenseActivationProps) {
+  return KEY_ENTRY ? <KeyActivationForm {...props} /> : null
+}
+
+function KeyActivationForm({ onActivated, submitLabel = 'Aktivera licensen' }: LicenseActivationProps) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -669,6 +700,7 @@ export function LicenseActivation({ onActivated, submitLabel = 'Aktivera license
 
 /** Liten rad med säljare, support och moms – längst ned på köpsidan (bara när Lagom säljs på webben). */
 export function SellerFooter() {
+  if (!WEB_PURCHASES) return null
   return (
     <footer className="flex flex-col items-center gap-1 px-2 pt-2 text-center text-[0.8125rem] leading-relaxed text-ink-3">
       <span className="inline-flex items-start gap-1.5">
@@ -852,9 +884,14 @@ export function StorePurchasePanel({ headingId, planIds, note }: { headingId?: s
 
 /**
  * Webben när webbförsäljningen är avstängd (`VITE_WEB_SALES=off`): Lagom köps i appbutikerna.
- * En länk som saknas visas inte. Licensnycklar från tidigare webbköp fungerar som vanligt.
+ * En länk som saknas visas inte. Licensnycklar från tidigare webbköp fungerar som vanligt. Bara
+ * på webben – ritar ingenting i butiksbyggena.
  */
-export function StoreLinksPanel({ headingId }: { headingId?: string }) {
+export function StoreLinksPanel(props: { headingId?: string }) {
+  return WEB_PURCHASES ? <WebStoreLinksPanel {...props} /> : null
+}
+
+function WebStoreLinksPanel({ headingId }: { headingId?: string }) {
   const autoId = useId()
   const hid = headingId ?? autoId
   const links = [
@@ -904,9 +941,14 @@ export function StoreLinksPanel({ headingId }: { headingId?: string }) {
 
 /**
  * Hämta licensnyckeln från ett webbköp igen med e-post och kvittonummer. Visas bara där
- * webbköpen har gjorts (`offersLicenseRecovery()`), aldrig i butiksapparna.
+ * webbköpen har gjorts (`offersLicenseRecovery()`), aldrig i butiksapparna – där ritar den
+ * ingenting och följer inte med i paketet.
  */
 export function LicenseRecovery() {
+  return WEB_PURCHASES ? <WebLicenseRecovery /> : null
+}
+
+function WebLicenseRecovery() {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [receipt, setReceipt] = useState('')

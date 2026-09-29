@@ -56,6 +56,8 @@ const MODULES = {
   barcode: () => import('./barcode'),
   /** Apple Hälsa och Health Connect (Inställningar → Apple Hälsa/Health Connect). */
   health: () => import('./health'),
+  /** Framstegsbilder: filer i appens egen mapp (src/lib/progressPhotos.ts, /vikt/bilder). */
+  photos: () => import('./photos'),
 }
 
 export type NativeModuleName = keyof typeof MODULES

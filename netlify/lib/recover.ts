@@ -11,8 +11,8 @@
  * - fel e-post och fel nummer ger samma svar (404 'hittades-inte') och samma svarstid
  *   (`RECOVER_MIN_MS`), så att det inte går att ta reda på vilka e-postadresser som har köpt,
  * - högst 5 försök per IP-adress och 10 minuter, och högst 10 försök per e-postadress och timme
- *   (per funktionsinstans), och dessutom en gräns för hela webbplatsen i Netlify (`config` i
- *   netlify/functions/recover-license.mts, se docs/BETALNING.md),
+ *   (per funktionsinstans), och dessutom Netlifys gräns per IP-adress över alla instanser (`config`
+ *   i netlify/functions/recover-license.mts, se docs/BETALNING.md),
  * - återbetalda och bestridda köp ger ingen licens (410 'aterbetald').
  * E-postadressen loggas aldrig.
  */

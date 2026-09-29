@@ -8,7 +8,8 @@
  * - `PasteIngredientsSheet` – arket i receptredigeraren: textruta → kontroll → "Lägg till".
  *
  * Rader utan mängd ("smör till formen") eller utan träff markeras "Kontrollera" och läggs inte till
- * förrän de har en mängd – de hoppas över annars.
+ * förrän de har en mängd – de hoppas över annars. Rubriker ("Sås:") och instruktioner i en inklistrad
+ * text hoppas över redan vid tolkningen (`parseIngredientLines`).
  */
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { ArrowLeft, Check, ClipboardPaste, Repeat, Scale, Trash2, X } from 'lucide-react'
@@ -386,7 +387,7 @@ export function PasteIngredientsSheet({
           value={text}
           onValueChange={setText}
           placeholder={'3 dl vetemjöl\n2 ägg\n5 dl mjölk\n½ tsk salt\nsmör till stekning'}
-          hint="Mängder med dl, msk, tsk, krm, g och styck räknas om automatiskt. Rader utan mängd får du kontrollera."
+          hint="Mängder med dl, msk, tsk, krm, g och styck räknas om automatiskt. Rubriker och instruktioner hoppas över, och rader utan mängd får du kontrollera."
         />
       )}
     </Sheet>

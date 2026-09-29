@@ -186,6 +186,20 @@ describe('texter om data och lagring', () => {
   })
 })
 
+describe('framstegsbilder', () => {
+  it('säger att bilderna inte ingår i säkerhetskopian men raderas med all data – bara när de är på', () => {
+    const { unmount } = renderSection()
+    expect(screen.queryByText(/Framstegsbilder ingår inte/)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Tar bort allt från den här enheten\./)).toBeInTheDocument()
+    unmount()
+
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, progressPhotos: true } }))
+    renderSection()
+    expect(screen.getByText('Framstegsbilder ingår inte – de finns bara i den här webbläsaren.')).toBeInTheDocument()
+    expect(screen.getByText(/^Tar bort allt från den här enheten, även framstegsbilderna\./)).toBeInTheDocument()
+  })
+})
+
 describe('byta telefon eller flytta till appen', () => {
   it('förklarar flytten med säkerhetskopia', () => {
     renderSection()

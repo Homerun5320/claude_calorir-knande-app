@@ -23,6 +23,7 @@ import {
   searchProducts,
   type OffProduct,
 } from './openFoodFacts'
+import type { FoodExtraWithAllergens } from './allergens'
 
 // ---------------------------------------------------------------------------
 // Fixturer (förkortade svar i samma form som api/v2/product/{code}.json)
@@ -311,6 +312,8 @@ describe('mapOffProduct', () => {
       nova: 1,
       ingredientsText: 'Mellanmjölk, vitamin A, vitamin D.',
       allergens: ['mjölk'],
+      allergenKeys: ['mjolk'],
+      traceKeys: [],
       quantity: '1 l',
       origin: 'Sverige',
       labels: ['Nyckelhålet', 'Svenskt Sigill', 'Glutenfri'],
@@ -340,6 +343,7 @@ describe('mapOffProduct', () => {
     expect(food.extra?.nova).toBe(4)
     expect(food.extra?.ingredientsText).toBe('Sugar, cocoa butter, milk powder …')
     expect(food.extra?.labels).toEqual(['Fairtrade', 'Rainforest Alliance'])
+    expect((food.extra as FoodExtraWithAllergens).allergenKeys).toEqual(['gluten', 'soja', 'mjolk', 'notter'])
     // Salt ↔ natrium kompletteras.
     expect(food.nutrients.sodium).toBeCloseTo(100, 6)
   })
@@ -352,6 +356,36 @@ describe('mapOffProduct', () => {
     expect(food.nutrients.vitD).toBeCloseTo(1.1, 6)
     // Ingen portion angiven och 1 l är för stort som förval.
     expect(food.portions).toEqual([])
+  })
+
+  it('sparar allergenerna som nycklar och "kan innehålla spår av" utan det som redan ingår', () => {
+    const food = mapOffProduct({ ...CHOCOLATE, traces_tags: ['en:peanuts', 'en:sesame-seeds', 'en:milk', 'en:okand'] })!
+    const extra = food.extra as FoodExtraWithAllergens
+    expect(extra.allergens).toEqual(['gluten', 'mjölk', 'nötter', 'soja'])
+    expect(extra.allergenKeys).toEqual(['gluten', 'soja', 'mjolk', 'notter'])
+    expect(extra.traceKeys).toEqual(['jordnotter', 'sesam'])
+    // Utan allergener och spår sparas tomma listor – då vet Lagom att spåren har lästs in.
+    const oat = mapOffProduct(OAT)!.extra as FoodExtraWithAllergens
+    expect(oat.allergenKeys).toEqual([])
+    expect(oat.traceKeys).toEqual([])
+    const beer = mapOffProduct({ ...BEER, allergens_tags: [], traces_tags: [] })!
+    expect(beer.extra).toEqual({ quantity: '50 cl', allergenKeys: [], traceKeys: [] })
+  })
+
+  it('märker produkter med allergentaggar som Lagom inte kan tolka', () => {
+    const tagged = (allergens: string[], traces: string[] = []) => (mapOffProduct({ ...BEER, allergens_tags: allergens, traces_tags: traces })!.extra as FoodExtraWithAllergens).unreadAllergenTags
+    expect(tagged(['fi:maito'])).toBe(true)
+    expect(tagged(['en:milk'], ['de:schalenfruechte'])).toBe(true)
+    // Kanoniska taggar utanför EU:s lista och kända svenska ord är inte okända.
+    expect(tagged(['en:kiwi', 'en:none', 'sv:havre'])).toBeUndefined()
+  })
+
+  it('tolkar okända svenska allergentaggar när ordet är känt', () => {
+    const food = mapOffProduct({ ...BEER, allergens_tags: ['sv:havre', 'en:none'], traces_tags: ['sv:mandel'] })!
+    const extra = food.extra as FoodExtraWithAllergens
+    expect(extra.allergens).toEqual(['havre'])
+    expect(extra.allergenKeys).toEqual(['gluten'])
+    expect(extra.traceKeys).toEqual(['notter'])
   })
 
   it('returnerar produkter utan näringsvärden så att användaren kan komplettera', () => {
@@ -372,6 +406,8 @@ describe('fetchProductByBarcode', () => {
     expect(url).toMatch(/^https:\/\/world\.openfoodfacts\.org\/api\/v2\/product\/7310865004703\.json\?fields=/)
     expect(url).toContain('product_name_sv')
     expect(url).toContain('nutriments')
+    expect(url).toContain('allergens_tags')
+    expect(url).toContain('traces_tags')
   })
 
   it('returnerar null när produkten saknas (404 eller status 0)', async () => {

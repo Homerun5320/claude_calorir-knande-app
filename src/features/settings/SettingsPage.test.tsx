@@ -83,6 +83,26 @@ describe('SettingsPage – index', () => {
     expect(screen.getByRole('link', { name: /Mål och makron/ })).toHaveAttribute('href', '/installningar/mal')
   })
 
+  it('har en rad för allergier och säger till när veckobudgeten är på', async () => {
+    const { unmount } = renderAt('/installningar')
+    const allergies = screen.getByRole('link', { name: /Allergier och överkänslighet/ })
+    expect(allergies).toHaveAttribute('href', '/installningar/allergier')
+    expect(within(allergies).getByText('Inga valda')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Mål och makron/ }).textContent).not.toMatch(/veckobudget/)
+    unmount()
+
+    useProfileStore.setState((s) => ({
+      settings: { ...s.settings, allergens: ['mjolk', 'notter'], weeklyBudget: { enabled: true, shift: [-50, -50, -50, -50, 300, -50, -50] } },
+    }))
+    const again = renderAt('/installningar')
+    expect(within(screen.getByRole('link', { name: /Allergier och överkänslighet/ })).getByText('Mjölk och nötter')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Mål och makron/ }).textContent).toMatch(/per dag i snitt · veckobudget/)
+    again.unmount()
+
+    renderAt('/installningar/allergier')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Allergier och överkänslighet' })).toBeInTheDocument()
+  })
+
   it('öppnar Stöd & hjälp med länkar till 1177 och Frisk & Fri', async () => {
     renderAt('/installningar')
     fireEvent.click(screen.getByRole('button', { name: /Stöd & hjälp/ }))

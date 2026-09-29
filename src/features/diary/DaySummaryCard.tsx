@@ -1,11 +1,12 @@
 /**
  * Dagens summering överst i dagboken: ätit / budget / kvar, en lugn stapel, makron,
  * träning och vatten i miniformat samt märken för "Planerat" och "Dagen markerad som klar".
+ * Med veckobudget visas dagens förskjutning som en diskret rad ("Fredagsmys: +300 kcal i dagens budget").
  *
  * Medvetet läge: inga siffror – ett varmt ord, dagens tallrik och makrostaplar utan tal.
  */
 import { memo, useMemo, type ReactNode } from 'react'
-import { CalendarClock, CircleCheck, Droplet, Dumbbell } from 'lucide-react'
+import { CalendarClock, CalendarRange, CircleCheck, Droplet, Dumbbell } from 'lucide-react'
 import { Badge, ProgressBar, cx } from '../../components/ui'
 import { EnergyValue, MacroBars, formatLiters } from '../../components/domain'
 import { PlateModel } from '../../components/signature'
@@ -23,6 +24,8 @@ export interface DaySummaryCardProps {
   targets: Targets
   /** Dagens budget: mål + den andel av träningen som läggs tillbaka. */
   budget: number
+  /** Diskret rad om veckobudgeten den här dagen (`weeklyDayNote`), eller null. Aldrig i medvetet läge. */
+  weeklyNote?: string | null
   mindful: boolean
   energyUnit: 'kcal' | 'kJ'
   showFiber: boolean
@@ -39,6 +42,7 @@ export const DaySummaryCard = memo(function DaySummaryCard({
   waterMl,
   targets,
   budget,
+  weeklyNote,
   mindful,
   energyUnit,
   showFiber,
@@ -95,6 +99,12 @@ export const DaySummaryCard = memo(function DaySummaryCard({
           <p className="mt-2.5 text-sm leading-snug text-ink-2" aria-live="polite">
             {balanceNote(balance.status, kind)}
           </p>
+          {weeklyNote && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-[0.8125rem] leading-snug text-ink-3">
+              <CalendarRange className="mt-0.5 size-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+              <span>{weeklyNote}</span>
+            </p>
+          )}
         </>
       )}
 

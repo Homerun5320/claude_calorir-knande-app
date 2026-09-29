@@ -59,15 +59,30 @@ export async function clearNativeCopies(opts: { keepMirror?: boolean } = {}): Pr
 }
 
 /**
+ * Framstegsbilderna: webbens databas `lagom-bilder` och filerna i apparna (med Android-kamerans
+ * tillfälliga original). De ligger utanför `STORE_KEYS` och raderas därför här. Laddas med dynamisk
+ * import så att bildkoden inte följer med i huvudpaketet. Kastar aldrig.
+ */
+export async function deleteProgressPhotos(): Promise<void> {
+  try {
+    const { deleteAllProgressPhotos } = await import('../../lib/progressPhotos')
+    await deleteAllProgressPhotos()
+  } catch (error) {
+    logError(error, 'radera: framstegsbilder')
+  }
+}
+
+/**
  * Radera all data och gör appen redo för en ny profil. Provperiodens start finns kvar, och
  * licensen behålls om inte `removeLicense` anges. Är Lagom Moln påslaget loggas man också ut på
- * den här enheten (se `signOutOfCloud`). I apparna tas också kopian på telefonen, exportfilerna och
- * hälsokopplingen bort (se `clearNativeCopies`) – kopian dock inte när det bara var exempeldata
- * som raderades.
+ * den här enheten (se `signOutOfCloud`). Framstegsbilderna raderas (se `deleteProgressPhotos`), och
+ * i apparna tas också kopian på telefonen, exportfilerna och hälsokopplingen bort (se
+ * `clearNativeCopies`) – kopian och bilderna dock inte när det bara var exempeldata som raderades:
+ * exempeldata speglas aldrig och kan inte ha bilder, så det som finns är användarens eget.
  */
 export function wipeAndReset(opts: { removeLicense?: boolean } = {}): Promise<void> {
   const demo = isDemoData()
   wipeAllData(opts)
   resetAfterWipe()
-  return Promise.all([signOutOfCloud(), clearNativeCopies({ keepMirror: demo })]).then(() => undefined)
+  return Promise.all([signOutOfCloud(), clearNativeCopies({ keepMirror: demo }), demo ? undefined : deleteProgressPhotos()]).then(() => undefined)
 }

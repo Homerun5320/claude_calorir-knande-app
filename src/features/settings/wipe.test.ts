@@ -32,3 +32,41 @@ describe('wipeAndReset och Lagom Moln', () => {
     expect(signOut).not.toHaveBeenCalled()
   })
 })
+
+describe('wipeAndReset och framstegsbilderna', () => {
+  const deleteAllProgressPhotos = vi.fn(async () => true)
+
+  afterEach(() => {
+    vi.doUnmock('../../lib/progressPhotos')
+    deleteAllProgressPhotos.mockClear()
+  })
+
+  it('raderar framstegsbilderna, som ligger utanför STORE_KEYS', async () => {
+    vi.resetModules()
+    vi.doMock('../../lib/progressPhotos', () => ({ deleteAllProgressPhotos }))
+    const { wipeAndReset } = await import('./wipe')
+    await wipeAndReset()
+    expect(deleteAllProgressPhotos).toHaveBeenCalledTimes(1)
+  })
+
+  it('låter bilderna ligga kvar när det bara var exempeldata som raderades', async () => {
+    vi.resetModules()
+    vi.doMock('../../lib/progressPhotos', () => ({ deleteAllProgressPhotos }))
+    const { setDemoFlag } = await import('../../lib/demoFlag')
+    setDemoFlag()
+    const { wipeAndReset } = await import('./wipe')
+    await wipeAndReset()
+    expect(deleteAllProgressPhotos).not.toHaveBeenCalled()
+  })
+
+  it('kastar aldrig, även om bilderna inte går att radera', async () => {
+    vi.resetModules()
+    vi.doMock('../../lib/progressPhotos', () => ({
+      deleteAllProgressPhotos: async () => {
+        throw new Error('trasig databas')
+      },
+    }))
+    const { wipeAndReset } = await import('./wipe')
+    await expect(wipeAndReset()).resolves.toBeUndefined()
+  })
+})

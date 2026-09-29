@@ -108,7 +108,7 @@ function Section({ title, eyebrow, children }: { title: string; eyebrow?: string
 // ---------------------------------------------------------------------------
 
 function EnergySection({ data }: { data: InsightsData }) {
-  const { avg, refs, summary, targets, unit } = data
+  const { avg, refs, summary, goalKcal, unit, weeklyPlan } = data
   const tableRefs = useMemo(() => reliableReferences(avg.averages, avg.coverage, refs), [avg.averages, avg.coverage, refs])
   const coverage = useMemo(() => coverageSummary(avg.coverage), [avg.coverage])
   return (
@@ -119,8 +119,8 @@ function EnergySection({ data }: { data: InsightsData }) {
           <dd className="mt-0.5 font-display text-lg font-semibold text-ink tabular-nums">{formatEnergy(summary.avgKcal, unit)}</dd>
         </div>
         <div className="rounded-2xl bg-surface-2 px-3.5 py-2.5">
-          <dt className="text-xs text-ink-3">Dagsmål</dt>
-          <dd className="mt-0.5 font-display text-lg font-semibold text-ink tabular-nums">{formatEnergy(targets.kcal, unit)}</dd>
+          <dt className="text-xs text-ink-3">{weeklyPlan ? 'Dagsmål i snitt (veckobudget)' : 'Dagsmål'}</dt>
+          <dd className="mt-0.5 font-display text-lg font-semibold text-ink tabular-nums">{formatEnergy(goalKcal, unit)}</dd>
         </div>
       </dl>
       <NutrientTable

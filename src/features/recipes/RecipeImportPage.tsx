@@ -8,10 +8,14 @@
  *
  * Instruktionerna importeras inte – bara länken sparas (`Recipe.sourceUrl`), så att man läser
  * dem på originalsidan. Bara länken skickas till servern, ingenting annat.
+ *
+ * Går sidan inte att läsa (sidor som visar receptet först i webbläsaren, som Coop, eller sidor som
+ * stänger ute serverhämtningar) kan användaren klistra in ingredienserna – eller hela receptet – i
+ * stället. Länken sparas ändå som källa.
  */
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChefHat, ClipboardPaste, Download, Globe, Save } from 'lucide-react'
+import { ChefHat, ClipboardPaste, Download, Globe, Pencil, Save } from 'lucide-react'
 import { Button, Card, NumberField, PageHeader, Stepper, TextField, toast } from '../../components/ui'
 import { API_BASE } from '../../config/commerce'
 import { plural } from '../../lib/format'
@@ -72,9 +76,15 @@ export async function fetchRecipePage(url: string, signal?: AbortSignal): Promis
 interface Imported {
   url: string
   lines: readonly ParsedIngredientLine[]
+  /** Sidan gick inte att läsa – användaren klistrar in ingredienserna själv. */
+  manual?: boolean
+  /** Raderna kommer från inklistrad text (då går texten att ändra). */
+  pastedLines?: boolean
 }
 
 const NO_LINES: readonly ParsedIngredientLine[] = []
+/** Samma gräns som tidsfältet – längre tider (t.ex. "PT48H" för surdeg) lämnas tomma. */
+const MAX_MINUTES = 24 * 60
 
 export default function RecipeImportPage() {
   useDocumentTitle('Importera recept')
@@ -90,8 +100,11 @@ export default function RecipeImportPage() {
   const [submitted, setSubmitted] = useState(false)
   /** Egna ingredienser när sidan inte angav några. */
   const [pasted, setPasted] = useState('')
+  /** Länken som inte gick att läsa – då erbjuds inklistring i stället. */
+  const [fallbackUrl, setFallbackUrl] = useState<string | undefined>()
   const abortRef = useRef<AbortController | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
+  const pasteRef = useRef<HTMLTextAreaElement>(null)
   const review = useIngredientReview(imported?.lines ?? NO_LINES)
   const result = review.result
   const pastedLines = useMemo(() => parseIngredientLines(pasted), [pasted])
@@ -108,25 +121,43 @@ export default function RecipeImportPage() {
     abortRef.current = ctrl
     setLoading(true)
     setError(undefined)
+    setFallbackUrl(undefined)
     const outcome = await fetchRecipePage(safe, ctrl.signal)
     if (ctrl.signal.aborted) return
     setLoading(false)
     if (!outcome.ok) {
       setError(IMPORT_ERRORS[outcome.error])
+      setFallbackUrl(safe)
       return
     }
     const recipes = parseRecipeJsonLd(outcome.html)
     const recipe = recipes.find((r) => r.ingredients.length > 0) ?? recipes[0]
     if (!recipe) {
       setError(IMPORT_ERRORS.noRecipe)
+      setFallbackUrl(safe)
       return
     }
     setName(recipe.name)
     setServings(Math.min(MAX_SERVINGS, Math.max(1, recipe.servings ?? 4)))
-    setMinutes(recipe.totalMinutes)
+    setMinutes(recipe.totalMinutes !== undefined && recipe.totalMinutes <= MAX_MINUTES ? recipe.totalMinutes : undefined)
     setSubmitted(false)
     setPasted('')
     setImported({ url: safe, lines: parseIngredientLines(recipe.ingredients.join('\n')) })
+  }
+
+  /** Sidan gick inte att läsa: fortsätt med länken som källa och klistra in ingredienserna. */
+  const pasteInstead = () => {
+    if (!fallbackUrl) return
+    setName('')
+    setServings(4)
+    setMinutes(undefined)
+    setSubmitted(false)
+    setPasted('')
+    setError(undefined)
+    setImported({ url: fallbackUrl, lines: [], manual: true })
+    setFallbackUrl(undefined)
+    // Textrutan finns först efter nästa rendering.
+    requestAnimationFrame(() => pasteRef.current?.focus())
   }
 
   const nameError = submitted && !name.trim() ? 'Ge receptet ett namn.' : undefined
@@ -183,6 +214,7 @@ export default function RecipeImportPage() {
               onValueChange={(v) => {
                 setUrl(v)
                 if (error) setError(undefined)
+                if (fallbackUrl) setFallbackUrl(undefined)
               }}
               placeholder="https://"
               autoComplete="off"
@@ -193,6 +225,17 @@ export default function RecipeImportPage() {
               Hämta recept
             </Button>
           </form>
+          {fallbackUrl && !imported && (
+            <div className="mt-3 rounded-2xl bg-surface-2 p-4">
+              <p className="text-sm leading-relaxed text-ink-2">
+                Vissa sidor visar receptet på ett sätt som Lagom inte kan läsa. Kopiera ingredienserna från sidan och klistra in dem här i
+                stället – länken sparas i receptet.
+              </p>
+              <Button variant="soft" size="sm" iconLeft={ClipboardPaste} className="mt-3" onClick={pasteInstead}>
+                Klistra in ingredienserna
+              </Button>
+            </div>
+          )}
           <p className="mt-3 text-xs leading-relaxed text-ink-3">
             Lagom hämtar namn, portioner, tid och ingredienser från sidan. Instruktionerna läser du på originalsidan – länken sparas i
             receptet. Bara länken skickas till Lagoms server, som hämtar sidan åt dig.
@@ -203,7 +246,16 @@ export default function RecipeImportPage() {
           <>
             <Card title="Receptet" eyebrow={`Från ${sourceHost(imported.url)}`}>
               <div className="flex flex-col gap-4">
-                <TextField ref={nameRef} label="Namn" value={name} onValueChange={setName} maxLength={80} error={nameError} autoComplete="off" />
+                <TextField
+                  ref={nameRef}
+                  label="Namn"
+                  value={name}
+                  onValueChange={setName}
+                  maxLength={80}
+                  error={nameError}
+                  autoComplete="off"
+                  placeholder={imported.manual ? 'Till exempel Kycklinggryta' : undefined}
+                />
                 <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <span className="text-sm font-medium text-ink-2">Portioner</span>
@@ -228,9 +280,12 @@ export default function RecipeImportPage() {
               {imported.lines.length === 0 ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm leading-relaxed text-ink-2">
-                    Sidan angav inga ingredienser. Klistra in dem från receptet, en per rad – sedan får du kontrollera dem här.
+                    {imported.manual
+                      ? 'Kopiera ingredienslistan från receptet och klistra in den här, en ingrediens per rad. Du kan också klistra in hela receptet – rubriker och instruktioner hoppas över.'
+                      : 'Sidan angav inga ingredienser. Klistra in dem från receptet, en per rad – sedan får du kontrollera dem här.'}
                   </p>
                   <TextField
+                    ref={pasteRef}
                     multiline
                     minRows={5}
                     label="Ingredienser"
@@ -243,7 +298,7 @@ export default function RecipeImportPage() {
                     iconLeft={ClipboardPaste}
                     className="self-start"
                     disabled={pastedLines.length === 0}
-                    onClick={() => setImported({ ...imported, lines: pastedLines })}
+                    onClick={() => setImported({ ...imported, lines: pastedLines, pastedLines: true })}
                   >
                     Matcha ingredienser
                   </Button>
@@ -257,6 +312,11 @@ export default function RecipeImportPage() {
                   <p className="mt-2 text-xs leading-relaxed text-ink-3" aria-live="polite">
                     {reviewSummary(result)}
                   </p>
+                  {imported.pastedLines && (
+                    <Button variant="ghost" size="sm" iconLeft={Pencil} className="mt-2 self-start" onClick={() => setImported({ ...imported, lines: [] })}>
+                      Ändra inklistrad text
+                    </Button>
+                  )}
                 </>
               )}
               {ingredientsError && (

@@ -7,7 +7,7 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
-import { BookOpen, ChefHat, Link2, Plus, Scale, Search, Sparkles } from 'lucide-react'
+import { BookOpen, ChefHat, Link2, Plus, Scale, Search, Share2, Sparkles } from 'lucide-react'
 import type { FoodTag, Recipe } from '../../types'
 import { Button, Chip, EmptyState, PageHeader, Tabs, TextField, tabPanelProps } from '../../components/ui'
 import { useFoodStore } from '../../stores/foodStore'
@@ -228,6 +228,10 @@ function OwnRecipes({
               <Button variant="soft" iconLeft={Link2} to="/recept/importera">
                 Importera från länk
               </Button>
+              {/* Delade recept (länk eller fil) – i apparna öppnas länkarna i webbläsaren, så här klistrar man in dem. */}
+              <Button variant="soft" iconLeft={Share2} to="/dela">
+                Öppna delat recept
+              </Button>
               <Button variant="soft" iconLeft={Sparkles} onClick={onExplore}>
                 Utforska klassiker
               </Button>
@@ -261,5 +265,14 @@ function OwnRecipes({
       />
     )
   }
-  return <RecipeGrid list={list} favSet={favSet} />
+  return (
+    <>
+      <RecipeGrid list={list} favSet={favSet} />
+      <div className="mt-4 flex justify-center">
+        <Button variant="ghost" iconLeft={Share2} to="/dela">
+          Öppna delat recept
+        </Button>
+      </div>
+    </>
+  )
 }

@@ -4,7 +4,12 @@
   säkerhetskopia delas (Capacitor Share). Bara exportmappen i cachen (src/native/files.ts skriver
   till Directory.Cache/delning/) – aldrig appens filmapp, där den automatiska kopian av dagboken
   (lagom-spegling.json) ligger.
+
+  Pictures/ i appens externa filmapp: Capacitors filväljare låter kameraappen skriva en tillfällig
+  originalbild där (JPEG_*.jpg) när en framstegsbild tas; src/native/photos.ts (clearCameraCaptures)
+  tar bort den direkt efter nedskalningen.
 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="delning" path="delning/" />
+    <external-files-path name="kamera" path="Pictures/" />
 </paths>

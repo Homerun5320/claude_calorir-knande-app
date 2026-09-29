@@ -31,6 +31,11 @@ describe('veckorapport', () => {
     expect(r.text).toContain('2,1 kg CO₂e')
   })
 
+  it('med veckobudget är målet veckans snitt', () => {
+    expect(buildReport(input({ weeklyBudget: true })).text).toMatch(/\(mål i snitt 2\s000 kcal med veckobudget\)/)
+    expect(buildReport(input()).text).toMatch(/\(mål 2\s000 kcal\)/)
+  })
+
   it('använder kJ när användaren valt det', () => {
     expect(buildReport(input({ unit: 'kJ' })).text).toMatch(/7\s740 kJ/)
   })

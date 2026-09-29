@@ -63,6 +63,7 @@ import { foodPlate, PLATE_PART_LABELS, type PlatePart } from '../../lib/plate'
 import { co2eEquivalents, foodClimateFactor } from '../../lib/climate'
 import { gramsFor, unitLabel } from '../../lib/units'
 import { hasUsableNutrition, offAttributionText, offProductUrl } from '../../lib/openFoodFacts'
+import { traceNames } from '../../lib/allergens'
 import {
   TAG_LABELS,
   decodeFoodId,
@@ -79,6 +80,7 @@ import {
 import { useAddFood } from './useAddFood'
 import { FoodSourceBadge, MealChips, nutriScoreTextClass, useLeave } from './components'
 import { PregnancyNote } from './PregnancyNote'
+import { AllergenFlags, useAllergenProfile } from './AllergenFlags'
 
 type Basis = 'portion' | '100g'
 
@@ -150,6 +152,14 @@ function FoodDetail({ food }: { food: Food }) {
   const removeCustomFood = useFoodStore((s) => s.removeCustomFood)
   const references = useReferences()
   const { addFood } = useAddFood()
+  // Med en allergiprofil visas inte egenskaperna Glutenfri/Laktosfri som egna märken: de har ingen
+  // källa (Lagoms, recept och egna livsmedel) och laktosfri betyder inte mjölkfri. Produktens
+  // märkning citeras i stället med källa av allergiflaggorna ("Märkt laktosfri enligt Open Food Facts").
+  const allergyProfile = useAllergenProfile().length > 0
+  const shownTags = useMemo(
+    () => (allergyProfile ? (food.tags ?? []).filter((t) => t !== 'glutenfri' && t !== 'laktosfri') : (food.tags ?? [])),
+    [allergyProfile, food.tags],
+  )
 
   const { date, meal } = useMemo(() => parseAddParams(params, meals, today), [params, meals, today])
   const fromAdd = (location.state as { from?: string } | null)?.from === 'lagg-till'
@@ -280,6 +290,7 @@ function FoodDetail({ food }: { food: Food }) {
           )}
           {food.rawWeight && <RawWeightNote food={food} />}
           <PregnancyNote food={food} />
+          <AllergenFlags food={food} />
           <div>
             <div className="mb-1.5 flex items-center justify-between text-xs text-ink-2">
               <span>Näringsdata</span>
@@ -288,9 +299,9 @@ function FoodDetail({ food }: { food: Food }) {
             <ProgressBar value={complete * 100} max={100} size="xs" tone={complete >= 0.6 ? 'mossa' : complete >= 0.3 ? 'sol' : 'hjortron'} aria-label="Andel kända näringsvärden" />
             {complete < 0.3 && <p className="mt-1.5 text-xs text-ink-3">Bara grundvärdena är kända. Okända ämnen visas som ”–”, aldrig som noll.</p>}
           </div>
-          {food.tags && food.tags.length > 0 && (
+          {shownTags.length > 0 && (
             <ul className="flex flex-wrap gap-1.5" aria-label="Egenskaper">
-              {food.tags.map((t) => (
+              {shownTags.map((t) => (
                 <li key={t}>
                   <Badge tone={t === 'nyckelhal' ? 'gran' : t === 'vegan' || t === 'vegetarisk' ? 'mossa' : 'neutral'} icon={t === 'nyckelhal' ? ShieldCheck : t === 'vegan' || t === 'vegetarisk' ? Leaf : undefined}>
                     {TAG_LABELS[t]}
@@ -525,13 +536,16 @@ function Provenance({
   const meta = sourceMeta(source)
   const Icon = PROVENANCE_ICON[source] ?? ShieldCheck
   const linkedCurated = source === 'lagom' && lmvNumber !== undefined
+  // Produkter från Open Food Facts har noten "Från Open Food Facts – jämför gärna med förpackningen."
+  // – källan står redan i raden ovanför, så den meningen visas inte två gånger.
+  const shownNote = source === 'openfoodfacts' ? note?.replace(/^\s*Från Open Food Facts\b[^.]*\.\s*/, '').trim() : note
   return (
     <div className={cx('flex items-start gap-3 rounded-2xl px-4 py-3 text-sm', meta.crowdSourced ? 'bg-hjortron-soft' : 'bg-surface-2')}>
       <Icon className={cx('mt-0.5 size-4 shrink-0', meta.crowdSourced ? 'text-hjortron' : 'text-gran')} aria-hidden />
       <div className="min-w-0 text-ink-2">
         <p className="text-ink">{provenanceText(source, lmvNumber, brand, isAverage, averageFromLmv)}</p>
         {lmvNumber !== undefined && !linkedCurated && <p className="mt-1 text-xs">Livsmedelsnummer {lmvNumber} i Livsmedelsverkets databas.</p>}
-        {note && <p className="mt-1 text-xs">{note}</p>}
+        {shownNote && <p className="mt-1 text-xs">{shownNote}</p>}
       </div>
     </div>
   )
@@ -707,7 +721,9 @@ function ProductCard({ food }: { food: Food }) {
   const x = food.extra ?? {}
   const nutri = nutriScoreInfo(x.nutriscore)
   const nova = novaInfo(x.nova)
-  const hasAny = nutri || nova || x.ingredientsText || (x.allergens && x.allergens.length) || (x.labels && x.labels.length) || x.origin || x.quantity
+  const traces = traceNames(food)
+  const hasAny =
+    nutri || nova || x.ingredientsText || (x.allergens && x.allergens.length) || traces.length > 0 || (x.labels && x.labels.length) || x.origin || x.quantity
   if (!hasAny) return null
   return (
     <Card title="Produktinformation" eyebrow={food.source === 'openfoodfacts' ? 'Open Food Facts' : undefined}>
@@ -758,6 +774,18 @@ function ProductCard({ food }: { food: Food }) {
               {x.allergens.map((a) => (
                 <li key={a}>
                   <Badge tone="hjortron">{a}</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {traces.length > 0 && (
+          <div>
+            <h3 className="eyebrow mb-1.5">Kan innehålla spår av</h3>
+            <ul className="flex flex-wrap gap-1.5">
+              {traces.map((t) => (
+                <li key={t}>
+                  <Badge tone="neutral">{t}</Badge>
                 </li>
               ))}
             </ul>

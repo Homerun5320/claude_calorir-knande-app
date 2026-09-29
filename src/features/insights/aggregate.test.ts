@@ -58,6 +58,11 @@ describe('dagssummor', () => {
     expect(s.nearBudgetDays).toBe(0)
   })
 
+  it('med veckobudget räknas varje dags budget mot den dagens mål', () => {
+    const days = buildDayStats(dates, entries, exercise, (d) => (d === '2026-09-23' ? 2300 : 1850), 50)
+    expect(days.map((d) => d.budget)).toEqual([1850, 1850, 2500])
+  })
+
   it('hjälpfunktioner för perioden', () => {
     expect(countLoggedDays(entries, dates)).toBe(2)
     expect(periodEntries(entries, dates)).toHaveLength(3)

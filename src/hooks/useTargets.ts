@@ -16,10 +16,33 @@ import {
 } from '../lib/energy'
 import { exerciseAddBack, totals, type ExerciseAddBack } from '../lib/diary'
 import { todayISO } from '../lib/dates'
+import { resolveWeeklyBudget, targetsForDate, type WeeklyPlan } from '../lib/weeklyBudget'
 import type { DayMeta, DiaryEntry, ISODate, Targets, WeightEntry } from '../types'
 
 export interface TargetsInfo {
+  /**
+   * Målen för `date` (andra argumentet till `useTargets`) – med veckobudgetens förskjutning för
+   * den veckodagen. Utan `date`: basmålen (samma som `baseTargets`).
+   */
   targets: Targets
+  /**
+   * Dagsmålen utan veckobudget – veckans snittdag. Mål och makron, sammanfattningar ("… per dag")
+   * och referensvärden utgår från dem.
+   */
+  baseTargets: Targets
+  /**
+   * Målen för ett visst datum: basmålen plus veckobudgetens förskjutning för veckodagen (aldrig
+   * under golvet). Samma funktion så länge målen inte ändras – går att skicka till memoiserade
+   * komponenter. Utan veckobudget returneras `baseTargets`.
+   */
+  targetsFor: (date: ISODate) => Targets
+  /** Veckobudgeten när den är påslagen och får användas, annars null. */
+  weeklyPlan: WeeklyPlan | null
+  /**
+   * Varför veckobudgeten inte används (graviditet, amning, under 18 år) – oavsett om den är
+   * påslagen – annars null.
+   */
+  weeklyBlocked: string | null
   energy: EnergyBreakdown | null
   adaptive: AdaptiveEstimate | null
   /** Vikten som målen baseras på (senaste vägningen till och med `today`). */
@@ -81,12 +104,20 @@ function weightsUntil(weights: readonly WeightEntry[], today: ISODate): WeightEn
   return weights.filter((w) => w.date <= today && Number.isFinite(w.kg) && w.kg > 0).sort((a, b) => a.date.localeCompare(b.date))
 }
 
-/** Beräknade dagsmål (med användarens egna överskrivningar och ev. adaptiv förbrukning). */
-export function useTargets(today: ISODate = todayISO()): TargetsInfo {
+/**
+ * Beräknade dagsmål (med användarens egna överskrivningar och ev. adaptiv förbrukning).
+ *
+ * - `today` är dagen som målen räknas utifrån (vikt, ålder, adaptiv förbrukning) – oftast `useToday()`.
+ * - `date` (valfritt) är dagen som `targets` gäller: med veckobudget får den veckodagens mål
+ *   (t.ex. extra på fredagar). Använd det överallt där ett mål visas eller jämförs för en viss dag
+ *   (Idag, dagboken). För flera dagar: `targetsFor(date)`, eller `weeklyPlan` med `kcalForDate`.
+ */
+export function useTargets(today: ISODate = todayISO(), date?: ISODate): TargetsInfo {
   const profile = useProfileStore((s) => s.profile)
   const targetOverrides = useProfileStore((s) => s.settings.targetOverrides)
   const adaptiveTargets = useProfileStore((s) => s.settings.adaptiveTargets)
   const addBackSetting = useProfileStore((s) => s.settings.exerciseAddBackPct)
+  const weeklySetting = useProfileStore((s) => s.settings.weeklyBudget)
   const allWeights = useBodyStore((s) => s.weights)
   // Graviditet, amning och under 18 år: formeln gäller även om adaptiva mål är påslagna.
   const profileBlocked = profile ? adaptiveBlockReasonFor(profile, today) : null
@@ -96,11 +127,16 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
   const entries = useDiaryStore((s) => (useAdaptive ? s.entries : NO_ENTRIES))
   const days = useDiaryStore((s) => (useAdaptive ? s.days : NO_DAYS))
 
-  return useMemo(() => {
+  const info = useMemo<TargetsInfo>(() => {
     if (!profile) {
       const targets = fallbackTargets(targetOverrides)
       return {
         targets,
+        baseTargets: targets,
+        // Utan profil är åldern okänd – ingen veckobudget.
+        targetsFor: () => targets,
+        weeklyPlan: null,
+        weeklyBlocked: null,
         energy: null,
         adaptive: null,
         weightKg: null,
@@ -126,8 +162,16 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
     // ogiltigt eget mål (t.ex. NaN från en säkerhetskopia) eller ett som har höjts till golvet
     // (som bygger på den adaptiva förbrukningen) räknas inte – annars kunde träningen räknas två gånger.
     const ownKcal = usable(targetOverrides.kcal) && targets.kcal === targetOverrides.kcal
+    // Veckobudgeten läggs ovanpå basmålet (egna mål och adaptiv förbrukning ingår redan), före
+    // träningstillägget, och följer golvet varje dag (se lib/weeklyBudget).
+    const weekly = resolveWeeklyBudget({ profile, energy, baseKcal: targets.kcal, setting: weeklySetting, today })
+    const plan = weekly.plan
     return {
       targets,
+      baseTargets: targets,
+      targetsFor: plan ? (d: ISODate) => targetsForDate(targets, plan, d, targetOverrides) : () => targets,
+      weeklyPlan: plan,
+      weeklyBlocked: weekly.blocked,
       energy,
       adaptive,
       weightKg,
@@ -136,5 +180,11 @@ export function useTargets(today: ISODate = todayISO()): TargetsInfo {
       adaptiveBlocked: profileBlocked ?? energy.adaptiveBlocked,
       exerciseAddBack: exerciseAddBack(addBackSetting, energy.tdeeSource, ownKcal),
     }
-  }, [profile, targetOverrides, useAdaptive, profileBlocked, addBackSetting, allWeights, entries, days, today])
+  }, [profile, targetOverrides, useAdaptive, profileBlocked, addBackSetting, weeklySetting, allWeights, entries, days, today])
+
+  return useMemo(() => {
+    if (date === undefined) return info
+    const targets = info.targetsFor(date)
+    return targets === info.targets ? info : { ...info, targets }
+  }, [info, date])
 }

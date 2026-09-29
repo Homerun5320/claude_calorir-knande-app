@@ -68,9 +68,16 @@
     <!-- Nätet: Open Food Facts, receptimport och serverfunktionerna. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Streckkodsläsaren. Kameran är inget krav för att installera appen. -->
+    <!-- Streckkodsläsaren och framstegsbilderna (Ta en bild). Kameran är inget krav för att installera appen. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Framstegsbilder: "Ta en bild" (<input capture>) öppnar kameraappen via Capacitors filväljare, som på Android 11+ bara hittar kameran om avsikten är deklarerad. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
 
     <!-- Lokala påminnelser (Android 13+ frågar om notiser). Inga exakta alarm – påminnelserna får komma någon minut sent. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

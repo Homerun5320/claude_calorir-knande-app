@@ -20,6 +20,10 @@
  *   lämnar telefonen, och Apple kräver radering av kontot i appen. Molnet får slås på i apparna
  *   först när ägaren har godkänt det och allt det är uppdaterat (docs/BACKEND.md) – då med
  *   LAGOM_ALLOW_STORE_CLOUD=1.
+ *
+ * Efter ett butiksbygge kontrollerar `findWebPurchaseCode` dessutom paketet: koden för webbköp
+ * (Stripe Checkout, tacksidan, "Tappat nyckeln?" och i App Store-bygget aktiveringen av
+ * licensnycklar) ska vara borttagen, inte bara dold.
  * Se docs/BETALNING.md.
  */
 import { createPrivateKey, createPublicKey } from 'node:crypto'
@@ -328,4 +332,64 @@ export function checkCommerceBuild(env: BuildEnv, ctx: CommerceBuildContext = {}
     }
   }
   return { errors, warnings }
+}
+
+// ---------------------------------------------------------------------------
+// Webbköpen i butiksappens paket
+// ---------------------------------------------------------------------------
+
+export type StoreDistribution = 'appstore' | 'play'
+
+/** Ett spår av webbköpen: en sträng som bara finns i koden för webbköp. */
+export interface WebPurchaseMarker {
+  /** Texten som söks i paketet (en sträng i koden – kommentarer finns inte kvar efter minifieringen). */
+  text: string
+  /** Vad spåret kommer från, för felmeddelandet. */
+  what: string
+  /** Butiksbyggena där spåret aldrig får finnas. */
+  stores: readonly StoreDistribution[]
+}
+
+const BOTH_STORES: readonly StoreDistribution[] = ['appstore', 'play']
+
+/**
+ * Spår av webbköpen som aldrig får finnas i butiksappens paket. Apple och Google tillåter inga
+ * andra köpsätt i apparna – koden tas därför bort ur butiksbyggena med byggkonstanter
+ * (`WEB_PURCHASES_BUILD` och `KEY_ENTRY_BUILD` i src/config/platform.ts), inte bara döljs.
+ * Licensnycklar från webbköp får aktiveras i Google Play-appen, men aldrig i App Store-bygget.
+ * Testerna kontrollerar att varje text finns i appens källkod – annars skulle en ändrad adress
+ * eller knapptext göra kontrollen tom.
+ */
+export const WEB_PURCHASE_MARKERS: readonly WebPurchaseMarker[] = [
+  { text: '/api/create-checkout', what: 'köpstarten i Stripe Checkout (createCheckout)', stores: BOTH_STORES },
+  { text: '/api/verify-purchase', what: 'tacksidan efter ett webbköp (verifyPurchase)', stores: BOTH_STORES },
+  { text: '/api/recover-license', what: '"Tappat nyckeln?" (recoverLicense)', stores: BOTH_STORES },
+  { text: 'Tappat nyckeln?', what: '"Tappat nyckeln?" i gränssnittet (LicenseRecovery)', stores: BOTH_STORES },
+  { text: 'Gå till betalning', what: 'köparket för webbköp (CheckoutSheet)', stores: BOTH_STORES },
+  { text: 'Köp (testläge', what: 'testköpen på webben (CheckoutSheet, buyInTestMode)', stores: BOTH_STORES },
+  { text: 'Klistra in hela nyckeln', what: 'aktiveringen av licensnycklar (LicenseActivation)', stores: ['appstore'] },
+  { text: '/api/license-revocations', what: 'spärrlistan för licensnycklar (refreshRevocations)', stores: ['appstore'] },
+]
+
+/** En fil i det färdiga paketet (JavaScript eller HTML). */
+export interface BundleFile {
+  name: string
+  code: string
+}
+
+/**
+ * Hitta webbköpens spår i ett butiksbygge. Ger en rad per fund ("assets/x.js: /api/create-checkout
+ * – köpstarten i Stripe Checkout …"), eller en tom lista. Webbygget (och okända värden) ger alltid
+ * en tom lista.
+ */
+export function findWebPurchaseCode(files: readonly BundleFile[], distribution: string | undefined): string[] {
+  if (distribution !== 'appstore' && distribution !== 'play') return []
+  const markers = WEB_PURCHASE_MARKERS.filter((m) => m.stores.includes(distribution))
+  const found: string[] = []
+  for (const file of files) {
+    for (const m of markers) {
+      if (file.code.includes(m.text)) found.push(`${file.name}: "${m.text}" – ${m.what}`)
+    }
+  }
+  return found
 }

@@ -13,6 +13,8 @@ import { renderLegalHtml, renderLegalMarkdown, type LegalDocSpec } from './legal
 const PRIVACY_OWNER_NOTES: Readonly<Record<string, string>> = {
   kameran:
     'Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först.',
+  mikrofonen:
+    'Röstsökningen (src/lib/voiceSearch.ts) lagrar ingenting och har därför ingen rad i lagringstabellen. Den kräver microphone=(self) i Permissions-Policy (netlify.toml). Den får bara använda taligenkänning på enheten (processLocally) – tillåts någon gång en reserv till en taltjänst på nätet (t.ex. webkitSpeechRecognition, som i Chrome skickar ljudet till Google) måste texten här, mottagarna och frågan om samtycke ses över först.',
   halsa:
     'Google granskar texten i Health Connect-deklarationen (Play Console → Appinnehåll → Hälsoappar). Datatyperna här ska stämma med AndroidManifest.xml, Info.plist och motiveringarna i docs/NATIVE.md §6. Ändras de i src/native/health.ts måste policyn uppdateras först.',
   lagringstid: 'Kontrollera hur länge loggar sparas i din Netlify-plan och skriv gärna in tiden här.',

@@ -19,6 +19,8 @@
  *   När korgen har något i sig blir "Lägg i korgen" huvudknappen i portionsarket, så att varje
  *   nytt livsmedel fortfarande bara är ett tryck.
  * - Dator: sök → Enter (första träffen) → skriv mängd → Enter.
+ * - Mikrofonen i sökfältet: röstsökning med svensk taligenkänning på enheten (`VoiceSearchButton`,
+ *   `lib/voiceSearch`). Visas bara där igenkänningen sker på enheten – aldrig via en taltjänst.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -91,7 +93,9 @@ import { OnlineSearch } from './OnlineSearch'
 import { FreeTextCard, type FreeTextRow } from './FreeTextCard'
 import { PlateLogSheet } from './PlateLogSheet'
 import { useFreeTextItems } from './useFreeText'
+import { VoiceSearchButton, VoiceSearchStatus, useVoiceSearch } from './VoiceSearchButton'
 import { requireAccess } from '../premium/requireAccess'
+import { ShareButton } from '../recipes/ShareButton'
 
 const EMPTY_ENTRIES: DiaryEntry[] = []
 const TABS_ID = 'lagg-till-flikar'
@@ -166,6 +170,16 @@ export default function AddFoodPage() {
   const [query, setQuery] = useState(() => params.get('q') ?? '')
   const q = query.trim()
   const searchRef = useRef<HTMLInputElement>(null)
+  // Röstsökning: texten fylls i sökfältet medan man pratar. Att skriva själv avbryter lyssnandet.
+  const voice = useVoiceSearch(setQuery)
+  const { cancel: cancelVoice } = voice
+  const onTypeQuery = useCallback(
+    (value: string) => {
+      cancelVoice()
+      setQuery(value)
+    },
+    [cancelVoice],
+  )
   const { results, lmvResults, loading, pending } = useFoodSearch(q, { meal, limit: 40 })
   // Livsmedelsverkets sektion: utfälld när huvudträffarna är få – användarens eget val gäller för sökningen.
   const [lmvToggle, setLmvToggle] = useState<{ q: string; open: boolean } | null>(null)
@@ -344,9 +358,10 @@ export default function AddFoodPage() {
           label="Sök livsmedel"
           labelHidden
           prefix={Search}
+          suffix={voice.visible ? <VoiceSearchButton voice={voice} /> : undefined}
           clearable
           value={query}
-          onValueChange={setQuery}
+          onValueChange={onTypeQuery}
           onKeyDown={onSearchKey}
           placeholder="Sök livsmedel"
           autoFocus={desktop}
@@ -357,6 +372,7 @@ export default function AddFoodPage() {
           enterKeyHint="search"
           fieldClassName="h-14! rounded-[1.25rem] bg-surface shadow-card"
         />
+        {voice.visible && <VoiceSearchStatus voice={voice} />}
       </div>
 
       {q ? (
@@ -825,6 +841,11 @@ function Browse(props: BrowseProps) {
                     illustration="plate"
                     title="Spara måltider du äter ofta"
                     text="Lägg din vanliga frukost i korgen och välj ”Spara som måltid” – sedan loggar du allt med ett tryck."
+                    action={
+                      <Button variant="soft" size="sm" to="/dela">
+                        Öppna delad måltid
+                      </Button>
+                    }
                   />
                 ) : (
                   <ul className="flex flex-col gap-3">
@@ -1019,7 +1040,10 @@ function TemplateCard({ template, mindful, onAdd, onToBasket }: { template: Meal
           </p>
           <p className="mt-1.5 line-clamp-2 text-sm text-ink-2">{template.items.map((i) => i.food.name).join(', ')}</p>
         </div>
-        <IconButton icon={Trash2} size="sm" aria-label={`Ta bort måltiden ${template.name}`} onClick={remove} noTooltip />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <ShareButton target={{ kind: 'meal', template }} size="sm" />
+          <IconButton icon={Trash2} size="sm" aria-label={`Ta bort måltiden ${template.name}`} onClick={remove} noTooltip />
+        </div>
       </div>
       <div className="mt-3 flex gap-2">
         <Button variant="soft" size="sm" iconLeft={ShoppingBasket} onClick={onToBasket} className="flex-1">

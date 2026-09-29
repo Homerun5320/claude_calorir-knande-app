@@ -3,17 +3,20 @@
  * levande nyckeltal så att sidan känns som en överblick och inte bara en meny.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   CalendarDays,
   CalendarHeart,
   ChartNoAxesColumn,
   ChefHat,
+  ChevronRight,
   CloudUpload,
   Dumbbell,
   GlassWater,
   HeartHandshake,
   Info,
+  Milestone,
   Scale,
   Settings,
   Timer,
@@ -37,6 +40,7 @@ import { storagePlace } from '../../config/platform'
 import { useBackupDue, useLastBackup } from '../settings/backupStatus'
 import { dayNumberSince, formatElapsed, loggedDaysInLast } from './moreLogic'
 import { SupportSheet } from './SupportSheet'
+import { MILESTONES_PATH, useMilestones } from './useMilestoneCelebration'
 import { PremiumHubCard } from '../premium/TrialBanner'
 import { TRIAL_DAYS } from '../../config/commerce'
 
@@ -54,6 +58,29 @@ interface HubItem {
    * för att lämna ett kort ensamt.
    */
   wide?: boolean
+}
+
+/**
+ * Länken till Milstolpar i dagkortet: den senast uppnådda milstolpen, annars en lugn inbjudan.
+ * Egen komponent så att Mer bara räknar milstolpar när de visas.
+ */
+function MilestonesLink({ today }: { today: string }) {
+  const { latest } = useMilestones(today)
+  return (
+    <Link
+      to={MILESTONES_PATH}
+      className="mt-3 flex min-h-11 items-center gap-3 rounded-2xl bg-surface/70 px-3 py-2 transition-colors hover:bg-surface"
+    >
+      <Milestone aria-hidden className="size-5 shrink-0 text-gran" strokeWidth={2.1} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[0.9375rem] font-semibold text-ink">Milstolpar</span>
+        <span className="block truncate text-[0.8125rem] leading-snug text-ink-2">
+          {latest ? `Senast: ${latest.def.title}` : 'Små glädjeämnen längs vägen'}
+        </span>
+      </span>
+      <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-3" />
+    </Link>
+  )
 }
 
 /** Nu, uppdaterat varje minut (för pågående fasta). */
@@ -98,6 +125,7 @@ export default function MorePage() {
   const today = useToday()
   const [support, setSupport] = useState(false)
   const mindful = useProfileStore((s) => s.settings.mindfulMode)
+  const hideMilestones = useProfileStore((s) => s.settings.hideMilestones === true)
   const profileCreated = useProfileStore((s) => s.profile?.createdAt)
   const name = useProfileStore((s) => s.profile?.name)
   const weights = useBodyStore((s) => s.weights)
@@ -204,6 +232,7 @@ export default function MorePage() {
                 </p>
               </div>
             </div>
+            {!hideMilestones && <MilestonesLink today={today} />}
           </Card>
         )}
 

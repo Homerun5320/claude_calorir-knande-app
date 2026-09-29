@@ -10,9 +10,10 @@
  * - alkohol: `alcohol_100g` är volymprocent → g per 100 g ≈ % vol × 0,789 (etanolens densitet)
  * - drycker anges per 100 ml; Lagom räknar dem som per 100 g (≈ 100 ml) och markerar dem `liquid`.
  */
-import type { Food, FoodCategory, FoodExtra, FoodTag, Nutrients, Portion } from '../types'
+import type { Food, FoodCategory, FoodTag, Nutrients, Portion } from '../types'
 import { completeNutrients, KJ_PER_KCAL, type NutrientKey } from './nutrients'
 import { formatNumber } from './format'
+import { hasUnreadAllergenTags, offAllergenKeys, type FoodExtraWithAllergens } from './allergens'
 
 // ---------------------------------------------------------------------------
 // Konfiguration och fel
@@ -57,6 +58,7 @@ export const OFF_FIELDS = [
   'ingredients_text_sv',
   'ingredients_text',
   'allergens_tags',
+  'traces_tags',
   'labels_tags',
   'categories_tags',
   'image_front_small_url',
@@ -154,6 +156,8 @@ export interface OffProduct {
   ingredients_text_sv?: string
   ingredients_text?: string
   allergens_tags?: string[]
+  /** "Kan innehålla spår av" – samma taxonomi som `allergens_tags`. */
+  traces_tags?: string[]
   labels_tags?: string[]
   categories_tags?: string[]
   image_front_small_url?: string
@@ -339,7 +343,10 @@ const ALLERGENS: Record<string, string> = {
   'en:sulphur-dioxide-and-sulphites': 'svaveldioxid/sulfit',
 }
 
-/** Allergener på svenska, i bokstavsordning och utan dubbletter. */
+/**
+ * Allergener på svenska, i bokstavsordning och utan dubbletter. Nycklarna (för flaggorna mot
+ * användarens allergiprofil) tas fram med `offAllergenKeys` i lib/allergens.ts.
+ */
 export function offAllergens(tags: readonly string[] | undefined): string[] {
   const out = new Set<string>()
   for (const tag of tags ?? []) {
@@ -480,14 +487,21 @@ export function mapOffProduct(p: OffProduct, fallbackCode?: string): Food | null
 
   const { labels, tags } = offLabels(p.labels_tags)
   const allergens = offAllergens(p.allergens_tags)
+  const allergenKeys = offAllergenKeys(p.allergens_tags)
+  // Spår av något som redan ingår är inte en egen uppgift.
+  const traceKeys = offAllergenKeys(p.traces_tags).filter((k) => !allergenKeys.includes(k))
   const nutriscore = clean(p.nutriscore_grade)?.toLowerCase()
   const nova = num(p.nova_group)
-  const extra: FoodExtra = {}
+  const extra: FoodExtraWithAllergens = {}
   if (nutriscore && /^[a-e]$/.test(nutriscore)) extra.nutriscore = nutriscore
   if (nova !== undefined && nova >= 1 && nova <= 4) extra.nova = Math.round(nova)
   const ingredients = clean(p.ingredients_text_sv) ?? clean(p.ingredients_text)
   if (ingredients) extra.ingredientsText = ingredients
   if (allergens.length > 0) extra.allergens = allergens
+  // Alltid satta (även tomma): då vet Lagom att spåren har lästs in – äldre sparade produkter saknar dem.
+  extra.allergenKeys = allergenKeys
+  extra.traceKeys = traceKeys
+  if (hasUnreadAllergenTags(p.allergens_tags) || hasUnreadAllergenTags(p.traces_tags)) extra.unreadAllergenTags = true
   const quantity = clean(p.quantity)
   if (quantity) extra.quantity = quantity
   const origin = clean(p.origins)

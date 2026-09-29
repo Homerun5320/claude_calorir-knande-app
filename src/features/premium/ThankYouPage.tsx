@@ -10,7 +10,9 @@
  * inte ut automatiskt – då får man välja. Annars skulle en länk med någon annans köp-id kunna byta
  * ut ens licens.
  *
- * I butiksapparna finns inga webbköp – där skickas man vidare till köpsidan.
+ * I butiksapparna finns inga webbköp – där skickas man vidare till köpsidan, och i butiksbyggena
+ * tas själva sidan bort ur paketet (konstanten `WEB_PURCHASES`, se WEB_PURCHASES_BUILD i
+ * src/config/platform.ts). Routen /tack finns bara i webbygget (src/App.tsx).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
@@ -18,7 +20,7 @@ import { ArrowRight, Clock, Mail, RefreshCw, WifiOff } from 'lucide-react'
 import { Button, Card, PageHeader, Spinner } from '../../components/ui'
 import { Confetti } from '../../components/signature'
 import { SUPPORT_EMAIL, planById } from '../../config/commerce'
-import { isInApp, isStandalone } from '../../config/platform'
+import { WEB_PURCHASES_BUILD, isInApp, isStandalone } from '../../config/platform'
 import { decodeLicense } from '../../lib/license'
 import { useAccess, verifyLicenseCached } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
@@ -26,6 +28,12 @@ import { useProfileStore } from '../../stores/profileStore'
 import { LicenseKeyBox, PurchaseSuccess, SAVE_KEY_ADVICE } from './components'
 import { PURCHASE_ERRORS, PurchaseError, activateLicense, sessionIdFrom, verifyPurchase, type PurchaseErrorCode } from './premiumLogic'
 import { isLicenseRevoked, prepareRevocationCheck } from './revocations'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/** Webbköpen finns i bygget (bara webbygget) – en konstant i samma modul, se WEB_PURCHASES_BUILD. */
+const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
 
 /** Hur många gånger vi frågar igen automatiskt medan betalningen behandlas, och hur tätt. */
 export const PENDING_RETRIES = 5
@@ -78,7 +86,7 @@ function supportMailto(sessionId: string | null): string {
 export default function ThankYouPage() {
   // Stripe skickar aldrig tillbaka någon till en butiksapp. (När webbförsäljningen är avstängd på
   // webben visas sidan ändå, så att ett köp som påbörjades innan dess kan hämtas.)
-  if (isInApp()) return <Navigate to="/premium" replace />
+  if (!WEB_PURCHASES || isInApp()) return <Navigate to="/premium" replace />
   return <ThankYouContent />
 }
 

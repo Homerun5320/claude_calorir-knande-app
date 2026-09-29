@@ -40,7 +40,7 @@ formulär och texter i övrigt: [APP-STORE.md](APP-STORE.md), [GOOGLE-PLAY.md](G
 
 | Vad | Värde | Varför det är viktigt |
 | --- | --- | --- |
-| **App-id** (Bundle ID i App Store, applicationId i Google Play) | `se.lagomappen.lagom` | **Kan aldrig ändras** efter första uppladdningen till App Store Connect eller Play Console – ett nytt id blir en ny app utan betyg, köp eller användare. Id:t är ett omvänt domännamn men kräver ingen domän. **Ägaren bekräftar det** (eller väljer ett annat) innan Bundle ID skapas hos Apple. Byts det: ändra `appId` i `capacitor.config.ts`, `PRODUCT_BUNDLE_IDENTIFIER` i `ios/App/App.xcodeproj/project.pbxproj`, `namespace`/`applicationId` i `android/app/build.gradle`, paketet för `MainActivity.java` och `package_name`/`custom_url_scheme` i `android/app/src/main/res/values/strings.xml`. |
+| **App-id** (Bundle ID i App Store, applicationId i Google Play) | `se.lagomappen.lagom` | **Kan aldrig ändras** efter första uppladdningen till App Store Connect eller Play Console – ett nytt id blir en ny app utan betyg, köp eller användare. Id:t är ett omvänt domännamn men kräver ingen domän. **Ägaren bekräftar det** (eller väljer ett annat) innan Bundle ID skapas hos Apple. Byts det: ändra `appId` i `capacitor.config.ts`, `PRODUCT_BUNDLE_IDENTIFIER` i `ios/App/App.xcodeproj/project.pbxproj`, `namespace`/`applicationId` i `android/app/build.gradle`, paketet för `MainActivity.java` och `package_name`/`custom_url_scheme` i `android/app/src/main/res/values/strings.xml`. Domänen lagomappen.se var sannolikt ledig 2026-09-29 och bör registreras – se [APPNAMN.md](APPNAMN.md). |
 | **Webbvyns ursprung** | `capacitor://localhost` (iPhone), `https://localhost` (Android) | Dagboken ligger i webbvyns IndexedDB, som hör till ursprunget. Ändras `server.hostname`, `iosScheme` eller `androidScheme` i `capacitor.config.ts` efter lanseringen **försvinner all sparad data** för användarna. Serverfunktionerna godtar just de här ursprungen (`ALLOWED_NATIVE_ORIGINS`). |
 | **Appnamn** | `Lagom` | Visas under ikonen. Namnet i butikerna sätts i App Store Connect och Play Console. |
 | **Version** | `version` i `package.json` (1.0.0) | Molnbyggena tar den för båda apparna: `versionName` på Android och `MARKETING_VERSION` (skickas med till Xcode) på iPhone. `MARKETING_VERSION` i Xcode-projektet gäller bara byggen på en egen Mac – håll den lika. En tagg måste vara `v` + versionen. Byggnumret ökar i molnbygget (avsnitt 9). |
@@ -246,6 +246,7 @@ Filer som **skapas** och inte ska ändras för hand: `ios/App/CapApp-SPM/Package
   | `haptics` | `tap()`/`success()` – använd `haptic()` från `src/native`; tyst vid "Minska rörelse" | vatten, mat loggad, fasta, köp, streckkod |
   | `barcode` | Streckkodsläsaren (se avsnitt 2) | ScanPage |
   | `health` | Apple Hälsa/Health Connect: läser vikt och steg, skriver vikt samt energi och vatten för avslutade dagar. Av från början; `lagom-health` i localStorage | `init.ts`, Inställningar → Apple Hälsa/Health Connect |
+  | `photos` | Framstegsbilder: nedskalade JPEG utan EXIF i `framsteg/` med `index.json` – på iPhone i `Directory.LibraryNoCloud`, på Android i `Directory.Data`. Android-kamerans tillfälliga original (`Pictures/JPEG_*.jpg` i appens externa filmapp, med en `.nomedia` så att galleriappar inte visar mappen) tas bort med `clearCameraCaptures()` direkt efter nedskalningen, när sidan öppnas och vid varje start av appen. Ett trasigt `index.json` byggs om ur filerna i mappen. Av från början | `src/lib/progressPhotos.ts` (Vikt & mått → Framstegsbilder), `init.ts` (Android: `clearCameraCaptures`), "Radera all data" |
 
 - **Alla dynamiska importer av native-moduler står i `index.ts`.** Vite tar bara bort en dynamisk
   import ur webbygget när villkoret (`NATIVE_BUILD`, en konstant i bygget) står i samma modul –
@@ -260,8 +261,10 @@ Filer som **skapas** och inte ska ändras för hand: `ios/App/CapApp-SPM/Package
   med `lazy()` bakom byggkonstanten `APP_SECTIONS_BUILD` i `SettingsPage.tsx` (samma mönster som
   `NATIVE_BUILD`) och följer därför inte med i webbygget.
 - "Radera all data" (`wipeAndReset`) tar i apparna också bort kopian, exportfilerna och
-  hälsokopplingen (`clearNativeCopies` i `src/features/settings/wipe.ts`). Raderas bara
-  exempeldata ("Skapa min egen profil") ligger kopian kvar – den är användarens tidigare dagbok.
+  hälsokopplingen (`clearNativeCopies` i `src/features/settings/wipe.ts`) och – även på webben –
+  framstegsbilderna (`deleteProgressPhotos` → `deleteAllProgressPhotos` i
+  `src/lib/progressPhotos.ts`). Raderas bara exempeldata ("Skapa min egen profil") ligger kopian
+  och bilderna kvar – de är användarens egna.
 - De inbyggda apparna sätter klassen `native-app` på `<html>` (`system`), och `src/index.css`
   stänger då av bildernas långtrycksmeny (`-webkit-touch-callout: none`).
 - Allt är no-op på webben och i testerna, och kastar aldrig: fel loggas med `logError`.
@@ -282,10 +285,10 @@ bra på Linux). Inställningar:
 | Var | Inställning |
 | --- | --- |
 | `Info.plist` | `CFBundleDisplayName` Lagom, `CFBundleDevelopmentRegion` **sv** och `CFBundleLocalizations` [sv] (systemets knappar och dialoger i appen blir svenska), `ITSAppUsesNonExemptEncryption` **false**, bara **porträtt**, `UIRequiredDeviceCapabilities` arm64 |
-| `NSCameraUsageDescription` | "Lagom använder kameran för att läsa streckkoder på förpackningar. Bilderna sparas inte." |
+| `NSCameraUsageDescription` | "Lagom använder kameran för att läsa streckkoder på förpackningar – de bilderna sparas inte. Om du slår på framstegsbilder kan du också ta bilder på dig själv; de sparas bara i appen på din iPhone och lämnar den aldrig." |
 | `NSHealthShareUsageDescription` | "Om du vill läser Lagom vikt och steg från Hälsa – vikten hamnar i viktkurvan och stegen under Träning. Uppgifterna stannar på din iPhone." |
 | `NSHealthUpdateUsageDescription` | "Lagom sparar vikt, energi från måltider och vatten som du loggar i Hälsa om du vill. Inget skickas någon annanstans." |
-| `NSPhotoLibraryAddUsageDescription` | "Om du vill spara en produktbild i Bilder behöver Lagom lov att lägga till den där. Lagom läser inga bilder från ditt bildbibliotek." – en reserv: webbvyns meny "Spara bild" är avstängd i appen (`-webkit-touch-callout: none`), men utan texten skulle iOS avsluta appen om en bild ändå sparas (t.ex. via delningsbladet). Ingen läsbehörighet (`NSPhotoLibraryUsageDescription`). |
+| `NSPhotoLibraryAddUsageDescription` | "Om du vill spara en produktbild i Bilder behöver Lagom lov att lägga till den där. Lagom kan inte se ditt bildbibliotek, och framstegsbilder sparas aldrig i Bilder." – en reserv: webbvyns meny "Spara bild" är avstängd i appen (`-webkit-touch-callout: none`), men utan texten skulle iOS avsluta appen om en bild ändå sparas (t.ex. via delningsbladet). Ingen läsbehörighet (`NSPhotoLibraryUsageDescription`). |
 | `App.entitlements` | HealthKit (`com.apple.developer.healthkit`). Slå också på **HealthKit** och **In-App Purchase** för Bundle ID:t på developer.apple.com (*Identifiers*) – annars misslyckas signeringen. |
 | `PrivacyInfo.xcprivacy` | Se [avsnitt 8](#8-integritet-app-privacy-och-data-safety). Ligger i appmålet (Copy Bundle Resources). |
 | Byggen | `TARGETED_DEVICE_FAMILY = 1` (**bara iPhone**), `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO`, `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO`, `IPHONEOS_DEPLOYMENT_TARGET = 16.4`, `MARKETING_VERSION = 1.0.0` |
@@ -320,7 +323,8 @@ Skapat med `npx cap add android`. Inställningar:
 | `app/build.gradle` | `namespace`/`applicationId` `se.lagomappen.lagom`; `versionName` från `package.json`; `versionCode` från `-PlagomVersionCode=<nummer>` (standard 1); uppladdningsnyckel från miljövariablerna `LAGOM_UPLOAD_KEYSTORE`, `…_KEYSTORE_PASSWORD`, `…_KEY_ALIAS`, `…_KEY_PASSWORD` (bara i molnbygget, aldrig i Git); `useLegacyPackaging = false` (16 KB) |
 | `AndroidManifest.xml` | `allowBackup="false"` + `data_extraction_rules.xml` (ingen automatisk molnkopia till Google Drive – dagboken stannar på telefonen; överföring direkt till en ny telefon fungerar), `usesCleartextTraffic="false"`, porträtt |
 | Tema | `values/colors.xml` och `values-night/colors.xml`: gran `#1F5A43`, bakgrund `#F6F3EC`, mörk bakgrund `#0B1210`; `Theme.AppCompat.DayNight` |
-| `file_paths.xml` | FileProvider bara för exportmappen i cachen (`Directory.Cache/delning/`) – aldrig filmappen, där den automatiska kopian av dagboken ligger |
+| `file_paths.xml` | FileProvider för exportmappen i cachen (`Directory.Cache/delning/`) och för `Pictures/` i appens externa filmapp (`external-files-path`, där kameraappen skriver framstegsbildens tillfälliga original – `clearCameraCaptures` tar bort den direkt efter nedskalningen och annars vid nästa start) – aldrig filmappen, där den automatiska kopian av dagboken och framstegsbilderna ligger |
+| `<queries>` | Avsikten `android.media.action.IMAGE_CAPTURE`: "Ta en bild" för framstegsbilder (`<input capture>`) öppnar kameraappen via Capacitors filväljare, som på Android 11+ bara hittar kameran när avsikten är deklarerad. Utan den faller knappen tillbaka till filväljaren |
 
 Webbvyn är telefonens *Android System WebView* (uppdateras via Google Play). Appens stilar
 (Tailwind CSS v4) kräver version 111 eller senare, och CSP:n förutsätter att webbvyn kan lägga in
@@ -331,7 +335,7 @@ Capacitors brygga utan inbäddat skript (`DOCUMENT_START_SCRIPT`, finns i alla s
 | Behörighet | Varför |
 | --- | --- |
 | `INTERNET` | Open Food Facts, receptimport, serverfunktionerna |
-| `CAMERA` (+ `uses-feature` kamera, inte krav) | Streckkodsläsaren |
+| `CAMERA` (+ `uses-feature` kamera, inte krav) | Streckkodsläsaren och framstegsbilderna ("Ta en bild") |
 | `POST_NOTIFICATIONS` | Lokala påminnelser (Android 13+ frågar) |
 | `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` (från tillägget) | Påminnelserna finns kvar efter omstart |
 | `VIBRATE` (från tillägget) | Haptik |
@@ -420,6 +424,7 @@ Google ML Kit i Android-appens streckkodsläsare (se tabellen):
 | Export/delning | Bara dit användaren själv väljer | Nej |
 | Automatisk kopia (`lagom-spegling.json`) | Nej – en fil i appens mapp. På iPhone i `Library/NoCloud`, som inte följer med i iCloud- eller datorsäkerhetskopian; på Android undantagen från Googles molnkopia (`data_extraction_rules.xml`) | Nej (beskrivs i integritetspolicyn) |
 | De senast kända köpen (`lagom-butikskop`) | Nej – localStorage i appen (produkt, köpdatum, slutdatum), så att köpen gäller utan uppkoppling | Nej (beskrivs i integritetspolicyns lagringstabell) |
+| Framstegsbilder (`src/native/photos.ts`, `src/lib/progressPhotos.ts`) | Nej – nedskalade JPEG utan EXIF/GPS i appens mapp (`framsteg/`, `index.json`): `Library/NoCloud` på iPhone (utanför iCloud- och datorsäkerhetskopian), appens filmapp på Android (undantagen från Googles molnkopia, `data_extraction_rules.xml`). Ingen delning, inte i säkerhetskopian eller speglingen, inget moln. Android: kamerans tillfälliga original (`Pictures/JPEG_*.jpg` i appens externa filmapp) tas bort direkt efter nedskalningen, och annars vid nästa start av appen | Nej – bilderna lämnar aldrig enheten, så de samlas inte in (varken *Photos* i App Privacy eller *Photos and videos* i Data safety); beskrivs i integritetspolicyns lagringstabell |
 
 ## 9. Molnbyggen: kontroll, signering och uppladdning
 

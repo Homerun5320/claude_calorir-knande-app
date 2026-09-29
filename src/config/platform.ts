@@ -42,6 +42,31 @@ export const DISTRIBUTION: Distribution =
 export const IS_STORE_BUILD = DISTRIBUTION !== 'web'
 
 /**
+ * Webbköpen (Stripe Checkout, tacksidan #/tack, testköpen och "Tappat nyckeln?") finns bara i
+ * webbygget. I butiksbyggena tas koden bort helt – Apple och Google tillåter inga andra köpsätt i
+ * apparna, och koden ska inte heller ligga dold i paketet.
+ *
+ * Obs: Vite (Rolldown) tar bara bort kod när villkoret är en konstant **i samma modul**. En modul
+ * som ska krympa i butiksbyggena upprepar därför uttrycket lokalt, med den här konstanten som
+ * reserv i testerna (där `define` saknas):
+ *
+ *     declare const __LAGOM_DISTRIBUTION__: string | undefined
+ *     const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
+ *
+ * Byggkontrollen (`findWebPurchaseCode` i scripts/commerce-guard.ts, körs av vite.config.ts)
+ * stoppar ett butiksbygge där koden ändå har kommit tillbaka.
+ */
+export const WEB_PURCHASES_BUILD: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : !IS_STORE_BUILD
+
+/**
+ * Licensnycklar (från webbköp) kan aktiveras och räknas i bygget: webben och Google Play-appen,
+ * aldrig App Store-bygget – där gäller bara köp i appen. Samma regel om konstanter som ovan:
+ *
+ *     const KEY_ENTRY: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : KEY_ENTRY_BUILD
+ */
+export const KEY_ENTRY_BUILD: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : DISTRIBUTION !== 'appstore'
+
+/**
  * Webbförsäljning (Stripe) på eller av: `VITE_WEB_SALES=off` stänger av köp på webben, så att
  * Lagom bara säljs i appbutikerna. Licensnycklar från tidigare webbköp fungerar ändå.
  */
@@ -186,7 +211,7 @@ export function isIosDevice(): boolean {
 
 /** Webbköp med Stripe erbjuds här: webbversionen i en vanlig webbläsare, med webbförsäljningen på. */
 export function sellsOnWeb(): boolean {
-  return !IS_STORE_BUILD && RUNTIME === 'web' && WEB_SALES_ENABLED
+  return WEB_PURCHASES_BUILD && RUNTIME === 'web' && WEB_SALES_ENABLED
 }
 
 /**
@@ -194,7 +219,7 @@ export function sellsOnWeb(): boolean {
  * där gäller bara köp i appen (som återställs via Apple-ID med "Återställ köp").
  */
 export function allowsLicenseKeyEntry(): boolean {
-  if (DISTRIBUTION === 'appstore') return false
+  if (!KEY_ENTRY_BUILD) return false
   if (isNativeIos()) return false
   return true
 }
@@ -216,7 +241,7 @@ export function trialViaStore(): boolean {
  * webbköpen har gjorts; aldrig i butiksapparna.
  */
 export function offersLicenseRecovery(): boolean {
-  return !isInApp() && allowsLicenseKeyEntry()
+  return WEB_PURCHASES_BUILD && !isInApp() && allowsLicenseKeyEntry()
 }
 
 /** Var datan sparas, för texter som "Din data sparas {storagePlace()}". */

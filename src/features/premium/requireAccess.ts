@@ -2,7 +2,7 @@
  * Spärr för NY loggning efter provperioden – och i exempelläget.
  *
  * Anropa `requireAccess()` precis innan något nytt skapas (mat, snabbregistrering, kopierad
- * måltid/dag, vatten, dryck, träning, vikt, mått, fasta, nytt livsmedel/recept). Är provperioden
+ * måltid/dag, vatten, dryck, träning, vikt, mått, fasta, nytt livsmedel/recept, framstegsbild). Är provperioden
  * slut och ingen licens finns returneras false och ett lugnt ark förklarar varför – med vägar
  * till priserna och till exporten. Att titta på, ändra, exportera och radera sin data spärras
  * aldrig.
@@ -33,6 +33,7 @@ export type BlockedAction =
   | 'livsmedel'
   | 'skanna'
   | 'planera'
+  | 'bild'
 
 export const BLOCKED_ACTION_TEXT: Record<BlockedAction, string> = {
   mat: 'logga mat',
@@ -48,6 +49,7 @@ export const BLOCKED_ACTION_TEXT: Record<BlockedAction, string> = {
   livsmedel: 'skapa egna livsmedel',
   skanna: 'skanna streckkoder',
   planera: 'planera måltider',
+  bild: 'spara framstegsbilder',
 }
 
 interface AccessGateState {

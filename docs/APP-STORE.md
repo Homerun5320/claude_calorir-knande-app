@@ -44,7 +44,7 @@ delning och export, lokala påminnelser, Apple Hälsa, haptik, statusfält och t
 | Målgrupp | Vuxna, **18 år och äldre**. |
 | Priser | Årslicens **349 kr** och Livstidslicens **699 kr** (närmaste prisnivå i App Store Connect). |
 | Livstid | För alltid, felrättningar ingår – inga löften om nya funktioner. |
-| Betalning | **Bara köp i appen** (Apple In-App Purchase). Inga länkar till eller omnämnanden av webbköp. |
+| Betalning | **Bara köp i appen** (Apple In-App Purchase). Inga länkar till eller omnämnanden av webbköp. Koden för webbköp finns inte i appens paket – byggkontrollen stoppar bygget annars. |
 | Licensnycklar | Kan **inte** aktiveras i App Store-appen. Köp återställs med **Återställ köp** (Apple-ID). Den som har köpt på webben får en erbjudandekod via supporten (se [avsnitt 6](#erbjudandekoder-för-webbköpare)). |
 | Provperiod | 14 dagar. Startas med ett gratis köp i App Store (`prov14`, 0 kr, riktlinje 3.1.1) när den egna profilen är skapad – exempeldatan är skrivskyddad och startar ingen provperiod. Följer Apple-kontot och börjar inte om efter en ominstallation. |
 | Appskal | **Capacitor 8**, iOS 16.4 eller senare, byggs med Xcode 26 i molnet. |
@@ -109,6 +109,9 @@ Reserv om namnet är upptaget (22 tecken):
 ```
 Lagom – kaloriräknaren
 ```
+
+Bara `Lagom` är troligen upptaget – minst två appar heter Lagom/LAGOM i App Store (se
+[APPNAMN.md](APPNAMN.md)). Säger App Store Connect nej, använd reserven direkt.
 
 ### Undertitel (högst 30 tecken)
 
@@ -393,7 +396,9 @@ Det här samlas **inte** in (och ska inte kryssas i):
   personuppgiftsbiträde i integritetspolicyn och i registerförteckningen, och Data safety i Google
   Play ändras på samma sätt – **före** inskickningen.
 - Identifierare, plats, kontakter, foton – streckkodsläsaren tolkar kamerabilden i telefonen och
-  sparar eller skickar inga bilder.
+  sparar eller skickar inga bilder. Framstegsbilder (frivilliga) sparas nedskalade och utan
+  platsuppgifter bara i appens mapp på telefonen (`Library/NoCloud`) och lämnar den aldrig – det
+  räknas inte som insamling. Delade recept och måltider skickar användaren själv (länk eller fil).
 - Diagnostik – felloggen sparas bara i telefonen och skickas bara om användaren själv mejlar
   felrapporten till supporten. Det är frivilligt och sker sällan, vilket enligt Apples regler
   inte behöver redovisas. (Vill du vara extra försiktig kan du ange *Other Diagnostic Data –
@@ -450,7 +455,7 @@ gränsen – det är okej, eftersom appen själv släpper in bara vuxna.
 | **Content Rights** – innehåller appen innehåll från tredje part? | **Ja**, och du har rätt att använda det: Livsmedelsverkets livsmedelsdatabas (CC BY 4.0, källan anges i appen), Open Food Facts (data ODbL, bilder CC BY-SA, källan anges), typsnitten Fraunces och Inter (SIL Open Font License), Workbox (MIT). Licenstexterna finns i `public/licenses/` och i Om Lagom. |
 | **Betalningsval i EU** (alternativa villkor, länkar till extern betalning) | **Nej.** Behåll Apples standardvillkor och bara köp i appen. Ansök inte om *StoreKit External Purchase Link Entitlement* eller *Alternative Terms Addendum for Apps in the EU*. |
 | **Sign in with Apple** | Behövs inte – appen har inga konton. |
-| **Kamerabehörighet** (`NSCameraUsageDescription` i `Info.plist`) | `Lagom använder kameran för att läsa streckkoder på förpackningar. Bilderna sparas inte.` |
+| **Kamerabehörighet** (`NSCameraUsageDescription` i `Info.plist`) | `Lagom använder kameran för att läsa streckkoder på förpackningar – de bilderna sparas inte. Om du slår på framstegsbilder kan du också ta bilder på dig själv; de sparas bara i appen på din iPhone och lämnar den aldrig.` |
 | **Apple Hälsa** (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`, HealthKit-förmågan) | Texterna och förmågan finns i projektet ([NATIVE.md §5](NATIVE.md#5-iphone-projektet-ios)). Slå på **HealthKit** för Bundle ID:t på developer.apple.com. Apple kräver att appen tydligt visar när den använder Hälsa (Inställningar → Apple Hälsa), att beskrivningen nämner kopplingen (2.5.1), att integritetspolicyn beskriver den och att hälsodata aldrig används för reklam eller lämnas vidare (5.1.3). |
 | **Notiser** | Lokala påminnelser – ingen pushfunktion (*Push Notifications* ska **inte** slås på för Bundle ID:t). iPhone frågar om lov först när användaren slår på en påminnelse. |
 | **Digital Services Act – trader** | Ja (du säljer appen). Se [avsnitt 2](#2-konto-och-avtal). |

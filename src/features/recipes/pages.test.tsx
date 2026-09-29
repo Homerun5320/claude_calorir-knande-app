@@ -84,6 +84,8 @@ describe('RecipesPage', () => {
     expect(screen.getByRole('tab', { name: /Mina recept/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Ditt första recept väntar')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Skapa recept' })).toHaveAttribute('href', '/recept/nytt')
+    // Delade recept öppnas här (i apparna öppnas delningslänkar i webbläsaren).
+    expect(screen.getByRole('link', { name: 'Öppna delat recept' })).toHaveAttribute('href', '/dela')
     // Den flytande knappen dubblerar inte tomlägets egen knapp (och täcker inte tipsen).
     expect(screen.queryByRole('link', { name: 'Nytt recept' })).not.toBeInTheDocument()
   })
@@ -195,6 +197,25 @@ describe('RecipeDetailPage', () => {
     expect(link).toHaveAttribute('href', 'https://www.recept.example.se/kladdkaka')
     expect(link).toHaveAttribute('target', '_blank')
     expect(screen.getByText('Instruktionerna finns hos källan.')).toBeInTheDocument()
+  })
+
+  it('med en allergiprofil visas inte märkena Glutenfri och Laktosfri – de saknar källa', async () => {
+    const tagged: Recipe = { ...ownRecipe, tags: ['glutenfri', 'laktosfri', 'vegetarisk'] }
+    useFoodStore.setState({ recipes: { [tagged.id]: tagged } })
+    const first = renderAt('/recept/r_test1')
+    await screen.findByRole('heading', { level: 1, name: 'Mormors gröt' })
+    expect(screen.getByText('Glutenfri')).toBeInTheDocument()
+    first.unmount()
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, allergens: ['gluten'] } }))
+    try {
+      renderAt('/recept/r_test1')
+      await screen.findByRole('heading', { level: 1, name: 'Mormors gröt' })
+      expect(screen.queryByText('Glutenfri')).not.toBeInTheDocument()
+      expect(screen.queryByText('Laktosfri')).not.toBeInTheDocument()
+      expect(screen.getByText('Vegetarisk')).toBeInTheDocument()
+    } finally {
+      useProfileStore.setState((s) => ({ settings: { ...s.settings, allergens: undefined } }))
+    }
   })
 
   it('visar ingen källa för recept utan länk', async () => {
@@ -467,6 +488,57 @@ describe('RecipeImportPage', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://example.se/recept' } })
     fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
     expect(await screen.findByText('Kunde inte hämta sidan – kontrollera länken')).toBeInTheDocument()
+  })
+
+  it('låter användaren klistra in ingredienserna när sidan inte gick att läsa – länken sparas som källa', async () => {
+    mockRecipeFetch(() => json({ code: 'inget-recept', error: 'Hittade inget recept på sidan.' }, 422))
+    const { router } = renderAt('/recept/importera')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Länk till receptet' }), { target: { value: 'https://recept.example.se/linssoppa/' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Hittade inget recept på sidan')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Klistra in ingredienserna' }))
+
+    expect(await screen.findByText(/Kopiera ingredienslistan från receptet/)).toBeInTheDocument()
+    expect(screen.getByText('Från recept.example.se')).toBeInTheDocument()
+    // Ett helt inklistrat recept: rubriker och instruktioner hoppas över.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ingredienser' }), { target: { value: 'Ingredienser\n2 dl havregryn\nGör så här\nKoka upp vatten och rör ner grynen.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Matcha ingredienser' }))
+    const list = await screen.findByRole('list', { name: 'Ingredienser att kontrollera' })
+    await within(list).findByRole('button', { name: /^Havregryn: 2 dl/ }, { timeout: 3000 })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+
+    // Texten går att ändra igen.
+    fireEvent.click(screen.getByRole('button', { name: 'Ändra inklistrad text' }))
+    expect(screen.getByRole('textbox', { name: 'Ingredienser' })).toHaveValue('Ingredienser\n2 dl havregryn\nGör så här\nKoka upp vatten och rör ner grynen.')
+    fireEvent.click(screen.getByRole('button', { name: 'Matcha ingredienser' }))
+    await within(await screen.findByRole('list', { name: 'Ingredienser att kontrollera' })).findByRole('button', { name: /^Havregryn: 2 dl/ }, { timeout: 3000 })
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Namn' }), { target: { value: 'Linssoppa' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Skapa receptet' }))
+    })
+    const saved = Object.values(useFoodStore.getState().recipes)
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).toMatchObject({ name: 'Linssoppa', servings: 4, sourceUrl: 'https://recept.example.se/linssoppa/' })
+    expect(saved[0].ingredients.map((i) => i.food.id)).toEqual(['lagom:havregryn'])
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/recept/${saved[0].id}`))
+  })
+
+  it('erbjuder inklistring även när sidan inte kunde hämtas – men inte för en ogiltig länk', async () => {
+    mockRecipeFetch(() => json({ code: 'hamtning' }, 502))
+    renderAt('/recept/importera')
+    const field = screen.getByRole('textbox', { name: 'Länk till receptet' })
+    fireEvent.change(field, { target: { value: 'kladdkaka' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByText('Klistra in hela länken till receptet – den börjar med https://')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Klistra in ingredienserna' })).not.toBeInTheDocument()
+
+    fireEvent.change(field, { target: { value: 'https://recept.example.se/kladdkaka' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hämta recept' }))
+    expect(await screen.findByRole('button', { name: 'Klistra in ingredienserna' })).toBeInTheDocument()
+    // En ny länk döljer erbjudandet.
+    fireEvent.change(field, { target: { value: 'https://recept.example.se/annan' } })
+    expect(screen.queryByRole('button', { name: 'Klistra in ingredienserna' })).not.toBeInTheDocument()
   })
 
   it('tolkar serverns riktiga felsvar (422 inget-recept, 400 ogiltig)', async () => {

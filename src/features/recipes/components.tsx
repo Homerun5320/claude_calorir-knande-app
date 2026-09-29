@@ -57,9 +57,14 @@ const TAG_TONES: Partial<Record<FoodTag, Tone>> = {
   klassiker: 'sol',
 }
 
-/** Små märkningar (vegetarisk, glutenfri …). */
+/**
+ * Små märkningar (vegetarisk, glutenfri …). Med en allergiprofil visas inte Glutenfri och Laktosfri:
+ * de har ingen källa (receptets ingredienser eller egna märkningar) och laktosfri betyder inte
+ * mjölkfri – samma regel som i livsmedelsdetaljen (se lib/allergens.ts).
+ */
 export function TagBadges({ tags, max, hide = [], size = 'sm' }: { tags: readonly FoodTag[]; max?: number; hide?: readonly FoodTag[]; size?: 'sm' | 'md' }) {
-  const list = sortedTags(tags).filter((t) => !hide.includes(t))
+  const allergyProfile = useProfileStore((s) => (s.settings.allergens?.length ?? 0) > 0)
+  const list = sortedTags(tags).filter((t) => !hide.includes(t) && !(allergyProfile && (t === 'glutenfri' || t === 'laktosfri')))
   const shown = max !== undefined ? list.slice(0, max) : list
   if (shown.length === 0) return null
   return (

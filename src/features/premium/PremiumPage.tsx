@@ -12,6 +12,9 @@
  * - Webben med webbförsäljningen avstängd: länkar till appbutikerna (`StoreLinksPanel`).
  * - iPhone-appen: provperioden startas med ett gratis köp i App Store ("Starta 14 dagar gratis").
  *
+ * Webbköpen (planerna, köparket och säljarraden) tas bort ur butiksbyggenas paket med konstanten
+ * `WEB_PURCHASES` (se WEB_PURCHASES_BUILD i src/config/platform.ts).
+ *
  * Nås även före välkomstflödet och efter provperioden.
  */
 import { useState } from 'react'
@@ -19,7 +22,7 @@ import { ArrowRight, Download, Sprout, UserRound } from 'lucide-react'
 import { Button, Card, PageHeader, Spinner, toast } from '../../components/ui'
 import { Confetti } from '../../components/signature'
 import { COMMERCE_MODE, PLANS, TRIAL_DAYS, type Plan } from '../../config/commerce'
-import { allowsLicenseKeyEntry, isInApp, offersLicenseRecovery, sellsOnWeb } from '../../config/platform'
+import { WEB_PURCHASES_BUILD, allowsLicenseKeyEntry, isInApp, offersLicenseRecovery, sellsOnWeb } from '../../config/platform'
 import { useAccess } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -41,6 +44,12 @@ import {
 import { StartOwnProfileButton } from './AccessGate'
 import { StartTrialButton } from './StartTrialButton'
 import { PURCHASE_ERRORS, PurchaseError, buyInTestMode, createCheckout, plansToOffer, redirectTo, storeRenewalNote } from './premiumLogic'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/** Webbköpen finns i bygget (bara webbygget) – en konstant i samma modul, se WEB_PURCHASES_BUILD. */
+const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
 
 function SectionHeading({ id, title, subtitle }: { id: string; title: string; subtitle?: string }) {
   return (
@@ -71,6 +80,7 @@ export default function PremiumPage() {
   }
 
   const confirm = async (p: Plan) => {
+    if (!WEB_PURCHASES) return
     setBusy(true)
     setError(null)
     if (COMMERCE_MODE === 'test') {
@@ -96,7 +106,9 @@ export default function PremiumPage() {
     }
   }
 
-  const web = sellsOnWeb()
+  // WEB_PURCHASES står också direkt i villkoren nedan: Vite tar bara bort kod när villkoret är en
+  // konstant i modulen, inte en lokal variabel.
+  const web = WEB_PURCHASES && sellsOnWeb()
   const inApp = isInApp()
   const keyEntry = allowsLicenseKeyEntry()
   const offered = plansToOffer(status, PLANS)
@@ -157,7 +169,7 @@ export default function PremiumPage() {
 
         {showStorePanel && (inApp ? <StorePurchasePanel headingId="premium-planer" planIds={offered.map((p) => p.id)} note={storeNote} /> : <StoreLinksPanel headingId="premium-planer" />)}
 
-        {web && offered.length > 0 && (
+        {WEB_PURCHASES && web && offered.length > 0 && (
           <section aria-labelledby="premium-planer">
             <SectionHeading
               id="premium-planer"
@@ -223,10 +235,10 @@ export default function PremiumPage() {
           </Card>
         )}
 
-        {web && <SellerFooter />}
+        {WEB_PURCHASES && web && <SellerFooter />}
       </div>
 
-      {web && <CheckoutSheet plan={plan} open={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={confirm} busy={busy} error={error} />}
+      {WEB_PURCHASES && web && <CheckoutSheet plan={plan} open={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={confirm} busy={busy} error={error} />}
     </div>
   )
 }

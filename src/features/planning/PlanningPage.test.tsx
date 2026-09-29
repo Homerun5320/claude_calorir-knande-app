@@ -167,6 +167,25 @@ describe('PlanningPage – veckan', () => {
     expect(day.textContent).not.toMatch(/för mycket|varning/i)
   })
 
+  it('ger varje dag sitt eget mål med veckobudgeten', () => {
+    // +300 kcal på fredagen och 50 kcal mindre de andra sex dagarna (summa 0).
+    const shift = [-50, -50, -50, -50, 300, -50, -50]
+    useProfileStore.setState((s) => ({ settings: { ...s.settings, adaptiveTargets: false, weeklyBudget: { enabled: true, shift } } }))
+    plan(recipeDraft(monday))
+    plan(recipeDraft(addDays(monday, 4)))
+    renderAt()
+    /** Dagens mål i kcal ur förloppsindikatorns text ("270 kcal planerat av 1 850 kcal"). */
+    const targetOf = (name: RegExp) => {
+      const text = within(screen.getByRole('region', { name })).getByRole('progressbar').getAttribute('aria-valuetext') ?? ''
+      const match = /planerat av ([\d\s ]+)/.exec(text)
+      return Number(match?.[1].replace(/\D/g, ''))
+    }
+    const mon = targetOf(/^Måndag/)
+    const fri = targetOf(/^Fredag/)
+    expect(mon).toBeGreaterThan(0)
+    expect(fri - mon).toBe(350)
+  })
+
   it('döljer siffrorna i medvetet läge', () => {
     useProfileStore.setState((s) => ({ settings: { ...s.settings, mindfulMode: true } }))
     plan(recipeDraft(monday))

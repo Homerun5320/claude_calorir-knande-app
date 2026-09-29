@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   native: true,
+  platform: 'ios' as 'ios' | 'android',
   modules: {} as Record<string, unknown>,
   loaded: [] as string[],
   logError: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./index')>()),
   isNative: () => mocks.native,
+  nativePlatform: () => (mocks.native ? mocks.platform : 'web'),
   loadNative: async (name: string) => {
     mocks.loaded.push(name)
     return mocks.native ? (mocks.modules[name] ?? null) : null
@@ -35,6 +37,7 @@ import { clearNativeCopies } from '../features/settings/wipe'
 
 beforeEach(() => {
   mocks.native = true
+  mocks.platform = 'ios'
   mocks.modules = {}
   mocks.loaded = []
 })
@@ -61,6 +64,16 @@ describe('startNative', () => {
     expect(mocks.loaded).toEqual(expect.arrayContaining(['system', 'purchases', 'mirror', 'reminders', 'health']))
     expect(mocks.setNativeStorePurchases).not.toHaveBeenCalled()
     expect(mocks.logError).not.toHaveBeenCalled()
+  })
+
+  it('Android: tar bort kamerans tillfälliga originalbilder vid varje start – inte på iPhone', async () => {
+    const clearCameraCaptures = vi.fn(async () => {})
+    mocks.modules = { photos: { clearCameraCaptures } }
+    await startNative()
+    expect(mocks.loaded).not.toContain('photos')
+    mocks.platform = 'android'
+    await startNative()
+    await vi.waitFor(() => expect(clearCameraCaptures).toHaveBeenCalledTimes(1))
   })
 
   it('ett fel i en del stoppar inte de andra, och saknade köp säger till direkt', async () => {

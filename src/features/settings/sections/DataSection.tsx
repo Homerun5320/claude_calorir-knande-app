@@ -44,6 +44,7 @@ import { clearDemoFlag } from '../../../lib/demoFlag'
 import { plural } from '../../../lib/format'
 import { useDemoData } from '../../../hooks/useDemoData'
 import { currentAccess } from '../../../hooks/useAccess'
+import { useProfileStore } from '../../../stores/profileStore'
 import { useLicenseStore } from '../../../stores/licenseStore'
 import { hasNewerData } from '../../../stores/storage'
 import { useHasNewerData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
@@ -52,7 +53,7 @@ import { useDiaryStore } from '../../../stores/diaryStore'
 import { SUPPORT_EMAIL } from '../../../config/commerce'
 import { isExampleEmail } from '../../../lib/placeholderEmail'
 import { CLOUD_ENABLED } from '../../../config/cloud'
-import { DISTRIBUTION, isInApp, isNativeApp, isTwa, sellsOnWeb, storagePlace } from '../../../config/platform'
+import { DISTRIBUTION, WEB_PURCHASES_BUILD, isInApp, isNativeApp, isTwa, sellsOnWeb, storagePlace } from '../../../config/platform'
 import { StartOwnProfileButton } from '../../premium/AccessGate'
 import { backupDateLabel, restoreBackupSafely } from '../backupImport'
 import { markBackupNow, useLastBackup } from '../backupStatus'
@@ -61,6 +62,14 @@ import { isNative } from '../../../native'
 import { ImportSummaryList } from '../ImportSummaryList'
 import { DELETE_WORD, formatBytes, isDeleteConfirmed } from '../settingsLogic'
 
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * Webbköpen finns i bygget (bara webbygget) – en konstant i samma modul, så att texten om Stripe
+ * inte följer med i butiksapparna (se WEB_PURCHASES_BUILD i src/config/platform.ts).
+ */
+const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
 
 /**
  * Spara en säkerhetskopia. "Senaste säkerhetskopian" uppdateras bara när filen faktiskt har sparats
@@ -81,7 +90,7 @@ async function exportBackup(): Promise<SaveOutcome> {
 
 /** Butiken som sköter köpen i den här versionen av appen (aldrig en annan plattforms namn i iPhone-appen). */
 function purchaseText(): string {
-  if (sellsOnWeb()) return 'När du köper en licens på webben sköts betalningen av Stripe.'
+  if (WEB_PURCHASES && sellsOnWeb()) return 'När du köper en licens på webben sköts betalningen av Stripe.'
   // Play-appen är också en inbyggd app (Capacitor) – därför avgör bygget först.
   if (DISTRIBUTION === 'play' || isTwa()) return 'Köp sköts av Google Play.'
   if (DISTRIBUTION === 'appstore' || isNativeApp()) return 'Köp sköts av App Store.'
@@ -151,6 +160,7 @@ export function DataSection() {
   const [readingOther, setReadingOther] = useState(false)
   const demo = useDemoData()
   const hasLicense = useLicenseStore((s) => s.licenseKey !== null)
+  const photosOn = useProfileStore((s) => s.settings.progressPhotos === true)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [typed, setTyped] = useState('')
   const [removeLicense, setRemoveLicense] = useState(false)
@@ -308,6 +318,8 @@ export function DataSection() {
           En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
           eller återställa om något händer.
         </p>
+        {/* Framstegsbilderna ligger utanför säkerhetskopian (src/lib/progressPhotos.ts). */}
+        {photosOn && <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-3">Framstegsbilder ingår inte – de finns bara {storagePlace()}.</p>}
         <p className="mt-2 text-[0.8125rem] text-ink-3" aria-live="polite">
           {lastBackupText(lastBackup)}
         </p>
@@ -423,7 +435,7 @@ export function DataSection() {
           Radera all data
         </h2>
         <p className="mb-4 mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-          Tar bort allt från den här enheten. Exportera gärna en säkerhetskopia först.
+          Tar bort allt från den här enheten{photosOn ? ', även framstegsbilderna' : ''}. Exportera gärna en säkerhetskopia först.
           {CLOUD_ENABLED && ' Du loggas också ut från Lagom Moln på den här enheten. Kopian i molnet raderas inte – det gör du under Lagom Moln.'}
         </p>
         <Button variant="danger" iconLeft={Trash} onClick={startDelete}>

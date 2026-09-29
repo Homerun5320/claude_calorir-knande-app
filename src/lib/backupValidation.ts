@@ -44,6 +44,7 @@ import type {
   Targets,
   ThemeMode,
   UnitKey,
+  WeeklyBudgetSettings,
   WeightEntry,
 } from '../types'
 import { ACTIVITY_LEVELS, ALLERGEN_KEYS, FOOD_CATEGORIES, MEAL_IDS } from '../types'
@@ -440,6 +441,24 @@ function sanitizeExtra(raw: unknown, r: Rec): FoodExtra | undefined {
     const v = stringList(raw[key], r)
     if (v !== undefined) extra[key] = v
   }
+  // Allergennycklarna från Open Food Facts (lib/allergens.ts) – bara kända nycklar, utan dubbletter.
+  // Tomma listor behålls: de betyder att spåren har lästs in (inga angivna), inte att de är okända.
+  for (const key of ['allergenKeys', 'traceKeys'] as const) {
+    const v = raw[key]
+    if (v === undefined || v === null) continue
+    if (!Array.isArray(v)) {
+      r.fixed = true
+      continue
+    }
+    const valid = [...new Set(v.filter(oneOf(ALLERGEN_KEYS)))]
+    extra[key] = valid
+    if (valid.length !== v.length) {
+      r.fixed = true
+      // Något som inte gick att tolka (t.ex. från en nyare version) – då sägs aldrig att inget anges.
+      if (v.some((k) => !oneOf(ALLERGEN_KEYS)(k))) extra.unreadAllergenTags = true
+    }
+  }
+  if (optBoolean(raw.unreadAllergenTags, r)) extra.unreadAllergenTags = true
   return extra
 }
 
@@ -1020,7 +1039,10 @@ function sanitizeWeeklyBudget(raw: unknown, r: Rec): Settings['weeklyBudget'] {
     raw.shift.every((v) => isNum(v) && Number.isInteger(v) && Math.abs(v) <= 1500) &&
     (raw.shift as number[]).reduce((a, b) => a + b, 0) === 0
   ) {
-    return { enabled: raw.enabled, shift: [...(raw.shift as number[])] }
+    const out: WeeklyBudgetSettings = { enabled: raw.enabled, shift: [...(raw.shift as number[])] }
+    if (typeof raw.since === 'string' && isValidISODate(raw.since)) out.since = raw.since
+    else if (raw.since !== undefined) r.fixed = true
+    return out
   }
   r.fixed = true
   return undefined

@@ -3,7 +3,8 @@
  *
  * Visar näring per portion, ingredienser som kan skalas till valfritt antal portioner,
  * Tallriksmodellen, klimatavtryck och instruktioner. Härifrån loggas en portion i dagboken,
- * egna recept redigeras eller tas bort och klassiker kopieras till "Mina recept".
+ * egna recept redigeras, delas (länk eller fil, se `ShareButton`) eller tas bort och klassiker
+ * kopieras till "Mina recept".
  */
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -60,6 +61,7 @@ import {
 } from './recipeLogic'
 import { servingNounFor, useIsFavoriteRecipe, useRecipe } from './useRecipes'
 import { LogRecipeSheet, RecipeEmoji, TagBadges } from './components'
+import { ShareButton } from './ShareButton'
 import { requireAccess } from '../premium/requireAccess'
 
 /** Redigeraren går tillbaka hit efter "Spara" i stället för att lägga en ny sida i historiken. */
@@ -220,12 +222,16 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
         title={recipe.name}
         subtitle={info?.intro}
         actions={
-          <IconButton
-            icon={<Heart className={cx('size-5', favorite && 'fill-lingon text-lingon')} strokeWidth={2.1} aria-hidden />}
-            aria-label={favorite ? 'Ta bort från favoriter' : 'Spara som favorit'}
-            pressed={favorite}
-            onClick={onFavorite}
-          />
+          <>
+            {/* Egna recept kan delas som länk eller fil – klassikerna har alla redan. */}
+            {!builtin && <ShareButton target={{ kind: 'recipe', recipe }} />}
+            <IconButton
+              icon={<Heart className={cx('size-5', favorite && 'fill-lingon text-lingon')} strokeWidth={2.1} aria-hidden />}
+              aria-label={favorite ? 'Ta bort från favoriter' : 'Spara som favorit'}
+              pressed={favorite}
+              onClick={onFavorite}
+            />
+          </>
         }
       >
         <div className="flex items-center gap-4">

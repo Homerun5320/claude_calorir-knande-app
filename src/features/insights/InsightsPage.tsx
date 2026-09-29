@@ -298,7 +298,7 @@ function PeriodPicker({
 // ---------------------------------------------------------------------------
 
 function buildReportFor(data: InsightsData, showClimate: boolean) {
-  const { period, entriesByDate, exerciseByDate, refProfile, summary, avg, targets, unit, mindful, refs } = data
+  const { period, entriesByDate, exerciseByDate, refProfile, summary, avg, targets, goalKcal, unit, mindful, refs, weeklyPlan } = data
   const results = evaluateKostrad({ entriesByDate, exerciseByDate, dates: period.elapsed, sex: refProfile.sex })
   const climate = showClimate ? summarizeClimate(climateDays(period.elapsed, entriesByDate)).avgKg : undefined
   const best = rankNutrients(avg.averages, avg.coverage, refs, 1).strongest[0]
@@ -306,7 +306,8 @@ function buildReportFor(data: InsightsData, showClimate: boolean) {
     period,
     summary,
     averages: avg.averages,
-    targets: { kcal: targets.kcal, proteinG: targets.proteinG, fiberG: targets.fiberG },
+    targets: { kcal: goalKcal, proteinG: targets.proteinG, fiberG: targets.fiberG },
+    weeklyBudget: weeklyPlan !== null,
     verdicts: macroVerdicts(avg.averages),
     unit,
     mindful,

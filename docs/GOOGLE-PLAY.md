@@ -372,11 +372,11 @@ skickas. Inget konto, ingen reklam och ingen koppling till någon person.
 | Köphistorik | **Inte insamlat** av appen – köpet hanteras av Google Play. *Om* köp senare kontrolleras mot en egen server (Netlify-funktion): ange *Köphistorik – insamlad, inte delad, appens funktioner*. Väljs **RevenueCat** som köp-i-appen-tillägg får RevenueCat köphistorik och ett användar-id: ange då *Köphistorik* och *Enhets- eller andra id:n* (insamlade, delade med tjänsteleverantör), och lägg till RevenueCat i integritetspolicyn och registerförteckningen – före inskickningen. Rekommendationen är ett tillägg som talar direkt med Play Billing utan egen server. |
 | Kraschloggar och diagnostik | **Inte insamlat** – felloggen stannar i telefonen och skickas bara om användaren själv mejlar den till supporten. |
 | Receptimport från en webbadress | Adressen skickas till Lagoms server, som hämtar receptet direkt och inte sparar något. Vill du vara försiktig: ange *Appaktivitet → Annat användargenererat innehåll – insamlad, behandlas bara tillfälligt, inte delad, appens funktioner*. |
-| Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen (ZXing) för streckkoder och sparas eller skickas inte. (Se också rutan om ML Kit nedan.) |
+| Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen (ZXing) för streckkoder och sparas eller skickas inte. Framstegsbilder (frivilliga) sparas nedskalade och utan platsuppgifter bara i appens mapp på telefonen och lämnar den aldrig (undantagna från Googles molnkopia). Kameraappens tillfälliga originalbild tas bort direkt efter nedskalningen, och annars vid nästa start av appen. (Se också rutan om ML Kit nedan.) |
 | Health Connect (vikt, steg, näring, vatten) | **Inte insamlat** – läses och skrivs bara i telefonen och lämnar den aldrig. Data som bara behandlas på enheten räknas inte som insamling. Kopplingen ska ändå beskrivas i integritetspolicyn (Health Connect-kravet). |
 | Påminnelser | **Inte insamlat** – lokala notiser som skapas i telefonen, ingen pushtjänst. |
 | Köp i appen | **Inte insamlat** av Lagom – köpet går direkt mellan telefonen och Google Play (`@capgo/native-purchases` gör inga egna nätanrop). |
-| Export och delning | **Inte insamlat** – filen går bara dit användaren själv väljer i delningsmenyn. |
+| Export och delning | **Inte insamlat** – filen går bara dit användaren själv väljer i delningsmenyn. Det gäller även delade recept och sparade måltider (länk eller fil) – receptet ligger i länken efter # och når aldrig Lagoms server. |
 | Säkerhetsgranskning (MASA) | Nej (valfri) |
 
 > **Streckkodsläsaren på Android och Google ML Kit – beslutat: ZXing.** Bilden tolkas i

@@ -15,6 +15,9 @@
  * - Ett eget energimål bryter aldrig mot reglerna ovan (se `kcalOverrideFloor`), och ett eget
  *   koffeinmål går aldrig över riktmärket.
  * - Makromålen överstiger aldrig energimålet (utom när egna makromål själva gör det).
+ * - Veckobudgeten (lib/weeklyBudget) flyttar energi mellan veckodagarna men följer golvet ovan
+ *   (`kcalOverrideFloor`) VARJE dag, och används inte alls vid graviditet, amning eller under
+ *   18 år (`weeklyBudgetBlockReason`).
  * - Säkerhetsmatrisen i `energy.safety.test.ts` prövar reglerna över tusentals kombinationer.
  */
 import type { GoalType, LifeStage, MacroPreset, Profile, Sex, Targets, WeightEntry, ISODate } from '../types'
@@ -79,6 +82,27 @@ export function adaptiveBlockReason(lifeStage: LifeStage | undefined, age: numbe
 /** `adaptiveBlockReason` för en profil (åldern räknas försiktigt, se `youngestAge`). */
 export function adaptiveBlockReasonFor(profile: Pick<Profile, 'lifeStage' | 'birthYear'>, today: ISODate = todayISO()): string | null {
   return adaptiveBlockReason(profile.lifeStage, youngestAge(profile.birthYear, today))
+}
+
+/**
+ * Varför veckobudgeten (lib/weeklyBudget) inte används, eller null om den får användas. Under
+ * graviditet, amning och uppväxt behöver kroppen jämn energi varje dag – då är dagsmålet detsamma
+ * alla dagar, även om veckobudgeten är påslagen. `age` ska vara den yngsta möjliga åldern
+ * (`youngestAge`); en okänd ålder räknas inte som vuxen.
+ */
+export function weeklyBudgetBlockReason(lifeStage: LifeStage | undefined, age: number | undefined): string | null {
+  if (lifeStage === 'gravid')
+    return 'Under graviditeten mår kropp och barn bäst av jämn energi varje dag, så veckobudgeten används inte just nu. Dagsmålet är detsamma alla dagar – fredagsmyset får plats ändå.'
+  if (lifeStage === 'ammar')
+    return 'När du ammar behöver kroppen jämn energi varje dag, så veckobudgeten används inte just nu. Dagsmålet är detsamma alla dagar – fredagsmyset får plats ändå.'
+  if (!(age !== undefined && age >= 18))
+    return 'Under 18 år behöver kroppen jämn energi varje dag för att växa, så veckobudgeten används inte. Dagsmålet är detsamma alla dagar – fredagsmyset får plats ändå.'
+  return null
+}
+
+/** `weeklyBudgetBlockReason` för en profil (åldern räknas försiktigt, se `youngestAge`). */
+export function weeklyBudgetBlockReasonFor(profile: Pick<Profile, 'lifeStage' | 'birthYear'>, today: ISODate = todayISO()): string | null {
+  return weeklyBudgetBlockReason(profile.lifeStage, youngestAge(profile.birthYear, today))
 }
 
 /**

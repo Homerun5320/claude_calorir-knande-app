@@ -47,7 +47,7 @@ export function PatternsTab({ data }: { data: InsightsData }) {
 
 function CalendarCard({ data }: { data: InsightsData }) {
   const navigate = useNavigate()
-  const { entriesByDate, today, mindful, unit, targets } = data
+  const { entriesByDate, today, mindful, unit, targetKcalFor } = data
   const [month, setMonth] = useState<ISODate>(today)
 
   const firstDate = useMemo(() => {
@@ -65,18 +65,20 @@ function CalendarCard({ data }: { data: InsightsData }) {
     return out
   }, [entriesByDate, mindful])
 
-  // Färgstyrka efter hur dagen låg mot målet – jämförbart mellan månader, utan röda varningar.
+  // Färgstyrka efter hur dagen låg mot dagens mål (med veckobudget har veckodagarna olika mål) –
+  // jämförbart mellan månader, utan röda varningar.
   const level = useCallback(
-    (v: number) => {
+    (v: number, date: ISODate) => {
       if (mindful) return 3
-      const r = targets.kcal > 0 ? v / targets.kcal : 0
+      const target = targetKcalFor(date)
+      const r = target > 0 ? v / target : 0
       if (r <= 0) return 1
       if (r < 0.6) return 1
       if (r < 0.9) return 2
       if (r <= 1.1) return 3
       return 4
     },
-    [mindful, targets.kcal],
+    [mindful, targetKcalFor],
   )
   const formatValue = useCallback((v: number) => (mindful ? 'Loggad' : formatEnergy(v, unit)), [mindful, unit])
   const openDay = useCallback((date: ISODate) => navigate(`/dagbok/${date}`), [navigate])
@@ -163,14 +165,14 @@ function TimingCard({ data }: { data: InsightsData }) {
 // ---------------------------------------------------------------------------
 
 function MoodCard({ data }: { data: InsightsData }) {
-  const { days, metaByDate, period, countedEnd, entriesByDate, exerciseByDate, targets, addBackPct } = data
+  const { days, metaByDate, period, countedEnd, entriesByDate, exerciseByDate, targetKcalFor, addBackPct } = data
   // En enskild vecka räcker sällan för samband – då tittar vi på de senaste åtta veckorna
   // (fram till sista dagen som räknas: idag räknas först när dagen är klar).
   const weekly = period.kind === 'vecka'
   const sourceDays = useMemo(() => {
     if (!weekly) return days
-    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
-  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
+    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targetKcalFor, addBackPct)
+  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targetKcalFor, addBackPct])
   const a = useMemo(() => moodInsights(sourceDays, metaByDate), [sourceDays, metaByDate])
   const span = weekly ? 'de senaste 8 veckorna' : 'perioden'
   return (

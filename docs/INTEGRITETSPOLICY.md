@@ -65,7 +65,11 @@ Kort sagt: din dagbok stannar på din enhet. Vi behandlar bara de uppgifter som 
 
 Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara på din enhet, i webbläsaren eller i appen. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.
 
-Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+
+Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna på din enhet. Lagom använder dem bara för att, på enheten, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.
+
+Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara på din enhet – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.
 
 Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort enheten eller rensar webbläsaren försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.
 
@@ -75,7 +79,11 @@ I apparna för iPhone och Android sparar Lagom dessutom en automatisk kopia av d
 >
 > Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din iPhone. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.
 >
-> Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+> Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+>
+> Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna i appen på din iPhone. Lagom använder dem bara för att, på telefonen, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.
+>
+> Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara i appen på din iPhone – nedskalade och utan platsuppgifter eller annan information från bildfilen – i en mapp som inte följer med i telefonens säkerhetskopia, och aldrig i Lagoms säkerhetskopia, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.
 >
 > Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.
 >
@@ -85,7 +93,11 @@ I apparna för iPhone och Android sparar Lagom dessutom en automatisk kopia av d
 >
 > Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din telefon. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.
 >
-> Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+> Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.
+>
+> Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna i appen på din telefon. Lagom använder dem bara för att, på telefonen, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.
+>
+> Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara i appen på din telefon – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.
 >
 > Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.
 >
@@ -98,6 +110,7 @@ Lagom sparar det som behövs för att appen ska fungera i enhetens lagring: Inde
 | Vad | Var | Varför | Hur länge | Så rensar du |
 | --- | --- | --- | --- | --- |
 | Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar | IndexedDB | Det är själva dagboken – appen fungerar inte utan den | Tills du raderar den | Inställningar → Data → Radera all data |
+| Allergier och intoleranser som du markerar (uppgifter om hälsa) | IndexedDB (lagom-profile, bland inställningarna) | För att varsamt flagga produkter från Open Food Facts som innehåller det du har markerat – det räknas fram på enheten | Tills du avmarkerar dem eller raderar all data | Inställningar → Allergier och överkänslighet, eller Inställningar → Data → Radera all data |
 | Licens och när provperioden startade | IndexedDB | För att veta om Lagom är upplåst | Tills du tar bort den. Provperiodens startdatum finns kvar när du raderar din data, så att provperioden inte börjar om | Licensen: Inställningar → Data → Radera all data med valet Ta även bort licensen. Provperiodens startdatum: rensa webbplatsens data eller avinstallera appen |
 | Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet har återbetalats eller bestridits | localStorage (lagom-sparrlista) | Så att en återkallad licens slutar gälla även utan uppkoppling | Tills en nyare lista hämtas | Rensa webbplatsens data eller avinstallera appen |
 | Köp i appen som gäller: vilken licens (eller provperiod), köpdatum och slutdatum – bara i apparna | localStorage (lagom-butikskop) | Så att Lagom är upplåst även när butiken inte svarar, till exempel utan uppkoppling | Tills butiken svarar med nya uppgifter – ett återbetalt köp försvinner då även här | Avinstallera appen |
@@ -109,7 +122,8 @@ Lagom sparar det som behövs för att appen ska fungera i enhetens lagring: Inde
 | Fellogg: högst 20 korta felbeskrivningar, utan livsmedel och värden | localStorage (lagom-error-log) | För felsökning – den skickas bara om du själv mejlar den till oss | De 20 senaste felen | Om Lagom → Felsökning → Rensa felloggen |
 | Kopplingen till Apple Hälsa eller Health Connect: vad du har valt att hämta och skicka, när den senast synkade och en liten logg (id för hämtade vikter samt de senaste dagarnas ifyllda steg och skickade summor), så att inget hämtas eller skickas två gånger | localStorage (lagom-health) | Så att kopplingen fungerar utan dubbletter – bara i apparna och bara om du slår på den | Tills du kopplar från, raderar din data eller avinstallerar appen. Loggen sparar bara de senaste dagarna (hämtade vikter högst 400 dagar) | Inställningar → Data → Radera all data, eller avinstallera appen |
 | Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia – bara i apparna | En fil i appens egen mapp på telefonen (lagom-spegling.json) – på iPhone utanför telefonens säkerhetskopia | Så att dagboken inte försvinner om telefonen rensar appens lagring | Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen | Inställningar → Data → Radera all data, eller avinstallera appen |
-| Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV) – bara i apparna | Appens cache (mappen delning) | Så att filen kan sparas eller delas med telefonens delningsblad | Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
+| Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder | På webben: IndexedDB-databasen lagom-bilder, skild från dagboken. I apparna: filer i appens egen mapp på telefonen (mappen framsteg) – på iPhone utanför telefonens säkerhetskopia | Så att du kan se och jämföra dina bilder över tid. De följer inte med i säkerhetskopian eller i den automatiska kopian, och skickas aldrig till oss | Tills du raderar dem | Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller rensa webbplatsens data eller avinstallera appen |
+| Den senaste filen du har exporterat eller delat (säkerhetskopia, CSV eller ett delat recept eller en delad måltid) – bara i apparna | Appens cache (mappen delning) | Så att filen kan sparas eller delas med telefonens delningsblad | Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
 | Påminnelser du själv har slagit på (text och klockslag) – bara i apparna | Telefonens notissystem | Så att påminnelsen kan visas i tid, även när appen är stängd | Tills du stänger av påminnelsen | Inställningar → Påminnelser, eller Inställningar → Data → Radera all data |
 | Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet, om appen startats från Google Play och när appen senast laddades om efter en uppdatering | sessionStorage (lagom-korg, lagom-onboarding, lagom-twa, lagom-chunk-reload) | Så att inget försvinner om sidan laddas om – och så att appen inte laddas om gång på gång efter en uppdatering | Tills du stänger fliken eller appen | Stäng fliken eller appen |
 | Appens filer, Livsmedelsverkets databas och produktbilder du har visat (på webben – apparna har sina filer med sig) | Service workerns cache | Så att appen startar snabbt och fungerar utan uppkoppling | Tills en ny version ersätter filerna. Produktbilder högst 60 dagar | Rensa webbplatsens data i webbläsaren eller avinstallera appen |
@@ -123,6 +137,7 @@ Allt rensas också om du tar bort webbplatsens data i webbläsarens inställning
 > | Vad | Var | Varför | Hur länge | Så rensar du |
 > | --- | --- | --- | --- | --- |
 > | Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar | IndexedDB | Det är själva dagboken – appen fungerar inte utan den | Tills du raderar den | Inställningar → Data → Radera all data |
+> | Allergier och intoleranser som du markerar (uppgifter om hälsa) | IndexedDB (lagom-profile, bland inställningarna) | För att varsamt flagga produkter från Open Food Facts som innehåller det du har markerat – det räknas fram på enheten | Tills du avmarkerar dem eller raderar all data | Inställningar → Allergier och överkänslighet, eller Inställningar → Data → Radera all data |
 > | Köp i App Store som gäller: vilken licens eller provperiod, köpdatum och slutdatum | localStorage (lagom-butikskop) | Så att Lagom är upplåst även när App Store inte svarar, till exempel utan uppkoppling | Tills App Store svarar med nya uppgifter – ett återbetalt köp försvinner då även här | Avinstallera appen |
 > | Tema (ljust eller mörkt) | localStorage (lagom-theme) | Så att appen startar i rätt färger utan att blinka | Tills du byter tema | Inställningar → Utseende och visning |
 > | Små visningsval, till exempel dolda tips och pausad animation | localStorage | Så att appen minns dina val | Tills du ändrar dem | Avinstallera appen |
@@ -132,7 +147,8 @@ Allt rensas också om du tar bort webbplatsens data i webbläsarens inställning
 > | Fellogg: högst 20 korta felbeskrivningar, utan livsmedel och värden | localStorage (lagom-error-log) | För felsökning – den skickas bara om du själv mejlar den till oss | De 20 senaste felen | Om Lagom → Felsökning → Rensa felloggen |
 > | Kopplingen till Apple Hälsa: vad du har valt att hämta och skicka, när den senast synkade och en liten logg (id för hämtade vikter samt de senaste dagarnas ifyllda steg och skickade summor), så att inget hämtas eller skickas två gånger | localStorage (lagom-health) | Så att kopplingen fungerar utan dubbletter – bara om du slår på den | Tills du kopplar från, raderar din data eller avinstallerar appen. Loggen sparar bara de senaste dagarna (hämtade vikter högst 400 dagar) | Inställningar → Data → Radera all data, eller avinstallera appen |
 > | Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia | En fil i appens egen mapp på din iPhone (lagom-spegling.json), som inte följer med i telefonens säkerhetskopia | Så att dagboken inte försvinner om iOS rensar appens lagring | Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen | Inställningar → Data → Radera all data, eller avinstallera appen |
-> | Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV) | Appens cache (mappen delning) | Så att filen kan sparas eller delas, till exempel med Spara i Filer | Tills nästa export, tills du raderar din data eller tills iOS rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
+> | Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder | Filer i appens egen mapp på din iPhone (mappen framsteg), som inte följer med i telefonens säkerhetskopia | Så att du kan se och jämföra dina bilder över tid. De följer inte med i Lagoms säkerhetskopia, i den automatiska kopian eller till iCloud, och skickas aldrig till oss | Tills du raderar dem eller avinstallerar appen | Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller avinstallera appen |
+> | Den senaste filen du har exporterat eller delat (säkerhetskopia, CSV eller ett delat recept eller en delad måltid) | Appens cache (mappen delning) | Så att filen kan sparas eller delas, till exempel med Spara i Filer | Tills nästa export, tills du raderar din data eller tills iOS rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
 > | Påminnelser du själv har slagit på (text och klockslag) | Telefonens notissystem | Så att påminnelsen kan visas i tid, även när appen är stängd | Tills du stänger av påminnelsen | Inställningar → Påminnelser, eller Inställningar → Data → Radera all data |
 > | Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet och när appen senast laddades om efter en uppdatering | sessionStorage (lagom-korg, lagom-onboarding, lagom-chunk-reload) | Så att inget försvinner om appen laddas om | Tills du stänger appen | Stäng appen |
 > | Produktbilder du har visat | Appens cache | Så att bilderna visas snabbt | Tills iOS rensar cachen | Avinstallera appen |
@@ -146,6 +162,7 @@ Allt rensas också om du tar bort webbplatsens data i webbläsarens inställning
 > | Vad | Var | Varför | Hur länge | Så rensar du |
 > | --- | --- | --- | --- | --- |
 > | Dagbok, profil, mål, vikt, recept, egna och sparade livsmedel, veckoplanering, påminnelser och inställningar | IndexedDB | Det är själva dagboken – appen fungerar inte utan den | Tills du raderar den | Inställningar → Data → Radera all data |
+> | Allergier och intoleranser som du markerar (uppgifter om hälsa) | IndexedDB (lagom-profile, bland inställningarna) | För att varsamt flagga produkter från Open Food Facts som innehåller det du har markerat – det räknas fram på enheten | Tills du avmarkerar dem eller raderar all data | Inställningar → Allergier och överkänslighet, eller Inställningar → Data → Radera all data |
 > | Licens och när provperioden startade | IndexedDB | För att veta om Lagom är upplåst | Tills du tar bort den. Provperiodens startdatum finns kvar när du raderar din data, så att provperioden inte börjar om | Licensen: Inställningar → Data → Radera all data med valet Ta även bort licensen. Provperiodens startdatum: avinstallera appen |
 > | Spärrlistan: licens-id för licenser som har återkallats, till exempel för att köpet har återbetalats eller bestridits | localStorage (lagom-sparrlista) | Så att en återkallad licens slutar gälla även utan uppkoppling | Tills en nyare lista hämtas | Avinstallera appen |
 > | Köp i appen som gäller: vilken licens (eller provperiod), köpdatum och slutdatum – bara i apparna | localStorage (lagom-butikskop) | Så att Lagom är upplåst även när butiken inte svarar, till exempel utan uppkoppling | Tills butiken svarar med nya uppgifter – ett återbetalt köp försvinner då även här | Avinstallera appen |
@@ -157,7 +174,8 @@ Allt rensas också om du tar bort webbplatsens data i webbläsarens inställning
 > | Fellogg: högst 20 korta felbeskrivningar, utan livsmedel och värden | localStorage (lagom-error-log) | För felsökning – den skickas bara om du själv mejlar den till oss | De 20 senaste felen | Om Lagom → Felsökning → Rensa felloggen |
 > | Kopplingen till Apple Hälsa eller Health Connect: vad du har valt att hämta och skicka, när den senast synkade och en liten logg (id för hämtade vikter samt de senaste dagarnas ifyllda steg och skickade summor), så att inget hämtas eller skickas två gånger | localStorage (lagom-health) | Så att kopplingen fungerar utan dubbletter – bara i apparna och bara om du slår på den | Tills du kopplar från, raderar din data eller avinstallerar appen. Loggen sparar bara de senaste dagarna (hämtade vikter högst 400 dagar) | Inställningar → Data → Radera all data, eller avinstallera appen |
 > | Automatisk kopia av dagboken, med samma innehåll som en säkerhetskopia – bara i apparna | En fil i appens egen mapp på telefonen (lagom-spegling.json) – på iPhone utanför telefonens säkerhetskopia | Så att dagboken inte försvinner om telefonen rensar appens lagring | Uppdateras högst 30 sekunder efter en ändring och när du lämnar appen. Finns tills du raderar din data eller avinstallerar appen | Inställningar → Data → Radera all data, eller avinstallera appen |
-> | Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV) – bara i apparna | Appens cache (mappen delning) | Så att filen kan sparas eller delas med telefonens delningsblad | Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
+> | Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder | Filer i appens egen mapp på telefonen (mappen framsteg). När du tar en bild med kameran skriver kameraappen först en tillfällig originalbild – med de platsuppgifter kameran eventuellt lägger till – i appens mapp på telefonens lagringsutrymme. Den tas bort så snart bilden har skalats ned, och annars nästa gång du öppnar appen eller Framstegsbilder, eller raderar all data | Så att du kan se och jämföra dina bilder över tid. De följer inte med i säkerhetskopian, i den automatiska kopian eller i Googles säkerhetskopia i molnet, och skickas aldrig till oss. De kan flyttas med när du för över allt direkt till en ny telefon | Tills du raderar dem eller avinstallerar appen | Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller avinstallera appen |
+> | Den senaste filen du har exporterat eller delat (säkerhetskopia, CSV eller ett delat recept eller en delad måltid) – bara i apparna | Appens cache (mappen delning) | Så att filen kan sparas eller delas med telefonens delningsblad | Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen | Inställningar → Data → Radera all data, eller avinstallera appen |
 > | Påminnelser du själv har slagit på (text och klockslag) – bara i apparna | Telefonens notissystem | Så att påminnelsen kan visas i tid, även när appen är stängd | Tills du stänger av påminnelsen | Inställningar → Påminnelser, eller Inställningar → Data → Radera all data |
 > | Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet och när appen senast laddades om efter en uppdatering | sessionStorage (lagom-korg, lagom-onboarding, lagom-chunk-reload) | Så att inget försvinner om appen laddas om | Tills du stänger appen | Stäng appen |
 > | Produktbilder du har visat | Appens cache | Så att bilderna visas snabbt | Tills Android rensar cachen | Avinstallera appen |
@@ -192,21 +210,57 @@ För att appen ska fungera kontaktar den några tjänster på internet. Varje g�
 > - Receptimport: om du hämtar ett recept från en webbadress skickas adressen till vår serverfunktion, som hämtar receptet åt dig. Adressen sparas inte – går hämtningen inte att göra loggas bara webbplatsens namn, för felsökning.
 > - Google Play: när du köper i appen, trycker på Återställ köp eller öppnar appen (för att se vilka köp som gäller) kontaktar appen Google Play via din telefon.
 
+## Dela recept och sparade måltider
+
+Du kan dela ett eget recept eller en sparad måltid som länk eller fil. Då följer bara det du har valt med: namn, ingredienser eller livsmedel och mängder och – för recept – portioner, emoji, tid, märkningar, instruktioner och länk till källan. För livsmedel som inte finns i Lagoms egen lista (egna livsmedel och produkter från Open Food Facts eller Livsmedelsverket) följer även märke, kategori, näringsvärden per 100 g och portioner med. Ingenting ur din dagbok, din profil, dina mål eller dina allergiinställningar följer med, och inte heller uppgifter om allergener.
+
+Receptet ligger i själva länken, efter tecknet #. Den delen skickas inte till Lagoms webbplats när länken öppnas – webbplatsen tar bara emot en vanlig sidvisning. Länken går däremot genom den app du själv skickar den med, till exempel e-post eller en meddelandeapp, och alla som har länken kan se innehållet. Detsamma gäller en fil som du delar.
+
+Det som delas med dig visas först på skärmen. Det sparas bland dina recept, sparade måltider och egna livsmedel på enheten bara om du väljer Spara.
+
 ## Kameran
 
-Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.
+Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.
 
 I apparna används telefonens egen streckkodsläsare: Apples inbyggda bildanalys på iPhone och den öppna läsaren ZXing, som ingår i appen, på Android. Båda läser koden på telefonen och skickar ingenting vidare.
 
+Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara på din enhet (se ”Din dagbok finns bara på din enhet”).
+
 > **I iPhone-appen (App Store) står i stället:**
 >
-> Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.
+> Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.
+>
+> Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din iPhone (se ”Din dagbok finns bara på din enhet”).
 
 > **I Google Play-appen står i stället:**
 >
-> Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.
+> Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.
+>
+> Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din telefon (se ”Din dagbok finns bara på din enhet”).
 
 > **Till ägaren:** Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först.
+
+## Mikrofonen och röstsökning
+
+Röstsökningen är valfri. I webbläsare som kan tolka tal direkt på enheten (till exempel nyare versioner av Chrome) finns en mikrofonknapp i sökfältet. Webbläsaren frågar om lov att använda mikrofonen först när du trycker på knappen.
+
+Rösten tolkas helt på din enhet av webbläsarens inbyggda taligenkänning: Lagom kräver igenkänning på enheten och använder aldrig en taltjänst på nätet. Ljudet skickas inte till Lagom eller någon annan, och ingenting sparas. Den tolkade texten hamnar i sökfältet och används som om du hade skrivit den – en sökning i Open Food Facts görs bara om du själv trycker på Sök i Open Food Facts.
+
+Saknar enheten svensk taligenkänning kan du välja att låta webbläsaren hämta den en gång. Nedladdningen sköts av webbläsaren (i Chrome från Google), och Lagom skickar inga uppgifter i samband med den. Röstsökningen finns inte i Safari, i andra webbläsare på iPhone och iPad eller i apparna.
+
+> **I iPhone-appen (App Store) står i stället:**
+>
+> Rubrik: Mikrofonen
+>
+> Lagom använder inte mikrofonen i appen på din iPhone – där finns ingen röstsökning.
+
+> **I Google Play-appen står i stället:**
+>
+> Rubrik: Mikrofonen
+>
+> Lagom använder inte mikrofonen i appen på din telefon – där finns ingen röstsökning.
+
+> **Till ägaren:** Röstsökningen (src/lib/voiceSearch.ts) lagrar ingenting och har därför ingen rad i lagringstabellen. Den kräver microphone=(self) i Permissions-Policy (netlify.toml). Den får bara använda taligenkänning på enheten (processLocally) – tillåts någon gång en reserv till en taltjänst på nätet (t.ex. webkitSpeechRecognition, som i Chrome skickar ljudet till Google) måste texten här, mottagarna och frågan om samtycke ses över först.
 
 ## Apple Hälsa och Health Connect
 

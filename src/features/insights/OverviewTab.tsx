@@ -128,22 +128,25 @@ function ConsistencyCard({ data }: { data: InsightsData }) {
 
 /** "120 kcal mer per dag än förra veckan" – neutral jämförelse med perioden innan. */
 function useTrend(data: InsightsData): string | undefined {
-  const { period, today, entriesByDate, exerciseByDate, targets, addBackPct, summary, unit } = data
+  const { period, today, entriesByDate, exerciseByDate, targetKcalFor, addBackPct, summary, unit } = data
   return useMemo(() => {
     if (summary.avgKcal === undefined) return undefined
     const prev = previousPeriod(period, today)
-    const prevSummary = summarizeDays(buildDayStats(prev.elapsed, entriesByDate, exerciseByDate, targets.kcal, addBackPct))
+    const prevSummary = summarizeDays(buildDayStats(prev.elapsed, entriesByDate, exerciseByDate, targetKcalFor, addBackPct))
     if (prevSummary.avgKcal === undefined || prevSummary.loggedDays < 2) return undefined
     const diff = summary.avgKcal - prevSummary.avgKcal
     const what = period.kind === 'vecka' ? (period.isCurrent ? 'samma dagar förra veckan' : 'veckan innan') : 'perioden innan'
     if (Math.abs(diff) < 20) return `Ungefär som ${what}.`
     return `${formatEnergy(Math.abs(diff), unit)} ${diff > 0 ? 'mer' : 'mindre'} per dag än ${what}.`
-  }, [period, today, entriesByDate, exerciseByDate, targets.kcal, addBackPct, summary.avgKcal, unit])
+  }, [period, today, entriesByDate, exerciseByDate, targetKcalFor, addBackPct, summary.avgKcal, unit])
 }
 
 function EnergyCard({ data }: { data: InsightsData }) {
   const navigate = useNavigate()
-  const { period, chartDays, days, summary, avg, targets, unit, today } = data
+  const { period, chartDays, days, summary, avg, targets, goalKcal, unit, today, weeklyPlan } = data
+  // Med veckobudget har dagarna olika mål – linjen och "mål" är då veckans snitt, och varje dags
+  // eget mål heter "Dagsmål".
+  const goalWord = weeklyPlan ? 'Snittmål' : 'Mål'
   const [stacked, setStacked] = useState(false)
   const factor = unit === 'kJ' ? KJ_PER_KCAL : 1
   const trend = useTrend(data)
@@ -153,7 +156,7 @@ function EnergyCard({ data }: { data: InsightsData }) {
   const barData = useMemo<BarDatum[]>(
     () =>
       chartDays.map((d) => {
-        const target = Math.abs(d.budget - targets.kcal) >= 1 ? d.budget * factor : undefined
+        const target = Math.abs(d.budget - goalKcal) >= 1 ? d.budget * factor : undefined
         if (!stacked) return { date: d.date, target, value: d.kcal === undefined ? undefined : d.kcal * factor }
         if (d.kcal === undefined) return { date: d.date, target }
         const m = macroKcal(d)
@@ -163,7 +166,7 @@ function EnergyCard({ data }: { data: InsightsData }) {
           segments: { protein: m.protein * factor, carbs: m.carbs * factor, fat: m.fat * factor, alcohol: m.alcohol * factor },
         }
       }),
-    [chartDays, stacked, factor, targets.kcal],
+    [chartDays, stacked, factor, goalKcal],
   )
   const lineSeries = useMemo(() => {
     if (!long) return []
@@ -194,7 +197,7 @@ function EnergyCard({ data }: { data: InsightsData }) {
       {long ? (
         <LineChart
           series={lineSeries}
-          goal={{ value: targets.kcal * factor, label: `Mål ${formatEnergy(targets.kcal, unit)}` }}
+          goal={{ value: goalKcal * factor, label: `${goalWord} ${formatEnergy(goalKcal, unit)}` }}
           xDomain={[period.start, period.end]}
           includeZero={false}
           height={220}
@@ -208,8 +211,9 @@ function EnergyCard({ data }: { data: InsightsData }) {
         <BarChart
           data={barData}
           stack={stacked ? (hasAlcohol ? STACK_WITH_ALCOHOL : STACK) : undefined}
-          target={targets.kcal * factor}
-          targetLabel="Mål"
+          target={goalKcal * factor}
+          targetLabel={goalWord}
+          dayTargetLabel={weeklyPlan ? 'Dagsmål' : undefined}
           highlight={highlight}
           onSelect={openDay}
           height={period.kind === '30' ? 190 : 176}
@@ -228,7 +232,7 @@ function EnergyCard({ data }: { data: InsightsData }) {
           label="Snitt/dag"
           value={<EnergyValue kcal={summary.avgKcal} showUnit={false} />}
           unit={summary.avgKcal !== undefined ? unit : undefined}
-          sublabel={`mål ${formatEnergy(targets.kcal, unit)}`}
+          sublabel={`${weeklyPlan ? 'mål i snitt' : 'mål'} ${formatEnergy(goalKcal, unit)}`}
         />
         <Stat
           size="sm"
@@ -471,13 +475,13 @@ function NutrientHighlightsCard({ data, onTab }: { data: InsightsData; onTab: (t
 // ---------------------------------------------------------------------------
 
 function WeekdayCard({ data }: { data: InsightsData }) {
-  const { period, countedEnd, entriesByDate, exerciseByDate, targets, addBackPct, days, unit } = data
+  const { period, countedEnd, entriesByDate, exerciseByDate, targetKcalFor, addBackPct, days, unit } = data
   const weekly = period.kind === 'vecka'
   // Veckovyn tittar på de senaste åtta veckorna fram till sista dagen som räknas (idag först när den är klar).
   const sourceDays = useMemo(() => {
     if (!weekly) return days
-    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targets.kcal, addBackPct)
-  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targets.kcal, addBackPct])
+    return buildDayStats(lastNDays(56, countedEnd), entriesByDate, exerciseByDate, targetKcalFor, addBackPct)
+  }, [weekly, days, countedEnd, entriesByDate, exerciseByDate, targetKcalFor, addBackPct])
   const pattern = useMemo(() => weekdayPattern(sourceDays), [sourceDays])
   const insight = useMemo(() => weekdayInsight(pattern), [pattern])
   const samples = pattern.reduce((s, p) => s + p.count, 0)

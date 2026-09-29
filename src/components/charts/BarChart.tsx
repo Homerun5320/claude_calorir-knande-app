@@ -57,6 +57,11 @@ export interface BarChartProps {
   target?: number
   /** Etikett för målet i tooltip och teckenförklaring. Standard "Mål". */
   targetLabel?: string
+  /**
+   * Etikett för dagarnas egna mål (`BarDatum.target`) i tooltip, uppläsning och tabell – t.ex.
+   * "Dagsmål" när linjen är ett snittmål. Standard: samma som `targetLabel`.
+   */
+  dayTargetLabel?: string
   /** Dagen som betonas (oftast idag). */
   highlight?: ISODate
   /** Vald dag (t.ex. öppen i dagboken) – får en markering under stapeln. */
@@ -90,6 +95,7 @@ export function BarChart({
   stack,
   target,
   targetLabel = 'Mål',
+  dayTargetLabel,
   highlight,
   selected,
   onSelect,
@@ -140,7 +146,11 @@ export function BarChart({
   const hasAny = totals.some((t) => t !== undefined)
   const keys = stack ?? NO_STACK
   const stacked = keys.length > 0
-  const hasTargets = target !== undefined || data.some((d) => d.target !== undefined)
+  const hasDayTargets = data.some((d) => d.target !== undefined)
+  const hasTargets = target !== undefined || hasDayTargets
+  // Har dagarna egna mål är varje dags mål (eget eller linjens) dagens mål – "Dagsmål" – medan
+  // linjen och teckenförklaringen behåller `targetLabel` (t.ex. "Snittmål").
+  const dayLabel = hasDayTargets ? (dayTargetLabel ?? targetLabel) : targetLabel
 
   // --- Layout --------------------------------------------------------------
   const tickLabels = formatTicks(ticks)
@@ -191,7 +201,7 @@ export function BarChart({
   const readout =
     activeDatum !== undefined
       ? `${formatDayLong(activeDatum.date)}: ${activeTotal === undefined ? 'ingen data' : fmt(activeTotal)}${
-          activeTarget !== undefined ? `, ${targetLabel.toLowerCase()} ${fmt(activeTarget)}` : ''
+          activeTarget !== undefined ? `, ${dayLabel.toLowerCase()} ${fmt(activeTarget)}` : ''
         }${diffText ? `, ${diffText.toLowerCase()}` : ''}`
       : ''
 
@@ -491,7 +501,7 @@ export function BarChart({
               ))}
             {activeTarget !== undefined && (
               <div className="mt-1 text-[11px] text-ink-2">
-                {targetLabel} {fmt(activeTarget)}
+                {dayLabel} {fmt(activeTarget)}
                 {diffText && <span className="block text-ink-3">{diffText}</span>}
               </div>
             )}
@@ -546,7 +556,7 @@ export function BarChart({
                   </th>
                 ))}
               <th scope="col">{stacked ? 'Totalt' : 'Värde'}</th>
-              {hasTargets && <th scope="col">{targetLabel}</th>}
+              {hasTargets && <th scope="col">{dayLabel}</th>}
             </tr>
           </thead>
           <tbody>

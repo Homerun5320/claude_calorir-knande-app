@@ -128,6 +128,18 @@ export interface FoodExtra {
   origin?: string
   /** Märkningar, t.ex. ['Nyckelhålet', 'KRAV']. */
   labels?: string[]
+  /**
+   * Allergener som nycklar enligt Open Food Facts (`allergens_tags`), se lib/allergens.ts. Sätts
+   * alltid (även tom) när produkten läses in, liksom `traceKeys`.
+   */
+  allergenKeys?: AllergenKey[]
+  /**
+   * "Kan innehålla spår av" som nycklar enligt Open Food Facts (`traces_tags`), utan det som redan
+   * ingår. Saknas fältet har spåren inte lästs in (äldre sparade produkter).
+   */
+  traceKeys?: AllergenKey[]
+  /** Open Food Facts anger allergener eller spår som Lagom inte kan tolka (t.ex. en tagg på finska). */
+  unreadAllergenTags?: boolean
 }
 
 /**
@@ -490,6 +502,11 @@ export interface WeeklyBudgetSettings {
   enabled: boolean
   /** Förskjutning i kcal per veckodag, index 0 = måndag … 6 = söndag. Summan ska vara 0. */
   shift: number[]
+  /**
+   * Dagen veckobudgeten slogs på. Dagar före den har det jämna dagsmålet (en dag som redan har
+   * varit får ingen fördelning i efterhand). Saknas = gäller alla dagar.
+   */
+  since?: ISODate
 }
 
 /** De 14 allergenerna i bilaga II till EU:s förordning 1169/2011 samt laktos. */

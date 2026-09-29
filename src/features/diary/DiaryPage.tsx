@@ -23,6 +23,7 @@ import { useTargets } from '../../hooks/useTargets'
 import { useToday } from '../../hooks/useToday'
 import { addDays, relativeDayLabel } from '../../lib/dates'
 import { dailyBudget } from '../../lib/diary'
+import { weeklyDayNote } from '../../lib/weeklyBudget'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
@@ -125,7 +126,9 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
   const glassMl = useProfileStore((s) => s.settings.waterGlassMl)
   const showFiber = useProfileStore((s) => s.settings.dashboardNutrients.includes('fiber'))
   // Samma regel för träningen som Idag, Träning och Inställningar (`useTargets().exerciseAddBack`).
-  const { targets, exerciseAddBack: addBack } = useTargets(today)
+  // Målen räknas utifrån idag men gäller den visade dagen – med veckobudget har varje veckodag sitt mål.
+  const { targets, exerciseAddBack: addBack, weeklyPlan } = useTargets(today, date)
+  const weeklyNote = weeklyDayNote(weeklyPlan, date, { unit: energyUnit, mindful, context: 'dag' })
   const day = useDay(date)
 
   const kind = dayKind(date, today)
@@ -380,6 +383,7 @@ function DiaryView({ date, today }: { date: ISODate; today: ISODate }) {
               waterMl={day.waterMl}
               targets={targets}
               budget={budget}
+              weeklyNote={weeklyNote}
               mindful={mindful}
               energyUnit={energyUnit}
               showFiber={showFiber}

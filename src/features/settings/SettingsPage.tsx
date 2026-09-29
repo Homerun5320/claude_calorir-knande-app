@@ -23,6 +23,7 @@ import {
   Target,
   UserRound,
   UtensilsCrossed,
+  Wheat,
   type LucideIcon,
 } from 'lucide-react'
 import { Card, ListGroup, ListRow, PageHeader, Spinner, type Tone } from '../../components/ui'
@@ -33,9 +34,11 @@ import { MACRO_PRESETS } from '../../lib/energy'
 import { formatEnergy, formatNumber } from '../../lib/format'
 import { useProfileStore } from '../../stores/profileStore'
 import { ACTIVITY_LEVELS, type Profile, type Settings } from '../../types'
+import { allergenSummary } from '../../lib/allergens'
 import { formatSince } from '../more/moreLogic'
 import { SupportSheet } from '../more/SupportSheet'
 import { useLastBackup } from './backupStatus'
+import { AllergySection } from './sections/AllergySection'
 import { AppearanceSection } from './sections/AppearanceSection'
 import { DataSection } from './sections/DataSection'
 import { DatabaseSection } from './sections/DatabaseSection'
@@ -71,7 +74,7 @@ const RemindersSection: ComponentType = APP_SECTIONS_BUILD ? lazy(() => import('
 const HealthSection: ComponentType = APP_SECTIONS_BUILD ? lazy(() => import('./sections/HealthSection')) : NoSection
 const AppSectionRows: ComponentType<AppSectionRowsProps> = APP_SECTIONS_BUILD ? lazy(() => import('./sections/AppSectionRows')) : NoRows
 
-export type SectionId = 'profil' | 'mal' | 'maltider' | 'utseende' | 'traning' | 'paminnelser' | 'halsa' | 'data' | 'databas' | 'licens' | 'moln'
+export type SectionId = 'profil' | 'mal' | 'maltider' | 'allergier' | 'utseende' | 'traning' | 'paminnelser' | 'halsa' | 'data' | 'databas' | 'licens' | 'moln'
 
 /** Sektioner som bara finns i de inbyggda apparna. */
 const APP_ONLY_SECTIONS: readonly string[] = ['paminnelser', 'halsa']
@@ -88,6 +91,13 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   profil: { title: 'Profil', description: 'Uppgifterna som dina mål räknas fram ur.', icon: UserRound, tone: 'blabar', component: ProfileSection },
   mal: { title: 'Mål och makron', description: 'Dagsmål, makrofördelning och egna mål.', icon: Target, tone: 'lingon', component: GoalsSection },
   maltider: { title: 'Måltider', description: 'Namn och vilka måltider som visas.', icon: UtensilsCrossed, tone: 'hjortron', component: MealsSection },
+  allergier: {
+    title: 'Allergier och överkänslighet',
+    description: 'Varsamma flaggor för det du inte tål – sparas bara på din enhet.',
+    icon: Wheat,
+    tone: 'hjortron',
+    component: AllergySection,
+  },
   utseende: { title: 'Utseende och visning', description: 'Tema, energienhet och medvetet läge.', icon: Palette, tone: 'vinbar', component: AppearanceSection },
   traning: { title: 'Träning och vatten', description: 'Träningskalorier och glasstorlek.', icon: Dumbbell, tone: 'fjall', component: TrainingSection },
   paminnelser: { title: 'Påminnelser', description: 'Frivilliga notiser – allt är avstängt tills du väljer.', icon: Bell, tone: 'sol', component: RemindersSection },
@@ -166,7 +176,7 @@ export function appearanceSummary(s: Pick<Settings, 'theme' | 'energyUnit' | 'mi
 function SettingsIndex() {
   const profile = useProfileStore((s) => s.profile)
   const settings = useProfileStore((s) => s.settings)
-  const { targets, exerciseAddBack } = useTargets()
+  const { targets, exerciseAddBack, weeklyPlan } = useTargets()
   const lastBackup = useLastBackup()
   const memoryOnly = useMemoryOnlyStorage()
   const [support, setSupport] = useState(false)
@@ -180,7 +190,7 @@ function SettingsIndex() {
   const custom = overrideCount(settings.targetOverrides)
   const goalsSub = settings.mindfulMode
     ? `Mål i bakgrunden · ${preset}`
-    : `${formatEnergy(targets.kcal, settings.energyUnit)} per dag · ${preset}${custom > 0 ? ` · ${custom} egna` : ''}`
+    : `${formatEnergy(targets.kcal, settings.energyUnit)} per dag${weeklyPlan ? ' i snitt · veckobudget' : ''} · ${preset}${custom > 0 ? ` · ${custom} egna` : ''}`
   const enabledMeals = settings.meals.filter((m) => m.enabled).length
   const backupSub = memoryOnly
     ? 'Sparas inte på enheten just nu – spara en säkerhetskopia'
@@ -227,6 +237,7 @@ function SettingsIndex() {
           {row('profil', profile ? 'Kön, ålder, längd, vikt och mål' : 'Inte ifylld ännu')}
           {row('mal', goalsSub)}
           {row('maltider', `${enabledMeals} av ${settings.meals.length} visas`)}
+          {row('allergier', allergenSummary(settings.allergens))}
         </ListGroup>
 
         <ListGroup title="Appen">

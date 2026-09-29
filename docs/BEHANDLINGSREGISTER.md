@@ -66,7 +66,7 @@ Omfattar utfärdande av licensnyckeln, spärrlistan för återbetalda köp och �
 | Mottagare | Netlify – biträde. |
 | Överföring utanför EU | USA (Netlify) – EU–US Data Privacy Framework och standardavtalsklausuler. |
 | Lagringstid | Netlifys loggar: enligt Netlifys lagringstid, [fylls i av ägaren]. Anropsbegränsningen: några minuter i minnet. |
-| Säkerhetsåtgärder | HTTPS, säkerhetshuvuden (bland annat Content-Security-Policy), inga namn, e-postadresser eller IP-adresser i loggmeddelanden, skydd mot anrop till interna adresser i receptimporten. |
+| Säkerhetsåtgärder | HTTPS, säkerhetshuvuden (bland annat Content-Security-Policy), inga namn, e-postadresser eller IP-adresser i loggmeddelanden, skydd mot anrop till interna adresser i receptimporten (även via omdirigeringar och DNS-rebinding). |
 
 ---
 

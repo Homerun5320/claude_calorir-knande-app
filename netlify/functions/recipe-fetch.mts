@@ -1,7 +1,8 @@
 /**
- * POST /api/recipe-fetch – hämtar en receptsida och svarar bara med dess JSON-LD.
- * Kropp: { url } → { html }. Skyddad mot anrop till interna adresser (SSRF).
- * Logiken finns i netlify/lib/recipeFetch.ts.
+ * POST /api/recipe-fetch – hämtar en receptsida och svarar bara med dess receptdata (JSON-LD, eller
+ * ett JSON-LD-block byggt av sidans mikrodata). Kropp: { url } → { html }. Skyddad mot anrop till
+ * interna adresser (SSRF) – varje anslutning använder bara de adresser som dess eget DNS-uppslag har
+ * kontrollerat, så DNS-rebinding fungerar inte. Logiken finns i netlify/lib/recipeFetch.ts.
  */
 import { withErrorBoundary, type NetlifyContext } from '../lib/handlers.ts'
 import { handleRecipeFetch } from '../lib/recipeFetch.ts'

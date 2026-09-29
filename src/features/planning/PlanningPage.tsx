@@ -71,7 +71,8 @@ export default function PlanningPage() {
 
   const hydrated = usePlanHydrated()
   const lookup = useRecipeLookup()
-  const { targets } = useTargets(today)
+  // Varje dag får sitt eget mål – med veckobudgeten kan helgen ha lite mer än vardagarna.
+  const { targetsFor } = useTargets(today)
   const entries = useDiaryEntries()
   const days = useWeekItems(weekStart)
   const allItems = usePlanStore((s) => s.items)
@@ -135,7 +136,7 @@ export default function PlanningPage() {
             weekStart={weekStart}
             today={today}
             days={days}
-            targets={targets}
+            targetsFor={targetsFor}
             resolve={lookup.resolve}
             entries={entries}
             onAdd={setAddFor}

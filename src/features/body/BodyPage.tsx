@@ -4,6 +4,8 @@
  * Visar trendvikten i stället för dag-till-dag-svängningar, en lugn prognos mot målet,
  * viktkurva, nyckeltal (BMI, midjemått), adaptiv energiförbrukning, kroppsmått och historik.
  * Medvetet läge döljer siffrorna (kan visas på begäran) och tonen är aldrig dömande.
+ * Framstegsbilderna (valfria, av som standard) har ett eget kort här – aldrig på Idag – och döljs
+ * helt i medvetet läge, även när siffrorna visas på begäran.
  */
 import { useMemo, useState } from 'react'
 import { HeartHandshake, Target } from 'lucide-react'
@@ -18,6 +20,7 @@ import { bodyOverview, latestMeasure } from './bodyLogic'
 import { LogWeightCard } from './LogWeightCard'
 import { MeasurementsCard } from './MeasurementsCard'
 import { MeasurementSheet } from './MeasurementSheet'
+import { ProgressPhotosCard } from './ProgressPhotosCard'
 import { Reveal } from './parts'
 import { TrendInfoCard } from './TrendInfoCard'
 import { WeightChartCard } from './WeightChartCard'
@@ -127,6 +130,13 @@ function BodyContent() {
         {!hideNumbers && (
           <Reveal delay={0.24}>
             <MeasurementsCard today={today} onAdd={openMeasure} />
+          </Reveal>
+        )}
+
+        {/* Framstegsbilder: alltid dolda i medvetet läge (risk för kroppsfixering). */}
+        {!mindful && (
+          <Reveal delay={0.26}>
+            <ProgressPhotosCard />
           </Reveal>
         )}
 

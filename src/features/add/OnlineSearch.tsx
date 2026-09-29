@@ -1,6 +1,7 @@
 /**
  * Sök i Open Food Facts – bara när användaren ber om det (knapp), aldrig vid varje tangenttryck.
- * Träffarna är användarbidrag och märks tydligt som sådana.
+ * Träffarna är användarbidrag och märks tydligt som sådana. Med en allergiprofil får träffar som
+ * innehåller något av det markerade en diskret flagga under raden.
  */
 import { useEffect, useRef, useState } from 'react'
 import { Globe, RefreshCw, Users, WifiOff } from 'lucide-react'
@@ -9,6 +10,7 @@ import { Button, SkeletonRow } from '../../components/ui'
 import { searchOnlineFoods } from '../../lib/foodRepo'
 import { OFF_ATTRIBUTION, OFF_MESSAGES, OpenFoodFactsError, isAbortError } from '../../lib/openFoodFacts'
 import { AddRow, RowList } from './components'
+import { AllergenFlags, useAllergenProfile } from './AllergenFlags'
 
 type OnlineState =
   | { q: string; status: 'loading' }
@@ -27,6 +29,7 @@ export function OnlineSearch({ query, onPick, onQuickAdd, onDetails, basketCount
   const q = query.trim()
   const [state, setState] = useState<OnlineState | null>(null)
   const ctrl = useRef<AbortController | null>(null)
+  const allergyProfile = useAllergenProfile().length > 0
 
   // Avbryt en pågående sökning när söktexten ändras eller sidan lämnas.
   useEffect(() => {
@@ -121,10 +124,13 @@ export function OnlineSearch({ query, onPick, onQuickAdd, onDetails, basketCount
               {current.foods.map((food) => (
                 <li key={food.id}>
                   <AddRow food={food} onPick={onPick} onQuickAdd={onQuickAdd} onDetails={onDetails} inBasket={basketCount(food.id)} />
+                  <AllergenFlags food={food} variant="row" />
                 </li>
               ))}
             </RowList>
-            <p className="mt-2 px-1 text-xs text-ink-3">{OFF_ATTRIBUTION}. Kontrollera värdena mot förpackningen innan du litar på dem.</p>
+            <p className="mt-2 px-1 text-xs text-ink-3">
+              {OFF_ATTRIBUTION}. Kontrollera värdena{allergyProfile ? ' och allergenerna' : ''} mot förpackningen innan du litar på dem.
+            </p>
           </>
         ))}
     </section>

@@ -65,7 +65,9 @@ describe('legalContent', () => {
       'Din dagbok finns bara på din enhet',
       'Lagring på din enhet',
       'Tjänster som appen kontaktar',
+      'Dela recept och sparade måltider',
       'Kameran',
+      'Mikrofonen och röstsökning',
       'Apple Hälsa och Health Connect',
       'Påminnelser',
       'När du köper',
@@ -111,6 +113,29 @@ describe('legalContent', () => {
     for (const where of ['lagom-health', 'lagom-spegling.json', 'mappen delning', 'Telefonens notissystem', 'lagom-butikskop']) {
       expect(text).toContain(where)
     }
+    // Framstegsbilderna (egen databas på webben, mappen framsteg i apparna) och allergierna.
+    for (const where of ['lagom-bilder', 'mappen framsteg', 'Allergier och intoleranser som du markerar']) expect(text).toContain(where)
+    const apps: LegalContext[] = [
+      { platform: 'play', webSales: false, licenseKeys: true },
+      { platform: 'appstore', webSales: false, licenseKeys: false },
+    ]
+    for (const ctx of apps) {
+      const rows = visibleSections(PRIVACY_SECTIONS, ctx).find((s) => s.id === 'lagring')?.table?.rows.flat().join(' ') ?? ''
+      for (const where of ['mappen framsteg', 'Allergier och intoleranser som du markerar']) expect(rows, `${ctx.platform}: ${where}`).toContain(where)
+      // Delade recept och måltider sparas som fil i appens cache (samma mapp som exporterna).
+      expect(rows, ctx.platform).toContain('ett delat recept eller en delad måltid')
+    }
+    // Play: kamerans tillfälliga original (med eventuella platsuppgifter) och när det tas bort.
+    const play = visibleSections(PRIVACY_SECTIONS, apps[0]).find((s) => s.id === 'lagring')?.table?.rows.flat().join(' ') ?? ''
+    expect(play).toContain('med de platsuppgifter kameran eventuellt lägger till')
+  })
+
+  it('delningen beskriver vad som följer med och att länken går genom den app man själv väljer', () => {
+    const dela = PRIVACY_SECTIONS.find((s) => s.id === 'dela')?.paragraphs.join(' ') ?? ''
+    for (const needle of ['märke, kategori, näringsvärden per 100 g och portioner', 'dina allergiinställningar', 'inte heller uppgifter om allergener', 'Länken går däremot genom den app du själv skickar den med']) {
+      expect(dela).toContain(needle)
+    }
+    expect(dela).not.toMatch(/någon annan server/)
   })
 
   it('beskriver dataflödena, rättslig grund och rättigheter', () => {
@@ -223,8 +248,8 @@ describe('legalContent', () => {
     for (const word of [/köp på webben/, /Stripe/, /service worker/i, /webbplatsens data/, /Safari|Chrome|Firefox|Edge/, /lagom-twa/]) {
       expect(text).not.toMatch(word)
     }
-    // Dagboken och kameran beskrivs för Android-appen, inte för webbläsaren.
-    for (const id of ['dagbok', 'kameran']) {
+    // Dagboken, kameran och mikrofonen beskrivs för Android-appen, inte för webbläsaren.
+    for (const id of ['dagbok', 'kameran', 'mikrofonen']) {
       expect(JSON.stringify(visibleSections(PRIVACY_SECTIONS, PLAY).find((s) => s.id === id))).not.toMatch(/webbläsar/i)
     }
     expect(text).toContain('Google Play: när du köper i appen')
@@ -232,6 +257,21 @@ describe('legalContent', () => {
     // Lagringstabellen i Play-appen tar upp samma lagring i localStorage som på webben (utom temat i webbläsaren).
     const play = visibleSections(PRIVACY_SECTIONS, PLAY).find((s) => s.id === 'lagring')?.table?.rows.flat().join(' ') ?? ''
     for (const where of ['lagom-sparrlista', 'lagom-theme', 'lagom-demo', 'lagom-last-backup', 'lagom-error-log', 'lagom-health', 'lagom-spegling.json', 'lagom-butikskop']) expect(play).toContain(where)
+  })
+
+  it('röstsökningen beskrivs på webben – apparna använder inte mikrofonen', () => {
+    const section = (ctx: LegalContext) => visibleSections(PRIVACY_SECTIONS, ctx).find((s) => s.id === 'mikrofonen')
+    const web = section(WEB)?.paragraphs.join(' ') ?? ''
+    expect(web).toContain('använder aldrig en taltjänst på nätet')
+    expect(web).toContain('ingenting sparas')
+    expect(web).toContain('finns inte i Safari')
+    // Den tolkade texten är som skriven text – en sökning online görs bara om man själv väljer den.
+    expect(web).toContain('en sökning i Open Food Facts görs bara om du själv trycker på Sök i Open Food Facts')
+    expect(web).toContain('(i Chrome från Google)')
+    for (const ctx of [APPSTORE, PLAY]) {
+      expect(section(ctx)?.heading).toBe('Mikrofonen')
+      expect(section(ctx)?.paragraphs.join(' ')).toMatch(/^Lagom använder inte mikrofonen i appen/)
+    }
   })
 
   it('iPhone-appen: provperioden startas med ett gratis köp i App Store, och spärrlistan finns inte i rättslig grund', () => {

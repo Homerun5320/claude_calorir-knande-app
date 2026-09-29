@@ -18,12 +18,21 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, KeyRound, Leaf, Sparkles, Sprout, UserRound } from 'lucide-react'
 import { Button, Dialog, PageHeader, confirmDialog } from '../../components/ui'
 import { TRIAL_DAYS } from '../../config/commerce'
-import { allowsLicenseKeyEntry, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
+import { KEY_ENTRY_BUILD, WEB_PURCHASES_BUILD, allowsLicenseKeyEntry, isInApp, sellsOnWeb, trialViaStore } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { BLOCKED_ACTION_TEXT, useAccessGateStore, type BlockedAction } from './requireAccess'
 import { priceSummary, priceSummaryText } from './premiumLogic'
 import { RestorePurchasesButton } from './RestorePurchasesButton'
 import { StartTrialButton } from './StartTrialButton'
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/** Webbköpen finns i bygget (bara webbygget) – en konstant i samma modul, se WEB_PURCHASES_BUILD. */
+const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ === 'web' : WEB_PURCHASES_BUILD
+
+/** Licensnycklar kan aktiveras i bygget (webben och Google Play, inte App Store) – se KEY_ENTRY_BUILD. */
+const KEY_ENTRY: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : KEY_ENTRY_BUILD
 
 /** Håller tillgången uppdaterad (licensverifiering, provstart). Renderar inget. */
 export function AccessSync() {
@@ -47,7 +56,7 @@ export function blockedText(action?: BlockedAction, status?: AccessStatus): stri
 
 /** Priserna under spärrtexten – kronor bara när Lagom säljs på webben. */
 export function blockedPriceLine(): string {
-  if (sellsOnWeb()) return `${priceSummary()} · inkl. moms · ingen automatisk förnyelse`
+  if (WEB_PURCHASES && sellsOnWeb()) return `${priceSummary()} · inkl. moms · ingen automatisk förnyelse`
   const text = priceSummaryText()
   return `${text.charAt(0).toLocaleUpperCase('sv-SE')}${text.slice(1)} · ingen automatisk förnyelse`
 }
@@ -79,7 +88,7 @@ function BlockedActions({ onNavigate, status }: { onNavigate?: () => void; statu
       <Button fullWidth variant="secondary" iconLeft={Download} onClick={() => go('/installningar/data')}>
         Exportera min data
       </Button>
-      {allowsLicenseKeyEntry() && (
+      {KEY_ENTRY && allowsLicenseKeyEntry() && (
         <Button fullWidth variant="ghost" size="sm" iconLeft={KeyRound} onClick={() => go('/installningar/licens')}>
           Jag har redan en licensnyckel
         </Button>

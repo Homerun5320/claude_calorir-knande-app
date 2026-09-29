@@ -32,6 +32,9 @@
 # (`export const config = { path, rateLimit }` i netlify/functions/*.mts) – inte här. En funktion med
 # egen `path` nås bara på den adressen och inte via /.netlify/functions/<namn>, så gränserna går
 # inte att kringgå. Lägg därför inga [[redirects]] för /api/ här. Se docs/BETALNING.md.
+# Gränserna räknas per IP-adress (aggregateBy ['ip', 'domain'], alla planer). Netlify hoppar tyst
+# över en felskriven rateLimit – formen kontrolleras i netlify/tests/netlify-toml.test.ts, och
+# gränserna provas i en förhandsvisning (429 från Netlify, inte från funktionen).
 
 # Säkerhetsheaders för hela webbplatsen.
 # CSP: bara egna filer + Open Food Facts (streckkoder och produktbilder) och Livsmedelsverkets API.
@@ -40,6 +43,7 @@
 # Hashen i script-src är temaskriptet i index.html – ändras skriptet måste hashen uppdateras
 # (testet netlify/tests/netlify-toml.test.ts säger till och skriver ut den nya hashen).
 # payment=(self): Google Play Billing i Play-appen (TWA) använder Payment Request API (Digital Goods) och kräver det.
+# microphone=(self): röstsökningen i "Lägg till" (bara taligenkänning på enheten, src/lib/voiceSearch.ts).
 # Butiksbygget (VITE_DISTRIBUTION=appstore) får samma CSP som meta-tagg i index.html (vite.config.ts),
 # utan frame-ancestors och Stripe men med VITE_API_BASE i connect-src.
 [[headers]]
@@ -49,7 +53,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(self), usb=(), bluetooth=()"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(self), usb=(), bluetooth=()"
     Cross-Origin-Opener-Policy = "same-origin"
     Strict-Transport-Security = "max-age=31536000"
 

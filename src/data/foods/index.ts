@@ -11,6 +11,7 @@ import { fikaSotsakerSnacks } from './fika-sotsaker-snacks'
 import { drycker } from './drycker'
 import { fettSasNotterVego } from './fett-sas-notter-vego'
 import { fardigratterSnabbmat } from './fardigratter-snabbmat'
+import { restauranger } from './restauranger'
 
 export const BUILTIN_FOODS: Food[] = [
   ...mejeriAgg,
@@ -22,6 +23,8 @@ export const BUILTIN_FOODS: Food[] = [
   ...drycker,
   ...fettSasNotterVego,
   ...fardigratterSnabbmat,
+  // Kedjornas egna produkter sist, efter de generiska raderna.
+  ...restauranger,
 ]
 
 export const BUILTIN_FOOD_FILES = {
@@ -34,4 +37,5 @@ export const BUILTIN_FOOD_FILES = {
   drycker,
   'fett-sas-notter-vego': fettSasNotterVego,
   'fardigratter-snabbmat': fardigratterSnabbmat,
+  restauranger,
 } as const

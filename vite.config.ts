@@ -6,7 +6,7 @@ import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from 'vite'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import { checkCommerceBuild } from './scripts/commerce-guard.ts'
+import { checkCommerceBuild, findWebPurchaseCode, type BundleFile } from './scripts/commerce-guard.ts'
 import { NATIVE_PURCHASES_READY } from './src/lib/storePurchases.ts'
 import { fillSellerPlaceholders, missingSellerPlaceholders } from './src/features/legal/staticSeller.ts'
 
@@ -38,6 +38,38 @@ function commerceGuard(): Plugin {
       })
       for (const w of warnings) config.logger.warn(`Lagom: ${w}`)
       if (errors.length > 0) throw new Error(`Lagom kan inte byggas:\n- ${errors.join('\n- ')}`)
+    },
+  }
+}
+
+/**
+ * Butiksbyggen: stoppar bygget om koden för webbköp (Stripe Checkout, tacksidan, "Tappat nyckeln?"
+ * och i App Store-bygget aktiveringen av licensnycklar) har kommit tillbaka i paketet. Koden tas
+ * bort med byggkonstanter (`__LAGOM_DISTRIBUTION__` nedan, WEB_PURCHASES_BUILD i
+ * src/config/platform.ts) – den här kontrollen säger till om ett villkor inte längre går att
+ * avgöra när appen byggs. Se `findWebPurchaseCode` i scripts/commerce-guard.ts.
+ */
+function storeBundleGuard(distribution: string): Plugin {
+  return {
+    name: 'lagom-store-bundle-guard',
+    apply: 'build',
+    // Efter Vites egna insticksprogram, så att index.html också finns med.
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const files: BundleFile[] = []
+      for (const out of Object.values(bundle)) {
+        if (out.type === 'chunk') files.push({ name: out.fileName, code: out.code })
+        else if (/\.(?:html|js|mjs)$/.test(out.fileName)) {
+          files.push({ name: out.fileName, code: typeof out.source === 'string' ? out.source : new TextDecoder().decode(out.source) })
+        }
+      }
+      const found = findWebPurchaseCode(files, distribution)
+      if (found.length > 0) {
+        this.error(
+          `Lagom: koden för webbköp finns kvar i butiksbygget (${distribution}). Lägg villkoret bakom en byggkonstant i samma modul ` +
+            `(se WEB_PURCHASES_BUILD i src/config/platform.ts):\n- ${found.join('\n- ')}`,
+        )
+      }
     },
   }
 }
@@ -188,6 +220,8 @@ export default defineConfig(({ mode }) => {
             __APP_VERSION__: JSON.stringify(APP_VERSION),
             __BUILD_ID__: JSON.stringify(BUILD_ID),
             // Distributionen som konstant (se src/config/platform.ts) – ogiltiga värden stoppas av byggkontrollen.
+            // Villkor på den tar bort kod ur bygget: native-koden ur webbygget (NATIVE_BUILD) och
+            // webbköpen ur butiksbyggena (WEB_PURCHASES_BUILD, KEY_ENTRY_BUILD; storeBundleGuard kontrollerar).
             __LAGOM_DISTRIBUTION__: JSON.stringify(env.VITE_DISTRIBUTION || 'web'),
           },
     plugins: [
@@ -195,7 +229,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       staticSellerPages(),
-      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE), removeWebOnlyFiles(env.VITE_DISTRIBUTION)] : []),
+      ...(IS_STORE ? [nativeCspMeta(env.VITE_API_BASE), removeWebOnlyFiles(env.VITE_DISTRIBUTION), storeBundleGuard(env.VITE_DISTRIBUTION)] : []),
       VitePWA({
         // Service workern registreras av UpdatePrompt (AppShell), som frågar innan en ny version tas i bruk.
         registerType: 'prompt',

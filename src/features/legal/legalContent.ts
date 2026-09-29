@@ -339,9 +339,43 @@ const MIRROR_ROW_IOS = [
   'Inställningar → Data → Radera all data, eller avinstallera appen',
 ]
 
+/** Framstegsbilder (src/lib/progressPhotos.ts, src/native/photos.ts) – bara om man slår på dem. */
+const PHOTOS_ROW = [
+  'Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder',
+  'På webben: IndexedDB-databasen lagom-bilder, skild från dagboken. I apparna: filer i appens egen mapp på telefonen (mappen framsteg) – på iPhone utanför telefonens säkerhetskopia',
+  'Så att du kan se och jämföra dina bilder över tid. De följer inte med i säkerhetskopian eller i den automatiska kopian, och skickas aldrig till oss',
+  'Tills du raderar dem',
+  'Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller rensa webbplatsens data eller avinstallera appen',
+]
+
+const PHOTOS_ROW_PLAY = [
+  'Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder',
+  'Filer i appens egen mapp på telefonen (mappen framsteg). När du tar en bild med kameran skriver kameraappen först en tillfällig originalbild – med de platsuppgifter kameran eventuellt lägger till – i appens mapp på telefonens lagringsutrymme. Den tas bort så snart bilden har skalats ned, och annars nästa gång du öppnar appen eller Framstegsbilder, eller raderar all data',
+  'Så att du kan se och jämföra dina bilder över tid. De följer inte med i säkerhetskopian, i den automatiska kopian eller i Googles säkerhetskopia i molnet, och skickas aldrig till oss. De kan flyttas med när du för över allt direkt till en ny telefon',
+  'Tills du raderar dem eller avinstallerar appen',
+  'Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+const PHOTOS_ROW_IOS = [
+  'Framstegsbilder som du själv har tagit eller valt – nedskalade och utan platsuppgifter eller annan information från bildfilen. Bara om du slår på framstegsbilder',
+  'Filer i appens egen mapp på din iPhone (mappen framsteg), som inte följer med i telefonens säkerhetskopia',
+  'Så att du kan se och jämföra dina bilder över tid. De följer inte med i Lagoms säkerhetskopia, i den automatiska kopian eller till iCloud, och skickas aldrig till oss',
+  'Tills du raderar dem eller avinstallerar appen',
+  'Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+/** Allergier och intoleranser (settings.allergens i lagom-profile, src/lib/allergens.ts). */
+const ALLERGY_ROW = [
+  'Allergier och intoleranser som du markerar (uppgifter om hälsa)',
+  'IndexedDB (lagom-profile, bland inställningarna)',
+  'För att varsamt flagga produkter från Open Food Facts som innehåller det du har markerat – det räknas fram på enheten',
+  'Tills du avmarkerar dem eller raderar all data',
+  'Inställningar → Allergier och överkänslighet, eller Inställningar → Data → Radera all data',
+]
+
 /** Exportfiler som delas med telefonens delningsblad (src/native/files.ts) – bara i apparna. */
 const EXPORT_ROW = [
-  'Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV) – bara i apparna',
+  'Den senaste filen du har exporterat eller delat (säkerhetskopia, CSV eller ett delat recept eller en delad måltid) – bara i apparna',
   'Appens cache (mappen delning)',
   'Så att filen kan sparas eller delas med telefonens delningsblad',
   'Tills nästa export, tills du raderar din data eller tills telefonen rensar cachen',
@@ -349,7 +383,7 @@ const EXPORT_ROW = [
 ]
 
 const EXPORT_ROW_IOS = [
-  'Den senaste filen du har exporterat eller delat (säkerhetskopia eller CSV)',
+  'Den senaste filen du har exporterat eller delat (säkerhetskopia, CSV eller ett delat recept eller en delad måltid)',
   'Appens cache (mappen delning)',
   'Så att filen kan sparas eller delas, till exempel med Spara i Filer',
   'Tills nästa export, tills du raderar din data eller tills iOS rensar cachen',
@@ -415,6 +449,20 @@ const LMV_ITEM =
 const RECIPE_ITEM =
   'Receptimport: om du hämtar ett recept från en webbadress skickas adressen till vår serverfunktion, som hämtar receptet åt dig. Adressen sparas inte – går hämtningen inte att göra loggas bara webbplatsens namn, för felsökning.'
 
+/** Framstegsbilder med kameran (webben och standardtexten). */
+const PHOTOS_CAMERA_TEXT =
+  'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara på din enhet (se ”Din dagbok finns bara på din enhet”).'
+
+/** Delade recept och måltider (src/lib/shareLink.ts) – samma text överallt, den nämner ingen plattform. */
+const SHARE_TEXT =
+  'Du kan dela ett eget recept eller en sparad måltid som länk eller fil. Då följer bara det du har valt med: namn, ingredienser eller livsmedel och mängder och – för recept – portioner, emoji, tid, märkningar, instruktioner och länk till källan. För livsmedel som inte finns i Lagoms egen lista (egna livsmedel och produkter från Open Food Facts eller Livsmedelsverket) följer även märke, kategori, näringsvärden per 100 g och portioner med. Ingenting ur din dagbok, din profil, dina mål eller dina allergiinställningar följer med, och inte heller uppgifter om allergener.'
+
+const SHARE_LINK_TEXT =
+  'Receptet ligger i själva länken, efter tecknet #. Den delen skickas inte till Lagoms webbplats när länken öppnas – webbplatsen tar bara emot en vanlig sidvisning. Länken går däremot genom den app du själv skickar den med, till exempel e-post eller en meddelandeapp, och alla som har länken kan se innehållet. Detsamma gäller en fil som du delar.'
+
+const SHARE_RECEIVE_TEXT =
+  'Det som delas med dig visas först på skärmen. Det sparas bland dina recept, sparade måltider och egna livsmedel på enheten bara om du väljer Spara.'
+
 const PRIVACY_TEMPLATE: LegalSection[] = [
   {
     id: 'ansvarig',
@@ -437,14 +485,18 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     heading: 'Din dagbok finns bara på din enhet',
     paragraphs: [
       'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara på din enhet, i webbläsaren eller i appen. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
-      'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+      'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig enheten om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+      'Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna på din enhet. Lagom använder dem bara för att, på enheten, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.',
+      'Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara på din enhet – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.',
       'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort enheten eller rensar webbläsaren försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
       'I apparna för iPhone och Android sparar Lagom dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom, och på iPhone följer den inte med i telefonens säkerhetskopia. På iPhone kan telefonens egen säkerhetskopia (iCloud eller en dator) ta med appens övriga data, som allt annat på telefonen – den sköts av Apple och ditt Apple-konto, inte av oss. På Android följer appens data inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
     ],
     appStore: {
       paragraphs: [
         'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din iPhone. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
-        'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+        'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+        'Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna i appen på din iPhone. Lagom använder dem bara för att, på telefonen, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.',
+        'Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara i appen på din iPhone – nedskalade och utan platsuppgifter eller annan information från bildfilen – i en mapp som inte följer med i telefonens säkerhetskopia, och aldrig i Lagoms säkerhetskopia, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.',
         'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
         'Lagom sparar dessutom en automatisk kopia av dagboken i appens egen mapp på din iPhone, så att inget försvinner om iOS rensar appens lagring. Kopian lämnar inte telefonen genom Lagom och följer inte med i telefonens säkerhetskopia. Din iPhones egen säkerhetskopia (iCloud eller en dator) kan ta med appens övriga data, som allt annat på telefonen – den sköts av Apple och ditt Apple-konto, inte av oss.',
       ],
@@ -452,7 +504,9 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     play: {
       paragraphs: [
         'Allt du fyller i och loggar – profil och mål, mat och dryck, vikt och mått, träning, fasta, recept, veckoplanering och anteckningar – sparas bara i appen på din telefon. Lagom har inga konton och ingen server med dagböcker. Vi kan inte se, läsa eller återställa din data.',
-        'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet och amning. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+        'Det gäller även uppgifter om hälsa, till exempel vikt, graviditet, amning och allergier eller intoleranser som du markerar. De lämnar aldrig telefonen om du inte själv exporterar dem eller skickar en säkerhetskopia till någon.',
+        'Allergier och intoleranser som du markerar under Inställningar → Allergier och överkänslighet sparas bara bland inställningarna i appen på din telefon. Lagom använder dem bara för att, på telefonen, flagga produkter från Open Food Facts som innehåller något av det du har markerat. De skickas aldrig till Open Food Facts eller till oss – sökningar och streckkoder skickas som vanligt, utan uppgifter om dina allergier.',
+        'Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara i appen på din telefon – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.',
         'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
         'Lagom sparar dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom. Appens data följer inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
       ],
@@ -474,6 +528,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           'Tills du raderar den',
           'Inställningar → Data → Radera all data',
         ],
+        ALLERGY_ROW,
         [
           'Licens och när provperioden startade',
           'IndexedDB',
@@ -509,6 +564,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
         ERROR_LOG_ROW,
         HEALTH_ROW,
         MIRROR_ROW,
+        PHOTOS_ROW,
         EXPORT_ROW,
         REMINDER_ROW,
         [
@@ -542,6 +598,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
             'Tills du raderar den',
             'Inställningar → Data → Radera all data',
           ],
+          ALLERGY_ROW,
           [
             'Licens och när provperioden startade',
             'IndexedDB',
@@ -571,6 +628,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           ERROR_LOG_ROW,
           HEALTH_ROW,
           MIRROR_ROW,
+          PHOTOS_ROW_PLAY,
           EXPORT_ROW,
           REMINDER_ROW,
           [
@@ -599,6 +657,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
             'Tills du raderar den',
             'Inställningar → Data → Radera all data',
           ],
+          ALLERGY_ROW,
           STORE_CACHE_ROW_IOS,
           ['Tema (ljust eller mörkt)', 'localStorage (lagom-theme)', 'Så att appen startar i rätt färger utan att blinka', 'Tills du byter tema', 'Inställningar → Utseende och visning'],
           ['Små visningsval, till exempel dolda tips och pausad animation', 'localStorage', 'Så att appen minns dina val', 'Tills du ändrar dem', 'Avinstallera appen'],
@@ -614,6 +673,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           ERROR_LOG_ROW,
           HEALTH_ROW_IOS,
           MIRROR_ROW_IOS,
+          PHOTOS_ROW_IOS,
           EXPORT_ROW_IOS,
           REMINDER_ROW_IOS,
           [
@@ -666,21 +726,47 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
     },
   },
   {
+    id: 'dela',
+    heading: 'Dela recept och sparade måltider',
+    paragraphs: [SHARE_TEXT, SHARE_LINK_TEXT, SHARE_RECEIVE_TEXT],
+  },
+  {
     id: 'kameran',
     heading: 'Kameran',
     paragraphs: [
-      'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.',
+      'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på enheten och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i enhetens eller webbläsarens inställningar.',
       'I apparna används telefonens egen streckkodsläsare: Apples inbyggda bildanalys på iPhone och den öppna läsaren ZXing, som ingår i appen, på Android. Båda läser koden på telefonen och skickar ingenting vidare.',
+      PHOTOS_CAMERA_TEXT,
     ],
     appStore: {
       paragraphs: [
-        'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.',
+        'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med Apples inbyggda bildanalys och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens Inställningar.',
+        'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din iPhone (se ”Din dagbok finns bara på din enhet”).',
       ],
     },
     play: {
       paragraphs: [
-        'Lagom använder kameran bara när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.',
+        'Lagom använder kameran när du skannar en streckkod. Bilden analyseras direkt på telefonen med den öppna läsaren ZXing, som ingår i appen, och sparas inte – bara den avlästa streckkoden skickas till Open Food Facts för att hitta produkten. Du kan när som helst ta tillbaka tillståndet i telefonens inställningar.',
+        'Har du slagit på framstegsbilder kan du också ta en bild med kameran eller välja en bild. Bara den bild du själv tar eller väljer används – den skalas ned, rensas från platsuppgifter och annan information från bildfilen och sparas bara i appen på din telefon (se ”Din dagbok finns bara på din enhet”).',
       ],
+    },
+  },
+  {
+    // Röstsökningen (src/lib/voiceSearch.ts): bara taligenkänning på enheten, bara på webben och aldrig i Safari.
+    id: 'mikrofonen',
+    heading: 'Mikrofonen och röstsökning',
+    paragraphs: [
+      'Röstsökningen är valfri. I webbläsare som kan tolka tal direkt på enheten (till exempel nyare versioner av Chrome) finns en mikrofonknapp i sökfältet. Webbläsaren frågar om lov att använda mikrofonen först när du trycker på knappen.',
+      'Rösten tolkas helt på din enhet av webbläsarens inbyggda taligenkänning: Lagom kräver igenkänning på enheten och använder aldrig en taltjänst på nätet. Ljudet skickas inte till Lagom eller någon annan, och ingenting sparas. Den tolkade texten hamnar i sökfältet och används som om du hade skrivit den – en sökning i Open Food Facts görs bara om du själv trycker på Sök i Open Food Facts.',
+      'Saknar enheten svensk taligenkänning kan du välja att låta webbläsaren hämta den en gång. Nedladdningen sköts av webbläsaren (i Chrome från Google), och Lagom skickar inga uppgifter i samband med den. Röstsökningen finns inte i Safari, i andra webbläsare på iPhone och iPad eller i apparna.',
+    ],
+    appStore: {
+      heading: 'Mikrofonen',
+      paragraphs: ['Lagom använder inte mikrofonen i appen på din iPhone – där finns ingen röstsökning.'],
+    },
+    play: {
+      heading: 'Mikrofonen',
+      paragraphs: ['Lagom använder inte mikrofonen i appen på din telefon – där finns ingen röstsökning.'],
     },
   },
   {

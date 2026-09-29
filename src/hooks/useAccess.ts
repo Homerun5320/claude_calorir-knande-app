@@ -26,7 +26,7 @@
  */
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
-import { allowsLicenseKeyEntry, trialViaStore } from '../config/platform'
+import { KEY_ENTRY_BUILD, allowsLicenseKeyEntry, trialViaStore } from '../config/platform'
 import { isDemoData } from '../lib/demoFlag'
 import { verifyLicense, type LicenseCheck, type LicensePayload } from '../lib/license'
 import { getStorePurchases, STORE_PRODUCT_IDS, type StoreEntitlement, type StoreProductId } from '../lib/storePurchases'
@@ -42,6 +42,16 @@ import {
 import { useDemoData } from './useDemoData'
 
 const DAY_MS = 86_400_000
+
+/** Sätts av vite.config.ts (`define`); finns inte i testerna. */
+declare const __LAGOM_DISTRIBUTION__: string | undefined
+
+/**
+ * Licensnycklar räknas i bygget (webben och Google Play, aldrig App Store-bygget). En konstant i
+ * samma modul, så att verifieringen av nycklar och spärrlistan inte anropas i App Store-bygget –
+ * se KEY_ENTRY_BUILD i src/config/platform.ts.
+ */
+const KEY_LICENSES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LAGOM_DISTRIBUTION__ !== 'appstore' : KEY_ENTRY_BUILD
 
 /** Var licensen kommer ifrån: en licensnyckel (webbköp) eller ett köp i appen. */
 export type LicenseSource = 'nyckel' | 'store'
@@ -432,6 +442,7 @@ export function refreshStoreEntitlements(opts: { fresh?: boolean } = {}): Promis
  * "alternativ A"). En nyckel som ändå har hamnat på enheten ignoreras därför.
  */
 function usableLicenseKey(key: string | null): string | null {
+  if (!KEY_LICENSES) return null
   return key && allowsLicenseKeyEntry() ? key : null
 }
 
@@ -478,7 +489,7 @@ export function currentAccess(now: number = Date.now()): AccessInfo {
   const state = useLicenseStore.getState()
   const trialStartedAt = state.trialStartedAt
   const licenseKey = usableLicenseKey(state.licenseKey)
-  if (licenseKey && !checks.has(licenseKey)) void verifyLicenseCached(licenseKey)
+  if (KEY_LICENSES && licenseKey && !checks.has(licenseKey)) void verifyLicenseCached(licenseKey)
   if (storePending()) void refreshStoreEntitlements()
   return computeAccess({
     licenseKey,
@@ -502,7 +513,7 @@ export function useAccess(): AccessInfo {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (licenseKey && !checks.has(licenseKey)) void verifyLicenseCached(licenseKey)
+    if (KEY_LICENSES && licenseKey && !checks.has(licenseKey)) void verifyLicenseCached(licenseKey)
   }, [licenseKey])
 
   // Provperioden startar när profilen skapas (välkomstflödet anropar ensureTrialStarted).
@@ -526,7 +537,7 @@ export function useAccess(): AccessInfo {
   // gång per dygn, och bara när en licensnyckel finns).
   useEffect(() => {
     void refreshStoreEntitlements()
-    if (licenseKey) void refreshRevocations()
+    if (KEY_LICENSES && licenseKey) void refreshRevocations()
   }, [now, licenseKey])
 
   // Uppdatera "dagar kvar" när appen återfår fokus och en gång i timmen.

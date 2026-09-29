@@ -36,7 +36,13 @@ Steg för steg med alla detaljer: [NATIVE.md §10](NATIVE.md#10-steg-för-steg-f
 1. **Företaget:** registrera den enskilda firman (F-skatt, moms) och bestäm vilken adress och vilket
    telefonnummer som ska visas offentligt (DSA, köpvillkoren).
 2. **Namn och domän:** gör varumärkessökningen för "Lagom" och skaffa egen domän och supportadress
-   före lanseringen – ursprunget och adresserna går inte att byta efteråt.
+   före lanseringen – ursprunget och adresserna går inte att byta efteråt. Underlag:
+   [APPNAMN.md](APPNAMN.md) (kontrollerat 2026-09-29). Slutsatsen: "Lagom" under ikonen går bra,
+   men bara "Lagom" som butiksnamn är troligen upptaget i App Store – använd
+   `Lagom – kaloriräknaren` i båda butikerna. Domänen lagomappen.se är sannolikt ledig och matchar
+   app-id:t – registrera den nu (supportadress `support@lagomappen.se`). Inget varumärke LAGOM för
+   appar eller kost hittades, men registren gick inte att söka därifrån – gör den kostnadsfria
+   sökningen hos PRV och i TMview själv ([APPNAMN.md §8](APPNAMN.md#8-det-här-gör-du-själv)).
 3. **Konton:** Apple Developer Program (99 USD/år) med Paid Apps Agreement, bank, W-8BEN,
    DSA-status och Small Business Program; Google Play Console (25 USD) med betalningsprofil och
    DSA-status.

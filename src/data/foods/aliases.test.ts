@@ -13,10 +13,14 @@ import type { FoodAlias } from '../../types'
 const byId = new Map(BUILTIN_FOODS.map((f) => [f.id, f]))
 const ID = /^lagom:[a-z0-9-]+$/
 
+/** Datafiler som tillkommit efter ögonblicksbilden i `legacy-ids.ts` (som inte ändras för hand). */
+const FILES_AFTER_LEGACY = ['restauranger']
+
 describe('livsmedelsalias', () => {
   it('har samma datafiler som databasen', () => {
     expect(Object.keys(FOOD_ALIAS_FILES).sort()).toEqual(Object.keys(BUILTIN_FOOD_FILES).sort())
-    expect(Object.keys(LEGACY_FOOD_IDS_BY_FILE).sort()).toEqual(Object.keys(BUILTIN_FOOD_FILES).sort())
+    const legacyFiles = Object.keys(BUILTIN_FOOD_FILES).filter((file) => !FILES_AFTER_LEGACY.includes(file))
+    expect(Object.keys(LEGACY_FOOD_IDS_BY_FILE).sort()).toEqual(legacyFiles.sort())
   })
 
   it('täcker varje tidigare id: livsmedlet finns kvar eller har ett alias till en ersättare som finns', () => {
@@ -51,9 +55,15 @@ describe('livsmedelsalias', () => {
 
   it('lägger varje alias i samma fil som det gamla livsmedlet låg i', () => {
     const wrong: string[] = []
+    const allLegacy = new Set<string>(LEGACY_FOOD_IDS)
     for (const [file, aliases] of Object.entries(FOOD_ALIAS_FILES)) {
-      const legacy = new Set<string>(LEGACY_FOOD_IDS_BY_FILE[file as keyof typeof LEGACY_FOOD_IDS_BY_FILE])
-      for (const a of aliases) if (!legacy.has(a.from)) wrong.push(`${file}: ${a.from}`)
+      const ids: readonly string[] | undefined = Object.hasOwn(LEGACY_FOOD_IDS_BY_FILE, file)
+        ? LEGACY_FOOD_IDS_BY_FILE[file as keyof typeof LEGACY_FOOD_IDS_BY_FILE]
+        : undefined
+      // Nyare filer (FILES_AFTER_LEGACY) finns inte i ögonblicksbilden – deras alias får bara inte
+      // gälla ett id som låg i någon av de äldre filerna.
+      const ok = ids ? (id: string) => ids.includes(id) : (id: string) => !allLegacy.has(id)
+      for (const a of aliases) if (!ok(a.from)) wrong.push(`${file}: ${a.from}`)
     }
     expect(wrong).toEqual([])
   })

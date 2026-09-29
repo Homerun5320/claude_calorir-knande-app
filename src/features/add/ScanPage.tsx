@@ -13,6 +13,8 @@
  * på Android, Apple Vision på iPhone) i helskärm i stället för webbens kamera. Den öppnas en gång
  * när sidan öppnas och sedan med knappen "Skanna streckkod" eller "Skanna nästa". Saknas
  * tillägget tar webbens kamera över.
+ *
+ * Har användaren markerat allergier visas varsamma flaggor i resultatet innan man lägger till.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -34,6 +36,7 @@ import { useAddFood } from './useAddFood'
 import { useBasketStore } from './basketStore'
 import { NutriScoreBadge, useLeave } from './components'
 import { PortionSheet } from './PortionSheet'
+import { AllergenFlags } from './AllergenFlags'
 import {
   CAMERA_ERROR_TEXT,
   cleanManualCode,
@@ -514,7 +517,13 @@ export default function ScanPage() {
           ) : undefined
         }
       >
-        {found && <ProductHeader food={found} />}
+        {found && (
+          <>
+            <ProductHeader food={found} />
+            {/* Varsamma allergiflaggor innan man lägger till (bara med en allergiprofil). */}
+            <AllergenFlags food={found} variant="compact" />
+          </>
+        )}
       </PortionSheet>
 
       {/* Hittades inte / offline / fel */}

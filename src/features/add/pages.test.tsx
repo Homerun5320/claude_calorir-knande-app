@@ -70,6 +70,20 @@ describe('AddFoodPage', () => {
     expect(screen.getByText('Här hamnar det du äter')).toBeInTheDocument()
   })
 
+  it('sparade måltider kan delas, och en delad måltid kan öppnas från tomläget', () => {
+    const { unmount } = renderAt('/lagg-till?flik=maltider')
+    expect(screen.getByText('Spara måltider du äter ofta')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Öppna delad måltid' })).toHaveAttribute('href', '/dela')
+    unmount()
+
+    useFoodStore.setState({
+      templates: [{ id: 'tpl1', name: 'Frukost på jobbet', items: [{ food: bulle, amount: 1, unit: 'g', grams: 80 }], createdAt: 1 }],
+    })
+    renderAt('/lagg-till?flik=maltider')
+    expect(screen.getByRole('button', { name: 'Dela måltiden Frukost på jobbet' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ta bort måltiden Frukost på jobbet' })).toBeInTheDocument()
+  })
+
   it('dagen byts med en knapp – datumfältet ligger utanför tabbordningen', () => {
     const { router } = renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
     const button = screen.getByRole('button', { name: /^Dag: .*\. Byt dag$/ })

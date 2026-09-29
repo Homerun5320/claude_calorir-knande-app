@@ -14,10 +14,12 @@
  * 3. Påminnelserna – bron till inställningssidan (RemindersSection väntar på `initNative()`).
  * 4. Apple Hälsa/Health Connect – gör inget när kopplingen är av.
  * 5. Speglingen – väntas inte in: den kan vänta på att användaren svarar på frågan om återställning.
+ * 6. Android: kamerans tillfälliga originalbilder (full storlek, med EXIF/GPS) från "Ta en bild"
+ *    tas bort vid varje start – även om appen stängdes mitt i eller framstegsbilderna är avstängda.
  */
 import { logError } from '../lib/errorLog'
 import { setNativeStorePurchases } from '../lib/storePurchases'
-import { loadNative } from './index'
+import { loadNative, nativePlatform } from './index'
 
 export async function startNative(): Promise<void> {
   try {
@@ -40,6 +42,12 @@ export async function startNative(): Promise<void> {
   void loadNative('mirror')
     .then((m) => m?.startMirror())
     .catch((error: unknown) => logError(error, 'native:mirror'))
+
+  if (nativePlatform() === 'android') {
+    void loadNative('photos')
+      .then((m) => m?.clearCameraCaptures())
+      .catch((error: unknown) => logError(error, 'native:bilder'))
+  }
 
   await Promise.all([
     loadNative('reminders')
