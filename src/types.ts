@@ -470,4 +470,44 @@ export interface Settings {
    * dagen det valdes. Saknas när inget fokus är valt.
    */
   weeklyFocus?: { id: string; since: ISODate }
+  /** Veckobudget: samma energi över veckan men fördelad ojämnt (t.ex. fredagsmys). Saknas = av. */
+  weeklyBudget?: WeeklyBudgetSettings
+  /** Allergier och intoleranser som användaren vill få varsamma flaggor för. Saknas = inga. */
+  allergens?: AllergenKey[]
+  /** Milstolpar som redan har firats (id), så att de bara firas en gång. */
+  milestonesSeen?: string[]
+  /** Dölj milstolparna helt. */
+  hideMilestones?: boolean
+  /** Framstegsbilder påslagna (av som standard och alltid dolda i medvetet läge). */
+  progressPhotos?: boolean
 }
+
+/**
+ * Veckobudget: dagsmålet flyttas mellan veckodagarna men veckans summa är densamma. Kalorigolvet
+ * och reglerna för graviditet, amning och under 18 år gäller ändå varje enskild dag.
+ */
+export interface WeeklyBudgetSettings {
+  enabled: boolean
+  /** Förskjutning i kcal per veckodag, index 0 = måndag … 6 = söndag. Summan ska vara 0. */
+  shift: number[]
+}
+
+/** De 14 allergenerna i bilaga II till EU:s förordning 1169/2011 samt laktos. */
+export const ALLERGEN_KEYS = [
+  'gluten',
+  'kraftdjur',
+  'agg',
+  'fisk',
+  'jordnotter',
+  'soja',
+  'mjolk',
+  'notter',
+  'selleri',
+  'senap',
+  'sesam',
+  'sulfiter',
+  'lupin',
+  'blotdjur',
+  'laktos',
+] as const
+export type AllergenKey = (typeof ALLERGEN_KEYS)[number]

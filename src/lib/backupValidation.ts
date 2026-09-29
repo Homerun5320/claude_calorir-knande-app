@@ -46,7 +46,7 @@ import type {
   UnitKey,
   WeightEntry,
 } from '../types'
-import { ACTIVITY_LEVELS, FOOD_CATEGORIES, MEAL_IDS } from '../types'
+import { ACTIVITY_LEVELS, ALLERGEN_KEYS, FOOD_CATEGORIES, MEAL_IDS } from '../types'
 import type { FoodUsage } from '../stores/foodStore'
 import type { FastRecord } from '../stores/fastingStore'
 import { DEFAULT_MEALS, DEFAULT_SETTINGS } from '../stores/profileStore'
@@ -978,7 +978,52 @@ function sanitizeSettings(raw: unknown, r: Rec): Settings {
   }
   const weeklyFocus = sanitizeWeeklyFocus(s.weeklyFocus, r)
   if (weeklyFocus) settings.weeklyFocus = weeklyFocus
+  const weeklyBudget = sanitizeWeeklyBudget(s.weeklyBudget, r)
+  if (weeklyBudget) settings.weeklyBudget = weeklyBudget
+  if (s.allergens !== undefined) {
+    if (Array.isArray(s.allergens)) {
+      const valid = [...new Set(s.allergens.filter(oneOf(ALLERGEN_KEYS)))]
+      if (valid.length !== s.allergens.length) r.fixed = true
+      if (valid.length > 0) settings.allergens = valid
+    } else {
+      r.fixed = true
+    }
+  }
+  if (s.milestonesSeen !== undefined) {
+    if (Array.isArray(s.milestonesSeen)) {
+      const valid = [...new Set(s.milestonesSeen.filter((id): id is string => isNonEmptyString(id) && id.length <= 100))].slice(0, 500)
+      if (valid.length !== s.milestonesSeen.length) r.fixed = true
+      if (valid.length > 0) settings.milestonesSeen = valid
+    } else {
+      r.fixed = true
+    }
+  }
+  for (const key of ['hideMilestones', 'progressPhotos'] as const) {
+    const v = s[key]
+    if (typeof v === 'boolean') settings[key] = v
+    else if (v !== undefined) r.fixed = true
+  }
   return settings
+}
+
+/**
+ * Veckobudget: sju heltal (kcal) inom ±1 500 vars summa är 0, annars ingen veckobudget (rättat).
+ * Golv och säkerhetsregler tillämpas när dagsmålet räknas ut, inte här.
+ */
+function sanitizeWeeklyBudget(raw: unknown, r: Rec): Settings['weeklyBudget'] {
+  if (raw === undefined || raw === null) return undefined
+  if (
+    isObj(raw) &&
+    typeof raw.enabled === 'boolean' &&
+    Array.isArray(raw.shift) &&
+    raw.shift.length === 7 &&
+    raw.shift.every((v) => isNum(v) && Number.isInteger(v) && Math.abs(v) <= 1500) &&
+    (raw.shift as number[]).reduce((a, b) => a + b, 0) === 0
+  ) {
+    return { enabled: raw.enabled, shift: [...(raw.shift as number[])] }
+  }
+  r.fixed = true
+  return undefined
 }
 
 // ---------------------------------------------------------------------------
