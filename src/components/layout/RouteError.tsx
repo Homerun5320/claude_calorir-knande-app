@@ -15,7 +15,7 @@ import { Download, House, RotateCw, Settings } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { LogoMark } from './Logo'
 import { saveBackup } from '../../lib/backup'
-import { hasNewerData } from '../../stores/storage'
+import { hasProtectedData } from '../../stores/storage'
 import { markBackupNow } from '../../features/settings/backupStatus'
 import { logError } from '../../lib/errorLog'
 import { isChunkLoadError, reloadOnce } from './chunkReload'
@@ -52,7 +52,7 @@ export function RouteError({ inShell = false }: { inShell?: boolean }) {
     setSaveFailed(false)
     // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
     void saveBackup().then((outcome) => {
-      if ((outcome === 'saved' || outcome === 'shared') && !hasNewerData()) markBackupNow()
+      if ((outcome === 'saved' || outcome === 'shared') && !hasProtectedData()) markBackupNow()
       else if (outcome === 'failed') setSaveFailed(true)
     })
   }

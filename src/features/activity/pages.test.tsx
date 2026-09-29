@@ -123,6 +123,8 @@ describe('Träning', () => {
   it('steg sparas på dagen och kan läggas till som aktivitet', async () => {
     renderAt('/traning')
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Steg idag' }), { target: { value: '12000' } })
+    // Stegen sparas efter en paus – eller direkt när fältet lämnas.
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Steg idag' }))
     expect(useDiaryStore.getState().days[todayISO()]?.steps).toBe(12000)
     fireEvent.click(await screen.findByRole('button', { name: 'Lägg till som aktivitet' }))
     const entry = useDiaryStore.getState().exercise[todayISO()]?.[0]

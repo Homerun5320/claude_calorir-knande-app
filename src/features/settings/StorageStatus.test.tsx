@@ -9,10 +9,11 @@ import { vi } from 'vitest'
 import { StorageStatus } from './sections/DataSection'
 import { BACKUP_REMINDER_DAYS, SAFARI_BACKUP_REMINDER_DAYS, backupDue, backupReminderDays } from './backupStatus'
 
-const status = vi.hoisted(() => ({ memoryOnly: false, newer: false, inApp: false }))
+const status = vi.hoisted(() => ({ memoryOnly: false, newer: false, unreadable: false, inApp: false }))
 vi.mock('../../hooks/useStorageStatus', () => ({
   useMemoryOnlyStorage: () => status.memoryOnly,
   useHasNewerData: () => status.newer,
+  useHasUnreadableData: () => status.unreadable,
 }))
 vi.mock('../../config/platform', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../config/platform')>()
@@ -32,7 +33,7 @@ function renderStatus(lastBackup: number | null = null) {
 }
 
 describe('StorageStatus', () => {
-  beforeEach(() => Object.assign(status, { memoryOnly: false, newer: false, inApp: false }))
+  beforeEach(() => Object.assign(status, { memoryOnly: false, newer: false, unreadable: false, inApp: false }))
 
   it('säger att allt sparas på enheten och påminner om säkerhetskopia', () => {
     renderStatus()
@@ -65,6 +66,15 @@ describe('StorageStatus', () => {
     renderStatus()
     expect(screen.getByRole('status')).toHaveTextContent('Din data är från en nyare version av Lagom – uppdatera appen.')
     expect(screen.getByRole('status')).not.toHaveTextContent(/privat läge/)
+  })
+
+  it('säger att den sparade dagboken inte gick att läsa – inte att webbläsaren spärrar', () => {
+    status.memoryOnly = true
+    status.unreadable = true
+    renderStatus()
+    expect(screen.getByRole('status')).toHaveTextContent('Den sparade dagboken gick inte att läsa. Den lämnas orörd och skrivs inte över')
+    expect(screen.getByRole('status')).not.toHaveTextContent(/Webbläsaren låter inte/)
+    expect(screen.getByRole('button', { name: 'Spara säkerhetskopia nu' })).toBeInTheDocument()
   })
 })
 

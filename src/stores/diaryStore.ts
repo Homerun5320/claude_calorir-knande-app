@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayMeta, DiaryEntry, ExerciseEntry, FoodEntry, ISODate, MealId, QuickEntry } from '../types'
 import { uid } from '../lib/id'
-import { idbStorage, PERSIST_VERSIONS, STORE_KEYS } from './storage'
+import { diaryStorage, type DiaryData } from './diaryMonthStorage'
+import { PERSIST_VERSIONS, STORE_KEYS } from './storage'
 
 type NewFoodEntry = Omit<FoodEntry, 'id' | 'createdAt'>
 type NewQuickEntry = Omit<QuickEntry, 'id' | 'createdAt'>
@@ -230,10 +231,14 @@ export const useDiaryStore = create<DiaryState>()(
     }),
     {
       name: STORE_KEYS.diary,
-      storage: idbStorage,
+      // Egen lagring: läser både en nyckel (version 1) och en nyckel per månad (version 2), se
+      // diaryMonthStorage.ts och docs/LAGRING.md §7.
+      storage: diaryStorage,
       version: PERSIST_VERSIONS[STORE_KEYS.diary],
+      // Bara datan sparas – i den här ordningen, så att strängen i version 1 blir densamma som förut.
+      partialize: (s): DiaryData => ({ entries: s.entries, water: s.water, exercise: s.exercise, days: s.days }),
       // Framtida migreringar läggs här – kasta aldrig fel, skyddet mot nyare data ligger i storage.ts.
-      migrate: (persisted) => persisted as DiaryState,
+      migrate: (persisted) => persisted as DiaryData,
     },
   ),
 )

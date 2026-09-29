@@ -10,8 +10,8 @@ import { mealForTime } from '../../lib/meals'
 import { ensurePersistentStorage, saveBackup } from '../../lib/backup'
 import { IS_STORE_BUILD, isNativeApp } from '../../config/platform'
 import { useTheme } from '../../hooks/useTheme'
-import { useHasNewerData, useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
-import { hasNewerData } from '../../stores/storage'
+import { useHasNewerData, useHasUnreadableData, useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
+import { hasProtectedData } from '../../stores/storage'
 import { markBackupNow } from '../../features/settings/backupStatus'
 import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGate'
 import { requireAccess } from '../../features/premium/requireAccess'
@@ -169,12 +169,13 @@ const WARNING_ACTION = 'inline-flex min-h-11 items-center gap-1.5 font-semibold 
 
 /**
  * Lugn, beständig varning när ändringar inte kan sparas på enheten – eller när sparad data kommer
- * från en nyare version av Lagom (den läses inte in och skrivs aldrig över).
+ * från en nyare version av Lagom eller inte går att tolka (den läses inte in och skrivs aldrig över).
  */
 function StorageWarning() {
   const memoryOnly = useMemoryOnlyStorage()
   const newerData = useHasNewerData()
-  if (!memoryOnly && !newerData) return null
+  const unreadable = useHasUnreadableData()
+  if (!memoryOnly && !newerData && !unreadable) return null
 
   if (newerData) {
     // Appen från butiken har sin kod inbyggd och uppdateras i butiken. Webbversionen (även
@@ -213,10 +214,22 @@ function StorageWarning() {
       <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
         <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">Din data sparas inte på enheten just nu</p>
-          <p className="text-ink-2">
-            Webbläsaren låter inte Lagom spara (t.ex. i privat läge eller när lagringen är full). Spara en säkerhetskopia så att inget går förlorat.
-          </p>
+          {unreadable ? (
+            <>
+              <p className="font-semibold">Den sparade dagboken gick inte att läsa</p>
+              <p className="text-ink-2">
+                Den lämnas orörd och skrivs inte över. Det du ändrar nu finns bara kvar tills du stänger appen – spara en säkerhetskopia och skicka gärna
+                felrapporten till supporten (Om Lagom → Felsökning).
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">Din data sparas inte på enheten just nu</p>
+              <p className="text-ink-2">
+                Webbläsaren låter inte Lagom spara (t.ex. i privat läge eller när lagringen är full). Spara en säkerhetskopia så att inget går förlorat.
+              </p>
+            </>
+          )}
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             <button
               type="button"
@@ -224,7 +237,7 @@ function StorageWarning() {
               onClick={() => {
                 // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
                 void saveBackup().then((outcome) => {
-                  if ((outcome === 'saved' || outcome === 'shared') && !hasNewerData()) markBackupNow()
+                  if ((outcome === 'saved' || outcome === 'shared') && !hasProtectedData()) markBackupNow()
                   else if (outcome === 'failed') toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
                 })
               }}
@@ -232,9 +245,15 @@ function StorageWarning() {
               <Download className="size-4" aria-hidden />
               Spara säkerhetskopia
             </button>
-            <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
-              Mer om data
-            </Link>
+            {unreadable ? (
+              <Link to="/om" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+                Felrapport
+              </Link>
+            ) : (
+              <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+                Mer om data
+              </Link>
+            )}
           </div>
         </div>
       </div>

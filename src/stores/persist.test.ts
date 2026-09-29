@@ -91,4 +91,23 @@ describe('radering med data från en nyare version', () => {
     expect(await get(STORE_KEYS.license)).toBe(newerLicense)
     expect(hasNewerData()).toBe(true)
   })
+
+  it('dagboken i månadsformat från en nyare version (index 3) skrivs aldrig över, men "Radera all data" tar bort den', async () => {
+    const newerIndex = JSON.stringify({ state: { format: 'manader', stateVersion: 1 }, version: 3 })
+    const month = JSON.stringify({ entries: {}, water: { '2026-09-01': 500 }, exercise: {}, days: {} })
+    await set(STORE_KEYS.diary, newerIndex)
+    await set(`${STORE_KEYS.diary}:2026-09`, month)
+    await useDiaryStore.persist.rehydrate()
+    expect(hasNewerData()).toBe(true)
+    expect(useDiaryStore.getState().water).not.toHaveProperty('2026-09-01')
+    useDiaryStore.getState().addWater('2026-09-02', 250)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(await get(STORE_KEYS.diary)).toBe(newerIndex)
+    expect(await get(`${STORE_KEYS.diary}:2026-09`)).toBe(month)
+
+    wipeAllData()
+    await waitFor(async () => expect(await get(STORE_KEYS.diary)).not.toBe(newerIndex))
+    expect(JSON.parse((await get<string>(STORE_KEYS.diary))!)).toEqual({ state: { entries: {}, water: {}, exercise: {}, days: {} }, version: 1 })
+    expect(await get(`${STORE_KEYS.diary}:2026-09`)).toBeUndefined()
+  })
 })

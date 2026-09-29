@@ -2,57 +2,40 @@
  * Anteckningar och mående för dagen: fritext som sparas automatiskt, samt humör, energi och
  * hunger på en skala 1–5 (samma skalor som kvällsreflektionen på Idag).
  *
+ * Anteckningen sparas en stund efter att man slutat skriva (`useDeferredSave`), direkt när fältet
+ * lämnas, när dagen byts och när sidan eller appen göms – inte vid varje tangenttryck, eftersom
+ * varje sparning skriver om hela dagboken.
+ *
  * Rendera med `key={date}` så att texten nollställs när dagen byts.
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Check } from 'lucide-react'
 import { Card, TextField, cx } from '../../components/ui'
+import { SAVE_DELAY_MS, useDeferredSave } from '../../hooks/useDeferredSave'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DayMeta, ISODate } from '../../types'
 import { DAY_SCALES, normalizeNote, type ScaleDef, type ScaleKey } from './diaryLogic'
 
 const EMPTY_META: DayMeta = {}
 /** Hur länge vi väntar efter sista tangenttrycket innan anteckningen sparas. */
-export const NOTE_SAVE_DELAY_MS = 600
+export const NOTE_SAVE_DELAY_MS = SAVE_DELAY_MS
+
+const readNote = (date: ISODate) => normalizeNote(useDiaryStore.getState().days[date]?.note)
+const saveNote = (note: string | undefined, date: ISODate) => useDiaryStore.getState().setDayMeta(date, { note })
 
 export function DayNotesCard({ date, planned = false }: { date: ISODate; /** Framtida dag: bara anteckning, inget mående. */ planned?: boolean }) {
   const meta = useDiaryStore((s) => s.days[date] ?? EMPTY_META)
   const setDayMeta = useDiaryStore((s) => s.setDayMeta)
   const [text, setText] = useState(meta.note ?? '')
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const pending = useRef<string | null>(null)
+  // Har anteckningen ändrats sedan kortet visades? Då visas "Sparat" när inget väntar längre.
+  const [edited, setEdited] = useState(false)
+  const saver = useDeferredSave<string | undefined>({ key: date, read: readNote, save: saveNote, delay: NOTE_SAVE_DELAY_MS })
+  const status: 'idle' | 'saving' | 'saved' = saver.pending ? 'saving' : edited ? 'saved' : 'idle'
 
-  // Spara en stund efter att man slutat skriva.
-  useEffect(() => {
-    const stored = useDiaryStore.getState().days[date]?.note ?? ''
-    if (normalizeNote(text) === normalizeNote(stored)) {
-      pending.current = null
-      return
-    }
-    pending.current = text
-    setStatus('saving')
-    const t = window.setTimeout(() => {
-      useDiaryStore.getState().setDayMeta(date, { note: normalizeNote(text) })
-      pending.current = null
-      setStatus('saved')
-    }, NOTE_SAVE_DELAY_MS)
-    return () => window.clearTimeout(t)
-  }, [text, date])
-
-  // Spara direkt om man lämnar dagen innan fördröjningen gått ut.
-  useEffect(
-    () => () => {
-      if (pending.current !== null) useDiaryStore.getState().setDayMeta(date, { note: normalizeNote(pending.current) })
-    },
-    [date],
-  )
-
-  const flush = () => {
-    if (pending.current === null) return
-    setDayMeta(date, { note: normalizeNote(pending.current) })
-    pending.current = null
-    setStatus('saved')
+  const onTextChange = (value: string) => {
+    setText(value)
+    if (saver.schedule(normalizeNote(value))) setEdited(true)
   }
 
   return (
@@ -87,8 +70,8 @@ export function DayNotesCard({ date, planned = false }: { date: ISODate; /** Fra
           </span>
         }
         value={text}
-        onValueChange={setText}
-        onBlur={flush}
+        onValueChange={onTextChange}
+        onBlur={saver.flush}
         placeholder={planned ? 'Något att tänka på inför dagen?' : 'Hur kändes dagen? Något du vill minnas?'}
         maxLength={2000}
       />

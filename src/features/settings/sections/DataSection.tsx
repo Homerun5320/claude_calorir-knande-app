@@ -46,8 +46,8 @@ import { useDemoData } from '../../../hooks/useDemoData'
 import { currentAccess } from '../../../hooks/useAccess'
 import { useProfileStore } from '../../../stores/profileStore'
 import { useLicenseStore } from '../../../stores/licenseStore'
-import { hasNewerData } from '../../../stores/storage'
-import { useHasNewerData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
+import { hasProtectedData } from '../../../stores/storage'
+import { useHasNewerData, useHasUnreadableData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { SUPPORT_EMAIL } from '../../../config/commerce'
@@ -78,9 +78,9 @@ const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LA
 async function exportBackup(): Promise<SaveOutcome> {
   const outcome = await saveBackup()
   if (outcome === 'saved' || outcome === 'shared') {
-    // Med data från en nyare version innehåller kopian bara det som gjorts nu – den sparade datan
-    // är inte med, så påminnelsen om säkerhetskopia ska inte tystna.
-    if (!hasNewerData()) markBackupNow()
+    // Med data från en nyare version – eller en sparad dagbok som inte gick att läsa – innehåller
+    // kopian bara det som gjorts nu. Den sparade datan är inte med, så påminnelsen ska inte tystna.
+    if (!hasProtectedData()) markBackupNow()
     toast(outcome === 'saved' ? 'Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.' : sharedFileToast(), { tone: 'success' })
   } else if (outcome === 'failed') {
     toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
@@ -582,6 +582,7 @@ export function DataSection() {
 export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
   const memoryOnly = useMemoryOnlyStorage()
   const newer = useHasNewerData()
+  const unreadable = useHasUnreadableData()
   const inApp = isInApp()
   if (memoryOnly) {
     return (
@@ -593,9 +594,11 @@ export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
             <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ink-2">
               {newer
                 ? 'Din data är från en nyare version av Lagom – uppdatera appen. Den sparade datan lämnas orörd, och det du gör nu finns bara kvar tills du stänger appen.'
-                : inApp
-                  ? 'Lagom kan inte spara på enheten just nu – t.ex. när lagringen är full. Det du gör finns kvar tills du stänger appen, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'
-                  : 'Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'}
+                : unreadable
+                  ? 'Den sparade dagboken gick inte att läsa. Den lämnas orörd och skrivs inte över, och det du gör nu finns bara kvar tills du stänger appen. Spara en säkerhetskopia och skicka gärna felrapporten till supporten (Om Lagom → Felsökning).'
+                  : inApp
+                    ? 'Lagom kan inte spara på enheten just nu – t.ex. när lagringen är full. Det du gör finns kvar tills du stänger appen, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'
+                    : 'Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'}
             </p>
           </div>
         </div>

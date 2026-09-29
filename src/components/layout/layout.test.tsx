@@ -36,10 +36,11 @@ vi.mock('virtual:pwa-register/react', () => ({
 }))
 
 /** Lagringens status i AppShell – styrs av testerna. */
-const storageStatus = vi.hoisted(() => ({ memoryOnly: false, newerData: false }))
+const storageStatus = vi.hoisted(() => ({ memoryOnly: false, newerData: false, unreadable: false }))
 vi.mock('../../hooks/useStorageStatus', () => ({
   useMemoryOnlyStorage: () => storageStatus.memoryOnly,
   useHasNewerData: () => storageStatus.newerData,
+  useHasUnreadableData: () => storageStatus.unreadable,
 }))
 
 /** Säkerhetskopian och beständig lagring (grupp C) – spioneras på, resten är som vanligt. */
@@ -324,6 +325,7 @@ describe('AppShell – lagring', () => {
   beforeEach(() => {
     storageStatus.memoryOnly = false
     storageStatus.newerData = false
+    storageStatus.unreadable = false
     backup.saveBackup.mockClear()
     backup.ensurePersistentStorage.mockClear()
   })
@@ -375,6 +377,17 @@ describe('AppShell – lagring', () => {
     expect(screen.getByRole('button', { name: 'Ladda om' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Spara säkerhetskopia' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Mer om data' })).toHaveAttribute('href', '/installningar/data')
+  })
+
+  it('säger till när den sparade dagboken inte gick att läsa – inte att webbläsaren spärrar', () => {
+    storageStatus.memoryOnly = true
+    storageStatus.unreadable = true
+    renderShell()
+    expect(screen.getByText('Den sparade dagboken gick inte att läsa')).toBeInTheDocument()
+    expect(screen.getByText(/Den lämnas orörd och skrivs inte över/)).toBeInTheDocument()
+    expect(screen.queryByText(/Webbläsaren låter inte Lagom spara/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Spara säkerhetskopia' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Felrapport' })).toHaveAttribute('href', '/om')
   })
 
   it('ber om en uppdatering i App Store i App Store-bygget – utan "Ladda om"', () => {

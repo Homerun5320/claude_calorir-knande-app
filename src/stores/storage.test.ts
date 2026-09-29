@@ -18,10 +18,17 @@ vi.mock('idb-keyval', () => ({
 const storage = await import('./storage')
 const {
   canRehydrate,
+  changedElsewhere,
+  guardedRead,
+  guardedRemove,
+  guardedWrite,
   hasNewerData,
+  hasProtectedData,
+  hasUnreadableData,
   isMemoryOnlyStorage,
   onLateRead,
   PERSIST_VERSIONS,
+  protectNewerData,
   READ_TIMEOUT_MS,
   releaseNewerData,
   resetStorageStateForTests,
@@ -346,6 +353,193 @@ describe('versionsskydd', () => {
     await w
     releaseNewerData()
     expect(hasNewerData()).toBe(false)
+  })
+})
+
+describe('minnets kopia (docs/LAGRING.md §9 punkt 5)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    reads.length = 0
+    writes.length = 0
+    getMock.mockClear()
+    setMock.mockClear()
+    resetStorageStateForTests()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  /** Läs nyckeln (inget sparat) så att den får skrivas. */
+  async function readEmpty(name: string, i = 0) {
+    const p = idbStorage.getItem(name)
+    reads[i].resolve(undefined)
+    await p
+  }
+
+  /** IndexedDB slutar fungera: nästa läsning misslyckas och ger minnesläge. */
+  async function breakIdb(name: string, i: number) {
+    const p = idbStorage.getItem(name)
+    reads[i].reject(new DOMException('Borta', 'UnknownError'))
+    return p
+  }
+
+  it('släpps efter en lyckad skrivning – då behåller butiken sitt tillstånd i stället', async () => {
+    await readEmpty('k')
+    const w = idbStorage.setItem('k', value(1))
+    writes[0].resolve()
+    await w
+    // Ingen kopia kvar: läsningen ger null, och zustand behåller då butikens nuvarande tillstånd.
+    expect(await breakIdb('k', 1)).toBeNull()
+    expect(isMemoryOnlyStorage()).toBe(true)
+    // Därefter sparas ändringarna i minnet som förut.
+    await idbStorage.setItem('k', value(2))
+    expect(await idbStorage.getItem('k')).toEqual(value(2))
+  })
+
+  it('behålls när en nyare skrivning har startat innan den förra blev klar', async () => {
+    await readEmpty('k')
+    const first = idbStorage.setItem('k', value(1))
+    const second = idbStorage.setItem('k', value(2))
+    writes[0].resolve()
+    await first
+    expect(await breakIdb('k', 1)).toEqual(value(2))
+    writes[1].resolve()
+    await second
+  })
+
+  it('behålls när skrivningen misslyckas', async () => {
+    await readEmpty('k')
+    const w = idbStorage.setItem('k', value(1))
+    writes[0].reject(new DOMException('Fullt', 'QuotaExceededError'))
+    await w
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await breakIdb('k', 1)).toEqual(value(1))
+  })
+
+  it('en butik behåller sitt tillstånd när IndexedDB slutar fungera efter en lyckad skrivning', async () => {
+    type S = { n: number; setN: (n: number) => void }
+    const useTest = create<S>()(
+      persist((set) => ({ n: 0, setN: (n) => set({ n }) }), { name: 'minnestest', storage: idbStorage, version: 1 }),
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    reads[0].resolve(JSON.stringify(value(3)))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(useTest.getState().n).toBe(3)
+    useTest.getState().setN(4)
+    writes[0].resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    const again = useTest.persist.rehydrate()
+    reads[1].reject(new DOMException('Borta', 'UnknownError'))
+    await again
+    expect(useTest.getState().n).toBe(4)
+  })
+})
+
+describe('gemensamma skydd för egna lagringar', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    resetStorageStateForTests()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('data som inte går att tolka: minnesläge, skrivs aldrig över – tills "Radera all data"', async () => {
+    const write = vi.fn(() => Promise.resolve())
+    const remove = vi.fn(() => Promise.resolve())
+    expect(await guardedRead('trasig', () => Promise.resolve({ status: 'unreadable' as const }))).toBeNull()
+    expect(isMemoryOnlyStorage()).toBe(true)
+    expect(hasNewerData()).toBe(false)
+    expect(canRehydrate('trasig')).toBe(false)
+    await guardedWrite('trasig', { n: 1 }, write)
+    await guardedRemove('trasig', remove)
+    expect(write).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    // Minnet håller objektet (en referens, ingen kopia).
+    const latest = { n: 2 }
+    await guardedWrite('trasig', latest, write)
+    expect(await guardedRead('trasig', () => Promise.resolve({ status: 'unreadable' as const }))).toBe(latest)
+    // "Radera all data" släpper skyddet.
+    releaseNewerData()
+    expect(isMemoryOnlyStorage()).toBe(false)
+    await guardedWrite('trasig', { n: 0 }, write)
+    expect(write).toHaveBeenCalledTimes(1)
+  })
+
+  it('hasUnreadableData och hasProtectedData: skyddad data som saknas i en säkerhetskopia', async () => {
+    expect(hasProtectedData()).toBe(false)
+    await guardedRead('trasig', () => Promise.resolve({ status: 'unreadable' as const }))
+    expect(hasUnreadableData()).toBe(true)
+    expect(hasNewerData()).toBe(false)
+    expect(hasProtectedData()).toBe(true)
+    releaseNewerData()
+    expect(hasProtectedData()).toBe(false)
+    await guardedRead('ny', () => Promise.resolve({ status: 'newer' as const }))
+    expect(hasUnreadableData()).toBe(false)
+    expect(hasProtectedData()).toBe(true)
+  })
+
+  it('protectNewerData: en skrivning som hittar nyare data skyddar nyckeln – utom efter "Radera all data"', async () => {
+    await guardedRead('k', () => Promise.resolve({ status: 'ok' as const, value: 1 }))
+    const found = vi.fn(() => {
+      expect(protectNewerData('k')).toBe(true)
+      return Promise.reject(new Error('nyare'))
+    })
+    await guardedWrite('k', 2, found)
+    expect(hasNewerData()).toBe(true)
+    expect(canRehydrate('k')).toBe(false)
+    // Syns som nyare data, inte som en misslyckad skrivning – och inget mer skrivs.
+    const write = vi.fn(() => Promise.resolve())
+    await guardedWrite('k', 3, write)
+    expect(write).not.toHaveBeenCalled()
+    // "Radera all data": skyddet släpps och skrivningen får skriva över …
+    releaseNewerData()
+    expect(isMemoryOnlyStorage()).toBe(false)
+    expect(protectNewerData('k')).toBe(false)
+    expect(hasNewerData()).toBe(false)
+    await guardedWrite('k', 0, write)
+    expect(write).toHaveBeenCalledTimes(1)
+    // … tills nyckeln har lästs in igen.
+    await guardedRead('k', () => Promise.resolve({ status: 'ok' as const, value: 0 }))
+    expect(protectNewerData('k')).toBe(true)
+    expect(hasNewerData()).toBe(true)
+  })
+
+  it('en läsning som går att tolka igen tar bort minnesläget', async () => {
+    await guardedRead('k', () => Promise.resolve({ status: 'unreadable' as const }))
+    expect(isMemoryOnlyStorage()).toBe(true)
+    expect(await guardedRead('k', () => Promise.resolve({ status: 'ok' as const, value: 'v' }))).toBe('v')
+    expect(isMemoryOnlyStorage()).toBe(false)
+  })
+
+  it('onAccept anropas bara när läsningen används – inte när den kom för sent', async () => {
+    const accepted = vi.fn()
+    let finish: () => void = () => {}
+    const slow = guardedRead<string>('k', () => new Promise((resolve) => (finish = () => resolve({ status: 'ok', value: 'sen', onAccept: accepted }))))
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 10)
+    expect(await slow).toBeNull()
+    finish()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(accepted).not.toHaveBeenCalled()
+    expect(await guardedRead('k', () => Promise.resolve({ status: 'ok' as const, value: 'ny', onAccept: accepted }))).toBe('ny')
+    expect(accepted).toHaveBeenCalledTimes(1)
+  })
+
+  it('changedElsewhere: bara när en annan flik har sparat (eller stämpeln är okänd)', async () => {
+    const write = () => Promise.resolve()
+    await guardedRead('k', () => Promise.resolve({ status: 'ok' as const, value: undefined }))
+    expect(changedElsewhere('k')).toBe(false)
+    await guardedWrite('k', 1, write)
+    expect(changedElsewhere('k')).toBe(false)
+    localStorage.setItem('lagom-sparad:k', 'annan-flik')
+    expect(changedElsewhere('k')).toBe(true)
+    // Aldrig läst eller skriven här: okänt – räknas som ändrat.
+    expect(changedElsewhere('okand')).toBe(true)
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Blockerad', 'SecurityError')
+    })
+    try {
+      // Går localStorage inte att läsa går det inte att avgöra.
+      expect(changedElsewhere('k')).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

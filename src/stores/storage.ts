@@ -18,7 +18,15 @@
  *   aldrig data), så att de kan läsa in butiken på nytt i stället för att skriva över den
  *   (`onRemoteWrite`). En stämpel i localStorage visar om en butik har ändrats sedan fliken läste
  *   den (`canRehydrate`).
- * - Allt detta syns för användaren via `isMemoryOnlyStorage()` / `subscribeStorageStatus()`.
+ * - Sparad data som inte går att tolka (t.ex. en trasig månad i dagboken) skrivs aldrig över –
+ *   nyckeln sparas bara i minnet under sessionen (`hasUnreadableData()`).
+ * - Allt detta syns för användaren via `isMemoryOnlyStorage()` / `subscribeStorageStatus()`;
+ *   `hasProtectedData()` säger om sparad data inte har lästs in (nyare version eller går inte att
+ *   tolka) – då saknas den i en säkerhetskopia.
+ *
+ * Skydden ligger i `guardedRead`/`guardedWrite`/`guardedRemove` och används både av den vanliga
+ * lagringen här (en JSON-sträng per butik) och av dagbokens egen lagring (diaryMonthStorage.ts,
+ * en nyckel per månad – docs/LAGRING.md §7).
  */
 import { del, get, set } from 'idb-keyval'
 import { createJSONStorage, type StateStorage } from 'zustand/middleware'
@@ -44,7 +52,10 @@ export type StoreKey = (typeof STORE_KEYS)[keyof typeof STORE_KEYS]
  *
  * Höj versionen här – och lägg till en migrering i butikens `migrate` – när formatet ändras. Data
  * med en högre version än den som står här kommer från en nyare version av appen: den läses inte
- * in och skrivs aldrig över (se `idbStateStorage.getItem`).
+ * in och skrivs aldrig över (se `guardedRead`). Dagboken sparas i version 1 (en nyckel) eller i
+ * månadsformatet (diaryMonthStorage.ts): där är `version` lagringsformatets (`DIARY_INDEX_VERSION`)
+ * och butikens version här följer med i indexet som `stateVersion`. Indexet känns igen på sin form,
+ * inte på versionen – dagbokens version här kan höjas som för alla andra butiker.
  */
 export const PERSIST_VERSIONS: Readonly<Record<StoreKey, number>> & Readonly<Record<string, number | undefined>> = {
   [STORE_KEYS.profile]: 1,
@@ -64,7 +75,13 @@ const WRITE_WAIT_MS = 8000
 /** Namnet på kanalen mellan flikar. */
 const CHANNEL_NAME = 'lagom-store'
 
-const memory = new Map<string, string>()
+/**
+ * Senaste värdet per nyckel när det inte (ännu) finns i IndexedDB: IndexedDB fungerar inte, nyckeln
+ * är oläst eller har data från en nyare version, eller skrivningen pågår eller misslyckades. Den
+ * vanliga lagringen sparar strängen, dagbokens lagring objektet (en referens – ingen kopia). Kopian
+ * släpps när en skrivning har lyckats och värdet fortfarande är det senaste (docs/LAGRING.md §9).
+ */
+const memory = new Map<string, unknown>()
 /** IndexedDB saknas eller gick inte att öppna/läsa – allt sparas bara i minnet. */
 let idbBroken = false
 /** Nycklar vars sparade data ännu inte har lästs in – får inte skrivas över i IndexedDB. */
@@ -75,6 +92,17 @@ const slowReads = new Set<string>()
 const failedWrites = new Set<string>()
 /** Nycklar med data från en nyare version av Lagom – läses inte in och skrivs aldrig över. */
 const newerData = new Set<string>()
+/**
+ * Nycklar vars skydd "Radera all data" har släppt (`releaseNewerData`) – då får även data från en
+ * nyare version som en skrivning hittar skrivas över (`protectNewerData`). Gäller tills nyckeln har
+ * lästs in igen.
+ */
+const released = new Set<string>()
+/**
+ * Nycklar med sparad data som inte går att tolka (t.ex. en trasig månad i dagboken). Den läses inte
+ * in och skrivs aldrig över under sessionen – ändringar sparas bara i minnet.
+ */
+const unreadable = new Set<string>()
 
 const statusListeners = new Set<() => void>()
 const lateReadListeners = new Set<(name: string) => void>()
@@ -143,6 +171,19 @@ function writeStamp(name: string): void {
     // Utan stämpel läses butiken in på nytt som förut (se `canRehydrate`).
     seenStamps.delete(name)
   }
+}
+
+/**
+ * true om nyckeln kan ha sparats någon annanstans (en annan flik eller ett annat fönster) sedan den
+ * här fliken läste eller skrev den: stämpeln har ändrats, eller fliken vet inte vilken stämpel den
+ * såg. Är den true skriver dagbokens lagring hela dagboken i stället för bara de ändrade månaderna.
+ * false när localStorage inte går att läsa – då går det inte att avgöra. Stämpeln är bara en
+ * ledtråd: dagbokens lagring kontrollerar själv i sin transaktion vad som ligger sparat.
+ */
+export function changedElsewhere(name: string): boolean {
+  const stamp = readStamp(name)
+  if (stamp === undefined) return false
+  return !seenStamps.has(name) || seenStamps.get(name) !== stamp
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +256,11 @@ export function storedVersion(raw: string): number | undefined {
   }
 }
 
-/** true om det sparade värdet kommer från en nyare version av appen än den här. */
+/**
+ * true om det sparade värdet kommer från en nyare version av appen än den här (versionen i värdet
+ * är högre än `PERSIST_VERSIONS`). Dagbokens egen lagring (diaryMonthStorage.ts) har samma regel
+ * för version 1 och känner själv igen månadsindexet.
+ */
 function isFromNewerVersion(name: string, raw: string): boolean {
   const known = PERSIST_VERSIONS[name]
   if (known === undefined) return false
@@ -223,100 +268,172 @@ function isFromNewerVersion(name: string, raw: string): boolean {
   return v !== undefined && v > known
 }
 
-const idbStateStorage: StateStorage = {
-  getItem: async (name) => {
-    if (!idbAvailable()) return memory.get(name) ?? null
-    // Markeras synkront, innan något hinner skriva – se `setItem`.
-    unread.add(name)
-    // Stämpeln läses FÖRE datan: sparar en annan flik under läsningen blir stämpeln ny, och då
-    // läses butiken hellre in en gång för mycket än en gång för lite.
-    const stamp = readStamp(name)
-    // Även ett synkront kast (indexedDB.open spärrad) fångas nedan och ger minnesläge direkt.
-    const read = attempt(() => get<string>(name))
-    try {
-      const v = await within(read, READ_TIMEOUT_MS)
-      if (v === TIMEOUT) {
-        slowReads.add(name)
-        notify()
-        read.then(
-          () => {
-            // Datan finns kvar och går att läsa – låt butiken läsa in den på nytt. `unread`
-            // tas bort först när den nya läsningen lyckas, så inget skrivs över under tiden.
-            slowReads.delete(name)
-            notify()
-            lateReadListeners.forEach((l) => l(name))
-          },
-          (e) => markBroken(e),
-        )
-        return memory.get(name) ?? null
-      }
-      if (typeof v === 'string' && isFromNewerVersion(name, v)) {
-        // Data från en nyare version av Lagom: läs inte in den (formatet kan ha ändrats) och
-        // skriv aldrig över den. Nyckeln ligger kvar i `unread`, så `setItem` sparar bara i minnet.
-        if (!newerData.has(name)) {
-          if (import.meta.env.DEV) console.warn(`Lagom: ${name} kommer från en nyare version av appen – sparar bara i minnet.`)
-          newerData.add(name)
+// ---------------------------------------------------------------------------
+// Skydden kring läsning och skrivning (delas av alla lagringar)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resultatet av en läsning från IndexedDB, tolkat av lagringen:
+ * - `ok`: värdet (undefined = inget sparat). `onAccept` anropas bara om läsningen används – inte
+ *   om den kom för sent eller skydden stoppade den.
+ * - `newer`: data från en nyare version av Lagom – läses inte in och skrivs aldrig över.
+ * - `unreadable`: sparad data som inte går att tolka – läses inte in och skrivs aldrig över under
+ *   sessionen (lagringen loggar själv felet).
+ */
+export type ReadResult<T> = { status: 'ok'; value: T | undefined; onAccept?: () => void } | { status: 'newer' } | { status: 'unreadable' }
+
+/** Minnets värde för nyckeln (se `memory`), null om inget finns. */
+function memoryValue<T>(name: string): T | null {
+  return (memory.get(name) as T | undefined) ?? null
+}
+
+/**
+ * Läs en nyckel med alla skydd. `read` gör själva läsningen (helst i en enda transaktion) och
+ * tolkar värdet:
+ * - Nyckeln markeras som oläst synkront, innan något hinner skriva, och är det tills hela läsningen
+ *   har lyckats – inget skrivs över oläst data.
+ * - Stämpeln läses FÖRE datan (se `canRehydrate`).
+ * - Tar läsningen längre tid än `READ_TIMEOUT_MS` visas appen utan den (`slowReads`); när den till
+ *   slut blir klar anropas `onLateRead` så att butiken läses in igen.
+ * - Data från en nyare version eller som inte går att tolka läses inte in och skrivs aldrig över.
+ * - Ett fel (även ett synkront kast när IndexedDB är spärrad) ger minnesläge direkt.
+ * I alla dessa fall returneras minnets värde (null om inget finns – då behåller zustand butikens
+ * nuvarande tillstånd).
+ */
+export async function guardedRead<T>(name: string, read: () => Promise<ReadResult<T>>): Promise<T | null> {
+  if (!idbAvailable()) return memoryValue<T>(name)
+  // Markeras synkront, innan något hinner skriva – se `guardedWrite`.
+  unread.add(name)
+  // Stämpeln läses FÖRE datan: sparar en annan flik under läsningen blir stämpeln ny, och då
+  // läses butiken hellre in en gång för mycket än en gång för lite.
+  const stamp = readStamp(name)
+  // Även ett synkront kast (indexedDB.open spärrad) fångas nedan och ger minnesläge direkt.
+  const pending = attempt(read)
+  try {
+    const result = await within(pending, READ_TIMEOUT_MS)
+    if (result === TIMEOUT) {
+      slowReads.add(name)
+      notify()
+      pending.then(
+        () => {
+          // Datan finns kvar och går att läsa – låt butiken läsa in den på nytt. `unread`
+          // tas bort först när den nya läsningen lyckas, så inget skrivs över under tiden.
           slowReads.delete(name)
           notify()
-        }
-        return memory.get(name) ?? null
-      }
-      unread.delete(name)
-      if (stamp === undefined) seenStamps.delete(name)
-      else seenStamps.set(name, stamp)
-      if (newerData.delete(name)) notify()
-      if (slowReads.delete(name)) notify()
-      return v ?? memory.get(name) ?? null
-    } catch (e) {
-      markBroken(e)
-      return memory.get(name) ?? null
-    }
-  },
-  setItem: async (name, value) => {
-    memory.set(name, value)
-    // Skriv aldrig över sparad data som ännu inte har lästs in (då skulle historiken försvinna),
-    // och aldrig över data från en nyare version av appen.
-    if (!idbAvailable() || unread.has(name) || newerData.has(name)) return
-    const write = attempt(() => set(name, value)).then(
-      () => {
-        if (failedWrites.delete(name)) notify()
-        writeStamp(name)
-        announceWrite(name)
-      },
-      (e: unknown) => {
-        if (import.meta.env.DEV) console.warn(`Lagom: kunde inte spara ${name}.`, e)
-        if (!failedWrites.has(name)) {
-          failedWrites.add(name)
-          notify()
-        }
-      },
-    )
-    await within(write, WRITE_WAIT_MS)
-  },
-  removeItem: async (name) => {
-    memory.delete(name)
-    // Data från en nyare version av appen raderas aldrig härifrån.
-    if (!idbAvailable() || newerData.has(name)) return
-    try {
-      await within(
-        attempt(() => del(name)),
-        WRITE_WAIT_MS,
+          lateReadListeners.forEach((l) => l(name))
+        },
+        (e) => markBroken(e),
       )
-    } catch (e) {
-      markBroken(e)
+      return memoryValue<T>(name)
     }
-  },
+    if (result.status === 'newer') {
+      // Data från en nyare version av Lagom: läs inte in den (formatet kan ha ändrats) och
+      // skriv aldrig över den. Nyckeln ligger kvar i `unread`, så skrivningar sparas bara i minnet.
+      if (!newerData.has(name)) {
+        if (import.meta.env.DEV) console.warn(`Lagom: ${name} kommer från en nyare version av appen – sparar bara i minnet.`)
+        newerData.add(name)
+        slowReads.delete(name)
+        notify()
+      }
+      return memoryValue<T>(name)
+    }
+    if (result.status === 'unreadable') {
+      // Sparad data som inte går att tolka: skriv aldrig över den (nyckeln ligger kvar i `unread`).
+      if (!unreadable.has(name)) {
+        unreadable.add(name)
+        slowReads.delete(name)
+        notify()
+      }
+      return memoryValue<T>(name)
+    }
+    unread.delete(name)
+    released.delete(name)
+    if (stamp === undefined) seenStamps.delete(name)
+    else seenStamps.set(name, stamp)
+    if (newerData.delete(name)) notify()
+    if (unreadable.delete(name)) notify()
+    if (slowReads.delete(name)) notify()
+    result.onAccept?.()
+    return result.value ?? memoryValue<T>(name)
+  } catch (e) {
+    markBroken(e)
+    return memoryValue<T>(name)
+  }
+}
+
+/** true om nyckeln får skrivas i IndexedDB just nu. */
+function mayWrite(name: string): boolean {
+  // Skriv aldrig över sparad data som ännu inte har lästs in (då skulle historiken försvinna),
+  // aldrig över data från en nyare version av appen och aldrig över data som inte gick att tolka.
+  return idbAvailable() && !unread.has(name) && !newerData.has(name) && !unreadable.has(name)
+}
+
+/**
+ * Skriv en nyckel med alla skydd. `value` sparas alltid i minnet (en referens – ingen kopia), och
+ * `write` anropas bara när nyckeln får skrivas i IndexedDB (synkront, så att skrivningarna läggs i
+ * samma ordning som anropen). En lyckad skrivning tar bort felet, släpper minnets kopia om den
+ * fortfarande är den senaste, sätter stämpeln och meddelar andra flikar. En misslyckad syns i
+ * `isMemoryOnlyStorage()` tills en senare skrivning lyckas. Väntar högst `WRITE_WAIT_MS` – en
+ * långsam skrivning får fortsätta i bakgrunden.
+ */
+export async function guardedWrite<T>(name: string, value: T, write: () => Promise<void>): Promise<void> {
+  memory.set(name, value)
+  if (!mayWrite(name)) return
+  const done = attempt(write).then(
+    () => {
+      if (failedWrites.delete(name)) notify()
+      // Minnets kopia behövs bara när IndexedDB inte kan användas (eller skrivningen misslyckas).
+      if (memory.get(name) === value) memory.delete(name)
+      writeStamp(name)
+      announceWrite(name)
+    },
+    (e: unknown) => {
+      if (import.meta.env.DEV) console.warn(`Lagom: kunde inte spara ${name}.`, e)
+      // Skrivningen hittade data från en nyare version (`protectNewerData`): den visas som sådan.
+      if (newerData.has(name)) return
+      if (!failedWrites.has(name)) {
+        failedWrites.add(name)
+        notify()
+      }
+    },
+  )
+  await within(done, WRITE_WAIT_MS)
+}
+
+/**
+ * Ta bort en nyckel med skydden: data från en nyare version eller som inte gick att tolka raderas
+ * aldrig härifrån (bara "Radera all data" släpper skyddet, se `releaseNewerData`).
+ */
+export async function guardedRemove(name: string, remove: () => Promise<void>): Promise<void> {
+  memory.delete(name)
+  if (!idbAvailable() || newerData.has(name) || unreadable.has(name)) return
+  try {
+    await within(attempt(remove), WRITE_WAIT_MS)
+  } catch (e) {
+    markBroken(e)
+  }
+}
+
+/** Den vanliga lagringen: hela butiken som en JSON-sträng under butikens nyckel. */
+const idbStateStorage: StateStorage = {
+  getItem: (name) =>
+    guardedRead<string>(name, async () => {
+      const v = await get<string>(name)
+      return typeof v === 'string' && isFromNewerVersion(name, v) ? { status: 'newer' } : { status: 'ok', value: v }
+    }),
+  setItem: (name, value) => guardedWrite(name, value, () => set(name, value)),
+  removeItem: (name) => guardedRemove(name, () => del(name)),
 }
 
 export const idbStorage = createJSONStorage(() => idbStateStorage)
 
 /**
  * true om ändringar just nu inte sparas på enheten: IndexedDB saknas eller är blockerad, en
- * skrivning har misslyckats, sparad data har ännu inte kunnat läsas in eller sparad data kommer
- * från en nyare version av appen.
+ * skrivning har misslyckats, sparad data har ännu inte kunnat läsas in, sparad data kommer från en
+ * nyare version av appen eller sparad data går inte att tolka.
  */
 export function isMemoryOnlyStorage(): boolean {
-  return !idbAvailable() || failedWrites.size > 0 || slowReads.size > 0 || newerData.size > 0
+  return !idbAvailable() || failedWrites.size > 0 || slowReads.size > 0 || newerData.size > 0 || unreadable.size > 0
 }
 
 /**
@@ -328,12 +445,48 @@ export function hasNewerData(): boolean {
 }
 
 /**
+ * true om någon butik har sparad data som inte går att tolka (t.ex. en trasig månad i dagboken).
+ * Den läses inte in och skrivs aldrig över under sessionen. Det är inte webbläsarens fel – visa en
+ * egen text i stället för "Webbläsaren låter inte Lagom spara".
+ */
+export function hasUnreadableData(): boolean {
+  return unreadable.size > 0
+}
+
+/**
+ * true om sparad data inte har lästs in och skyddas: den kommer från en nyare version eller går inte
+ * att tolka. En säkerhetskopia som görs då innehåller bara det som gjorts under sessionen – då ska
+ * påminnelsen om säkerhetskopia inte tystna (`markBackupNow`).
+ */
+export function hasProtectedData(): boolean {
+  return newerData.size > 0 || unreadable.size > 0
+}
+
+/**
+ * För lagringar som bygger på den här modulen (dagbokens lagring): en skrivning har hittat data från
+ * en nyare version av Lagom i IndexedDB – en annan flik med en nyare version har sparat under tiden.
+ * Nyckeln skyddas då som vid en läsning (läses inte in, skrivs aldrig över, `hasNewerData()`), och
+ * skrivningen ska avbrytas. Returnerar false om "Radera all data" har släppt skyddet för nyckeln
+ * (`releaseNewerData`) – då får datan skrivas över.
+ */
+export function protectNewerData(name: string): boolean {
+  if (released.has(name)) return false
+  unread.add(name)
+  if (!newerData.has(name)) {
+    newerData.add(name)
+    slowReads.delete(name)
+    notify()
+  }
+  return true
+}
+
+/**
  * true om butiken bör och kan läsas in på nytt från IndexedDB (efter `onRemoteWrite` eller när
  * fliken blir synlig igen):
  * - någon annan har sparat den sedan den här fliken läste eller skrev den (stämpeln i
  *   localStorage har ändrats – går den inte att läsa räknas det som ändrat),
  * - den sparade datan har redan lästs in och ingen läsning pågår,
- * - den kommer inte från en nyare version av appen, och
+ * - den kommer inte från en nyare version av appen och går att tolka, och
  * - senaste sparningen lyckades. Misslyckades den (t.ex. full lagring) finns de senaste
  *   ändringarna bara i minnet – en ny inläsning skulle ersätta dem med den äldre datan.
  *
@@ -342,29 +495,37 @@ export function hasNewerData(): boolean {
  */
 export function canRehydrate(name: string): boolean {
   // I minnesläge finns inget annat att läsa in.
-  if (!idbAvailable() || unread.has(name) || newerData.has(name) || failedWrites.has(name)) return false
+  if (!idbAvailable() || unread.has(name) || newerData.has(name) || unreadable.has(name) || failedWrites.has(name)) return false
   const stamp = readStamp(name)
   return stamp === undefined || !seenStamps.has(name) || seenStamps.get(name) !== stamp
 }
 
 /**
- * Släpp skyddet för data från en nyare version, så att nästa sparning skriver över den. Används
- * BARA när användaren uttryckligen raderar all data ("Radera all data") – då ska även den datan
- * bort. Anropa före rensningen av butikerna. `keep` behålls skyddade (t.ex. licensen, så att
- * provperiodens start inte försvinner).
+ * Släpp skyddet för data från en nyare version – och för sparad data som inte gick att tolka – så
+ * att nästa sparning skriver över den. Används BARA när användaren uttryckligen raderar all data
+ * ("Radera all data") – då ska även den datan bort. Anropa före rensningen av butikerna. `keep`
+ * behålls skyddade (t.ex. licensen, så att provperiodens start inte försvinner). Till nästa läsning
+ * får dagbokens skrivare då också skriva över data från en nyare version som den hittar i sin
+ * transaktion (`protectNewerData`).
  */
 export function releaseNewerData(keep: readonly string[] = []): void {
   let changed = false
-  for (const name of newerData) {
-    if (keep.includes(name)) continue
-    newerData.delete(name)
-    unread.delete(name)
-    changed = true
+  for (const protectedKeys of [newerData, unreadable]) {
+    for (const name of protectedKeys) {
+      if (keep.includes(name)) continue
+      protectedKeys.delete(name)
+      unread.delete(name)
+      released.add(name)
+      changed = true
+    }
   }
   if (changed) notify()
 }
 
-/** Prenumerera på ändringar av `isMemoryOnlyStorage()` och `hasNewerData()`. Returnerar avprenumeration. */
+/**
+ * Prenumerera på ändringar av `isMemoryOnlyStorage()`, `hasNewerData()`, `hasUnreadableData()` och
+ * `hasProtectedData()`. Returnerar avprenumeration.
+ */
 export function subscribeStorageStatus(listener: () => void): () => void {
   statusListeners.add(listener)
   return () => statusListeners.delete(listener)
@@ -386,14 +547,27 @@ export function onRemoteWrite(listener: (name: string) => void): () => void {
   return () => remoteWriteListeners.delete(listener)
 }
 
-/** Endast för tester: återställ modulens tillstånd. */
+const resetListeners = new Set<() => void>()
+
+/**
+ * För lagringar som bygger på den här modulen (dagbokens lagring): anropas av
+ * `resetStorageStateForTests`, så att deras eget tillstånd också återställs.
+ */
+export function registerStorageReset(listener: () => void): void {
+  resetListeners.add(listener)
+}
+
+/** Endast för tester: återställ modulens tillstånd (och dagbokslagringens, se `registerStorageReset`). */
 export function resetStorageStateForTests(): void {
   memory.clear()
   unread.clear()
   slowReads.clear()
   failedWrites.clear()
   newerData.clear()
+  unreadable.clear()
+  released.clear()
   seenStamps.clear()
+  resetListeners.forEach((l) => l())
   try {
     for (const key of Object.keys(localStorage)) if (key.startsWith(STAMP_PREFIX)) localStorage.removeItem(key)
   } catch {

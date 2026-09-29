@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DiaryEntry, QuickEntry } from '../types'
 import { useDiaryStore, type NewDiaryEntry } from './diaryStore'
+import { diaryStorage } from './diaryMonthStorage'
 
 const DAY = '2026-09-28'
 const NEXT = '2026-09-29'
@@ -163,5 +164,16 @@ describe('ingen omskrivning när ingenting ändras', () => {
     s().setDayMetas([])
     expect(writes).toBe(1)
     expect(s().days).toBe(before)
+  })
+})
+
+describe('lagringen', () => {
+  it('sparar bara datan, i samma ordning som förut, med dagbokens egen lagring', () => {
+    const options = useDiaryStore.persist.getOptions()
+    expect(options.storage).toBe(diaryStorage)
+    useDiaryStore.getState().addWater(DAY, 250)
+    const persisted = options.partialize!(useDiaryStore.getState())
+    expect(Object.keys(persisted)).toEqual(['entries', 'water', 'exercise', 'days'])
+    expect(persisted.water).toBe(useDiaryStore.getState().water)
   })
 })

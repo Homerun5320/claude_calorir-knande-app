@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { hasNewerData, isMemoryOnlyStorage, subscribeStorageStatus } from '../stores/storage'
+import { hasNewerData, hasUnreadableData, isMemoryOnlyStorage, subscribeStorageStatus } from '../stores/storage'
 
 /**
  * true när ändringar just nu inte sparas på enheten (IndexedDB blockerad, full eller långsam,
@@ -16,4 +16,12 @@ export function useMemoryOnlyStorage(): boolean {
  */
 export function useHasNewerData(): boolean {
   return useSyncExternalStore(subscribeStorageStatus, hasNewerData, () => false)
+}
+
+/**
+ * true när sparad data inte går att tolka (t.ex. en trasig månad i dagboken). Den läses inte in och
+ * skrivs aldrig över – det är inte webbläsarens fel, så visa en egen text.
+ */
+export function useHasUnreadableData(): boolean {
+  return useSyncExternalStore(subscribeStorageStatus, hasUnreadableData, () => false)
 }

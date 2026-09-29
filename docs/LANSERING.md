@@ -83,9 +83,12 @@ Steg för steg med alla detaljer: [NATIVE.md §10](NATIVE.md#10-steg-för-steg-f
 
 - **Dagbokens lagring:** i dag skrivs hela dagboken om vid varje ändring. Det går snabbt de första
   månaderna men blir märkbart trögt på en mellanklasstelefon efter ungefär ett år (0,25 s per
-  tryck, 0,45 s efter två år). Dela upp den i en nyckel per månad inom ungefär ett halvår efter
-  lanseringen, i två appversioner (läsare först, skrivare sedan), och mät först på en riktig iPhone
-  och en mellanklass-Android – underlag och plan i [LAGRING.md](LAGRING.md).
+  tryck, 0,45 s efter två år). Läsaren för en nyckel per månad (version A) följer med redan i
+  första versionen, med skrivaren avstängd. Skrivaren är klar och mätt i Chromium: en loggning tar
+  15–29 ms i stället för 0,27–0,74 s efter ett till tre år vid 4–6× strypning. Slå på den
+  (`DIARY_MONTHS_WRITE_BUILD = true`) inom ungefär ett halvår efter lanseringen, efter en mätning
+  på en riktig iPhone och en mellanklass-Android och när de flesta har version A – underlag och
+  plan i [LAGRING.md](LAGRING.md).
 
 ## Ungefärlig tidsplan
 

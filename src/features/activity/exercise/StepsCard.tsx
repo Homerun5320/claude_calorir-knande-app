@@ -2,12 +2,18 @@
  * Steg: logga dagens steg (sparas i dagens DayMeta), se ungefärlig sträcka och nettoförbrukning,
  * och lägg till stegen *utöver* aktivitetsnivåns baslinje som en aktivitet – så att vardagens
  * promenader inte räknas två gånger.
+ *
+ * Fältet har ett eget utkast så att det går snabbt att skriva: stegen sparas först efter en kort
+ * paus (`useDeferredSave`), direkt när fältet lämnas, när dagen byts (på den gamla dagen) och när
+ * appen göms. Varje sparning skriver om hela dagboken, så tangenttryck och tryck på −/+ i rad blir
+ * en enda sparning (docs/LAGRING.md §3).
  */
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Footprints, Plus, RefreshCw } from 'lucide-react'
 import { Button, Card, NumberField, Stat, toast } from '../../../components/ui'
 import { useEnergyUnit } from '../../../components/domain'
 import { formatEnergy, formatNumber } from '../../../lib/format'
+import { useDeferredSave } from '../../../hooks/useDeferredSave'
 import { useDiaryStore, type NewExerciseEntry } from '../../../stores/diaryStore'
 import { ACTIVITY_LEVELS, type ExerciseEntry, type ISODate } from '../../../types'
 import { estimateSteps, STEPS_ACTIVITY_ID, STEPS_MET } from '../activityLogic'
@@ -22,9 +28,34 @@ export interface StepsCardProps {
   mindful: boolean
 }
 
+/** Stegen sparas som heltal – tomt fält (eller ett tal utanför gränserna) blir inga steg. */
+function roundSteps(v: number | undefined): number | undefined {
+  return v === undefined ? undefined : Math.round(v)
+}
+
+const readSteps = (date: ISODate) => useDiaryStore.getState().days[date]?.steps
+
 export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basics, mindful }: StepsCardProps) {
-  const steps = useDiaryStore((s) => s.days[date]?.steps)
+  const stored = useDiaryStore((s) => s.days[date]?.steps)
   const unit = useEnergyUnit()
+
+  const saver = useDeferredSave<number | undefined>({
+    key: date,
+    read: readSteps,
+    save: (steps, day) => useDiaryStore.getState().setDayMeta(day, { steps }),
+  })
+
+  // Utkastet i fältet. En ny dag visar den dagens steg (ett osparat värde sparas då på den gamla
+  // dagen). Ändras stegen utifrån (t.ex. från Apple Hälsa/Health Connect) följer fältet med – om
+  // inget väntar på att sparas och det inte bara är vår egen sparning som har landat.
+  const [draft, setDraft] = useState(stored)
+  const [synced, setSynced] = useState({ date, stored })
+  if (synced.date !== date || synced.stored !== stored) {
+    if (synced.date !== date || (!saver.pending && roundSteps(draft) !== stored)) setDraft(stored)
+    setSynced({ date, stored })
+  }
+
+  const steps = draft
   const est = useMemo(
     () => estimateSteps(steps ?? 0, basics.weightKg, basics.activityLevel, basics.heightCm),
     [steps, basics.weightKg, basics.activityLevel, basics.heightCm],
@@ -32,21 +63,25 @@ export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basi
   const existing = exercise.find((x) => x.activityId === STEPS_ACTIVITY_ID)
   const levelLabel = ACTIVITY_LEVELS[basics.activityLevel].label.toLocaleLowerCase('sv-SE')
 
-  const setSteps = (v: number | undefined) => {
-    useDiaryStore.getState().setDayMeta(date, { steps: v === undefined ? undefined : Math.round(v) })
+  const onStepsChange = (v: number | undefined) => {
+    setDraft(v)
+    saver.schedule(roundSteps(v))
   }
 
   const addAsActivity = () => {
-    if (est.extraSteps <= 0) return
+    // Spara det som står i fältet först – aktiviteten bygger på dagens sparade steg.
+    saver.flush()
+    const saved = estimateSteps(readSteps(date) ?? 0, basics.weightKg, basics.activityLevel, basics.heightCm)
+    if (saved.extraSteps <= 0) return
     const payload: NewExerciseEntry = {
       date,
       activityId: STEPS_ACTIVITY_ID,
       name: 'Extra steg',
-      minutes: Math.max(1, est.extraMinutes),
-      kcal: est.extraKcal,
+      minutes: Math.max(1, saved.extraMinutes),
+      kcal: saved.extraKcal,
       met: STEPS_MET,
-      distanceKm: Math.round(est.extraKm * 100) / 100,
-      note: `${formatNumber(est.extraSteps)}\u00a0steg utöver vardagens ${formatNumber(est.baseline)}`,
+      distanceKm: Math.round(saved.extraKm * 100) / 100,
+      note: `${formatNumber(saved.extraSteps)}\u00a0steg utöver vardagens ${formatNumber(saved.baseline)}`,
     }
     const store = useDiaryStore.getState()
     if (existing) {
@@ -69,7 +104,8 @@ export const StepsCard = memo(function StepsCard({ date, isToday, exercise, basi
       <NumberField
         label={isToday ? 'Steg idag' : 'Steg den här dagen'}
         value={steps}
-        onChange={setSteps}
+        onChange={onStepsChange}
+        onBlur={saver.flush}
         suffix="steg"
         prefix={Footprints}
         step={500}
