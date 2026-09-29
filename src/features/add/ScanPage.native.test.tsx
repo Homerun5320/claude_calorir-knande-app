@@ -80,10 +80,14 @@ describe('ScanPage i apparna', () => {
     expect(mocks.openCamera).not.toHaveBeenCalled()
     expect(document.querySelector('video')).toBeNull()
 
+    // Portionsväljaren rapporterar mängden i en effekt efter första renderingen. findByRole kan
+    // hitta arket innan den effekten har körts (på en belastad CI-maskin), och då gör ett tryck
+    // ingenting – låt effekterna köras klart innan knappen trycks.
+    await act(async () => {})
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Lägg i korgen' }))
     })
-    expect(useBasketStore.getState().items).toHaveLength(1)
+    await waitFor(() => expect(useBasketStore.getState().items).toHaveLength(1))
     await waitFor(() => expect(mocks.scanFoodBarcode).toHaveBeenCalledTimes(2))
     expect(await screen.findByRole('button', { name: 'Skanna streckkod' })).toBeInTheDocument()
   })
