@@ -191,6 +191,8 @@ räknare plus `LAGOM_BUILD_NUMBER_OFFSET`.
   | `There is a problem with the request entity – You already have a current Distribution certificate` | Apple tillåter högst tre distributionscertifikat. Återkalla ett gammalt under *Certificates* på developer.apple.com (inte ett som en publicerad app behöver för något annat – för Lagom finns bara det här). |
   | `Unauthorized` / `NOT_AUTHORIZED` | Fel *Issuer ID*/*Key ID*, en ofullständig `.p8`, eller en nyckel utan rollen App Manager. |
   | *HealthKit saknas i appens behörigheter* | HealthKit är inte påslaget för Bundle ID:t. Slå på det; nästa bygge skapar en ny profil. |
+  | *iPhone-widgeten: halvvägs påslagen* | Projektfilen, `App.entitlements` och `WIDGET_IOS_READY` ska vara på eller av tillsammans. Återställ filerna eller slå på allt med `node scripts/ios-widget.mjs enable` ([WIDGET.md §8](WIDGET.md#8-iphone--planen)). |
+  | `Provisioning profile … doesn't include the com.apple.security.application-groups entitlement` (bara med widgeten på) | App Group saknas för appens eller widgetens Bundle ID. På developer.apple.com: skapa gruppen `group.se.lagomappen.lagom` och slå på *App Groups* med den för både `se.lagomappen.lagom` och `se.lagomappen.lagom.widget` (skapas bygget automatiskt utan förmågor – slå då på dem). Nästa bygge skapar nya profiler. |
   | `The bundle version must be higher than the previously uploaded version` | Byggnumret har redan använts – höj `LAGOM_BUILD_NUMBER_OFFSET`. |
   | `No suitable application records were found` | Appen finns inte i App Store Connect, eller Bundle ID:t skiljer sig. |
   | Swift-paket går inte att hämta | Tillfälligt fel hos GitHub – kör igen. |

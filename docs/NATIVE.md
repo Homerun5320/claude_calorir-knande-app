@@ -11,8 +11,9 @@ formulär och texter i övrigt: [APP-STORE.md](APP-STORE.md), [GOOGLE-PLAY.md](G
 
 > **Läget (2026-09-28):** grunden är på plats – projekten, ikoner, startskärmar, behörigheter,
 > integritetsmanifest och byggkommandon – och funktionerna finns i `src/native/` (köp i appen,
-> export och delning, påminnelser, streckkodsläsare, Hälsa, haptik, statusfält, bakåtknapp och –
-> bara på Android – widgeten på hemskärmen, se [WIDGET.md](WIDGET.md)).
+> export och delning, påminnelser, streckkodsläsare, Hälsa, haptik, statusfält, bakåtknapp och
+> widgeten på hemskärmen – på Android färdig, på iPhone klar i koden men avstängd tills App Group
+> finns, se [WIDGET.md](WIDGET.md)).
 > Molnbyggena är klara: kontrollbygget (`.github/workflows/native.yml`) och de signerade
 > butiksbyggena till TestFlight och Google Play (`.github/workflows/release.yml` eller
 > `codemagic.yaml`), se [avsnitt 9](#9-molnbyggen-kontroll-signering-och-uppladdning). Det som
@@ -252,7 +253,7 @@ Filer som **skapas** och inte ska ändras för hand: `ios/App/CapApp-SPM/Package
   | `barcode` | Streckkodsläsaren (se avsnitt 2) | ScanPage |
   | `health` | Apple Hälsa/Health Connect: läser vikt och steg, skriver vikt samt energi och vatten för avslutade dagar. Av från början; `lagom-health` i localStorage | `init.ts`, Inställningar → Apple Hälsa/Health Connect |
   | `photos` | Framstegsbilder: nedskalade JPEG utan EXIF i `framsteg/` med `index.json` – på iPhone i `Directory.LibraryNoCloud`, på Android i `Directory.Data`. Android-kamerans tillfälliga original (`Pictures/JPEG_*.jpg` i appens externa filmapp, med en `.nomedia` så att galleriappar inte visar mappen) tas bort med `clearCameraCaptures()` direkt efter nedskalningen, när sidan öppnas och vid varje start av appen. Ett trasigt `index.json` byggs om ur filerna i mappen. Av från början | `src/lib/progressPhotos.ts` (Vikt & mått → Framstegsbilder), `init.ts` (Android: `clearCameraCaptures`), "Radera all data" |
-  | `widget` | Hemskärmswidgeten **på Android** (iPhone av: `WIDGET_IOS_READY = false`, se [WIDGET.md](WIDGET.md)). Bygger sammanfattningen med `buildWidgetPayload` (`src/lib/widgetSummary.ts`: färdiga svenska texter för idag och sex dagar framåt, inga livsmedelsnamn, inga energisiffror i medvetet läge, aldrig exempeldata) och skickar den till appens egna tillägg `LagomWidget` (`update({ data })`/`clear()`): en gång vid start, 1,5 s efter den senaste ändringen, när appen öppnas igen och direkt när den går till bakgrunden om en ändring väntar – aldrig samma innehåll två gånger och aldrig i minnesläge. Tar emot länkarna `lagom-widget://idag` → `/` och `lagom-widget://lagg-till` → `/lagg-till` (`appUrlOpen` och `App.getLaunchUrl()`, startlänken bara vid sidans första laddning – inte efter en omladdning) och ignorerar allt annat | `init.ts` (sist, väntas inte in), "Radera all data" (`clearWidget`) |
+  | `widget` | Hemskärmswidgeten **på Android** (iPhone: koden och WidgetKit-målet finns men är av – `WIDGET_IOS_READY = false` och målet är inte inbäddat i appen, se [WIDGET.md §8](WIDGET.md#8-iphone--planen)). Bygger sammanfattningen med `buildWidgetPayload` (`src/lib/widgetSummary.ts`: färdiga svenska texter för idag och sex dagar framåt, inga livsmedelsnamn, inga energisiffror i medvetet läge, aldrig exempeldata) och skickar den till appens egna tillägg `LagomWidget` (`update({ data })`/`clear()`): en gång vid start, 1,5 s efter den senaste ändringen, när appen öppnas igen och direkt när den går till bakgrunden om en ändring väntar – aldrig samma innehåll två gånger och aldrig i minnesläge. Tar emot länkarna `lagom-widget://idag` → `/` och `lagom-widget://lagg-till` → `/lagg-till` (`appUrlOpen` och `App.getLaunchUrl()`, startlänken bara vid sidans första laddning – inte efter en omladdning) och ignorerar allt annat | `init.ts` (sist, väntas inte in), "Radera all data" (`clearWidget`) |
 
 - **Alla dynamiska importer av native-moduler står i `index.ts`.** Vite tar bara bort en dynamisk
   import ur webbygget när villkoret (`NATIVE_BUILD`, en konstant i bygget) står i samma modul –
@@ -501,8 +502,17 @@ båda; `release.yml` hoppar över en app vars hemligheter inte finns i GitHub.
   `scripts/commerce-guard.ts` (kan stoppa butiksbygget), `scripts/native-config.mjs`,
   `scripts/check-android-16kb.mjs` och arbetsflödet självt. Ändringar i resten av webbkoden
   kontrolleras av `ci.yml`.
+- **iPhone-widgetens logik (Linux, alltid):** jobbet *iPhone-widgetens logik (Swift på Linux)*
+  kompilerar `WidgetShared.swift`, `WidgetPayload.swift`, `WidgetContent.swift` och
+  `ios/App/LagomWidgetTests/main.swift` med `swiftc` och kör testerna mot fixturerna från
+  `buildWidgetPayload` (`src/native/widgetIosFixtures.test.ts`) – samma tolkningsregler som Androids
+  JUnit-tester.
 - **macOS bara på begäran:** *Actions → Native-appar → Run workflow → Bygg även iPhone-appen*.
-  macOS-minuter räknas tio gånger i privata repon.
+  macOS-minuter räknas tio gånger i privata repon. Förutom appen bygger jobbet widgetmålet
+  (`xcodebuild -target LagomWidgetExtension`), kör Swift-testerna och bygger appen med widgeten
+  påslagen och inbäddad (`node scripts/ios-widget.mjs enable` i körningens egen kopia – aldrig
+  incheckat) och kontrollerar att `PlugIns/LagomWidgetExtension.appex` har rätt Bundle ID och
+  tilläggstyp.
 - Webbdelen byggs som testbygge; dina riktiga säljaruppgifter används om de finns som Variables.
 
 ### release.yml – de signerade butiksbyggena
@@ -577,7 +587,10 @@ valfritt `LAGOM_INTERN_TESTFLIGHT` i `app_store`) – se kommentaren överst i `
 
 Byggena kontrollerar byggkontrollen (`scripts/commerce-guard.ts`), variablerna, taggen, att
 uppladdningsnyckeln går att öppna, att AAB:n är signerad (och med vilken nyckel), 16 KB-sidorna,
-och att IPA:n har rätt Bundle ID, version, byggnummer och HealthKit. Arbetsflödena är kontrollerade
+och att IPA:n har rätt Bundle ID, version, byggnummer och HealthKit. Läget för iPhone-widgeten läses
+en gång (`node scripts/ios-widget.mjs status`; ett halvt läge stoppar bygget): är den på hämtas
+även widgetens profil och IPA:n ska innehålla `LagomWidgetExtension.appex` med samma version och App
+Group i båda signaturerna, är den av får IPA:n inte innehålla den. Arbetsflödena är kontrollerade
 med `actionlint` och `shellcheck`, förutsättningssteget och Android-signaturkontrollerna är provade
 lokalt, och `src/native/storeBuilds.test.ts` håller filerna i takt med projekten. Själva Gradle-
 och Xcode-stegen kan bara provas i en riktig körning – räkna med att första körningen av varje app
@@ -783,9 +796,12 @@ ligga på datorn. Har du någon gång tillgång till en Mac med Xcode 26: `npm r
 - [ ] Widgeten på hemskärmen: prova på en riktig Android-telefon enligt
       [WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon) (lägga till, storlekar, ljust och mörkt läge,
       medvetet läge, exempeldata, midnatt, fastan, länkarna, "Radera all data", TalkBack).
-- [ ] iPhone-widgeten: först när App Group `group.se.lagomappen.lagom` finns i ägarens
-      Apple-konto – planen i [WIDGET.md §8](WIDGET.md#8-iphone--planen). Till dess är
-      `WIDGET_IOS_READY` false.
+- [ ] iPhone-widgeten: koden är klar och provbyggd i CI men av. Slå på den när App Group
+      `group.se.lagomappen.lagom` finns i ägarens Apple-konto (och App ID:t
+      `se.lagomappen.lagom.widget` med App Groups) med `node scripts/ios-widget.mjs enable` –
+      checklistan i [WIDGET.md §8](WIDGET.md#8-iphone--planen). Till dess är `WIDGET_IOS_READY`
+      false. Kontrollera i den första körningen av `release.yml` att `xcode-project use-profiles`
+      hoppar över widgetmålet utan profil.
 - [ ] Kontrollera i CI i det sammanslagna Android-manifestet (`app/build/intermediates/merged_manifests`)
       att bara de fem hälsobehörigheterna finns kvar, att `MlKitInitProvider` saknas och att
       `PermissionsRationaleActivity` och `ViewPermissionUsageActivity` finns med.
