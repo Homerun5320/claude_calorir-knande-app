@@ -39,20 +39,26 @@ export async function signOutOfCloud(): Promise<void> {
 
 /**
  * De inbyggda apparna: ta bort det som ligger utanför butikerna – den automatiska kopian
- * (`lagom-spegling.json`), exportfiler i cachen och kopplingen till Apple Hälsa/Health Connect
- * (`lagom-health`). "Radera all data" får inte kunna ta tillbaka något. No-op på webben; kastar
- * aldrig.
+ * (`lagom-spegling.json`), exportfiler i cachen, kopplingen till Apple Hälsa/Health Connect
+ * (`lagom-health`) och hemskärmswidgetens sammanfattning (SharedPreferences "lagom-widget" på
+ * Android). "Radera all data" får inte kunna ta tillbaka något. No-op på webben; kastar aldrig.
  *
  * `keepMirror`: raderingen gällde bara exempeldata ("Skapa min egen profil"). Exempeldata speglas
  * aldrig, så en kopia som finns är användarens egen tidigare dagbok – den får ligga kvar och
- * ersätts först när något nytt läggs in.
+ * ersätts först när något nytt läggs in. Widgeten töms alltid: den ska visa det som finns i appen
+ * nu, och den fylls igen när något nytt läggs in.
  */
 export async function clearNativeCopies(opts: { keepMirror?: boolean } = {}): Promise<void> {
   if (!isNative()) return
   try {
-    const [mirror, files, health] = await Promise.all([opts.keepMirror ? null : loadNative('mirror'), loadNative('files'), loadNative('health')])
+    const [mirror, files, health, widget] = await Promise.all([
+      opts.keepMirror ? null : loadNative('mirror'),
+      loadNative('files'),
+      loadNative('health'),
+      loadNative('widget'),
+    ])
     health?.resetHealth()
-    await Promise.all([mirror?.deleteMirror(), files?.clearExportCache()])
+    await Promise.all([mirror?.deleteMirror(), files?.clearExportCache(), widget?.clearWidget()])
   } catch (error) {
     logError(error, 'radera: kopior i appen')
   }
@@ -76,9 +82,10 @@ export async function deleteProgressPhotos(): Promise<void> {
  * Radera all data och gör appen redo för en ny profil. Provperiodens start finns kvar, och
  * licensen behålls om inte `removeLicense` anges. Är Lagom Moln påslaget loggas man också ut på
  * den här enheten (se `signOutOfCloud`). Framstegsbilderna raderas (se `deleteProgressPhotos`), och
- * i apparna tas också kopian på telefonen, exportfilerna och hälsokopplingen bort (se
- * `clearNativeCopies`) – kopian och bilderna dock inte när det bara var exempeldata som raderades:
- * exempeldata speglas aldrig och kan inte ha bilder, så det som finns är användarens eget.
+ * i apparna tas också kopian på telefonen, exportfilerna, hälsokopplingen och widgetens
+ * sammanfattning bort (se `clearNativeCopies`) – kopian och bilderna dock inte när det bara var
+ * exempeldata som raderades: exempeldata speglas aldrig och kan inte ha bilder, så det som finns
+ * är användarens eget.
  */
 export function wipeAndReset(opts: { removeLicense?: boolean } = {}): Promise<void> {
   const demo = isDemoData()

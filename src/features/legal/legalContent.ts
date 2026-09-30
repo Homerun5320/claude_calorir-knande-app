@@ -364,6 +364,32 @@ const PHOTOS_ROW_IOS = [
   'Vikt & mått → Framstegsbilder → Radera alla bilder (eller en bild i taget), Inställningar → Data → Radera all data, eller avinstallera appen',
 ]
 
+/**
+ * Hemskärmswidgeten (src/lib/widgetSummary.ts, src/native/widget.ts, android/…/widget/) – bara i
+ * Android-appen. Aldrig i `appStore`-varianten: iPhone-widgeten finns inte ännu (WIDGET_IOS_READY,
+ * docs/WIDGET.md), och den texten får inte nämna Android. Sammanfattningen sparas i appen även när
+ * ingen widget är placerad (tillägget vet inte om någon är det).
+ */
+const WIDGET_WHAT =
+  'Sammanfattning för widgeten på hemskärmen, för i dag och de sex följande dagarna: hur mycket energi du har ätit och har kvar av dagsmålet (inte i medvetet läge), antal loggade måltider, vatten och en pågående fasta. Inga livsmedel, måltidsnamn eller exempeldata'
+
+const WIDGET_DETAILS = [
+  'Appens egen lagring på telefonen (SharedPreferences-filen lagom-widget), som inte följer med i Googles säkerhetskopia i molnet',
+  'Så att widgeten kan visa dagens siffror även när appen är stängd. Den sparas även om du inte har lagt till widgeten, men syns bara om du själv lägger till den på hemskärmen – och då för alla som ser skärmen',
+  'Skrivs över när något ändras i appen. Finns tills du raderar din data eller avinstallerar appen',
+  'Inställningar → Data → Radera all data, eller avinstallera appen',
+]
+
+const WIDGET_ROW = [`${WIDGET_WHAT} – bara i Android-appen`, ...WIDGET_DETAILS]
+
+const WIDGET_ROW_PLAY = [WIDGET_WHAT, ...WIDGET_DETAILS]
+
+/** Widgeten i avsnittet om dagboken – webbens text och Play-appens (aldrig i iPhone-appen). */
+const WIDGET_TEXT_SUMMARY =
+  'en widget på hemskärmen. Den visar en kort sammanfattning av dagen – hur mycket energi du har kvar (inte i medvetet läge), antal loggade måltider, vatten och en pågående fasta – men aldrig vad du har ätit. Sammanfattningen sparas bara i appen på telefonen och skickas inte till oss, men på hemskärmen kan den läsas av alla som ser skärmen. Du tar bort widgeten från hemskärmen som andra widgetar.'
+const WIDGET_TEXT_WEB = `I Android-appen kan du lägga till ${WIDGET_TEXT_SUMMARY}`
+const WIDGET_TEXT_PLAY = `Du kan lägga till ${WIDGET_TEXT_SUMMARY}`
+
 /** Allergier och intoleranser (settings.allergens i lagom-profile, src/lib/allergens.ts). */
 const ALLERGY_ROW = [
   'Allergier och intoleranser som du markerar (uppgifter om hälsa)',
@@ -503,6 +529,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
       'Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara på din enhet – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.',
       'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort enheten eller rensar webbläsaren försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
       'I apparna för iPhone och Android sparar Lagom dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom, och på iPhone följer den inte med i telefonens säkerhetskopia. På iPhone kan telefonens egen säkerhetskopia (iCloud eller en dator) ta med appens övriga data, som allt annat på telefonen – den sköts av Apple och ditt Apple-konto, inte av oss. På Android följer appens data inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
+      WIDGET_TEXT_WEB,
     ],
     appStore: {
       paragraphs: [
@@ -522,6 +549,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
         'Framstegsbilder är avstängda tills du själv slår på dem. Bilderna sparas då bara i appen på din telefon – nedskalade och utan platsuppgifter eller annan information från bildfilen – och följer aldrig med i säkerhetskopian, den automatiska kopian eller till oss. Du kan radera en bild eller alla när du vill.',
         'Eftersom vi inte har någon kopia är det bra att spara en säkerhetskopia då och då under Inställningar → Data. Tappar du bort telefonen eller tar bort appen försvinner annars datan. Synkning mellan enheter finns inte i den här versionen – kommer den blir den frivillig, och den här policyn uppdateras först.',
         'Lagom sparar dessutom en automatisk kopia av dagboken i appens egen mapp på telefonen, så att inget försvinner om telefonen rensar appens lagring. Kopian lämnar inte telefonen genom Lagom. Appens data följer inte med i Googles säkerhetskopia i molnet, men kan flyttas med när du för över allt direkt till en ny telefon.',
+        WIDGET_TEXT_PLAY,
       ],
     },
   },
@@ -580,6 +608,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
         PHOTOS_ROW,
         EXPORT_ROW,
         REMINDER_ROW,
+        WIDGET_ROW,
         [
           'Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet, om appen startats från Google Play och när appen senast laddades om efter en uppdatering',
           'sessionStorage (lagom-korg, lagom-onboarding, lagom-twa, lagom-chunk-reload)',
@@ -644,6 +673,7 @@ const PRIVACY_TEMPLATE: LegalSection[] = [
           PHOTOS_ROW_PLAY,
           EXPORT_ROW,
           REMINDER_ROW,
+          WIDGET_ROW_PLAY,
           [
             'Korgen när du lägger till flera livsmedel, utkastet i välkomstflödet och när appen senast laddades om efter en uppdatering',
             'sessionStorage (lagom-korg, lagom-onboarding, lagom-chunk-reload)',

@@ -97,9 +97,20 @@ jobs:
       - name: Webbdelen (VITE_DISTRIBUTION=play) och cap sync
         run: npm run build:android
 
-      - name: Gradle – debug-APK och release-AAB (osignerad)
+      # :app:testDebugUnitTest kör appens egna JUnit-tester (hemskärmswidgeten,
+      # android/app/src/test/java) – bara appmodulen, inte tilläggens egna tester.
+      - name: Gradle – debug-APK, release-AAB (osignerad) och appens enhetstester
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug bundleRelease -PlagomVersionCode=${{ github.run_number }}
+        run: ./gradlew --no-daemon assembleDebug bundleRelease :app:testDebugUnitTest -PlagomVersionCode=${{ github.run_number }}
+
+      - name: Spara testrapporten om något steg misslyckas
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-android-enhetstester
+          path: android/app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: 16 KB-sidor (Google Play, Android 15+)
         run: |

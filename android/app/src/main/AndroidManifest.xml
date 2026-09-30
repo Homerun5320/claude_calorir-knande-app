@@ -63,6 +63,27 @@
             android:name="com.google.mlkit.common.internal.MlKitInitProvider"
             android:authorities="${applicationId}.mlkitinitprovider"
             tools:node="remove" />
+
+        <!--
+          Hemskärmswidgeten "Idag" (widget/LagomWidgetProvider.java, docs/WIDGET.md). Appen skickar
+          färdiga texter via det lokala tillägget LagomWidget; datan ligger i appens SharedPreferences.
+          exported="false": bara systemet (widgetuppdateringar) och appen själv når mottagaren. Inga
+          nya behörigheter – ritningen vid midnatt är ett inexakt alarm med ett fönster (setWindow,
+          inget exakt alarm). Länkarna från widgeten är uttryckliga Intent till MainActivity – ingen
+          intent-filter för lagom-widget://. MainActivity är ändå exporterad (startaktiviteten), så
+          appen följer bara de två länkarna, till Idag och Lägg till (WidgetLinks).
+        -->
+        <receiver
+            android:name=".widget.LagomWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lagom_widget_info" />
+        </receiver>
     </application>
 
     <!-- Nätet: Open Food Facts, receptimport och serverfunktionerna. -->

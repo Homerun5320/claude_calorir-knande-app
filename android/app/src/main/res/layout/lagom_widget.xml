@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hemskärmswidgeten "Idag" (widget/LagomWidgetProvider.java, docs/WIDGET.md).
+
+  Bara vyer som RemoteViews tillåter från Android 8 (API 26): LinearLayout, TextView, Button,
+  ImageButton, ImageView, ProgressBar och Chronometer – inga egna vyer, inga temaattribut (hemskärmen
+  ritar widgeten med sitt eget tema), bara färger från values/widget_colors.xml.
+
+  Standardvärdena nedan är läget utan data (rubriken "Lagom", reservtexten och knappen); providern
+  sätter alla texter och synligheter vid varje ritning. widget/WidgetLayout.java räknar med samma mått:
+  rubrikraden 48 dp (knappens tryckyta), energitexten (24 sp), stapeln och sedan valfria rader (13 sp
+  och 2–4 dp marginal). Texten i sp växer med systemets textstorlek, så ändras en textstorlek,
+  marginal eller höjd här ska konstanterna där ändras också. Ordningen här: energidetalj, måltider,
+  vatten, fasta.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true"
+    android:orientation="vertical"
+    android:padding="@dimen/widget_padding">
+
+    <!-- Rubrikraden: "Idag" (eller "Lagom") och knappen Lägg till – med text, eller rund när widgeten är smal. -->
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:text="@string/widget_title_app"
+            android:textAllCaps="true"
+            android:textColor="@color/widget_gran"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/widget_add"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/widget_touch_target"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/widget_button_add"
+            android:contentDescription="@string/widget_add_description"
+            android:drawableStart="@drawable/widget_ic_add"
+            android:drawablePadding="6dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minWidth="@dimen/widget_touch_target"
+            android:minHeight="@dimen/widget_touch_target"
+            android:paddingStart="12dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="0dp"
+            android:stateListAnimator="@null"
+            android:text="@string/widget_add"
+            android:textAllCaps="false"
+            android:textColor="@color/widget_on_gran"
+            android:textSize="14sp" />
+
+        <ImageButton
+            android:id="@+id/widget_add_icon"
+            android:layout_width="@dimen/widget_touch_target"
+            android:layout_height="@dimen/widget_touch_target"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_button_add_icon"
+            android:contentDescription="@string/widget_add_description"
+            android:scaleType="center"
+            android:src="@drawable/widget_ic_add"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Reservtexten: ingen data än, ingen profil, exempeldata eller ingen dag för idag. -->
+    <TextView
+        android:id="@+id/widget_fallback"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:text="@string/widget_fallback_default"
+        android:textColor="@color/widget_ink_2"
+        android:textSize="15sp" />
+
+    <!-- Energin: "1 240 kcal kvar" (stor), "760 av 2 000 kcal" och stapeln. Aldrig i medvetet läge. -->
+    <TextView
+        android:id="@+id/widget_energy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="serif"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/widget_ink"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_energy_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_ink_2"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- Stapeln är dekor: texten ovanför säger samma sak för skärmläsare. -->
+    <ProgressBar
+        android:id="@+id/widget_energy_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="8dp"
+        android:importantForAccessibility="no"
+        android:indeterminate="false"
+        android:max="1000"
+        android:maxHeight="6dp"
+        android:minHeight="6dp"
+        android:progressDrawable="@drawable/widget_progress_energy"
+        android:visibility="gone" />
+
+    <!-- "3 måltider loggade" / "Inget loggat än". -->
+    <TextView
+        android:id="@+id/widget_meals"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_ink_2"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- Vatten: "0,75 av 2 l" och en liten stapel. -->
+    <LinearLayout
+        android:id="@+id/widget_water_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_water_icon"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@string/widget_water_description"
+            android:src="@drawable/widget_ic_water" />
+
+        <TextView
+            android:id="@+id/widget_water"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink_2"
+            android:textSize="13sp" />
+
+        <ProgressBar
+            android:id="@+id/widget_water_bar"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="56dp"
+            android:layout_height="4dp"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            android:indeterminate="false"
+            android:max="1000"
+            android:maxHeight="4dp"
+            android:minHeight="4dp"
+            android:progressDrawable="@drawable/widget_progress_water"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Pågående fasta: ikonen (beskrivs som "Fasta pågår"), "Fastat 14:03:22" och målet. -->
+    <LinearLayout
+        android:id="@+id/widget_fasting_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_fasting_icon"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@string/widget_fasting_description"
+            android:src="@drawable/widget_ic_timer" />
+
+        <Chronometer
+            android:id="@+id/widget_fasting_timer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink_2"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_fasting_target"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widget_ink_3"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

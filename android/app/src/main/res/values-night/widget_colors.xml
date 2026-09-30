@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hemskärmswidgetens färger i mörkt läge: tokens under .dark i src/index.css. -->
+<resources>
+    <!-- Bakgrunden (lg-surface – lg-bg är nästan svart mot en mörk bakgrundsbild) och spåret (lg-surface-3). -->
+    <color name="widget_background">#131C19</color>
+    <color name="widget_track">#23302B</color>
+    <color name="widget_ink">#EEEBE3</color>
+    <color name="widget_ink_2">#B9BEB8</color>
+    <color name="widget_ink_3">#99A29C</color>
+    <color name="widget_gran">#6CC49A</color>
+    <color name="widget_on_gran">#08110D</color>
+    <color name="widget_fjall">#7CBADB</color>
+    <color name="widget_ripple">#29EEEBE3</color>
+    <color name="widget_ripple_on_gran">#33000000</color>
+</resources>

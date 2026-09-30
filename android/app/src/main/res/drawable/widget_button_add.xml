@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Knappen "Lägg till": en grön kapsel (40 dp) i en 48 dp hög tryckyta. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/widget_ripple_on_gran">
+    <item>
+        <inset
+            android:insetBottom="4dp"
+            android:insetTop="4dp">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/widget_gran" />
+                <corners android:radius="20dp" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hemskärmswidgetens mått (widget/WidgetLayout.java räknar med samma höjder). -->
+<resources>
+    <!-- Inre marginal: vanlig och trång (lägre än WidgetLayout.tightBelow – 123 dp vid normal textstorlek). -->
+    <dimen name="widget_padding">14dp</dimen>
+    <dimen name="widget_padding_tight">12dp</dimen>
+    <!-- Hörnen före Android 12 (appens kort: 1.5rem); från Android 12 systemets radie (drawable-v31). -->
+    <dimen name="widget_corner_radius">24dp</dimen>
+    <!-- Tryckytorna: minst 48 dp. -->
+    <dimen name="widget_touch_target">48dp</dimen>
+</resources>
