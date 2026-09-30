@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Energistapeln: granens gröna på ett ljust spår – alltid samma neutrala färg, även över dagsmålet
+  (inga röda varningar). scale i stället för clip ger rundade ändar vid alla nivåer.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widget_track" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <scale
+            android:scaleGravity="start|center_vertical"
+            android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <solid android:color="@color/widget_gran" />
+                <corners android:radius="3dp" />
+            </shape>
+        </scale>
+    </item>
+</layer-list>

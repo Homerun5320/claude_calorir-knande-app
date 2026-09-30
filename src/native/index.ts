@@ -58,6 +58,11 @@ const MODULES = {
   health: () => import('./health'),
   /** Framstegsbilder: filer i appens egen mapp (src/lib/progressPhotos.ts, /vikt/bilder). */
   photos: () => import('./photos'),
+  /**
+   * Hemskärmswidgeten (Android; iPhone senare, docs/WIDGET.md): dagens sammanfattning till
+   * tillägget LagomWidget och länkarna från widgeten – startas från init.ts, töms i wipe.ts.
+   */
+  widget: () => import('./widget'),
 }
 
 export type NativeModuleName = keyof typeof MODULES

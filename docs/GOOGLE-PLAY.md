@@ -14,7 +14,7 @@ kod som webbversionen, byggd med `VITE_DISTRIBUTION=play` (`npm run build:androi
 fungerar utan uppkoppling och visar aldrig webbpriser eller webbköp. Köp görs med **Google Play
 Billing** i appen (`@capgo/native-purchases`). Appen har också inbyggda funktioner: streckkodsläsare,
 delning och export via telefonens delningsmeny, lokala påminnelser, en frivillig koppling till
-**Health Connect**, haptik och Androids bakåtknapp. Allt om projektet, behörigheterna och byggena:
+**Health Connect**, en widget på hemskärmen, haptik och Androids bakåtknapp. Allt om projektet, behörigheterna och byggena:
 [NATIVE.md](NATIVE.md).
 
 Skillnader mot den tidigare planen med en Trusted Web Activity (TWA/Bubblewrap):
@@ -176,6 +176,7 @@ LOGGA MAT SNABBT
 • Skanna streckkoden på förpackningen för att hitta produkten
 • Saknas en vara? Fyll i från förpackningen med telefonens textigenkänning eller inklistrad text – du granskar innan du sparar
 • Spara måltider du äter ofta och lägg in dem med ett tryck
+• Widget på hemskärmen om du vill – dagens energi, måltider och vatten och en knapp för att lägga till
 
 NÄRING OCH MÅL
 • Dagsringen visar energi, protein, kolhydrater, fett och fibrer mot ditt dagsmål
@@ -215,10 +216,11 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(3 883 tecken med radbrytningar.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
-veckoplaneringen, receptimporten, påminnelserna och Health Connect ska finnas i version 1.0, men
-kontrollera i den version du laddar upp (Inställningar → Påminnelser och Inställningar → Health
-Connect). Saknas någon: ta bort raden. Googles policy för
+(3 986 tecken med radbrytningar.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
+veckoplaneringen, receptimporten, påminnelserna, Health Connect och widgeten ska finnas i version 1.0,
+men kontrollera i den version du laddar upp (Inställningar → Påminnelser, Inställningar → Health
+Connect och hemskärmens lista över widgetar, där den heter **Idag** under Lagom). Saknas någon: ta
+bort raden – och motsvarande ord i versionsinformationen. Googles policy för
 appar med information från myndigheter kräver att källan anges (gärna med adress) – det gör raden
 "Källa:" ovan.
 
@@ -230,6 +232,14 @@ webbplatsens adress (`VITE_API_BASE`), som byggkontrollen redan kräver i butiks
 det bara att dela som fil. Röstsökningen är webbens och finns inte i appen – den står därför inte i
 texterna.
 
+Widgeten på hemskärmen är Android-appens egen kod (det lokala tillägget `LagomWidget` i
+`android/app/src/main/java/se/lagomappen/lagom/widget/`, registrerat i `MainActivity`, se
+[WIDGET.md](WIDGET.md)) och finns bara i Play-appen. Den lägger inte till några behörigheter eller
+beroenden, och inget lämnar telefonen – Data safety är därför oförändrad. Raden säger bara det
+widgeten visar: energin (inga siffror i medvetet läge), antal måltider, vatten och knappen "Lägg
+till" – aldrig exempeldata. Den byggs i molnbygget men kan bara provas på en riktig telefon
+([WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon)) – gör det innan raden följer med till produktion.
+
 ### Versionsinformation (högst 500 tecken)
 
 *Play Console → Testa och släpp → Produktion → Skapa ny version → Versionsinformation.* Texten står
@@ -237,10 +247,10 @@ mellan språktaggarna `<sv-SE>` och `</sv-SE>` i rutan. För de första testvers
 kort rad (avsnitt 10); den här texten gäller version 1.0 i produktion.
 
 ```
-Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare och "Fyll i från förpackningen", recept som du kan dela som länk eller fil, veckoplanering och veckobudget, allergiprofil, insikter, milstolpar, vikt och mått, vatten och träning – och om du vill framstegsbilder, påminnelser och koppling till Health Connect. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
+Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare och "Fyll i från förpackningen", recept som du kan dela som länk eller fil, veckoplanering och veckobudget, allergiprofil, insikter, milstolpar, vikt och mått, vatten och träning – och om du vill framstegsbilder, påminnelser, en widget på hemskärmen och koppling till Health Connect. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
 ```
 
-(470 tecken.)
+(495 tecken.)
 
 ### Kategori och kontaktuppgifter
 
@@ -289,6 +299,10 @@ node scripts/app-store-screenshots.mjs --dist=dist-native --only=play   # → st
 - Inbyggda vyer (streckkodsläsarens helskärm, Health Connects behörighetsfråga, notiser) syns inte
   i webbläsaren. Vill du visa dem: ta en skärmdump på en Android-telefon med testbygget (1 080 ×
   1 920 px eller större, 9:16) – redigera den inte.
+- Widgeten på hemskärmen syns bara på en telefon, och den visar **aldrig exempeldata** ("Widgeten
+  visar inte exempeldata"). Vill du visa den: skapa en egen testprofil i testbygget, logga några
+  påhittade måltider och ta skärmdumpen på hemskärmen – med en neutral bakgrund och utan andra
+  appars ikoner eller notiser i bild.
 - Skriptet startar `vite preview` på en ledig port, laddar exempeldatan via *Utforska med
   exempeldata* och fotograferar Idag, Dagbok, Insikter (förra veckan), Recept, Vikt & mått och
   ett livsmedel med näringsvärden – i ljust och mörkt läge. Servern stängs efteråt.
@@ -491,6 +505,7 @@ skickas. Inget konto, ingen reklam och ingen koppling till någon person.
 | Foton/kamera | **Inte insamlat** – kamerabilden tolkas i telefonen (ZXing) för streckkoder och sparas eller skickas inte. Framstegsbilder (frivilliga) sparas nedskalade och utan platsuppgifter bara i appens mapp på telefonen och lämnar den aldrig (undantagna från Googles molnkopia). Kameraappens tillfälliga originalbild tas bort direkt efter nedskalningen, och annars vid nästa start av appen. (Se också rutan om ML Kit nedan.) |
 | Health Connect (vikt, steg, näring, vatten) | **Inte insamlat** – läses och skrivs bara i telefonen och lämnar den aldrig. Data som bara behandlas på enheten räknas inte som insamling. Kopplingen ska ändå beskrivas i integritetspolicyn (Health Connect-kravet). |
 | Påminnelser | **Inte insamlat** – lokala notiser som skapas i telefonen, ingen pushtjänst. |
+| Widgeten på hemskärmen | **Inte insamlat** – appen sparar en färdig sammanfattning (energi, antal måltider, vatten, fasta; inga livsmedel) i sina egna SharedPreferences (`lagom-widget`, undantagna från Googles molnkopia), och hemskärmen ritar den på telefonen. Inget skickas någonstans, ingen behörighet behövs, och widgeten läggs bara till om användaren själv vill. |
 | Köp i appen | **Inte insamlat** av Lagom – köpet går direkt mellan telefonen och Google Play (`@capgo/native-purchases` gör inga egna nätanrop). |
 | Export och delning | **Inte insamlat** – filen går bara dit användaren själv väljer i delningsmenyn. Det gäller även delade recept och sparade måltider (länk eller fil) – receptet ligger i länken efter # och når aldrig Lagoms server. |
 | Säkerhetsgranskning (MASA) | Nej (valfri) |
@@ -618,6 +633,8 @@ After the trial, viewing, export and deletion always work; only new logging requ
 <LICENSNYCKEL>
 
 Optional features, all off by default: Health Connect (Inställningar → Health Connect) reads weight and steps and writes weight, dietary energy and water (energy and water for finished days); data stays on the device. Reminders (Inställningar → Påminnelser) are local notifications. The camera is only used to scan barcodes; no images are stored or sent.
+
+Home screen widget (optional): long-press the home screen, choose Widgets and add 'Idag' under Lagom. It shows today's remaining energy, logged meals and water, and opens the app ('Lägg till' opens the add-food screen). It never shows sample data, so create a profile first to see numbers. The summary is stored only on the device.
 
 The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```
@@ -795,9 +812,9 @@ Behövs bara för att molnbygget ska ladda upp till intern testning själv:
 - [ ] 16 KB-kontrollen grön i molnbygget.
 - [ ] Produkterna `livstid` och `ar` (engångsprodukter, 699 kr och 349 kr, bara Sverige) aktiva och testade med licenstestare: köp, avbrutet köp, väntande köp, Återställ köp, återbetalning med och utan borttagen rätt.
 - [x] Återbetalda Play-köp: Voided Purchases API behövs inte – telefonen hämtar köpen från Play och ett återkallat köp försvinner ([avsnitt 7](#återbetalningar-och-återkallade-köp)).
-- [ ] Testat på en riktig telefon: exempeldata, egen profil, streckkodsläsaren, export/delning, påminnelser, Health Connect, bakåtknappen, utan uppkoppling.
+- [ ] Testat på en riktig telefon: exempeldata, egen profil, streckkodsläsaren, export/delning, påminnelser, Health Connect, widgeten på hemskärmen ([WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon)), bakåtknappen, utan uppkoppling.
 - [x] Streckkodsläsaren på Android läser med ZXing – Data safety och integritetspolicyn stämmer med det ([avsnitt 8](#datasäkerhet-data-safety)).
-- [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
+- [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian, widgetens sammanfattning (`lagom-widget`) och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
 - [ ] Sluten test: minst 12 testare i 14 dagar i följd.
 - [ ] Butikstexter (och versionsinformationen för produktion), ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
 - [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de sex Health Connect-typerna, IARC, målgrupp 18+, appåtkomst med granskarlicens.

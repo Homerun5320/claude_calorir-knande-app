@@ -294,6 +294,25 @@ describe('legalContent', () => {
     expect(grounds?.items?.join(' ')).not.toMatch(/spärrlist/i)
   })
 
+  it('hemskärmswidgeten (lagom-widget) finns i webbens och Play-appens lagringstabell – aldrig i iPhone-appen', () => {
+    const storage = (ctx: LegalContext) => visibleSections(PRIVACY_SECTIONS, ctx).find((s) => s.id === 'lagring')?.table?.rows ?? []
+    for (const ctx of [WEB, PLAY]) {
+      const row = storage(ctx).find((r) => r.join(' ').includes('lagom-widget'))
+      expect(row, ctx.platform).toBeDefined()
+      const text = row?.join(' ') ?? ''
+      // Bara summor och antal – inga livsmedel, ingen energi i medvetet läge, aldrig exempeldata.
+      expect(text, ctx.platform).toContain('inte i medvetet läge')
+      expect(text, ctx.platform).toContain('Inga livsmedel, måltidsnamn eller exempeldata')
+      expect(text, ctx.platform).toContain('Radera all data')
+      expect(textFor(ctx), ctx.platform).toContain('widget på hemskärmen')
+    }
+    // På webben står det att widgeten bara finns i Android-appen.
+    expect(storage(WEB).flat().join(' ')).toContain('bara i Android-appen')
+    // iPhone har ingen widget ännu (WIDGET_IOS_READY) – varken raden eller stycket.
+    expect(storage(APPSTORE).flat().join(' ')).not.toContain('lagom-widget')
+    expect(textFor(APPSTORE)).not.toMatch(/widget/i)
+  })
+
   it('spärrlistan nämns där licensnycklar kan aktiveras (webben och Play-appen), inte i iPhone-appen', () => {
     expect(textFor(PLAY)).toContain('Spärrlistan: har du aktiverat en licensnyckel')
     expect(textFor({ ...WEB, webSales: false })).toContain('Spärrlistan: har du aktiverat en licensnyckel')

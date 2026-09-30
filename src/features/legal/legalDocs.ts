@@ -11,6 +11,8 @@ import { renderLegalHtml, renderLegalMarkdown, type LegalDocSpec } from './legal
  * i legalContent.ts, som byggs in i appen.
  */
 const PRIVACY_OWNER_NOTES: Readonly<Record<string, string>> = {
+  lagring:
+    'Hemskärmswidgeten i Android-appen (raden om lagom-widget och stycket under ”Din dagbok finns bara på din enhet”) beskriver exakt vad src/lib/widgetSummary.ts skickar till widgeten: energi kvar och ätit (inte i medvetet läge), antal loggade måltider, vatten och en pågående fasta – inga livsmedel och aldrig exempeldata. Ändras det som widgeten visar måste raden, stycket, docs/WIDGET.md §5 och supportsidan ses över först. Raden och stycket får inte finnas i iPhone-appens text förrän iPhone-widgeten finns (WIDGET_IOS_READY i src/native/widget.ts).',
   kameran:
     'Android-appen läser streckkoder med ZXing (src/native/barcode.ts, ANDROID_SCANNING_LIBRARY). Byter ni till Google ML Kit skickar det enligt Googles redovisning driftdata till Google (enhet, app, identifierare, prestanda och felkoder) – då måste texten här, Data safety och frågan om samtycke (LEK 9 kap. 28 §) ses över först. ”Fyll i från förpackningen” (src/lib/nutritionLabel.ts, features/add/LabelTextImport.tsx) har ingen egen kamera- eller OCR-kod och lagrar ingenting (därför ingen rad i lagringstabellen): telefonens textigenkänning ger bara text. Byggs en egen textigenkänning med kameran in (t.ex. ett nytt tillägg) måste texten här, Info.plist, PrivacyInfo.xcprivacy och Data safety ses över först.',
   mikrofonen:

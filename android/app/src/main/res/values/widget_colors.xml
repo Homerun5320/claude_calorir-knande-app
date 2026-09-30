@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hemskärmswidgetens färger – samma tokens som i src/index.css (ljust tema). Mörkt läge:
+  values-night/widget_colors.xml. Widgeten läser bara de här färgerna (inga temaattribut: hemskärmen
+  ritar widgeten med sitt eget tema).
+-->
+<resources>
+    <!-- Bakgrunden (lg-bg) och stapelns spår (lg-surface-3). -->
+    <color name="widget_background">#F6F3EC</color>
+    <color name="widget_track">#E5DDCD</color>
+    <!-- Text (lg-ink, lg-ink-2, lg-ink-3 – minst 4,5:1 mot bakgrunden). -->
+    <color name="widget_ink">#16201C</color>
+    <color name="widget_ink_2">#48524D</color>
+    <color name="widget_ink_3">#5C645F</color>
+    <!-- Granens gröna (lg-gran) med text ovanpå (lg-on-gran). -->
+    <color name="widget_gran">#1F5A43</color>
+    <color name="widget_on_gran">#FFFFFF</color>
+    <!-- Vatten (lg-fjall). -->
+    <color name="widget_fjall">#2F7AA1</color>
+    <!-- Tryckeffekt på bakgrunden och på den gröna knappen. -->
+    <color name="widget_ripple">#1F16201C</color>
+    <color name="widget_ripple_on_gran">#33FFFFFF</color>
+</resources>

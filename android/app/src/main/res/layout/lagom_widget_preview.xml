@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Förhandsvisningen i hemskärmens lista över widgetar (android:previewLayout, Android 12+): samma
+  utseende som res/layout/lagom_widget.xml med exempeltexter. Samma regler för vyer (RemoteViews).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true"
+    android:orientation="vertical"
+    android:padding="@dimen/widget_padding">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:maxLines="1"
+            android:text="@string/widget_title_today"
+            android:textAllCaps="true"
+            android:textColor="@color/widget_gran"
+            android:textSize="12sp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/widget_touch_target"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/widget_button_add"
+            android:drawableStart="@drawable/widget_ic_add"
+            android:drawablePadding="6dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minWidth="@dimen/widget_touch_target"
+            android:minHeight="@dimen/widget_touch_target"
+            android:paddingStart="12dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="0dp"
+            android:stateListAnimator="@null"
+            android:text="@string/widget_add"
+            android:textAllCaps="false"
+            android:textColor="@color/widget_on_gran"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="serif"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/widget_preview_energy"
+        android:textColor="@color/widget_ink"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/widget_preview_detail"
+        android:textColor="@color/widget_ink_2"
+        android:textSize="13sp" />
+
+    <ProgressBar
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="8dp"
+        android:importantForAccessibility="no"
+        android:indeterminate="false"
+        android:max="1000"
+        android:maxHeight="6dp"
+        android:minHeight="6dp"
+        android:progress="380"
+        android:progressDrawable="@drawable/widget_progress_energy" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/widget_preview_meals"
+        android:textColor="@color/widget_ink_2"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@string/widget_water_description"
+            android:src="@drawable/widget_ic_water" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/widget_preview_water"
+            android:textColor="@color/widget_ink_2"
+            android:textSize="13sp" />
+
+        <ProgressBar
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="56dp"
+            android:layout_height="4dp"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            android:indeterminate="false"
+            android:max="1000"
+            android:maxHeight="4dp"
+            android:minHeight="4dp"
+            android:progress="375"
+            android:progressDrawable="@drawable/widget_progress_water" />
+    </LinearLayout>
+</LinearLayout>

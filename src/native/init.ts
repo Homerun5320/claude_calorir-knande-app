@@ -16,6 +16,9 @@
  * 5. Speglingen – väntas inte in: den kan vänta på att användaren svarar på frågan om återställning.
  * 6. Android: kamerans tillfälliga originalbilder (full storlek, med EXIF/GPS) från "Ta en bild"
  *    tas bort vid varje start – även om appen stängdes mitt i eller framstegsbilderna är avstängda.
+ * 7. Hemskärmswidgeten (Android; iPhone när `WIDGET_IOS_READY` blir true) – sist, när de andra
+ *    funktionerna har startat. Väntas inte in. Den tar också emot länkarna från widgeten (även
+ *    den som startade appen).
  */
 import { logError } from '../lib/errorLog'
 import { setNativeStorePurchases } from '../lib/storePurchases'
@@ -57,4 +60,8 @@ export async function startNative(): Promise<void> {
       .then((m) => m?.startHealth())
       .catch((error: unknown) => logError(error, 'native:halsa')),
   ])
+
+  void loadNative('widget')
+    .then((m) => m?.startWidget())
+    .catch((error: unknown) => logError(error, 'native:widget'))
 }

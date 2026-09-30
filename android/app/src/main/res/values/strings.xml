@@ -4,4 +4,29 @@
     <string name="title_activity_main">Lagom</string>
     <string name="package_name">se.lagomappen.lagom</string>
     <string name="custom_url_scheme">se.lagomappen.lagom</string>
+
+    <!--
+      Hemskärmswidgeten "Idag" (widget/LagomWidgetProvider.java, docs/WIDGET.md). Dagens siffror
+      kommer som färdiga texter från appen; här står bara widgetens egna texter.
+    -->
+    <!-- Namnet och beskrivningen i hemskärmens lista över widgetar. -->
+    <string name="widget_label">Idag</string>
+    <string name="widget_description">Dagens energi, måltider och vatten – och en knapp för att lägga till.</string>
+    <!-- Rubriken: "Idag" med dagens siffror, "Lagom" när widgeten visar en rad om att öppna appen. -->
+    <string name="widget_title_today">Idag</string>
+    <string name="widget_title_app">Lagom</string>
+    <string name="widget_add">Lägg till</string>
+    <string name="widget_add_description">Lägg till i dagboken</string>
+    <!-- Innan appen har skickat något (eller när datan inte går att läsa). -->
+    <string name="widget_fallback_default">Öppna Lagom för dagens siffror</string>
+    <!-- Fastans räknare: %s blir den tid som har gått, t.ex. "Fastat 14:03:22". -->
+    <string name="widget_fasting_format">Fastat %s</string>
+    <string name="widget_fasting_description">Fasta pågår</string>
+    <string name="widget_water_description">Vatten</string>
+    <!-- Exemplet i hemskärmens lista (Android 12+) – samma format som appens texter
+         (\u00A0 = hårt blanksteg som tusentalsavgränsare, som i src/lib/format.ts). -->
+    <string name="widget_preview_energy">1\u00A0240 kcal kvar</string>
+    <string name="widget_preview_detail">760 av 2\u00A0000 kcal</string>
+    <string name="widget_preview_meals">3 måltider loggade</string>
+    <string name="widget_preview_water">0,75 av 2 l</string>
 </resources>

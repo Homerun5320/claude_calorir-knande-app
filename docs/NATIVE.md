@@ -11,7 +11,8 @@ formulär och texter i övrigt: [APP-STORE.md](APP-STORE.md), [GOOGLE-PLAY.md](G
 
 > **Läget (2026-09-28):** grunden är på plats – projekten, ikoner, startskärmar, behörigheter,
 > integritetsmanifest och byggkommandon – och funktionerna finns i `src/native/` (köp i appen,
-> export och delning, påminnelser, streckkodsläsare, Hälsa, haptik, statusfält, bakåtknapp).
+> export och delning, påminnelser, streckkodsläsare, Hälsa, haptik, statusfält, bakåtknapp och –
+> bara på Android – widgeten på hemskärmen, se [WIDGET.md](WIDGET.md)).
 > Molnbyggena är klara: kontrollbygget (`.github/workflows/native.yml`) och de signerade
 > butiksbyggena till TestFlight och Google Play (`.github/workflows/release.yml` eller
 > `codemagic.yaml`), se [avsnitt 9](#9-molnbyggen-kontroll-signering-och-uppladdning). Det som
@@ -65,6 +66,10 @@ formulär och texter i övrigt: [APP-STORE.md](APP-STORE.md), [GOOGLE-PLAY.md](G
 | `@capacitor/barcode-scanner` | 3.1.2 | Inbyggd streckkodsläsare: **ML Kit** på Android, Apples **Vision** på iPhone | MIT |
 | `@capgo/native-purchases` | 8.8.1 | Köp i appen: **StoreKit 2** och **Google Play Billing 9** | MPL-2.0 |
 | `@capgo/capacitor-health` | 8.11.4 | **Apple Hälsa** (HealthKit) och **Health Connect** | MPL-2.0 |
+
+Hemskärmswidgeten på Android kräver inget paket: tillägget `LagomWidget` är appens egen kod i
+`android/` (Androids egna API:er och det Capacitor redan har), registrerat i `MainActivity` – se
+[avsnitt 6](#hemskärmswidgeten) och [WIDGET.md](WIDGET.md).
 
 MPL-2.0 gäller bara tilläggens egna filer (vi ändrar dem inte); licenstexten följer med i
 `licenses.txt` i bygget. `@capacitor/barcode-scanner` drar med sig `html5-qrcode` (Apache-2.0):
@@ -247,6 +252,7 @@ Filer som **skapas** och inte ska ändras för hand: `ios/App/CapApp-SPM/Package
   | `barcode` | Streckkodsläsaren (se avsnitt 2) | ScanPage |
   | `health` | Apple Hälsa/Health Connect: läser vikt och steg, skriver vikt samt energi och vatten för avslutade dagar. Av från början; `lagom-health` i localStorage | `init.ts`, Inställningar → Apple Hälsa/Health Connect |
   | `photos` | Framstegsbilder: nedskalade JPEG utan EXIF i `framsteg/` med `index.json` – på iPhone i `Directory.LibraryNoCloud`, på Android i `Directory.Data`. Android-kamerans tillfälliga original (`Pictures/JPEG_*.jpg` i appens externa filmapp, med en `.nomedia` så att galleriappar inte visar mappen) tas bort med `clearCameraCaptures()` direkt efter nedskalningen, när sidan öppnas och vid varje start av appen. Ett trasigt `index.json` byggs om ur filerna i mappen. Av från början | `src/lib/progressPhotos.ts` (Vikt & mått → Framstegsbilder), `init.ts` (Android: `clearCameraCaptures`), "Radera all data" |
+  | `widget` | Hemskärmswidgeten **på Android** (iPhone av: `WIDGET_IOS_READY = false`, se [WIDGET.md](WIDGET.md)). Bygger sammanfattningen med `buildWidgetPayload` (`src/lib/widgetSummary.ts`: färdiga svenska texter för idag och sex dagar framåt, inga livsmedelsnamn, inga energisiffror i medvetet läge, aldrig exempeldata) och skickar den till appens egna tillägg `LagomWidget` (`update({ data })`/`clear()`): en gång vid start, 1,5 s efter den senaste ändringen, när appen öppnas igen och direkt när den går till bakgrunden om en ändring väntar – aldrig samma innehåll två gånger och aldrig i minnesläge. Tar emot länkarna `lagom-widget://idag` → `/` och `lagom-widget://lagg-till` → `/lagg-till` (`appUrlOpen` och `App.getLaunchUrl()`, startlänken bara vid sidans första laddning – inte efter en omladdning) och ignorerar allt annat | `init.ts` (sist, väntas inte in), "Radera all data" (`clearWidget`) |
 
 - **Alla dynamiska importer av native-moduler står i `index.ts`.** Vite tar bara bort en dynamisk
   import ur webbygget när villkoret (`NATIVE_BUILD`, en konstant i bygget) står i samma modul –
@@ -255,13 +261,14 @@ Filer som **skapas** och inte ska ändras för hand: `ios/App/CapApp-SPM/Package
 - `initNative()` anropas en gång av AppShell (efter hydreringen och `useTheme`) och startar
   funktionerna i `src/native/init.ts`: `system` först (startskärmen), sedan köpen (useAccess
   väntar på dem, högst 15 s), sedan påminnelser och Hälsa; speglingen väntas inte in, eftersom den
-  kan vänta på användarens svar. `SplashScreen.launchShowDuration` (3 s) är reserven om skriptet
+  kan vänta på användarens svar. Widgeten startas sist och väntas inte heller in. `SplashScreen.launchShowDuration` (3 s) är reserven om skriptet
   aldrig startar.
 - Inställningssidorna Påminnelser och Apple Hälsa/Health Connect finns bara i apparna. De laddas
   med `lazy()` bakom byggkonstanten `APP_SECTIONS_BUILD` i `SettingsPage.tsx` (samma mönster som
   `NATIVE_BUILD`) och följer därför inte med i webbygget.
-- "Radera all data" (`wipeAndReset`) tar i apparna också bort kopian, exportfilerna och
-  hälsokopplingen (`clearNativeCopies` i `src/features/settings/wipe.ts`) och – även på webben –
+- "Radera all data" (`wipeAndReset`) tar i apparna också bort kopian, exportfilerna,
+  hälsokopplingen och widgetens sammanfattning (`clearNativeCopies` i
+  `src/features/settings/wipe.ts`; widgeten töms alltid, även när bara exempeldata raderas) och – även på webben –
   framstegsbilderna (`deleteProgressPhotos` → `deleteAllProgressPhotos` i
   `src/lib/progressPhotos.ts`). Raderas bara exempeldata ("Skapa min egen profil") ligger kopian
   och bilderna kvar – de är användarens egna.
@@ -349,6 +356,8 @@ de ca 40 hälsobehörigheter som `@capgo/capacitor-health` deklarerar men Lagom 
 `READ_ACTIVE_CALORIES_BURNED`). ML Kits `MlKitInitProvider` tas också bort (se avsnitt 2).
 Ändras datatyperna i Hälsa-funktionen: ändra listan i manifestet och deklarationen i Play Console.
 
+Hemskärmswidgeten kräver **ingen** behörighet (se [Hemskärmswidgeten](#hemskärmswidgeten) nedan).
+
 ### Health Connect
 
 - **Integritetspolicyn i behörighetsfrågan:** Health Connect öppnar tilläggets aktivitet
@@ -367,6 +376,49 @@ de ca 40 hälsobehörigheter som `@capgo/capacitor-health` deklarerar men Lagom 
 - Data från Health Connect sparas bara på telefonen och skickas inte vidare – enligt Googles
   definition samlas den alltså inte in (Data safety), men den ska ändå beskrivas i
   integritetspolicyn (Health Connect-kravet), se avsnitt 10.
+
+### Hemskärmswidgeten
+
+Widgeten **Idag** (dagens energi, loggade måltider, vatten, en pågående fasta och knappen "Lägg
+till") är Android-appens egen kod – inget npm-paket och inga Gradle-beroenden utöver Capacitor och
+Androids egna API:er. Design, kontraktet och iPhone-planen: [WIDGET.md](WIDGET.md).
+
+| Var | Vad |
+| --- | --- |
+| `MainActivity.java` | Registrerar det lokala tillägget `LagomWidgetPlugin` (`@CapacitorPlugin(name = "LagomWidget")`) med `registerPlugin(…)` **före** `super.onCreate`, som skapar bryggan. Tar också bort en widgetlänk ur start-Intent:en när Android återskapar aktiviteten – från Senaste (`FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`) eller ur sparat tillstånd – så att Lägg till inte öppnas igen (`dropReplayedWidgetLink`, `WidgetLinks.isReplayedLink`) |
+| `widget/WidgetLinks.java` | Länkarna `lagom-widget://idag` och `lagom-widget://lagg-till` och `isReplayedLink` – ren Java, testad med JUnit (`WidgetLinksTest`). Samma länkar som `WIDGET_LINKS` i `src/native/widget.ts` (`src/native/widgetAndroid.test.ts` jämför dem) |
+| `widget/LagomWidgetPlugin.java` | `update({ data })`: avvisar data som saknas, är längre än 32 768 tecken eller inte klarar den strikta tolkningen (`WidgetJson`, `WidgetPayload`) med `call.reject` – den förra datan ligger då kvar – och sparar annars texten och ritar om alla widgetar. `clear()`: tar bort datan och ritar om. Felmeddelandena är fasta texter, aldrig innehållet |
+| `widget/WidgetStore.java` | SharedPreferences-filen **`lagom-widget`**, nyckeln `payload` (`MODE_PRIVATE`, `commit()` på tilläggets egen tråd) |
+| `widget/LagomWidgetProvider.java` | `AppWidgetProvider`: ritar om när appen skickar ny data, var 30:e minut (`updatePeriodMillis`, systemets minsta intervall) och efter lokal midnatt med ett **inexakt** alarm med ett fönster på 10 minuter (`AlarmManager.setWindow`, RTC – väcker inte telefonen och kräver ingen behörighet), så att nästa dags rad i datan visas när dygnet byts. Fastan räknas upp av en `Chronometer` i widgeten själv |
+| `widget/WidgetView.java`, `widget/WidgetLayout.java` | Ren Java utan `android.*`: vad som visas (läge, medvetet läge, reservtext) och hur mycket som får plats i en viss storlek. Testas med JUnit i `android/app/src/test/java/se/lagomappen/lagom/widget/` (`cd android && ./gradlew testDebugUnitTest`) |
+| `AndroidManifest.xml` | `<receiver android:name=".widget.LagomWidgetProvider" android:exported="false">` med `APPWIDGET_UPDATE` och `@xml/lagom_widget_info`. **Ingen** intent-filter för `lagom-widget://` |
+| `res/xml/lagom_widget_info.xml` | 4 × 2 rutor från början, kan ändras ned till 2 × 2 (då blir knappen en rund ikon), bara hemskärmen (inte låsskärmen), ingen inställningsaktivitet, förhandsvisning (`lagom_widget_preview.xml`) med påhittade exempeltal i hemskärmens lista |
+| `res/layout/lagom_widget.xml`, `res/values/widget_colors.xml` (+ `values-night/`), `widget_dimens.xml`, `drawable/widget_*` (+ `drawable-v31/`) | Layouten och designsystemets färger i ljust och mörkt läge; rundade hörn efter systemet från Android 12 |
+| `res/values/strings.xml` | Widgetens egna texter på svenska (namnet "Idag", "Lägg till", reservtexten "Öppna Lagom för dagens siffror"). Dagens siffror kommer färdigformaterade från appen – widgeten formaterar aldrig tal själv |
+
+- **Länkarna:** ett tryck på widgeten och knappen "Lägg till" skickar en *uttrycklig* Intent till
+  `MainActivity` (`ACTION_VIEW`, `lagom-widget://idag` respektive `lagom-widget://lagg-till`,
+  `PendingIntent` med `FLAG_IMMUTABLE`). `MainActivity` har `launchMode="singleTask"`, så en app
+  som körs får länken som `appUrlOpen` och en kallstart via `App.getLaunchUrl()` (och en sparad
+  `appUrlOpen` – att öppna sidan är idempotent). Någon intent-filter finns inte, men `MainActivity`
+  är exporterad (startaktiviteten), så även en annan app kan starta den med en sådan länk. Därför
+  följer `src/native/widget.ts` bara just de två (till `/` och `/lagg-till`, sidor som man ändå
+  når i appen) och ignorerar allt annat.
+- **Lagring och säkerhetskopior:** `lagom-widget` ligger bland appens SharedPreferences, som är
+  undantagna från Googles molnkopia (`data_extraction_rules.xml`, domänen `sharedpref`; äldre
+  Android: `allowBackup="false"`). Vid överföring direkt till en ny telefon följer de med som
+  appens övriga data (`device-transfer`). Integritetspolicyns lagringstabell (webben och
+  Play-appen) beskriver den; "Radera all data" och avinstallation tar bort den.
+- **Behörigheter:** inga nya – varken exakta alarm, tjänster, WorkManager eller nätet.
+- **Data safety:** oförändrat. Sammanfattningen lämnar aldrig telefonen – hemskärmsappen ritar
+  widgeten på telefonen (se [avsnitt 8](#app-privacy-app-store-connect-och-data-safety-play-console)).
+- **Länken följs en gång:** Capacitor läser start-Intent:en bara när aktiviteten skapas, och
+  `App.getLaunchUrl()` ger den sedan så länge aktiviteten lever. Återskapar Android aktiviteten
+  med sin gamla Intent (från Senaste efter att processen har avslutats, eller ur sparat tillstånd)
+  tar `MainActivity` bort widgetlänken före `super.onCreate`, och laddas sidan om i samma aktivitet
+  läser JS inte startlänken igen (`pageWasReloaded()` i `src/native/widget.ts`, navigeringens typ –
+  ingen egen lagring). Ett nytt tryck på widgeten kommer via `onNewIntent` och påverkas inte. Så
+  testas det: [WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon), punkt 7.
 
 ### 16 KB-sidor
 
@@ -424,6 +476,7 @@ Google ML Kit i Android-appens streckkodsläsare (se tabellen):
 | Export/delning | Bara dit användaren själv väljer | Nej |
 | Automatisk kopia (`lagom-spegling.json`) | Nej – en fil i appens mapp. På iPhone i `Library/NoCloud`, som inte följer med i iCloud- eller datorsäkerhetskopian; på Android undantagen från Googles molnkopia (`data_extraction_rules.xml`) | Nej (beskrivs i integritetspolicyn) |
 | De senast kända köpen (`lagom-butikskop`) | Nej – localStorage i appen (produkt, köpdatum, slutdatum), så att köpen gäller utan uppkoppling | Nej (beskrivs i integritetspolicyns lagringstabell) |
+| Widgeten på hemskärmen (Android, `src/native/widget.ts`, `LagomWidget`) | Nej – en färdig sammanfattning (energi, antal måltider, vatten, fasta; inga livsmedel, inga energisiffror i medvetet läge, aldrig exempeldata) i appens SharedPreferences (`lagom-widget`, undantagna från Googles molnkopia) som hemskärmen ritar på telefonen. Visas bara om användaren själv lägger till widgeten | Nej – varken insamling eller delning i Data safety; beskrivs i integritetspolicyns lagringstabell (webben och Play) |
 | Framstegsbilder (`src/native/photos.ts`, `src/lib/progressPhotos.ts`) | Nej – nedskalade JPEG utan EXIF/GPS i appens mapp (`framsteg/`, `index.json`): `Library/NoCloud` på iPhone (utanför iCloud- och datorsäkerhetskopian), appens filmapp på Android (undantagen från Googles molnkopia, `data_extraction_rules.xml`). Ingen delning, inte i säkerhetskopian eller speglingen, inget moln. Android: kamerans tillfälliga original (`Pictures/JPEG_*.jpg` i appens externa filmapp) tas bort direkt efter nedskalningen, och annars vid nästa start av appen | Nej – bilderna lämnar aldrig enheten, så de samlas inte in (varken *Photos* i App Privacy eller *Photos and videos* i Data safety); beskrivs i integritetspolicyns lagringstabell |
 
 ## 9. Molnbyggen: kontroll, signering och uppladdning
@@ -709,7 +762,8 @@ ligga på datorn. Har du någon gång tillgång till en Mac med Xcode 26: `npm r
       påminnelser, den automatiska kopian och exportfilerna i lagringstabellen, att telefonens
       egen säkerhetskopia (iCloud) kan innehålla appens data (men inte den automatiska kopian),
       streckkodsläsaren i apparna, köp direkt mellan telefonen och butiken, de sparade köpen
-      (`lagom-butikskop`) och en egen text för Google Play-appen (även som fristående sida för
+      (`lagom-butikskop`), widgetens sammanfattning i Android-appen (`lagom-widget`, bara i webbens
+      och Play-appens text) och en egen text för Google Play-appen (även som fristående sida för
       Health Connect).
 - [ ] Prova på riktiga telefoner (TestFlight och Play-testning), utöver köpen:
       - påminnelser: frågan om notiser (Android 13+ och iPhone), att de kommer i tid, att ett tryck
@@ -726,6 +780,12 @@ ligga på datorn. Har du någon gång tillgång till en Mac med Xcode 26: `npm r
       - att ett långt tryck på en produktbild inte ger någon meny (iPhone och Android),
       - den automatiska kopian: stäng frågan "Vi hittade din data" – den går bara att besvara med
         knapparna, och "Börja om" frågar en gång till.
+- [ ] Widgeten på hemskärmen: prova på en riktig Android-telefon enligt
+      [WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon) (lägga till, storlekar, ljust och mörkt läge,
+      medvetet läge, exempeldata, midnatt, fastan, länkarna, "Radera all data", TalkBack).
+- [ ] iPhone-widgeten: först när App Group `group.se.lagomappen.lagom` finns i ägarens
+      Apple-konto – planen i [WIDGET.md §8](WIDGET.md#8-iphone--planen). Till dess är
+      `WIDGET_IOS_READY` false.
 - [ ] Kontrollera i CI i det sammanslagna Android-manifestet (`app/build/intermediates/merged_manifests`)
       att bara de fem hälsobehörigheterna finns kvar, att `MlKitInitProvider` saknas och att
       `PermissionsRationaleActivity` och `ViewPermissionUsageActivity` finns med.

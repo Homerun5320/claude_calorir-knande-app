@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Den runda plusknappen i smala widgetar: en grön cirkel (40 dp) i en 48 × 48 dp tryckyta. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/widget_ripple_on_gran">
+    <item>
+        <inset android:inset="4dp">
+            <shape android:shape="oval">
+                <solid android:color="@color/widget_gran" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

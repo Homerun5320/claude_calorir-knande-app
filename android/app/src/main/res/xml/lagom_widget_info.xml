@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hemskärmswidgeten "Idag" (widget/LagomWidgetProvider.java, docs/WIDGET.md).
+
+  - Standardstorlek 4 × 2 rutor (targetCellWidth/Height från Android 12, minWidth/minHeight före:
+    70 × rutor − 30 dp). Kan ändras åt båda hållen, ned till 2 × 2 (då blir knappen en rund ikon och
+    bara energitexten och stapeln visas – widget/WidgetLayout.java).
+  - updatePeriodMillis: var 30:e minut (systemets minsta intervall), så att nästa dags rad i datan
+    visas när dygnet byts. Dessutom ett inexakt alarm med ett fönster på 10 minuter efter 00:01
+    (AlarmManager.setWindow) – inga exakta alarm.
+  - Ingen inställningsaktivitet; bara hemskärmen (inte låsskärmen).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/lagom_widget"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:previewLayout="@layout/lagom_widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />
