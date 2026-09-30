@@ -216,7 +216,7 @@ jobs:
 
       # Ingen Gradle-cache i butiksbygget: det signerade paketet byggs från rena beroenden.
       - name: Java 21 (Capacitor 8)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
