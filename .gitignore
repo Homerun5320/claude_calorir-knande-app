@@ -1,0 +1,63 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+# Butiksbygget (VITE_DISTRIBUTION=appstore/play)
+dist-native
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Miljövariabler och hemligheter (.env.example checkas in som mall)
+.env
+.env.*
+!.env.example
+
+# Netlify CLI
+.netlify/
+
+# Signeringsnycklar för Android – får aldrig checkas in
+*.jks
+*.keystore
+android.keystore
+
+# Apple: App Store Connect API-nyckel (.p8), certifikat (.p12) och provisioneringsprofiler –
+# hör hemma i lösenordshanteraren och molnbyggets hemligheter, aldrig i Git
+*.p8
+*.p12
+*.mobileprovision
+
+# Butiksskärmdumpar – tas fram med scripts/app-store-screenshots.mjs från det färdiga bygget
+# precis före inskickningen (de beror på dagens datum och exempeldata). Laddas upp direkt från
+# mappen. Ikonerna och funktionsgrafiken i store-assets/ checkas däremot in.
+store-assets/screenshots/
+
+# De inbyggda apparna (Capacitor): webbdelen kopieras in av `npx cap sync` och ignoreras redan i
+# android/.gitignore och ios/.gitignore. Här: filer som skapas vid bygget och signerade paket.
+android/app/src/main/res/values/lagom_generated.xml
+android/app/release/
+*.ipa
+*.xcarchive
+
+# Molnbyggena (docs/NATIVE.md §9): nycklar som base64 för hemligheterna, Apples certifikatnyckel
+# och Google Plays tjänstekonto – skapas utanför repot, men mönstren skyddar ändå.
+*.b64
+lagom_ios_distribution_key*
+lagom-play-*.json

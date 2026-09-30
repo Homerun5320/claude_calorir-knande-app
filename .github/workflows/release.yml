@@ -1,0 +1,450 @@
+# Butiksbyggen: SIGNERADE appar till Google Play (intern test) och TestFlight.
+#
+# Körs när du taggar en version (git tag v1.0.0 && git push origin v1.0.0) eller för hand
+# (Actions → Butiksbyggen → Run workflow). Kontrollbyggena utan signering finns i native.yml, och
+# samma butiksbyggen kan göras i Codemagic (codemagic.yaml) – använd en tjänst per app, annars
+# laddas samma version upp två gånger. Steg för steg: docs/NATIVE.md §9–10.
+#
+# Varje app byggs BARA när dess hemligheter finns (Settings → Secrets and variables → Actions):
+#   Android: LAGOM_UPLOAD_KEYSTORE_BASE64, LAGOM_UPLOAD_KEYSTORE_PASSWORD, LAGOM_UPLOAD_KEY_ALIAS,
+#            LAGOM_UPLOAD_KEY_PASSWORD (uppladdningsnyckeln, läses av android/app/build.gradle)
+#            + valfritt PLAY_SERVICE_ACCOUNT_JSON (uppladdning till Google Play, intern test)
+#   iPhone:  APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
+#            APP_STORE_CONNECT_PRIVATE_KEY (App Store Connect API-nyckeln, rollen App Manager)
+#            och CERTIFICATE_PRIVATE_KEY (distributionscertifikatets privata nyckel)
+# Saknas de hoppas appen över (med en förklaring i körningens sammanfattning) – inga
+# macOS-minuter går åt i onödan.
+#
+# Webbdelen byggs med dina riktiga uppgifter (Variables, samma som Netlifys produktion) och ALDRIG
+# som testbygge: LAGOM_ALLOW_STORE_WITHOUT_IAP och VITE_ACCEPT_TEST_PURCHASES sätts inte här, och
+# VITE_COMMERCE_MODE måste vara live (i testläge godtas osignerade testlicenser, som annars skulle
+# gå att klistra in i Play-appen eller återställa från en säkerhetskopia).
+#
+# Byggnumret (versionCode på Android, CFBundleVersion på iPhone) är körningens nummer
+# (github.run_number) plus LAGOM_BUILD_NUMBER_OFFSET (Variable, standard 0 – höj den om du har
+# laddat upp byggen från Codemagic eller för hand med högre nummer). Versionen (1.0.0) tas från
+# package.json för båda apparna; vid en tagg måste taggen vara v + versionen.
+#
+# OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
+name: Butiksbyggen
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      plattform:
+        description: Vilka appar som byggs
+        type: choice
+        options: [alla, android, iphone]
+        default: alla
+      ladda_upp:
+        description: Ladda upp till Google Play (intern test) och TestFlight
+        type: boolean
+        default: true
+      intern_testflight:
+        description: 'iPhone: bara intern test i TestFlight (bygget kan då inte skickas in för granskning)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: butiksbygge-${{ github.ref }}
+  # En pågående uppladdning avbryts aldrig halvvägs.
+  cancel-in-progress: false
+
+env:
+  LAGOM_APP_ID: se.lagomappen.lagom
+  # Webbdelen – samma värden som i Netlifys produktion. De byggs in i appen och är inte hemliga,
+  # därför Variables och inte Secrets.
+  VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+  VITE_COMMERCE_MODE: ${{ vars.VITE_COMMERCE_MODE }}
+  VITE_LICENSE_PUBLIC_KEYS: ${{ vars.VITE_LICENSE_PUBLIC_KEYS }}
+  VITE_LICENSE_PUBLIC_KEY: ${{ vars.VITE_LICENSE_PUBLIC_KEY }}
+  VITE_SELLER_NAME: ${{ vars.VITE_SELLER_NAME }}
+  VITE_SELLER_ORGNR: ${{ vars.VITE_SELLER_ORGNR }}
+  VITE_SELLER_ADDRESS: ${{ vars.VITE_SELLER_ADDRESS }}
+  VITE_SELLER_PHONE: ${{ vars.VITE_SELLER_PHONE }}
+  VITE_SELLER_VAT: ${{ vars.VITE_SELLER_VAT }}
+  VITE_SUPPORT_EMAIL: ${{ vars.VITE_SUPPORT_EMAIL }}
+
+jobs:
+  forutsattningar:
+    name: Förutsättningar (hemligheter, variabler och version)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.check.outputs.android }}
+      ios: ${{ steps.check.outputs.ios }}
+      play: ${{ steps.check.outputs.play }}
+      testflight: ${{ steps.check.outputs.testflight }}
+      intern: ${{ steps.check.outputs.intern }}
+      version: ${{ steps.check.outputs.version }}
+      build_number: ${{ steps.check.outputs.build_number }}
+    steps:
+      - name: Hämta package.json
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Kontrollera vad som kan byggas
+        id: check
+        env:
+          WANT: ${{ github.event_name == 'workflow_dispatch' && inputs.plattform || 'alla' }}
+          UPLOAD: ${{ github.event_name != 'workflow_dispatch' || inputs.ladda_upp }}
+          INTERN: ${{ github.event_name == 'workflow_dispatch' && inputs.intern_testflight }}
+          # Bara "finns/finns inte" – själva hemligheterna lämnar aldrig sina steg.
+          HAS_KEYSTORE: ${{ secrets.LAGOM_UPLOAD_KEYSTORE_BASE64 != '' && secrets.LAGOM_UPLOAD_KEYSTORE_PASSWORD != '' && secrets.LAGOM_UPLOAD_KEY_ALIAS != '' && secrets.LAGOM_UPLOAD_KEY_PASSWORD != '' }}
+          HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+          HAS_APPLE: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID != '' && secrets.APP_STORE_CONNECT_KEY_IDENTIFIER != '' && secrets.APP_STORE_CONNECT_PRIVATE_KEY != '' && secrets.CERTIFICATE_PRIVATE_KEY != '' }}
+          OFFSET: ${{ vars.LAGOM_BUILD_NUMBER_OFFSET || '0' }}
+          RUN_NUMBER: ${{ github.run_number }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          errors=()
+          notes=()
+
+          if [ "$REF_TYPE" = tag ] && [ "$REF_NAME" != "v$version" ]; then
+            errors+=("Taggen $REF_NAME stämmer inte med versionen i package.json ($version). Tagga v$version, eller ändra versionen först.")
+          fi
+          if ! [[ "$OFFSET" =~ ^[0-9]+$ ]]; then
+            errors+=("LAGOM_BUILD_NUMBER_OFFSET måste vara ett heltal (nu: \"$OFFSET\").")
+            OFFSET=0
+          fi
+          build=$((RUN_NUMBER + OFFSET))
+
+          android=false; ios=false; play=false; testflight=false
+          case "$WANT" in alla|android) want_android=true ;; *) want_android=false ;; esac
+          case "$WANT" in alla|iphone) want_ios=true ;; *) want_ios=false ;; esac
+
+          if $want_android; then
+            if [ "$HAS_KEYSTORE" = true ]; then
+              android=true
+            else
+              notes+=("Android hoppas över: uppladdningsnyckeln saknas (LAGOM_UPLOAD_KEYSTORE_BASE64, LAGOM_UPLOAD_KEYSTORE_PASSWORD, LAGOM_UPLOAD_KEY_ALIAS och LAGOM_UPLOAD_KEY_PASSWORD).")
+            fi
+          fi
+          if $want_ios; then
+            if [ "$HAS_APPLE" = true ]; then
+              ios=true
+            else
+              notes+=("iPhone hoppas över: App Store Connect-nyckeln eller certifikatnyckeln saknas (APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY och CERTIFICATE_PRIVATE_KEY). Bygger du iPhone-appen i Codemagic är det rätt.")
+            fi
+          fi
+          if $android && [ "$UPLOAD" = true ]; then
+            if [ "$HAS_PLAY" = true ]; then
+              play=true
+            else
+              notes+=("Ingen uppladdning till Google Play: PLAY_SERVICE_ACCOUNT_JSON saknas. Den signerade AAB:n sparas som artefakt – ladda upp den för hand i Play Console.")
+            fi
+          fi
+          if $ios && [ "$UPLOAD" = true ]; then testflight=true; fi
+
+          # Webbdelens variabler. Byggkontrollen (scripts/commerce-guard.ts) kontrollerar mer, men
+          # först efter npm ci – här stoppas bygget innan en macOS-maskin startas i onödan.
+          if $android || $ios; then
+            for name in VITE_API_BASE VITE_SELLER_NAME VITE_SELLER_ADDRESS VITE_SELLER_PHONE VITE_SUPPORT_EMAIL; do
+              if [ -z "${!name:-}" ]; then
+                errors+=("Variabeln $name saknas (Settings → Secrets and variables → Actions → Variables). Samma värde som i Netlifys produktion.")
+              fi
+            done
+            case "${VITE_API_BASE:-}" in
+              ""|https://*) ;;
+              *) errors+=("VITE_API_BASE måste börja med https:// (nu: $VITE_API_BASE).") ;;
+            esac
+            if [ "${VITE_COMMERCE_MODE:-}" != live ]; then
+              errors+=("VITE_COMMERCE_MODE måste vara live i butiksbyggen (nu: \"${VITE_COMMERCE_MODE:-}\"). I testläge godtas osignerade testlicenser – de skulle gå att klistra in i Play-appen eller återställa från en säkerhetskopia.")
+            fi
+            if [ -z "${VITE_LICENSE_PUBLIC_KEYS:-}${VITE_LICENSE_PUBLIC_KEY:-}" ]; then
+              errors+=("VITE_LICENSE_PUBLIC_KEYS (eller VITE_LICENSE_PUBLIC_KEY) saknas – samma publika licensnyckel som på Netlify (skarpt läge kräver den).")
+            fi
+          fi
+
+          {
+            echo "## Butiksbygge $version ($build)"
+            echo
+            echo "| App | Byggs | Laddas upp |"
+            echo "| --- | --- | --- |"
+            echo "| Android | $([ "$android" = true ] && echo ja || echo nej) | $([ "$play" = true ] && echo 'ja – Google Play, intern test' || echo nej) |"
+            echo "| iPhone | $([ "$ios" = true ] && echo ja || echo nej) | $([ "$testflight" = true ] && echo 'ja – TestFlight' || echo nej)$([ "$INTERN" = true ] && echo ' (bara intern test)' || true) |"
+            echo
+            for n in "${notes[@]}"; do echo "- $n"; done
+            for e in "${errors[@]}"; do echo "- **Fel:** $e"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for n in "${notes[@]}"; do echo "::notice title=Butiksbygge::$n"; done
+          if [ "${#errors[@]}" -gt 0 ]; then
+            for e in "${errors[@]}"; do echo "::error title=Butiksbygge::$e"; done
+            exit 1
+          fi
+
+          {
+            echo "android=$android"
+            echo "ios=$ios"
+            echo "play=$play"
+            echo "testflight=$testflight"
+            echo "intern=$INTERN"
+            echo "version=$version"
+            echo "build_number=$build"
+          } >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android – signerad AAB (+ Google Play, intern test)
+    needs: forutsattningar
+    if: needs.forutsattningar.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.forutsattningar.outputs.version }}
+      BUILD_NUMBER: ${{ needs.forutsattningar.outputs.build_number }}
+      AAB: android/app/build/outputs/bundle/release/app-release.aab
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Ingen Gradle-cache i butiksbygget: det signerade paketet byggs från rena beroenden.
+      - name: Java 21 (Capacitor 8)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Hemligheterna finns bara i de steg som behöver dem – inte under npm ci eller vite build.
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Webbdelen (VITE_DISTRIBUTION=play), Health Connect-adressen och cap sync
+        run: npm run build:android
+
+      - name: Uppladdningsnyckeln
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LAGOM_UPLOAD_KEYSTORE_BASE64 }}
+          LAGOM_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.LAGOM_UPLOAD_KEYSTORE_PASSWORD }}
+          LAGOM_UPLOAD_KEY_ALIAS: ${{ secrets.LAGOM_UPLOAD_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/lagom-upload.jks"
+          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 --decode > "$keystore"
+          if ! keytool -list -keystore "$keystore" -storepass "$LAGOM_UPLOAD_KEYSTORE_PASSWORD" -alias "$LAGOM_UPLOAD_KEY_ALIAS" > /dev/null; then
+            echo "::error title=Uppladdningsnyckeln::Nyckelfilen går inte att öppna med LAGOM_UPLOAD_KEYSTORE_PASSWORD, eller aliaset LAGOM_UPLOAD_KEY_ALIAS finns inte i den. Kontrollera att LAGOM_UPLOAD_KEYSTORE_BASE64 är hela filen i base64 (docs/NATIVE.md §10)."
+            exit 1
+          fi
+
+      - name: Gradle – signerad release-AAB
+        working-directory: android
+        env:
+          LAGOM_UPLOAD_KEYSTORE: ${{ runner.temp }}/lagom-upload.jks
+          LAGOM_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.LAGOM_UPLOAD_KEYSTORE_PASSWORD }}
+          LAGOM_UPLOAD_KEY_ALIAS: ${{ secrets.LAGOM_UPLOAD_KEY_ALIAS }}
+          LAGOM_UPLOAD_KEY_PASSWORD: ${{ secrets.LAGOM_UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease -PlagomVersionCode="$BUILD_NUMBER"
+
+      - name: Kontrollera signaturen (uppladdningsnyckeln)
+        run: |
+          set -euo pipefail
+          # Utdata fångas först: grep -q/awk exit i en pipe kan annars ge SIGPIPE och ett falskt fel.
+          verify="$(jarsigner -verify "$AAB" 2>&1 || true)"
+          if ! grep -q 'jar verified' <<< "$verify"; then
+            echo "$verify"
+            echo "::error title=Signaturen::AAB:n är inte signerad – kontrollera uppladdningsnyckelns hemligheter."
+            exit 1
+          fi
+          certs="$(keytool -printcert -jarfile "$AAB")"
+          fingerprint="$(awk '/SHA256:/ { print $2; exit }' <<< "$certs")"
+          echo "Uppladdningsnyckelns SHA-256: $fingerprint"
+          {
+            echo "### Android $VERSION ($BUILD_NUMBER)"
+            echo
+            echo "Signerad med uppladdningsnyckeln, SHA-256:"
+            echo
+            echo "\`$fingerprint\`"
+            echo
+            echo "Samma fingeravtryck ska stå under *Play Console → Testa och släpp → Appintegritet → Appsignering → Certifikat för uppladdningsnyckel*."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 16 KB-sidor (Google Play, Android 15+)
+        run: node scripts/check-android-16kb.mjs "$AAB"
+
+      - name: Spara den signerade AAB:n
+        run: |
+          mkdir -p "$RUNNER_TEMP/ut"
+          cp "$AAB" "$RUNNER_TEMP/ut/lagom-$VERSION-$BUILD_NUMBER.aab"
+
+      - name: Artefakt – signerad AAB (för uppladdning för hand)
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-android-${{ env.VERSION }}-${{ env.BUILD_NUMBER }}
+          path: ${{ runner.temp }}/ut/*.aab
+          retention-days: 30
+
+      - name: Google Play – intern test
+        if: needs.forutsattningar.outputs.play == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.LAGOM_APP_ID }}
+          releaseFiles: ${{ env.AAB }}
+          releaseName: ${{ env.VERSION }} (${{ env.BUILD_NUMBER }})
+          tracks: internal
+          # "draft" om Play Console svarar "Only releases with status draft may be created on draft app"
+          # (appen har aldrig släppts på något spår) – sätt då Variablen PLAY_RELEASE_STATUS=draft.
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+
+      - name: Städa bort nyckelfilen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/lagom-upload.jks"
+
+  ios:
+    name: iPhone – signerad IPA (+ TestFlight)
+    needs: forutsattningar
+    if: needs.forutsattningar.outputs.ios == 'true'
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.forutsattningar.outputs.version }}
+      BUILD_NUMBER: ${{ needs.forutsattningar.outputs.build_number }}
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Xcode 26 eller senare (App Store kräver iOS 26-SDK:n)
+        run: |
+          # Senaste stabila Xcode 26+ (betaversioner kan inte ladda upp till App Store).
+          XCODE="$(find /Applications -maxdepth 1 -name 'Xcode_2[6-9]*.app' ! -iname '*beta*' | sort -V | tail -1)"
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+          xcodebuild -version
+          MAJOR="$(xcodebuild -version | awk 'NR==1 { split($2, v, "."); print v[1] }')"
+          if [ "${MAJOR:-0}" -lt 26 ]; then
+            echo "::error::Xcode 26 eller senare krävs (hittade $(xcodebuild -version | head -1))."
+            exit 1
+          fi
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Webbdelen (VITE_DISTRIBUTION=appstore) och cap sync
+        run: npm run build:ios
+
+      # Codemagics kommandoradsverktyg (öppen källkod, GPL-3.0, låst version) – samma signering som
+      # i codemagic.yaml. Xcodes egen molnsignering kräver ett utvecklingscertifikat med privat
+      # nyckel på maskinen vid arkiveringen, vilket inte fungerar på GitHubs nya maskiner varje gång.
+      - name: Signeringsverktyg (codemagic-cli-tools)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cm"
+          "$RUNNER_TEMP/cm/bin/pip" install --quiet --disable-pip-version-check codemagic-cli-tools==0.69.0
+          echo "$RUNNER_TEMP/cm/bin" >> "$GITHUB_PATH"
+
+      - name: Signering – distributionscertifikat och profil via App Store Connect API
+        env:
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+          INTERN: ${{ needs.forutsattningar.outputs.intern }}
+        run: |
+          set -euo pipefail
+          keychain initialize
+          # Hämtar certifikatet som hör till CERTIFICATE_PRIVATE_KEY (eller skapar det första gången)
+          # och en App Store-profil för Bundle ID:t med dess förmågor (HealthKit, köp i appen).
+          app-store-connect fetch-signing-files "$LAGOM_APP_ID" \
+            --platform IOS --type IOS_APP_STORE --strict-match-identifier --create
+          keychain add-certificates
+          if [ "$INTERN" = true ]; then
+            xcode-project use-profiles --project ios/App/App.xcodeproj \
+              --custom-export-options '{"testFlightInternalTestingOnly": true}'
+          else
+            xcode-project use-profiles --project ios/App/App.xcodeproj
+          fi
+
+      - name: Xcode – arkivera och exportera IPA
+        run: |
+          set -euo pipefail
+          # Version och byggnummer skickas med här (package.json och körningens nummer) – Xcode-projektets
+          # MARKETING_VERSION/CURRENT_PROJECT_VERSION gäller bara byggen på en Mac.
+          xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App --config Release \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CURRENT_PROJECT_VERSION=$BUILD_NUMBER MARKETING_VERSION=$VERSION"
+          ipa="$(find build/ios/ipa -maxdepth 1 -name '*.ipa' | head -1)"
+          [ -n "$ipa" ] || { echo "::error::Ingen IPA skapades."; exit 1; }
+          echo "IPA=$ipa" >> "$GITHUB_ENV"
+
+      - name: Kontrollera IPA:n (version, byggnummer och HealthKit)
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/ipa"
+          rm -rf "$work" && mkdir -p "$work"
+          unzip -q "$IPA" -d "$work"
+          app="$(find "$work/Payload" -maxdepth 1 -name '*.app' | head -1)"
+          plist="$app/Info.plist"
+          short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
+          bundle="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          echo "Bundle ID $id, version $short ($bundle)"
+          [ "$id" = "$LAGOM_APP_ID" ] || { echo "::error::Fel Bundle ID i IPA:n: $id"; exit 1; }
+          [ "$short" = "$VERSION" ] || { echo "::error::Versionen i IPA:n ($short) är inte $VERSION."; exit 1; }
+          [ "$bundle" = "$BUILD_NUMBER" ] || { echo "::error::Byggnumret i IPA:n ($bundle) är inte $BUILD_NUMBER."; exit 1; }
+          entitlements="$(codesign -d --entitlements - "$app" 2>/dev/null || true)"
+          if ! grep -q 'com.apple.developer.healthkit' <<< "$entitlements"; then
+            echo "::error::HealthKit saknas i appens behörigheter – slå på HealthKit för Bundle ID:t på developer.apple.com och kör igen (profilen skapas då om)."
+            exit 1
+          fi
+          {
+            echo "### iPhone $short ($bundle)"
+            echo
+            echo "Signerad för App Store med HealthKit."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Artefakt – signerad IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-iphone-${{ env.VERSION }}-${{ env.BUILD_NUMBER }}
+          path: ${{ env.IPA }}
+          retention-days: 30
+
+      - name: Artefakt – Package.resolved (checka in den, så att Swift-paketen låses)
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-ios-package-resolved-${{ env.BUILD_NUMBER }}
+          path: ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: TestFlight – ladda upp
+        if: needs.forutsattningar.outputs.testflight == 'true'
+        env:
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          app-store-connect publish --path "$IPA"
+          echo "Uppladdad. Apple behandlar bygget en stund (upp till en timme) innan det syns i TestFlight." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Byggloggar vid fel
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lagom-iphone-loggar-${{ env.BUILD_NUMBER }}
+          path: /tmp/xcodebuild_logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Städa nyckelringen
+        if: always()
+        run: keychain use-login || true

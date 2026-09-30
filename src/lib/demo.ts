@@ -1,0 +1,243 @@
+/**
+ * Exempeldata: en realistisk svensk vecka (gröt, knäckebröd, köttbullar, ärtsoppa på torsdag,
+ * fredagstacos, fika …) så att man kan utforska Lagom utan att först mata in egna uppgifter.
+ * Tydligt markerad som exempel (profilen saknar namn och Idag/Dagbok visar en markering) och kan
+ * rensas när som helst – "Börja med min egen profil" eller Inställningar → Data.
+ */
+import type { DiaryEntry, ExerciseEntry, Food, ISODate, MealId, Profile, UnitKey, WeightEntry } from '../types'
+import { addDays, fromISODate, todayISO, weekdayIndex } from './dates'
+import { makeFoodEntry } from './diary'
+import { uid } from './id'
+import { useBodyStore } from '../stores/bodyStore'
+import { useDiaryStore } from '../stores/diaryStore'
+import { useProfileStore } from '../stores/profileStore'
+import { useFoodStore, usageFromEntries } from '../stores/foodStore'
+import { setDemoFlag } from './demoFlag'
+import { aliasAmount, canonicalFoodId, resolveFoodAlias } from '../data/foods/aliases'
+
+export { DEMO_FLAG_KEY, clearDemoFlag, isDemoData, subscribeDemoFlag } from './demoFlag'
+
+/**
+ * Exemplets profil. Den har medvetet inget namn – exempeldatan ska aldrig kunna tas för någon
+ * annans (eller ens egen) profil. Idag och Dagbok visar en tydlig markering så länge den används.
+ */
+export const DEMO_PROFILE: Omit<Profile, 'createdAt'> = {
+  sex: 'kvinna',
+  birthYear: 1991,
+  heightCm: 168,
+  startWeightKg: 71.8,
+  activityLevel: 'latt',
+  goal: 'ga_ner',
+  weeklyRateKg: 0.25,
+  targetWeightKg: 67,
+  lifeStage: 'ingen',
+  diet: 'flexitarian',
+  macroPreset: 'nnr',
+}
+
+/**
+ * [livsmedels-id (utan 'lagom:'), antal portioner eller gram med suffix 'g', måltid, tid, portion?]
+ * Antal portioner avser den angivna portionen, annars livsmedlets första portion.
+ */
+type Item = [string, number | `${number}g`, MealId, string, portion?: string]
+
+/** Favoriter i exemplet – livsmedel och en svensk klassiker (inbyggt recept). */
+export const DEMO_FAVORITES: readonly string[] = [
+  'lagom:havregrynsgrot-mellanmjolk',
+  'lagom:knackebrod-wasa-husman',
+  'lagom:kanelbulle-bageri',
+  'lagom:kaffe-bryggt',
+  'recipe:klassiker-kottbullar',
+]
+
+const FRUKOST_A: Item[] = [
+  ['havregrynsgrot-mellanmjolk', 1, 'frukost', '07:10'],
+  ['lingonsylt', '30g', 'frukost', '07:10'],
+  ['kaffe-bryggt', 1, 'frukost', '07:15'],
+]
+const FRUKOST_B: Item[] = [
+  ['knackebrod-wasa-husman', 2, 'frukost', '07:05'],
+  ['bregott-normalsaltat-75', '8g', 'frukost', '07:05'],
+  ['hushallsost-26', '20g', 'frukost', '07:05'],
+  ['filmjolk-3', '200g', 'frukost', '07:05'],
+  ['musli-sotad', '40g', 'frukost', '07:05'],
+  ['kaffe-bryggt', 1, 'frukost', '07:20'],
+]
+const FIKA: Item[] = [
+  ['kanelbulle-bageri', 1, 'fika', '15:00'],
+  ['kaffe-med-mjolk', 1, 'fika', '15:00'],
+]
+const FIKA_LATT: Item[] = [
+  ['apple-med-skal', 1, 'fika', '15:10'],
+  ['kaffe-bryggt', 1, 'fika', '15:10'],
+]
+
+/** Luncher och middagar per veckodag (mån = 0). */
+const DAYS: Array<{ lunch: Item[]; middag: Item[]; extra?: Item[] }> = [
+  {
+    lunch: [['kycklinggryta-gradde-ris', 1, 'lunch', '12:00'], ['sallad-blandad', '60g', 'lunch', '12:00']],
+    middag: [['lax-potatis-hollandaise', 1, 'middag', '18:15'], ['broccoli', '80g', 'middag', '18:15']],
+  },
+  {
+    lunch: [['smorgas-agg-kaviar', 2, 'lunch', '12:10'], ['tomatsoppa', 1, 'lunch', '12:10']],
+    middag: [['spagetti-kottfarssas', 1, 'middag', '18:00'], ['gurka', '60g', 'middag', '18:00']],
+  },
+  {
+    lunch: [['pasta-pesto', 1, 'lunch', '11:50'], ['sallad-blandad', '50g', 'lunch', '11:50']],
+    middag: [['kottbullar-potatismos-grasas-lingon', 1, 'middag', '18:00'], ['gurka', '50g', 'middag', '18:00']],
+  },
+  {
+    // Torsdag: ärtsoppa och pannkakor
+    lunch: [['artsoppa-med-flask', 1, 'lunch', '12:00'], ['pannkakor-tunna', 2, 'lunch', '12:15'], ['jordgubbssylt', '30g', 'lunch', '12:15']],
+    middag: [['pytt-i-panna', 1, 'middag', '18:30', 'agg']],
+  },
+  {
+    lunch: [['kycklingwok-ris', 1, 'lunch', '12:00']],
+    // Fredagsmys
+    middag: [['tacos-fredagstacos', 1, 'middag', '18:30']],
+    extra: [['chips-lattsaltade', '40g', 'kvallsmat', '21:00']],
+  },
+  {
+    lunch: [['raksmorgas', 1, 'lunch', '13:00']],
+    middag: [['laxpudding-smor', 1, 'middag', '18:00'], ['vin-vitt-torrt', '150g', 'middag', '18:00']],
+    extra: [['chokladboll', 1, 'fika', '15:30']],
+  },
+  {
+    lunch: [['smorgas-grovt-ost', 2, 'lunch', '12:30'], ['yoghurt-naturell-3', '150g', 'lunch', '12:30'], ['blabar-skogs', '50g', 'lunch', '12:30']],
+    middag: [['kycklingfile-klyftpotatis-tzatziki', 1, 'middag', '18:00'], ['paprika-rod', '60g', 'middag', '18:00']],
+  },
+]
+
+/** Alla livsmedel som exemplet använder (för kontroll i tester). */
+export function demoFoodIds(): string[] {
+  const items = [...FRUKOST_A, ...FRUKOST_B, ...FIKA, ...FIKA_LATT, ...DAYS.flatMap((d) => [...d.lunch, ...d.middag, ...(d.extra ?? [])])]
+  return [...new Set(items.map(([slug]) => `lagom:${slug}`))]
+}
+
+/** Tidsstämpel för ett klockslag ('HH:mm') en viss dag, i lokal tid. */
+function at(date: ISODate, time: string): number {
+  const d = fromISODate(date)
+  const [hh, mm] = time.split(':').map(Number)
+  d.setHours(hh, mm, 0, 0)
+  return d.getTime()
+}
+
+/** Enkel deterministisk "slump" så att exemplet ser likadant ut varje gång. */
+function noise(i: number): number {
+  const x = Math.sin(i * 12.9898) * 43758.5453
+  return x - Math.floor(x) - 0.5
+}
+
+function resolveItem(foods: ReadonlyMap<string, Food>, item: Item, date: ISODate): Omit<DiaryEntry, 'id' | 'createdAt'> | null {
+  const [slug, qty, meal, time, portion] = item
+  const id = `lagom:${slug}`
+  // Sammanslagna livsmedel följer sitt alias (gram för en rå rad blir rå vikt).
+  const alias = resolveFoodAlias(id)
+  const food = foods.get(id) ?? (alias ? foods.get(alias.to) : undefined)
+  if (!food) return null
+  let amount: number
+  let unit: UnitKey
+  if (typeof qty === 'string') {
+    ;({ amount, unit } = aliasAmount(food.id === id ? undefined : alias, Number.parseFloat(qty), 'g'))
+  } else if (food.portions.length) {
+    amount = qty
+    unit = `portion:${(food.portions.find((p) => p.id === portion) ?? food.portions[0]).id}`
+  } else {
+    amount = qty * 100
+    unit = 'g'
+  }
+  return makeFoodEntry(food, amount, unit, date, meal, time)
+}
+
+/**
+ * Fyll appen med exempeldata för de senaste `days` dagarna. Ersätter befintlig data.
+ * `now` styr hur mycket av idag som redan är loggat.
+ */
+export async function seedDemoData(opts: { now?: Date; days?: number } = {}): Promise<void> {
+  const now = opts.now ?? new Date()
+  const today = todayISO(now)
+  const days = opts.days ?? 14
+  const { loadBuiltinCatalog } = await import('./foodRepo')
+  const foods = (await loadBuiltinCatalog()).byId
+
+  // Profil och inställningar
+  useProfileStore.setState((s) => ({
+    profile: { ...DEMO_PROFILE, createdAt: now.getTime() - days * 86_400_000 },
+    settings: { ...s.settings, onboardingDone: true },
+  }))
+
+  // Dagbok
+  const entries: Record<ISODate, DiaryEntry[]> = {}
+  const water: Record<ISODate, number> = {}
+  const exercise: Record<ISODate, ExerciseEntry[]> = {}
+  // Visa alltid minst frukost och lunch för idag, även tidigt på dagen (det är exempeldata).
+  const hour = Math.max(12.5, now.getHours() + now.getMinutes() / 60)
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDays(today, -i)
+    const wd = weekdayIndex(date)
+    const plan = DAYS[wd]
+    const items: Item[] = [
+      ...(i % 2 === 0 ? FRUKOST_A : FRUKOST_B),
+      ...plan.lunch,
+      ...(wd === 2 || wd === 5 ? FIKA : FIKA_LATT),
+      ...plan.middag,
+      ...(plan.extra ?? []),
+    ]
+    const isToday = i === 0
+    const list: DiaryEntry[] = []
+    let k = 0
+    for (const item of items) {
+      if (isToday) {
+        const [hh, mm] = item[3].split(':').map(Number)
+        if (hh + mm / 60 > hour) continue
+      }
+      const e = resolveItem(foods, item, date)
+      // Posten skapades när måltiden åts (aldrig i framtiden) – då blir "Senaste" och förslagen
+      // per måltid desamma som om man loggat själv.
+      if (e) list.push({ ...e, id: uid('e_'), createdAt: Math.min(at(date, item[3]), now.getTime()) + k++ } as DiaryEntry)
+    }
+    if (list.length) entries[date] = list
+    water[date] = isToday ? Math.min(1500, Math.max(250, Math.round(hour - 6) * 125)) : 1250 + Math.round(noise(i) * 4) * 250
+    // Träning: rask promenad tisdag och torsdag efter jobbet, löprunda lördag förmiddag.
+    // Idag visas passet bara om klockan har hunnit dit.
+    const session =
+      wd === 1 || wd === 3
+        ? { time: '17:30', activityId: 'promenad-rask', name: 'Promenad, rask', minutes: 40, kcal: 180, met: 4.8 }
+        : wd === 5
+          ? { time: '10:00', activityId: 'lopning-10', name: 'Löpning 10 km/h (6:00 min/km)', minutes: 35, kcal: 340, met: 9.3, distanceKm: 5.8 }
+          : null
+    if (session && (!isToday || at(date, session.time) <= now.getTime())) {
+      const { time, ...rest } = session
+      exercise[date] = [{ id: uid('x_'), date, ...rest, createdAt: at(date, time) }]
+    }
+  }
+  const daysMeta = Object.fromEntries(
+    Object.keys(entries)
+      .filter((d) => d !== today)
+      .map((d, idx) => [d, { complete: true, mood: 3 + (idx % 3 === 0 ? 1 : 0), energy: 3 + (idx % 4 === 0 ? 1 : 0) }]),
+  )
+  useDiaryStore.setState({ entries, water, exercise, days: daysMeta })
+
+  // Vikt: långsam nedgång med vardagligt brus, vägning de flesta morgnar
+  const weights: WeightEntry[] = []
+  for (let i = 45; i >= 0; i--) {
+    if (i % 3 === 1 && i > 3) continue
+    const date = addDays(today, -i)
+    const kg = Math.round((DEMO_PROFILE.startWeightKg - (45 - i) * 0.035 + noise(i + 3) * 0.9) * 10) / 10
+    weights.push({ id: uid('w_'), date, kg, createdAt: Math.min(at(date, '07:00'), now.getTime()) })
+  }
+  const measured = (daysAgo: number, waistCm: number, hipCm: number) => {
+    const date = addDays(today, -daysAgo)
+    return { id: uid('m_'), date, waistCm, hipCm, createdAt: at(date, '07:05') }
+  }
+  useBodyStore.setState({ weights, measurements: [measured(30, 82, 101), measured(2, 80, 100)] })
+
+  // Favoriter och "Senaste" (samma statistik som `recordUsage` ger när man loggar själv: antal,
+  // senast använd, senaste mängd och enhet samt måltider – det styr förslagen per måltid).
+  useFoodStore.setState({
+    favorites: [...new Set(DEMO_FAVORITES.map((id) => canonicalFoodId(id)))],
+    usage: usageFromEntries(entries),
+  })
+
+  setDemoFlag()
+}

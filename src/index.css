@@ -1,0 +1,377 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
+
+/*
+ * Lagom – designsystem "Nordisk natur".
+ *
+ * Ljust tema "Midsommar": havrevit bakgrund, granskogsgrön accent.
+ * Mörkt tema "Midvinter": nattsvart skog med norrskensgrönt.
+ *
+ * Färgnamn:
+ *   gran     – primär (granskog / norrsken)
+ *   lingon   – protein, varningar
+ *   hjortron – kolhydrater, uppmärksamhet
+ *   blabar   – fett, information
+ *   mossa    – fibrer, "bra"
+ *   vinbar   – alkohol
+ *   fjall    – vatten
+ *   sol      – höjdpunkter, streak, midnattssol
+ *
+ * Varje färg har -soft (tonad bakgrund). Använd alltid tokens, aldrig hårdkodade hex-värden i komponenter.
+ *
+ * Safe areas (notch, Dynamic Island, hemindikator): använd var(--sa-top), var(--sa-bottom),
+ * var(--sa-left) och var(--sa-right) – aldrig env(safe-area-inset-*) direkt. Variablerna tar i
+ * första hand --safe-area-inset-* (som ett inbyggt appskal kan sätta när webbvyn inte ger env()
+ * rätt värde, t.ex. på Android) och annars webbläsarens env(). Klasserna pt-safe och pb-safe
+ * använder dem.
+ */
+
+/* dark: gäller bara på skärmen – en utskrift är alltid ljus (se @media print längst ned). */
+@custom-variant dark {
+  @media not print {
+    &:where(.dark, .dark *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+
+  --color-bg: var(--lg-bg);
+  --color-surface: var(--lg-surface);
+  --color-surface-2: var(--lg-surface-2);
+  --color-surface-3: var(--lg-surface-3);
+  --color-line: var(--lg-line);
+  --color-ink: var(--lg-ink);
+  --color-ink-2: var(--lg-ink-2);
+  --color-ink-3: var(--lg-ink-3);
+
+  --color-gran: var(--lg-gran);
+  --color-gran-strong: var(--lg-gran-strong);
+  --color-gran-soft: var(--lg-gran-soft);
+  --color-on-gran: var(--lg-on-gran);
+
+  /* Omvänd yta (toast-notiser): mörk i ljust tema, ljus i mörkt tema. */
+  --color-inverse: var(--lg-inverse);
+  --color-on-inverse: var(--lg-on-inverse);
+  --color-inverse-accent: var(--lg-inverse-accent);
+
+  --color-lingon: var(--lg-lingon);
+  --color-lingon-soft: var(--lg-lingon-soft);
+  --color-hjortron: var(--lg-hjortron);
+  --color-hjortron-soft: var(--lg-hjortron-soft);
+  --color-blabar: var(--lg-blabar);
+  --color-blabar-soft: var(--lg-blabar-soft);
+  --color-mossa: var(--lg-mossa);
+  --color-mossa-soft: var(--lg-mossa-soft);
+  --color-vinbar: var(--lg-vinbar);
+  --color-vinbar-soft: var(--lg-vinbar-soft);
+  --color-fjall: var(--lg-fjall);
+  --color-fjall-soft: var(--lg-fjall-soft);
+  --color-sol: var(--lg-sol);
+  --color-sol-soft: var(--lg-sol-soft);
+
+  /* Semantiska alias */
+  --color-protein: var(--lg-lingon);
+  --color-carbs: var(--lg-hjortron);
+  --color-fat: var(--lg-blabar);
+  --color-fiber: var(--lg-mossa);
+  --color-alcohol: var(--lg-vinbar);
+  --color-water: var(--lg-fjall);
+  --color-good: var(--lg-mossa);
+  --color-warn: var(--lg-hjortron);
+  --color-bad: var(--lg-lingon);
+
+  /*
+   * Text i tonfärg (text-lingon, text-carbs …) använder tonens textvariant, som har minst 4,5:1
+   * mot bg, surface, surface-2, surface-3 och tonens -soft i båda temana (WCAG 1.4.3).
+   * Ytor, staplar och prickar (bg-, fill-, stroke-) behåller grundtonen.
+   * text-sol lämnas orörd: den används bara för logotypens punkt och dekorativa ikoner.
+   */
+  --text-color-lingon: var(--lg-lingon-text);
+  --text-color-hjortron: var(--lg-hjortron-text);
+  --text-color-mossa: var(--lg-mossa-text);
+  --text-color-fjall: var(--lg-fjall-text);
+  --text-color-protein: var(--lg-lingon-text);
+  --text-color-carbs: var(--lg-hjortron-text);
+  --text-color-fiber: var(--lg-mossa-text);
+  --text-color-water: var(--lg-fjall-text);
+  --text-color-good: var(--lg-mossa-text);
+  --text-color-warn: var(--lg-hjortron-text);
+  --text-color-bad: var(--lg-lingon-text);
+
+  --radius-card: 1.5rem;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 0 0 var(--lg-shadow-a), 0 8px 24px -12px var(--lg-shadow-b);
+  --shadow-float: 0 12px 40px -12px var(--lg-shadow-c);
+
+  --ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+:root {
+  color-scheme: light;
+  --lg-bg: #f6f3ec;
+  --lg-surface: #ffffff;
+  --lg-surface-2: #efeae0;
+  --lg-surface-3: #e5ddcd;
+  --lg-line: #e3dccd;
+  --lg-ink: #16201c;
+  --lg-ink-2: #48524d;
+  /* Minst 4,5:1 mot alla ytor (även surface-3 och -soft-tonerna) – används för liten text. */
+  --lg-ink-3: #5c645f;
+
+  --lg-gran: #1f5a43;
+  --lg-gran-strong: #154332;
+  --lg-gran-soft: #dcebe2;
+  --lg-on-gran: #ffffff;
+
+  --lg-lingon: #c0353b;
+  --lg-lingon-soft: #f8dfdc;
+  --lg-hjortron: #c77712;
+  --lg-hjortron-soft: #fbead0;
+  --lg-blabar: #3d4b99;
+  --lg-blabar-soft: #e0e4f6;
+  --lg-mossa: #4f7f3b;
+  --lg-mossa-soft: #e1eed8;
+  --lg-vinbar: #8a3b73;
+  --lg-vinbar-soft: #f2deeb;
+  --lg-fjall: #2f7aa1;
+  --lg-fjall-soft: #dbeaf3;
+  --lg-sol: #e6a91a;
+  --lg-sol-soft: #fcf0cc;
+
+  /* Textvarianter (se --text-color-* ovan): minst 4,6:1 mot alla ytor och tonens -soft. */
+  --lg-gran-text: var(--lg-gran);
+  --lg-lingon-text: #b52c34;
+  --lg-hjortron-text: #954e00;
+  --lg-blabar-text: var(--lg-blabar);
+  --lg-mossa-text: #3f6c2b;
+  --lg-vinbar-text: var(--lg-vinbar);
+  --lg-fjall-text: #1d678c;
+  --lg-sol-text: #885600;
+
+  --lg-inverse: #16201c;
+  --lg-on-inverse: #f6f3ec;
+  --lg-inverse-accent: #e6a91a; /* 8,0:1 mot inverse */
+
+  --lg-shadow-a: rgb(22 32 28 / 0.04);
+  --lg-shadow-b: rgb(22 32 28 / 0.18);
+  --lg-shadow-c: rgb(22 32 28 / 0.35);
+}
+
+/* Safe areas – se kommentaren överst. */
+:root {
+  --sa-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sa-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --sa-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --sa-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+
+/* Mörkt tema bara på skärmen – vid utskrift gäller de ljusa värdena ovan. */
+@media not print {
+  .dark {
+    color-scheme: dark;
+    --lg-bg: #0b1210;
+    --lg-surface: #131c19;
+    --lg-surface-2: #1a2522;
+    --lg-surface-3: #23302b;
+    --lg-line: #26332e;
+    --lg-ink: #eeebe3;
+    --lg-ink-2: #b9beb8;
+    --lg-ink-3: #99a29c;
+
+    --lg-gran: #6cc49a;
+    --lg-gran-strong: #8fd8b2;
+    --lg-gran-soft: #183329;
+    --lg-on-gran: #08110d;
+
+    --lg-lingon: #f0786f;
+    --lg-lingon-soft: #3a1d1c;
+    --lg-hjortron: #f3b35c;
+    --lg-hjortron-soft: #3a2b16;
+    --lg-blabar: #919df0;
+    --lg-blabar-soft: #1e2346;
+    --lg-mossa: #9ccb7e;
+    --lg-mossa-soft: #1f311b;
+    --lg-vinbar: #da8cc3;
+    --lg-vinbar-soft: #381d31;
+    --lg-fjall: #7cbadb;
+    --lg-fjall-soft: #132d3a;
+    --lg-sol: #f5cf6b;
+    --lg-sol-soft: #3a3116;
+
+    /* I mörkt läge klarar grundtonerna redan minst 4,9:1 som text. */
+    --lg-gran-text: var(--lg-gran);
+    --lg-lingon-text: var(--lg-lingon);
+    --lg-hjortron-text: var(--lg-hjortron);
+    --lg-blabar-text: var(--lg-blabar);
+    --lg-mossa-text: var(--lg-mossa);
+    --lg-vinbar-text: var(--lg-vinbar);
+    --lg-fjall-text: var(--lg-fjall);
+    --lg-sol-text: var(--lg-sol);
+
+    --lg-inverse: #eeebe3;
+    --lg-on-inverse: #0b1210;
+    --lg-inverse-accent: #6b4a00; /* 6,8:1 mot inverse – solgult syns inte på ljus botten */
+
+    --lg-shadow-a: rgb(0 0 0 / 0.3);
+    --lg-shadow-b: rgb(0 0 0 / 0.5);
+    --lg-shadow-c: rgb(0 0 0 / 0.7);
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+    /* Fokuserade element ska inte hamna under den klibbiga sidrubriken (WCAG 2.4.11). */
+    scroll-padding-top: calc(4.5rem + var(--sa-top));
+  }
+  /* …och inte under den fasta bottennavigeringen på mobil (AppShell sätter klassen). */
+  @media (max-width: 1023.98px) {
+    html.has-bottom-nav {
+      scroll-padding-bottom: calc(7rem + var(--sa-bottom));
+    }
+  }
+  /* Sidrubriker som får fokus vid sidbyte (tabIndex -1) behöver ingen fokusram vid musklick. */
+  h1[tabindex='-1']:focus:not(:focus-visible) {
+    outline: none;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+  ::selection {
+    background: var(--lg-gran-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--lg-gran);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+  button,
+  [role='button'] {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+  /*
+   * De inbyggda apparna (src/native/system.ts sätter klassen): ingen meny med "Spara bild" när man
+   * håller fingret på en bild – en app ska inte bete sig som en webbsida, och på iPhone skulle
+   * sparandet kräva tillgång till Bilder.
+   */
+  html.native-app img {
+    -webkit-touch-callout: none;
+  }
+}
+
+@layer components {
+  /* Kort */
+  .card {
+    @apply bg-surface rounded-[var(--radius-card)] shadow-[var(--shadow-card)];
+  }
+  /* Rubrik i Fraunces med optisk storlek */
+  .font-display {
+    font-variation-settings: 'SOFT' 50, 'WONK' 0;
+  }
+  .display-num {
+    @apply font-display tabular-nums tracking-tight;
+    font-variation-settings: 'SOFT' 100, 'WONK' 0, 'opsz' 144;
+  }
+  .eyebrow {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-ink-3;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Utrymme för bottennavigering + iOS hemindikator */
+  .pb-nav {
+    padding-bottom: calc(6.5rem + var(--sa-bottom));
+  }
+  .pt-safe {
+    padding-top: var(--sa-top);
+  }
+  .pb-safe {
+    padding-bottom: var(--sa-bottom);
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Subtil papperskorn-textur för bakgrunden */
+  .grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Utskrift (t.ex. rapporten att ta med till vården): alltid ljust tema, vit bakgrund och
+ * A4-marginaler. Kort delas inte mellan sidor och får en tunn ram i stället för skugga.
+ * Navigering, sidhuvudets knappar och notiser döljs med print:hidden i komponenterna.
+ */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  :root {
+    color-scheme: light;
+    --lg-bg: #ffffff;
+  }
+  html,
+  body {
+    background: #ffffff;
+  }
+  body {
+    min-height: 0;
+    /* Diagrammens och markeringarnas färger ska med på papperet. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .grain {
+    background-image: none;
+  }
+  .card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid var(--lg-line);
+  }
+  .pb-nav,
+  .pb-safe {
+    padding-bottom: 0;
+  }
+  .pt-safe {
+    padding-top: 0;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}

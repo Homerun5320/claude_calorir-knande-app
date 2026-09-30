@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+: dagboken (webbvyns lagring) följer inte med i den automatiska säkerhetskopian till
+  molnet – den stannar på telefonen, som integritetspolicyn säger. Vid överföring direkt mellan två
+  telefoner (kabel eller wifi när en ny telefon ställs in) följer den med.
+  Äldre Android: android:allowBackup="false" i manifestet stänger av båda.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="root" path="." />
+        <include domain="file" path="." />
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,25 @@
+# Dependabot föreslår uppdateringar en gång i veckan.
+# - npm: mindre uppdateringar (minor och patch) samlas i en enda pull request.
+#   Större versioner (major) kommer var för sig, så att de kan granskas en i taget.
+# - github-actions: nya versioner av stegen i .github/workflows/.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Stockholm
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-och-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Stockholm

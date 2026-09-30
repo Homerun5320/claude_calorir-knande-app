@@ -1,0 +1,303 @@
+/**
+ * Köplogiken: statustexter, när provperioden visas, vilka planer som erbjuds, aktivering av
+ * licensnycklar och anropen till betalservern (med fejkad fetch).
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PLANS } from '../../config/commerce'
+import { accessStatus, currentAccess, resetLicenseChecks } from '../../hooks/useAccess'
+import { createTestLicense } from '../../lib/license'
+import { useLicenseStore } from '../../stores/licenseStore'
+import {
+  PURCHASE_ERRORS,
+  PurchaseError,
+  activateLicense,
+  buyInTestMode,
+  createCheckout,
+  formatKronor,
+  perMonthText,
+  plansToOffer,
+  priceSummary,
+  priceSummaryText,
+  recoverLicense,
+  renewalBlockedInStore,
+  sessionIdFrom,
+  statusSummary,
+  trialBannerLevel,
+  verifyPurchase,
+} from './premiumLogic'
+
+const DAY = 86_400_000
+const NOW = Date.UTC(2026, 8, 27, 10)
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+beforeEach(() => {
+  useLicenseStore.getState().resetLicenseState()
+  resetLicenseChecks()
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
+
+describe('statustexter', () => {
+  it('provperiod, utgången och licens med ärliga, lugna texter', () => {
+    const prov = accessStatus({ trialStartedAt: NOW - 3 * DAY, license: null, now: NOW })
+    expect(statusSummary(prov).title).toBe('11 dagar kvar av provperioden')
+    expect(statusSummary(prov).text).toMatch(/Inget dras automatiskt/)
+
+    const one = accessStatus({ trialStartedAt: NOW - 13.5 * DAY, license: null, now: NOW })
+    expect(statusSummary(one).title).toBe('1 dag kvar av provperioden')
+
+    const slut = accessStatus({ trialStartedAt: NOW - 20 * DAY, license: null, now: NOW })
+    expect(statusSummary(slut).title).toBe('Provperioden är slut – din data finns kvar')
+    expect(statusSummary(slut).text).toMatch(/se, exportera och radera/)
+
+    const livstid = accessStatus({ trialStartedAt: NOW - 90 * DAY, license: { ok: true, payload: { v: 1, id: 'a', plan: 'livstid', iat: 1 } }, now: NOW })
+    expect(statusSummary(livstid)).toMatchObject({ label: 'Livstidslicens', title: 'Lagom är ditt – för alltid' })
+    // Ärliga löften: felrättningar ingår – inga löften om alla framtida uppdateringar.
+    expect(statusSummary(livstid).text).toContain('felrättningar ingår')
+    expect(statusSummary(livstid).text).not.toMatch(/framtida uppdateringar/)
+
+    const exp = Math.floor((NOW + 100 * DAY) / 1000)
+    const ar = accessStatus({ trialStartedAt: null, license: { ok: true, payload: { v: 1, id: 'b', plan: 'ar', iat: 1, exp } }, now: NOW })
+    expect(statusSummary(ar).title).toMatch(/^Giltig till \d+ [a-zåäö]+ 2027$/)
+    expect(statusSummary(ar).text).toMatch(/100 dagar kvar\. Licensen förnyas inte automatiskt/)
+  })
+
+  it('en återkallad licens (återbetalt köp) förklaras vänligt – datan finns kvar', () => {
+    const s = accessStatus({ trialStartedAt: NOW - 400 * DAY, license: { ok: false, reason: 'aterkallad' }, now: NOW })
+    expect(s).toMatchObject({ kind: 'utgangen', revoked: true, licenseExpired: false })
+    const summary = statusSummary(s)
+    expect(summary.title).toBe('Licensen har återkallats – din data finns kvar')
+    expect(summary.text).toContain('Licensen har återkallats, till exempel för att köpet har återbetalats eller bestridits. Tror du att det är fel? Mejla oss, så reder vi ut det.')
+    expect(summary.text).toContain('se, exportera och radera')
+    // Under en pågående provperiod gäller provperioden som vanligt.
+    expect(accessStatus({ trialStartedAt: NOW - DAY, license: { ok: false, reason: 'aterkallad' }, now: NOW }).kind).toBe('prov')
+  })
+
+  it('en licens som går ut medan appen är öppen räknas som utgången', () => {
+    const exp = Math.floor((NOW - 1000) / 1000)
+    const s = accessStatus({ trialStartedAt: NOW - 400 * DAY, license: { ok: true, payload: { v: 1, id: 'c', plan: 'ar', iat: 1, exp } }, now: NOW })
+    expect(s).toMatchObject({ kind: 'utgangen', licenseExpired: true })
+    expect(statusSummary(s).title).toBe('Årslicensen har gått ut – din data finns kvar')
+  })
+
+  it('provperioden syns diskret, tydligare de sista tre dagarna och som kort efteråt', () => {
+    expect(trialBannerLevel(accessStatus({ trialStartedAt: NOW, license: null, now: NOW }))).toBe('chip')
+    expect(trialBannerLevel(accessStatus({ trialStartedAt: NOW - 11 * DAY, license: null, now: NOW }))).toBe('soon')
+    expect(trialBannerLevel(accessStatus({ trialStartedAt: NOW - 15 * DAY, license: null, now: NOW }))).toBe('expired')
+    expect(trialBannerLevel(accessStatus({ trialStartedAt: null, license: null, now: NOW }))).toBe('none')
+    expect(trialBannerLevel({ kind: 'licensierad', plan: PLANS[1], payload: { v: 1, id: 'x', plan: 'livstid', iat: 1 }, test: false })).toBe('none')
+  })
+
+  it('erbjuder inga planer vid livstid och bara livstid vid en färsk årslicens', () => {
+    const payload = { v: 1 as const, id: 'x', plan: 'ar' as const, iat: 1 }
+    expect(plansToOffer({ kind: 'prov', daysLeft: 3, endsAt: NOW }, PLANS)).toHaveLength(2)
+    expect(plansToOffer({ kind: 'licensierad', plan: PLANS[1], payload: { ...payload, plan: 'livstid' }, test: false }, PLANS)).toEqual([])
+    expect(plansToOffer({ kind: 'licensierad', plan: PLANS[0], payload, expiresAt: NOW + 200 * DAY, daysLeft: 200, test: false }, PLANS).map((p) => p.id)).toEqual(['livstid'])
+    expect(plansToOffer({ kind: 'licensierad', plan: PLANS[0], payload, expiresAt: NOW + 10 * DAY, daysLeft: 10, test: false }, PLANS)).toHaveLength(2)
+  })
+
+  it('Google Play: en årslicens från butiken som gäller kan inte förnyas i förväg', () => {
+    const payload = { v: 1 as const, id: 'x', plan: 'ar' as const, iat: 1 }
+    const fromStore = { kind: 'licensierad' as const, plan: PLANS[0], payload, expiresAt: NOW + 10 * DAY, daysLeft: 10, test: false, source: 'store' as const }
+    expect(PLANS[0].id).toBe('ar')
+    expect(renewalBlockedInStore(fromStore, 'play')).toBe(true)
+    expect(plansToOffer(fromStore, PLANS, 'play').map((p) => p.id)).toEqual(['livstid'])
+    // App Store (non-renewing subscription) och webben kan förnyas som förut.
+    expect(renewalBlockedInStore(fromStore, 'appstore')).toBe(false)
+    expect(plansToOffer(fromStore, PLANS, 'appstore')).toHaveLength(2)
+    // En licensnyckel (webbköp) i Play-appen kan förnyas – den är ingen ägd Play-produkt.
+    expect(renewalBlockedInStore({ ...fromStore, source: 'nyckel' }, 'play')).toBe(false)
+    expect(plansToOffer({ ...fromStore, source: 'nyckel' }, PLANS, 'play')).toHaveLength(2)
+  })
+
+  it('priser inklusive moms i klartext', () => {
+    expect(priceSummary()).toBe('349 kr/år eller 699 kr för alltid')
+    expect(priceSummaryText()).toBe(priceSummary())
+    expect(perMonthText(PLANS[0])).toBe('29 kr/mån')
+    expect(formatKronor(139.8)).toBe('139,80 kr')
+  })
+
+  it('i butiksappar nämns inga kronor – priset kommer från butiken', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const logic = await import('./premiumLogic')
+    // Innan butikens priser har hämtats: priserna visas i butiken före köpet.
+    expect(logic.priceSummaryText()).toBe('årslicens eller livstidslicens som köp i appen (priserna visas i App Store innan du köper)')
+    expect(logic.priceSummaryText()).not.toMatch(/kr\b/)
+    // Med butikens priser (riktlinje 3.1.1: priserna efter provperioden ska synas innan den startar).
+    logic.rememberStorePrices([
+      { id: 'ar', title: 'Årslicens', displayPrice: '349,00 kr' },
+      { id: 'livstid', title: 'Livstidslicens', displayPrice: '699,00 kr' },
+    ])
+    expect(logic.priceSummaryText()).toBe('årslicens (349,00 kr) eller livstidslicens (699,00 kr) som köp i appen')
+    logic.resetStorePricesForTests()
+    expect(logic.storeName()).toBe('App Store')
+    // priceSummary finns kvar (webbpriserna), men används bara när Lagom säljs på webben.
+    expect(logic.priceSummary()).toBe('349 kr/år eller 699 kr för alltid')
+  })
+
+  it('webben med webbförsäljningen avstängd hänvisar till appbutikerna', async () => {
+    vi.stubEnv('VITE_WEB_SALES', 'off')
+    vi.resetModules()
+    const logic = await import('./premiumLogic')
+    expect(logic.priceSummaryText()).toBe('årslicens eller livstidslicens i appbutikerna')
+  })
+})
+
+describe('aktivering', () => {
+  it('sparar en giltig nyckel och uppdaterar tillgången direkt', async () => {
+    const key = createTestLicense('livstid', undefined)
+    const res = await activateLicense(`  ${key}\n`)
+    expect(res.ok).toBe(true)
+    expect(useLicenseStore.getState().licenseKey).toBe(key)
+    expect(currentAccess().status.kind).toBe('licensierad')
+  })
+
+  it('visar ett begripligt fel för skräp och tomt fält', async () => {
+    expect(await activateLicense('')).toEqual({ ok: false, message: 'Klistra in din licensnyckel först.' })
+    const res = await activateLicense('inte en nyckel')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.message).toMatch(/börjar med LAGOM1/)
+    expect(useLicenseStore.getState().licenseKey).toBeNull()
+  })
+
+  it('testköp ger en testlicens med rätt giltighet', async () => {
+    const res = await buyInTestMode(PLANS[0], NOW)
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.payload).toMatchObject({ plan: 'ar', test: true })
+      expect(res.payload.exp).toBe(Math.floor(NOW / 1000) + 365 * 86_400)
+    }
+  })
+})
+
+describe('butiksbyggen', () => {
+  it('createCheckout och redirectTo kastar – ingen Stripe i appen', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const logic = await import('./premiumLogic')
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    await expect(logic.createCheckout('livstid')).rejects.toMatchObject({ code: 'invalid' })
+    expect(() => logic.redirectTo('https://checkout.stripe.com/x')).toThrow(logic.PurchaseError)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('testköp är avstängda och osignerade testnycklar godtas inte (verifieras alltid som skarpt läge)', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'play')
+    vi.resetModules()
+    const logic = await import('./premiumLogic')
+    const { PLANS: plans } = await import('../../config/commerce')
+    const { useLicenseStore: store } = await import('../../stores/licenseStore')
+    await waitForHydration(store)
+    expect(await logic.buyInTestMode(plans[1], NOW)).toEqual({ ok: false, message: 'Testköp är avstängda i den här versionen.' })
+    const res = await logic.activateLicense(createTestLicense('livstid', undefined, NOW), NOW)
+    expect(res).toEqual({ ok: false, message: 'Det här är en testlicens och gäller inte i den riktiga appen.' })
+    expect(store.getState().licenseKey).toBeNull()
+  })
+})
+
+describe('App Store-bygget', () => {
+  it('licensnycklar går inte att aktivera – inte ens signerade – och inget sparas', async () => {
+    vi.stubEnv('VITE_DISTRIBUTION', 'appstore')
+    vi.resetModules()
+    const logic = await import('./premiumLogic')
+    const { useLicenseStore: store } = await import('../../stores/licenseStore')
+    await waitForHydration(store)
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const res = await logic.activateLicense('LAGOM1.eyJ2IjoxfQ.c2lnbmF0dXI', NOW)
+    expect(res).toEqual({ ok: false, message: logic.KEY_ENTRY_DISABLED })
+    expect(store.getState().licenseKey).toBeNull()
+    // Ingen spärrlista hämtas heller.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+async function waitForHydration(store: { persist: { hasHydrated: () => boolean } }) {
+  for (let i = 0; i < 100 && !store.persist.hasHydrated(); i++) await new Promise((r) => setTimeout(r, 10))
+}
+
+describe('Tappat nyckeln? (recover-license)', () => {
+  it('skickar e-post och kvittonummer och returnerar nyckeln', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ key: ' LAGOM1.a.b ' }))
+    await expect(recoverLicense(' kund@example.se ', ' 1234-5678 ')).resolves.toBe('LAGOM1.a.b')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/recover-license')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'kund@example.se', receipt: '1234-5678' })
+  })
+
+  it('för många försök, okänt köp, serverfel och konstiga svar ger svenska meddelanden', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ error: 'Too many' }, 429))
+    await expect(recoverLicense('a@b.se', '1')).rejects.toMatchObject({ code: 'rate-limit', message: PURCHASE_ERRORS['rate-limit'] })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ code: 'hittades-inte' }, 404))
+    await expect(recoverLicense('a@b.se', '1')).rejects.toMatchObject({ code: 'not-found', message: expect.stringContaining('Vi hittar inget köp') })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({}, 503))
+    await expect(recoverLicense('a@b.se', '1')).rejects.toMatchObject({ code: 'server' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ key: 'inte en nyckel' }))
+    await expect(recoverLicense('a@b.se', '1')).rejects.toMatchObject({ code: 'invalid' })
+  })
+
+  it('offline: inget anrop görs', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    await expect(recoverLicense('a@b.se', '1')).rejects.toMatchObject({ code: 'offline' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    onLine.mockRestore()
+  })
+})
+
+describe('betalservern', () => {
+  it('create-checkout skickar planen och returnerar Stripes adress', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' }))
+    await expect(createCheckout('livstid')).resolves.toBe('https://checkout.stripe.com/c/pay/cs_test_1')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/create-checkout')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ plan: 'livstid', consent: true })
+  })
+
+  it('create-checkout: serverfel, konstiga svar och nätverksfel ger svenska meddelanden', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({}, 500))
+    await expect(createCheckout('ar')).rejects.toMatchObject({ code: 'server', message: PURCHASE_ERRORS.server })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ url: 'javascript:alert(1)' }))
+    await expect(createCheckout('ar')).rejects.toMatchObject({ code: 'invalid' })
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await expect(createCheckout('ar')).rejects.toBeInstanceOf(PurchaseError)
+  })
+
+  it('offline: inget anrop görs', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    await expect(createCheckout('ar')).rejects.toMatchObject({ code: 'offline', message: PURCHASE_ERRORS.offline })
+    expect(fetchMock).not.toHaveBeenCalled()
+    onLine.mockRestore()
+  })
+
+  it('verify-purchase: nyckel, pågående betalning och okänt köp', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ licenseKey: 'LAGOM1.a.b' }))
+    await expect(verifyPurchase('cs_test_1')).resolves.toEqual({ kind: 'ok', licenseKey: 'LAGOM1.a.b' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ sessionId: 'cs_test_1' })
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ status: 'pending' }, 202))
+    await expect(verifyPurchase('cs_test_1')).resolves.toEqual({ kind: 'pending' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ code: 'hittades-inte' }, 404))
+    await expect(verifyPurchase('cs_test_1')).rejects.toMatchObject({ code: 'not-found' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({}, 502))
+    await expect(verifyPurchase('cs_test_1')).rejects.toMatchObject({ code: 'server', message: PURCHASE_ERRORS.server })
+    // Serverns egna svenska meddelande visas när det finns.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json({ code: 'avbruten', error: 'Köpet avbröts eller hann gå ut. Inga pengar har dragits.' }, 410))
+    await expect(verifyPurchase('cs_test_1')).rejects.toMatchObject({ code: 'not-found', message: 'Köpet avbröts eller hann gå ut. Inga pengar har dragits.' })
+  })
+
+  it('session-id läses ur hash-adressen och som reserv ur sökdelen', () => {
+    expect(sessionIdFrom(new URLSearchParams('session_id=cs_1'), '')).toBe('cs_1')
+    expect(sessionIdFrom(new URLSearchParams(''), '?session_id=cs_2')).toBe('cs_2')
+    expect(sessionIdFrom(new URLSearchParams(''), '')).toBeNull()
+  })
+})

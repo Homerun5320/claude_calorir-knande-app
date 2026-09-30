@@ -1,0 +1,81 @@
+apply plugin: 'com.android.application'
+
+// Versionen följer "version" i package.json, så att appen, Om Lagom och butiken visar samma nummer.
+def lagomPackage = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+// Byggnumret måste öka för varje uppladdning till Google Play: -PlagomVersionCode=<nummer>
+// (molnbygget använder körningens nummer). Lokalt och i testbyggen: 1.
+def lagomVersionCode = (project.findProperty('lagomVersionCode') ?: '1').toString().toInteger()
+// Uppladdningsnyckeln (Play App Signing) finns bara i molnbyggets hemligheter – aldrig i Git.
+def lagomUploadKeystore = System.getenv('LAGOM_UPLOAD_KEYSTORE')
+
+android {
+    namespace = "se.lagomappen.lagom"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "se.lagomappen.lagom"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode lagomVersionCode
+        versionName lagomPackage.version
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (lagomUploadKeystore) {
+                storeFile file(lagomUploadKeystore)
+                storePassword System.getenv('LAGOM_UPLOAD_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('LAGOM_UPLOAD_KEY_ALIAS')
+                keyPassword System.getenv('LAGOM_UPLOAD_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (lagomUploadKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    packaging {
+        jniLibs {
+            // Okomprimerade och 16 KB-justerade .so-filer (krav i Google Play för Android 15+).
+            useLegacyPackaging = false
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bakgrunden i den adaptiva appikonen: granens gröna (mitten av ikonens toning i public/icon.svg). -->
+<resources>
+    <color name="ic_launcher_background">#1F5A43</color>
+</resources>

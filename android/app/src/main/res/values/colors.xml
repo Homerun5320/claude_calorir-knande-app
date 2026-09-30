@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lagoms färger, samma som i src/index.css. Mörkt läge: values-night/colors.xml. -->
+<resources>
+    <!-- Granens gröna (lg-gran). -->
+    <color name="colorPrimary">#1F5A43</color>
+    <color name="colorPrimaryDark">#174736</color>
+    <color name="colorAccent">#1F5A43</color>
+    <!-- Appens bakgrund (lg-bg) – syns bakom startskärmen och innan webbvyn har ritats. -->
+    <color name="lagom_background">#F6F3EC</color>
+</resources>

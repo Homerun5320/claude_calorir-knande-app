@@ -1,0 +1,68 @@
+# Kontroll av varje ändring: typer, lint, tester, bygge och sårbarheter i beroendena.
+# Körs på pull requests och när något hamnar på main. Samma kommandon som i CLAUDE.md.
+#
+# OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typer, lint, tester och bygge
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Typkontroll
+        run: npx tsc -b
+
+      - name: Lint (oxlint)
+        run: npx oxlint -f github src netlify scripts
+
+      - name: Tester
+        run: npx vitest run
+
+      - name: Bygge (testläge för betalningen)
+        run: npx vite build
+        env:
+          VITE_COMMERCE_MODE: test
+
+      # Butiksvarianterna av webbdelen har egna regler i bygget (CSP som meta-tagg från netlify.toml,
+      # inga fristående webbsidor, integritetssidan för Health Connect och byggkontrollens
+      # butiksregler). De kräver ingen SDK och byggs här vid varje ändring med testvärden – själva
+      # apparna byggs i native.yml och release.yml. Paketen härifrån används aldrig.
+      - name: Butiksbyggen av webbdelen (App Store och Google Play, testvärden)
+        env:
+          VITE_API_BASE: https://lagom.invalid
+          VITE_SELLER_NAME: Testbygge
+          VITE_SELLER_ADDRESS: Testgatan 1, 123 45 Teststad
+          VITE_SELLER_PHONE: 000-000 00 00
+          VITE_SUPPORT_EMAIL: ci@users.noreply.github.com
+          LAGOM_ALLOW_STORE_WITHOUT_IAP: '1'
+        run: |
+          VITE_DISTRIBUTION=appstore npx vite build
+          VITE_DISTRIBUTION=play npx vite build
+
+      - name: Sårbarheter i produktionsberoenden
+        run: npm audit --omit=dev --audit-level=high
