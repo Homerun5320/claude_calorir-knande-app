@@ -6,9 +6,11 @@ och en knapp, **Lägg till**, som öppnar appen direkt på Lägg till mat.
 
 > **Läget (2026-09-30):** Android-widgeten finns i repot – appens egen kod i `android/`, JS-sidan i
 > `src/native/widget.ts` och `src/lib/widgetSummary.ts`. Den byggs i molnbygget men är inte provad
-> på en riktig telefon ännu ([avsnitt 7](#7-testa-på-en-telefon)). **iPhone-widgeten finns inte
-> ännu:** `WIDGET_IOS_READY` i `src/native/widget.ts` är `false`, och på iPhone gör modulen
-> ingenting. Planen står i [avsnitt 8](#8-iphone--planen).
+> på en riktig telefon ännu ([avsnitt 7](#7-testa-på-en-telefon)). **iPhone-widgeten finns i koden
+> men är avslagen** tills App Group finns i ägarens Apple-konto: målet `LagomWidgetExtension` byggs
+> i kontrollbygget men bäddas inte in i appen, och `WIDGET_IOS_READY` i `src/native/widget.ts` är
+> `false` – på iPhone gör modulen ingenting. Den slås på med `node scripts/ios-widget.mjs enable`
+> ([avsnitt 8](#8-iphone--planen)).
 
 Inga nya paket och inga nya behörigheter: tillägget `LagomWidget` är appens egen kod (inget
 npm-paket, inga Gradle-beroenden utöver det Capacitor redan har), och Data safety är oförändrad
@@ -112,8 +114,10 @@ Båda sidor följer det här exakt. Ändras något: se [avsnitt 9](#9-ändra-wid
 
 ### Tillägget `LagomWidget`
 
-Registreras i Android-appen själv (`MainActivity.onCreate`, före `super.onCreate`). JS:
-`registerPlugin<LagomWidgetPlugin>('LagomWidget')` – bara i `src/native/widget.ts`.
+Registreras i Android-appen själv (`MainActivity.onCreate`, före `super.onCreate`) och i
+iPhone-appen i `LagomBridgeViewController.capacitorDidLoad()` (anropas inte förrän widgeten är
+påslagen, [avsnitt 8](#8-iphone--planen)). JS: `registerPlugin<LagomWidgetPlugin>('LagomWidget')` –
+bara i `src/native/widget.ts`.
 
 | Metod | Vad |
 | --- | --- |
@@ -155,9 +159,10 @@ Registreras i Android-appen själv (`MainActivity.onCreate`, före `super.onCrea
   döljer ändå alltid energisiffrorna när `mindful` är true, oavsett vad dagarna innehåller.
 - **Fastan:** `startedAt` är ett heltal större än 0 (annars utelämnar JS fastan – en ogiltig fasta
   skulle annars få widgeten att avvisa hela datan). Widgeten räknar själv upp tiden.
-- **Widgetens kontroll** (`WidgetPayload.java`, `WidgetJson.java`): `v` måste vara 1, texterna
-  högst 200 tecken, högst 31 dagar, giltiga datum, högst 8 nivåer djup. **Okända fält godtas och
-  ignoreras**, så att ett nytt valfritt fält inte får en äldre widget att sluta fungera.
+- **Widgetens kontroll** (`WidgetPayload.java`, `WidgetJson.java`; på iPhone `WidgetPayload.swift`
+  med samma regler): `v` måste vara 1, texterna högst 200 tecken (UTF-16-enheter), högst 31 dagar,
+  giltiga datum, högst 8 nivåer djup. **Okända fält godtas och ignoreras**, så att ett nytt valfritt
+  fält inte får en äldre widget att sluta fungera.
 - En hel sammanfattning är i praktiken under 4 096 tecken, även efter ett års dagbok.
 
 ### Länkarna från widgeten
@@ -255,6 +260,7 @@ Att tänka på:
 | `android/app/src/test/java/se/lagomappen/lagom/widget/` | JUnit-testerna för det som inte behöver Android – `WidgetPayloadTest`, `WidgetViewTest`, `WidgetLayoutTest`, `WidgetLinksTest` (`cd android && ./gradlew testDebugUnitTest`; kontrollbygget kör `:app:testDebugUnitTest`) |
 | `android/app/src/main/res/` | `layout/lagom_widget.xml`, `layout/lagom_widget_preview.xml`, `xml/lagom_widget_info.xml`, `values/widget_colors.xml` (+ `values-night/`), `values/widget_dimens.xml`, `drawable/widget_*` (+ `drawable-v31/`), texterna i `values/strings.xml` |
 | `android/app/src/main/AndroidManifest.xml` | `<receiver android:name=".widget.LagomWidgetProvider" android:exported="false">` |
+| `ios/App/LagomWidget/`, `ios/App/App/LagomWidgetPlugin.swift`, `ios/App/LagomWidgetTests/`, `scripts/ios-widget.mjs` | iPhone-widgeten (avslagen) – se [avsnitt 8](#8-iphone--planen) |
 
 ## 7. Testa på en telefon
 
@@ -293,13 +299,22 @@ på telefonen och tillåt installation från okända källor). Prova:
 
 ## 8. iPhone – planen
 
-**Varför den är av:** en iPhone-widget är ett eget *app extension*-mål (WidgetKit) med ett eget
-Bundle ID. Appen och widgeten kan bara dela data genom en **App Group**, som måste finnas i ägarens
-Apple Developer-konto och vara påslagen för båda Bundle ID:na – och finnas i båda
-signeringsprofilerna. Så länge den inte finns skulle molnbygget inte kunna signera appen alls
-(profilen saknar `com.apple.security.application-groups`), och hela iPhone-appen skulle stoppas.
-Därför finns varken målet, tillägget eller behörigheten i `ios/` ännu, och `WIDGET_IOS_READY`
-är `false`. Allt slås på i **samma** ändring, när stegen nedan är gjorda.
+**Läget:** iPhone-widgeten finns i koden men är **avslagen**. En iPhone-widget är ett eget *app
+extension*-mål (WidgetKit) med ett eget Bundle ID, och appen och widgeten kan bara dela data genom
+en **App Group**, som måste finnas i ägarens Apple Developer-konto, vara påslagen för båda Bundle
+ID:na och finnas i båda signeringsprofilerna. Så länge den inte finns skulle en app som bäddar in
+widgeten inte gå att signera, och hela iPhone-appen skulle stoppas. Därför gäller i dag:
+
+- Målet `LagomWidgetExtension` finns i Xcode-projektet och byggs i kontrollbygget, men appmålet
+  beror inte på det och bäddar inte in det (ingen `PBXTargetDependency`, ingen kopieringsfas).
+- `App.entitlements` saknar `com.apple.security.application-groups`.
+- `WIDGET_IOS_READY` i `src/native/widget.ts` är `false`: på iPhone gör JS-modulen ingenting, och
+  tillägget `LagomWidget` kompileras in i appen men anropas aldrig (utan App Group avvisar det
+  `update` med `STORAGE`).
+
+De tre ändras alltid tillsammans med **`node scripts/ios-widget.mjs enable`** (se sist i avsnittet).
+`node scripts/ios-widget.mjs status` skriver `på` eller `av`, och `check` stoppar med ett svenskt fel
+när de tre inte stämmer (halvvägs påslagen). Båda tar `--root=<katalog>`.
 
 ### Utformning
 
@@ -307,71 +322,79 @@ Därför finns varken målet, tillägget eller behörigheten i `ios/` ännu, och
   `src/native/widget.ts` på iPhone exakt det den gör på Android (`widgetSupported()`).
 - Storlekarna `systemSmall` och `systemMedium` på hemskärmen – **inte** låsskärmens
   `accessory`-storlekar. StandBy (laddning i liggande läge, synligt för andra i rummet) undantas med
-  `.disfavoredLocations([.standBy], for: [.systemSmall])` (iOS 17 och senare, bakom en
-  tillgänglighetskontroll – appen stöder iOS 16.4).
-- Namn och beskrivning: `.configurationDisplayName("Idag")` och `.description("Dagens energi,
-  måltider och vatten – och en knapp för att lägga till.")`, svenska som utvecklingsspråk.
-- Samma regler som på Android: medvetet läge döljer energin, exempeldata visas aldrig, texterna
-  kommer färdiga från appen.
+  `.disfavoredLocations([.standBy], for: [.systemSmall])`, och siffrorna och staplarna är
+  `privacySensitive()`.
+- Widgetmålet kräver **iOS 17** (`IPHONEOS_DEPLOYMENT_TARGET = 17.0`; appen stöder fortfarande
+  16.4), så `.containerBackground(for: .widget)` och `disfavoredLocations` används utan
+  tillgänglighetskontroller. På iOS 16 finns ingen widget att välja – appen fungerar som vanligt.
+- Namn och beskrivning som på Android: `.configurationDisplayName("Idag")` och `.description("Dagens
+  energi, måltider och vatten – och en knapp för att lägga till.")`, svenska som utvecklingsspråk.
+- Samma regler som på Android (`WidgetContent.swift` motsvarar `WidgetView.java`): medvetet läge
+  döljer energin, exempeldata och ingen profil ger bara texten utan knapp, en tom text döljer sin
+  rad, och valfria rader som inte får plats tas bort i prioritetsordning (energidetaljen, måltider,
+  fasta, vatten) med `ViewThatFits`. Färgerna kommer från widgetens asset-katalog – samma som
+  `values/widget_colors.xml`, ljust och mörkt. Fastan räknar upp med `Text(start, style: .timer)`.
+- **Tidslinjen:** en post nu och en vid varje lokal midnatt då datan har en ny dag (och midnatten
+  efter den sista, då `fallbackText` visas), med policyn `.never` – appen ber WidgetKit ladda om
+  tidslinjen varje gång den skickar ny data. Datumen jämförs i den gregorianska kalendern i
+  telefonens tidszon, och dygnens början räknas från kl. 12 så att sommartiden blir rätt. Byter
+  telefonen tidszon står de uträknade midnätterna kvar tills appen skickar ny data (Android ritar om
+  var 30:e minut).
 
 ### Koden
 
-1. **Tillägget i appen** – `ios/App/App/LagomWidgetPlugin.swift`: `LagomWidgetPlugin: CAPPlugin,
-   CAPBridgedPlugin` med `identifier = "LagomWidgetPlugin"`, `jsName = "LagomWidget"` och metoderna
-   `update` och `clear` (`CAPPluginReturnPromise`). `update` avvisar data som är längre än 32 768
-   tecken eller inte går att avkoda (samma kontroll som på Android; den förra datan ligger kvar),
-   sparar texten i `UserDefaults(suiteName: "group.se.lagomappen.lagom")` under nyckeln
-   `payload` och anropar `WidgetCenter.shared.reloadAllTimelines()`. `clear` tar bort nyckeln och
-   ritar om.
-2. **Registrera tillägget** – en egen `LagomBridgeViewController: CAPBridgeViewController` med
-   `override open func capacitorDidLoad() { bridge?.registerPluginInstance(LagomWidgetPlugin()) }`,
-   och `SceneDelegate.swift` använder den i stället för `CAPBridgeViewController()`.
-3. **Widgeten** – en ny mapp `ios/App/LagomWidget/`: `LagomWidgetBundle.swift` (`@main`),
-   `LagomWidget.swift` (`StaticConfiguration`, `kind` "LagomWidget"; `TimelineProvider` som läser
-   App Group-datan och lägger en post vid varje lokal midnatt för de sju dagarna, med
-   `fallbackText` efter den sista), `WidgetPayload.swift` (en `Codable`-modell som ingår i både
-   appen och widgeten), vyerna i SwiftUI med designsystemets färger i en egen asset-katalog (ljust
-   och mörkt), `.containerBackground(for: .widget)` (krävs från iOS 17, bakom `if #available`),
-   fastan med `Text(start, style: .timer)`, `Info.plist` med `NSExtension` →
-   `NSExtensionPointIdentifier` = `com.apple.widgetkit-extension`, och `LagomWidget.entitlements`.
-4. **Länkarna** – `widgetURL(URL(string: "lagom-widget://idag"))` för hela widgeten och
-   `Link(destination: URL(string: "lagom-widget://lagg-till")!)` för knappen i `systemMedium` (i
-   `systemSmall` är hela widgeten ett tryck, till Idag). De kommer fram via `SceneDelegateProxy` i
-   `SceneDelegate.swift` – `scene(_:openURLContexts:)` när appen körs och
-   `connectionOptions.urlContexts` vid kallstart – som `appUrlOpen` och `App.getLaunchUrl()`, som
-   redan finns. Enligt Apples dokumentation öppnar `widgetURL` och `Link` alltid appen som widgeten
-   hör till; prova på en telefon att länken kommer fram utan att schemat registreras i
-   `CFBundleURLTypes`. Behövs det: registrera `lagom-widget` – andra appar kan då också öppna
-   länkarna, men de leder ändå bara till `/` och `/lagg-till`.
-5. **Behörigheterna** – `com.apple.security.application-groups` = `[group.se.lagomappen.lagom]` i
-   både `App.entitlements` och `LagomWidget.entitlements`.
-6. **Integritetsmanifest** – appens `PrivacyInfo.xcprivacy` får UserDefaults-skälet `1C8F.1`
-   (delade UserDefaults i en App Group) utöver `CA92.1`, och widgeten får ett eget
-   `PrivacyInfo.xcprivacy` med samma skäl och ingen insamlad data.
+| Fil | Mål | Vad |
+| --- | --- | --- |
+| `ios/App/App/LagomWidgetPlugin.swift` | App | Tillägget `LagomWidget` (`CAPBridgedPlugin`, `update` och `clear`, samma felkoder som på Android). `update` avvisar saknad data (`INVALID`), för stor data (`TOO_LARGE`, räknat i UTF-16-enheter som i JS och Java) och ogiltig data (`INVALID`, samma kontroll som på Android) – den förra datan ligger då kvar. Annars sparas texten i App Groupens `UserDefaults` under nyckeln `payload` och `WidgetCenter.shared.reloadTimelines(ofKind: "LagomWidget")` anropas. Utan App Group: `STORAGE`. `clear` tar bort nyckeln och ritar om. |
+| `ios/App/App/LagomBridgeViewController.swift`, `SceneDelegate.swift` | App | Registrerar tillägget i `capacitorDidLoad()`, före sidans första laddning; `SceneDelegate` använder den i stället för `CAPBridgeViewController()`. |
+| `ios/App/LagomWidget/WidgetShared.swift` | App + widget | App Group, nyckeln, 32 768 tecken, `kind` och länkarna. `sharedDefaults()` ger `nil` när gruppens behållare saknas (behörigheten finns inte i bygget). |
+| `ios/App/LagomWidget/WidgetPayload.swift` | App + widget | Modellen och `WidgetPayload.parse(_:)` – en egen strikt JSON-tolkare (RFC 8259) med samma regler som `WidgetPayload.java`/`WidgetJson.java`, så att båda plattformarna godtar och avvisar samma data. Felen (`WidgetPayloadError`) är fasta svenska texter som aldrig citerar datan. |
+| `ios/App/LagomWidget/WidgetContent.swift` | widget | Vad som visas vid en tidpunkt och tidslinjens poster – bara Foundation. |
+| `ios/App/LagomWidget/LagomTodayWidget.swift`, `TodayWidgetView.swift`, `LagomWidgetBundle.swift` | widget | `TimelineProvider` och widgeten "Idag", vyerna i SwiftUI och `@main`. |
+| `ios/App/LagomWidget/Assets.xcassets`, `PrivacyInfo.xcprivacy` | widget (resurser) | Färgerna (bl.a. `AccentColor` och `WidgetBackground`, som bygginställningarna pekar på) och widgetens integritetsmanifest (UserDefaults-skälet `1C8F.1`, ingen insamlad data). |
+| `ios/App/LagomWidget/Info.plist`, `LagomWidget.entitlements` | widget (bygginställningar, ingen byggfas) | `NSExtension` → `NSExtensionPointIdentifier` = `com.apple.widgetkit-extension`; App Group i widgetens behörigheter. |
+| `ios/App/App/PrivacyInfo.xcprivacy` | App | UserDefaults-skälen `CA92.1` och `1C8F.1` (delade UserDefaults i en App Group). |
+| `ios/App/LagomWidgetTests/` | – | Swift-testerna: `main.swift` och facitfilerna i `fixtures/`, som `src/native/widgetIosFixtures.test.ts` skriver ur `buildWidgetPayload`. Inte i Xcode-projektet. |
+| `scripts/ios-widget.mjs`, `scripts/pbxproj.mjs` | – | `status`, `check` och `enable`, och läsaren för projektfilen. Testerna: `netlify/tests/ios-widget.test.ts` och `src/native/iosWidgetCi.test.ts`. |
 
-### Lägga till målet utan Mac
+Målet i `project.pbxproj` (nya id:n börjar med `7A1D6E0`): `LagomWidgetExtension`
+(`com.apple.product-type.app-extension`, produkten `LagomWidgetExtension.appex`),
+`PRODUCT_BUNDLE_IDENTIFIER = se.lagomappen.lagom.widget`, `IPHONEOS_DEPLOYMENT_TARGET = 17.0`,
+`TARGETED_DEVICE_FAMILY = 1`, `APPLICATION_EXTENSION_API_ONLY = YES`, `SKIP_INSTALL = YES`,
+`SWIFT_VERSION = 5.0`, `WidgetKit.framework` och `SwiftUI.framework`. `MARKETING_VERSION` och
+`CURRENT_PROJECT_VERSION` är desamma som appens – molnbygget skickar dem till alla mål, och App Store
+kräver att widgeten har samma som appen. En ny fil i `ios/App/LagomWidget/` eller en ny Swift-fil i
+`ios/App/App/` måste också in i projektfilen (testet kontrollerar det). XcodeGen och Tuist avråds:
+de skriver om hela projektet som Capacitor har skapat.
 
-Xcode-projektet (`ios/App/App.xcodeproj/project.pbxproj`) är en textfil och kan ändras utan Mac:
+**Länkarna** – `widgetURL(lagom-widget://idag)` för hela widgeten och
+`Link(destination: lagom-widget://lagg-till)` för knappen i `systemMedium` (i `systemSmall` är hela
+widgeten ett tryck, till Idag). De kommer fram via `SceneDelegateProxy` i `SceneDelegate.swift` –
+`scene(_:openURLContexts:)` när appen körs och `connectionOptions.urlContexts` vid kallstart – som
+`appUrlOpen` och `App.getLaunchUrl()`. iOS spelar inte upp länkar igen när en scen återställs, så
+inget som `WidgetLinks.isReplayedLink` behövs. Enligt Apples dokumentation öppnar `widgetURL` och
+`Link` alltid appen som widgeten hör till; prova på en telefon att länken kommer fram utan att
+schemat registreras i `CFBundleURLTypes`. Behövs det: registrera `lagom-widget` – andra appar kan då
+också öppna länkarna, men de leder ändå bara till `/` och `/lagg-till`.
 
-- **Rekommenderat: för hand i en egen ändring** – ett nytt `PBXNativeTarget` "LagomWidgetExtension"
-  (`productType = "com.apple.product-type.app-extension"`) med fasta 24-teckens id:n, källor och
-  resurser (`PBXSourcesBuildPhase`, `PBXResourcesBuildPhase`), `WidgetKit.framework` och
-  `SwiftUI.framework`, byggkonfigurationer för Debug och Release (`PRODUCT_BUNDLE_IDENTIFIER =
-  se.lagomappen.lagom.widget`, `INFOPLIST_FILE`, `CODE_SIGN_ENTITLEMENTS`,
-  `IPHONEOS_DEPLOYMENT_TARGET = 16.4`, `TARGETED_DEVICE_FAMILY = 1`, `SKIP_INSTALL = YES`,
-  `APPLICATION_EXTENSION_API_ONLY = YES`), och i appmålet ett `PBXTargetDependency` och en
-  kopieringsfas "Embed Foundation Extensions" (`dstSubfolderSpec = 13`, PlugIns). Versionen och
-  byggnumret följer med automatiskt: molnbygget skickar `MARKETING_VERSION` och
-  `CURRENT_PROJECT_VERSION` till alla mål, och App Store kräver att widgeten har samma som appen.
-- **Kontrollera i CI:** simulatorbygget i `native.yml` bygger widgeten som beroende till schemat
-  `App`; lägg till `xcodebuild -list` (målet finns) och i `release.yml`/`codemagic.yaml` en kontroll
-  av IPA:n: `Payload/App.app/PlugIns/LagomWidgetExtension.appex` finns, har Bundle ID
-  `se.lagomappen.lagom.widget` och App Group-behörigheten – precis som HealthKit kontrolleras i dag.
-  `src/native/storeBuilds.test.ts` kan kontrollera projektfilen och behörigheterna.
-- **Alternativ:** en hyrd Mac i molnet en timme (Xcode → File → New → Target → Widget Extension)
-  och sedan checka in resultatet. Xcode 16 och senare skapar nya mål med synkroniserade mappar –
-  kontrollera efteråt att `npx cap sync ios` och molnbyggena fungerar som förut. XcodeGen och Tuist
-  avråds: de skriver om hela projektet som Capacitor har skapat.
+### Kontrolleras i CI
+
+Swift och Xcode finns inte lokalt – Swift-koden kompileras först i molnbygget.
+
+- **`native.yml`, jobbet *iPhone-widgetens logik (Swift på Linux)*** – vid varje körning, som
+  Android-kontrollen. De tre filerna använder bara Foundation (även på Linux):
+  `swiftc -o "$OUT" ios/App/LagomWidget/WidgetShared.swift ios/App/LagomWidget/WidgetPayload.swift ios/App/LagomWidget/WidgetContent.swift ios/App/LagomWidgetTests/main.swift`
+  och sedan `"$OUT" ios/App/LagomWidgetTests/fixtures` (slutkod 0 när allt gick igenom).
+- **`native.yml`, iPhone-bygget** (på begäran), efter det vanliga appbygget: samma Swift-tester på
+  macOS, widgetmålet för sig
+  (`xcodebuild -project ios/App/App.xcodeproj -target LagomWidgetExtension -configuration Debug -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build`)
+  och appen med widgeten inbäddad – påslagen med `enable` bara i molnets utcheckning, aldrig
+  incheckad – med kontroll av Bundle ID, tilläggspunkt, version och byggnummer i
+  `App.app/PlugIns/LagomWidgetExtension.appex`.
+- **`release.yml` och `codemagic.yaml`** läser läget en gång (`check`, sedan `status`) innan något
+  ändrar projektet. `på`: även profilen för `se.lagomappen.lagom.widget` hämtas, och IPA:n ska
+  innehålla widgeten med rätt Bundle ID, samma version och App Group i både appens och widgetens
+  signatur. `av`: IPA:n får inte innehålla widgeten. Halvvägs påslagen stoppar bygget.
 
 ### Signering och profiler
 
@@ -381,10 +404,12 @@ Xcode-projektet (`ios/App/App.xcodeproj/project.pbxproj`) är en textfil och kan
    Befintliga profiler blir ogiltiga – molnbygget skapar nya (`--create`).
 3. *Identifiers → + → App IDs → App*: *Explicit* `se.lagomappen.lagom.widget`, beskrivning "Lagom
    widget", förmågan **App Groups** med samma grupp. Inget annat (ingen HealthKit).
-4. **Molnbyggena** (`release.yml` och `codemagic.yaml`): ett andra anrop
+4. **Molnbyggena** (`release.yml` och `codemagic.yaml`) sköter resten när widgeten är på: ett andra
    `app-store-connect fetch-signing-files se.lagomappen.lagom.widget --platform IOS --type IOS_APP_STORE --strict-match-identifier --create`
-   före `xcode-project use-profiles`, som sedan kopplar båda profilerna till rätt mål efter Bundle
-   ID. App Store Connect API-nyckeln och certifikatnyckeln är desamma – inga nya hemligheter.
+   före `xcode-project use-profiles`, som kopplar varje profil till sitt mål efter Bundle ID. App
+   Store Connect API-nyckeln och certifikatnyckeln är desamma – inga nya hemligheter. Så länge
+   widgeten är av finns målet i projektet utan profil; `use-profiles` ska då bara hoppa över det
+   (kontrollera det i den första körningen efter den här ändringen).
 5. **App Store Connect:** widgeten följer med i appen – ingen egen app och inga nya produkter.
    App Privacy är oförändrad (inget lämnar telefonen).
 6. **Testa i TestFlight** enligt [avsnitt 7](#7-testa-på-en-telefon) (på iPhone: håll fingret på
@@ -393,14 +418,18 @@ Xcode-projektet (`ios/App/App.xcodeproj/project.pbxproj`) är en textfil och kan
 ### När iPhone-widgeten slås på – i samma ändring
 
 - [ ] Stegen under *Signering och profiler* är gjorda i ägarens konto.
-- [ ] Målet, tillägget, behörigheterna och integritetsmanifesten i `ios/`; CI-kontrollerna ovan.
-- [ ] `WIDGET_IOS_READY = true` i `src/native/widget.ts` (utan tillägget avvisas anropen och loggas
-      bara som fel).
+- [ ] `node scripts/ios-widget.mjs enable`: appmålet beror på widgetmålet och bäddar in det
+      ("Embed Foundation Extensions", PlugIns), App Group i `App.entitlements` och
+      `WIDGET_IOS_READY = true`. Skriptet vägrar om widgeten redan är på eller halvvägs och skriver
+      ut det som återstår.
 - [ ] Integritetspolicyn: en rad i `appStore`-variantens lagringstabell (App Group-behållaren,
       delad mellan appen och widgeten) och ett stycke under "Din dagbok finns bara på din enhet" –
-      utan att nämna Android. Kör `npx vitest run src/features/legal -u`.
-- [ ] APP-STORE.md: widgeten i beskrivningen (och "Nyheter"), NATIVE.md §5 och §8, supportsidan
-      och CLAUDE.md.
+      utan att nämna Android. Ändra testet i `src/features/legal/legal.test.tsx` (som i dag kräver
+      att iPhone-texten saknar widgeten) och kör `npx vitest run src/features/legal -u`.
+- [ ] APP-STORE.md: widgeten i beskrivningen (och "Nyheter"), NATIVE.md §5 och §8, supportsidan,
+      det här avsnittet och CLAUDE.md.
+- [ ] `npx vitest run netlify/tests/ios-widget.test.ts src/native src/features/legal` och
+      `node scripts/ios-widget.mjs check`.
 - [ ] Provat i TestFlight.
 
 ## 9. Ändra widgeten
@@ -416,7 +445,12 @@ Xcode-projektet (`ios/App/App.xcodeproj/project.pbxproj`) är en textfil och kan
 - **Nya länkar** kräver en ändring på båda sidor: `WIDGET_LINKS` i `src/native/widget.ts` och
   `WidgetLinks.java` (`widgetAndroid.test.ts` jämför dem). De leder bara till sidor som man ändå
   når i appen – vem som helst kan skicka dem till `MainActivity`.
+- **Båda plattformarna:** kontrollen av datan och vad som visas finns både i Java
+  (`android/…/widget/`) och i Swift (`ios/App/LagomWidget/`) – ändra dem tillsammans, så att de
+  godtar och visar samma sak.
 - **Testerna:** `npx vitest run src/lib/widgetSummary.test.ts src/native/widget.test.ts
-  src/native/widgetAndroid.test.ts` och JUnit-testerna i `android/app/src/test/`.
+  src/native/widgetAndroid.test.ts` och JUnit-testerna i `android/app/src/test/`. Ändras texterna
+  eller formatet: skriv om Swift-testernas facitfiler med
+  `npx vitest run src/native/widgetIosFixtures.test.ts -u` (Swift-testerna körs i molnbygget).
 - **Ny data i widgeten** → uppdatera integritetspolicyns rad (webben och Play), avsnitt 5 här,
   supportsidan (`public/support/index.html`) och vid behov Data safety.

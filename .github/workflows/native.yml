@@ -11,6 +11,12 @@
 # (Actions → Native-appar → Run workflow → "Bygg även iPhone-appen"). Android-kontrollen körs på
 # Linux när något som påverkar appskalet ändras.
 #
+# iPhone-widgeten (docs/WIDGET.md §8) är av tills App Group finns i Apple-kontot, men koden
+# kontrolleras ändå: logiken (ios/App/LagomWidgetTests, Swift utan Xcode) på Linux tillsammans med
+# Android-kontrollen, och i iPhone-bygget även widgetmålet för sig och appen med widgeten inbäddad –
+# påslagen med node scripts/ios-widget.mjs enable bara i molnets utcheckning, efter det vanliga
+# appbygget.
+#
 # OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
 name: Native-appar
 
@@ -36,6 +42,8 @@ on:
       - scripts/commerce-guard.ts
       - scripts/native-config.mjs
       - scripts/check-android-16kb.mjs
+      - scripts/ios-widget.mjs
+      - scripts/pbxproj.mjs
       - .github/workflows/native.yml
   push:
     branches: [main]
@@ -52,6 +60,8 @@ on:
       - scripts/commerce-guard.ts
       - scripts/native-config.mjs
       - scripts/check-android-16kb.mjs
+      - scripts/ios-widget.mjs
+      - scripts/pbxproj.mjs
       - .github/workflows/native.yml
 
 permissions:
@@ -124,11 +134,42 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
+  # Widgetens logik (datan, vad som visas och tidslinjen) är ren Foundation och kompileras med
+  # swiftc även på Linux – billigt nog att köras varje gång. Samma kommando körs på macOS i
+  # iPhone-bygget.
+  ios-widget-logik:
+    name: iPhone-widgetens logik (Swift på Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Swift finns på maskinen
+        run: |
+          if ! command -v swiftc > /dev/null; then
+            echo "::error::swiftc saknas på GitHubs Linux-maskin (ubuntu-latest) – widgetens Swift-tester kan inte köras. Se programlistan i github.com/actions/runner-images; installera Swift i ett eget steg om den har tagits bort."
+            exit 1
+          fi
+          swiftc --version
+
+      - name: Widget – logiktester (swiftc)
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/lagom-widget-tests"
+          swiftc -o "$out" \
+            ios/App/LagomWidget/WidgetShared.swift \
+            ios/App/LagomWidget/WidgetPayload.swift \
+            ios/App/LagomWidget/WidgetContent.swift \
+            ios/App/LagomWidgetTests/main.swift
+          "$out" ios/App/LagomWidgetTests/fixtures
+
   ios:
     name: iPhone (simulatorbygge utan signering)
     if: github.event_name == 'workflow_dispatch' && inputs.ios
     runs-on: macos-26
-    timeout-minutes: 60
+    # Appen byggs två gånger (utan och med widgeten) plus widgetmålet för sig.
+    timeout-minutes: 75
     steps:
       - name: Hämta koden
         uses: actions/checkout@v7
@@ -170,3 +211,76 @@ jobs:
           path: ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
           if-no-files-found: ignore
           retention-days: 14
+
+      # iPhone-widgeten (docs/WIDGET.md §8). Stegen nedan kommer efter appbygget ovan, som alltid
+      # bygger repots läge (i dag utan widgeten).
+      - name: Widget – logiktester (swiftc)
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/lagom-widget-tests"
+          swiftc -o "$out" \
+            ios/App/LagomWidget/WidgetShared.swift \
+            ios/App/LagomWidget/WidgetPayload.swift \
+            ios/App/LagomWidget/WidgetContent.swift \
+            ios/App/LagomWidgetTests/main.swift
+          "$out" ios/App/LagomWidgetTests/fixtures
+
+      - name: Widget – bygg målet för simulatorn
+        run: >-
+          xcodebuild -project ios/App/App.xcodeproj -target LagomWidgetExtension -configuration Debug
+          -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+
+      # Widgeten slås på bara i den här utcheckningen (ändringen checkas aldrig in) och appen byggs
+      # om i en egen DerivedData-mapp: så syns det redan nu om appen inte går att bygga med widgeten
+      # inbäddad. Webbdelen är byggd med WIDGET_IOS_READY = false – här prövas bara appskalet.
+      - name: Widget påslagen – bygg appen med widgeten inbäddad
+        run: |
+          set -euo pipefail
+          if ! node scripts/ios-widget.mjs check; then
+            echo "::error::iPhone-widgeten är halvvägs påslagen (se felet ovan) – projektfilen, App.entitlements och WIDGET_IOS_READY ska vara på eller av tillsammans (docs/WIDGET.md §8)."
+            exit 1
+          fi
+          WIDGET="$(node scripts/ios-widget.mjs status)"
+          echo "iPhone-widgeten i repot: $WIDGET"
+          where="Widgeten är påslagen i repot."
+          if [ "$WIDGET" = "av" ]; then
+            # Utskriftens lista gäller den riktiga påslagningen, inte den här körningen.
+            node scripts/ios-widget.mjs enable > /dev/null
+            echo "Widgeten är påslagen i den här utcheckningen (checkas aldrig in)."
+            where="I repot är widgeten av – den slogs på bara i den här körningen."
+          fi
+          derived="$RUNNER_TEMP/lagom-widget-pa"
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO build
+          app="$derived/Build/Products/Debug-iphonesimulator/App.app"
+          plist="$app/PlugIns/LagomWidgetExtension.appex/Info.plist"
+          if [ ! -f "$plist" ]; then
+            echo "::error::Appen byggdes, men widgeten är inte inbäddad: App.app/PlugIns/LagomWidgetExtension.appex/Info.plist saknas. Kontrollera beroendet och kopieringsfasen \"Embed Foundation Extensions\" i appmålet (scripts/ios-widget.mjs)."
+            exit 1
+          fi
+          id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist" 2>/dev/null || true)"
+          point="$(/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$plist" 2>/dev/null || true)"
+          echo "Widgeten i appen: $id ($point)"
+          if [ "$id" != "se.lagomappen.lagom.widget" ]; then
+            echo "::error::Widgeten har fel Bundle ID: \"$id\" (väntade se.lagomappen.lagom.widget – PRODUCT_BUNDLE_IDENTIFIER i målet LagomWidgetExtension)."
+            exit 1
+          fi
+          if [ "$point" != "com.apple.widgetkit-extension" ]; then
+            echo "::error::Widgetens NSExtension → NSExtensionPointIdentifier är \"$point\", inte com.apple.widgetkit-extension (ios/App/LagomWidget/Info.plist)."
+            exit 1
+          fi
+          # App Store kräver samma version och byggnummer i widgeten som i appen.
+          for key in CFBundleShortVersionString CFBundleVersion; do
+            in_app="$(/usr/libexec/PlistBuddy -c "Print :$key" "$app/Info.plist" 2>/dev/null || true)"
+            in_widget="$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true)"
+            if [ -z "$in_app" ] || [ "$in_app" != "$in_widget" ]; then
+              echo "::error::$key skiljer sig: appen \"$in_app\", widgeten \"$in_widget\". Widgetmålet ska ha samma MARKETING_VERSION och CURRENT_PROJECT_VERSION som appen."
+              exit 1
+            fi
+          done
+          {
+            echo "### iPhone-widgeten"
+            echo
+            echo "Appen byggdes för simulatorn med widgeten inbäddad ($id). $where"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -28,7 +28,13 @@
  *   följs bara vid sidans första laddning, inte efter en omladdning (`pageWasReloaded()`). Länkar
  *   som Android spelar upp igen när aktiviteten återskapas tar MainActivity bort
  *   (`WidgetLinks.isReplayedLink`).
- * - iPhone: inte ännu (`WIDGET_IOS_READY`, se docs/WIDGET.md) – där gör modulen ingenting.
+ * - iPhone: widgeten (ios/App/LagomWidget/) och tillägget (ios/App/App/LagomWidgetPlugin.swift –
+ *   samma kontrakt och samma kontroll av datan som på Android) finns i koden men är avslagna tills
+ *   App Group "group.se.lagomappen.lagom" finns i ägarens Apple-konto. Då slås allt på med
+ *   `node scripts/ios-widget.mjs enable` (docs/WIDGET.md §8); så länge `WIDGET_IOS_READY` är false
+ *   gör modulen ingenting på iPhone. Där ligger datan i App Groupens UserDefaults (nyckeln
+ *   "payload"), och länkarna kommer via SceneDelegate som 'appUrlOpen' och `App.getLaunchUrl()` –
+ *   iOS spelar inte upp dem igen när appen återskapas.
  * - "Radera all data" tömmer widgeten med `clearWidget()` (features/settings/wipe.ts).
  * - Inget här kastar: fel loggas med `logError(error, 'native:widget')`.
  *
@@ -48,7 +54,10 @@ import { useProfileStore } from '../stores/profileStore'
 import { isMemoryOnlyStorage, subscribeStorageStatus } from '../stores/storage'
 import { nativePlatform } from './index'
 
-/** Det lokala tillägget i Android-appen (android/app/src/main/java/…). */
+/**
+ * Det lokala tillägget i apparna: android/app/src/main/java/…/widget/LagomWidgetPlugin.java och
+ * ios/App/App/LagomWidgetPlugin.swift (samma namn, metoder och felkoder).
+ */
 export interface LagomWidgetPlugin {
   /** Spara JSON-texten för `WidgetPayload` och rita om alla widgetar. Avvisar ogiltig data. */
   update(options: { data: string }): Promise<void>
@@ -59,9 +68,11 @@ export interface LagomWidgetPlugin {
 export const LagomWidget = registerPlugin<LagomWidgetPlugin>('LagomWidget')
 
 /**
- * iPhone-widgeten (WidgetKit med App Group "group.se.lagomappen.lagom") finns inte ännu – den kräver
- * App Groups på ägarens Apple-konto (docs/WIDGET.md). Så länge den är false gör modulen ingenting
- * på iPhone.
+ * iPhone-widgeten (WidgetKit med App Group "group.se.lagomappen.lagom") finns i koden men är
+ * avslagen – den kräver App Groups på ägarens Apple-konto. Ändra inte raden för hand: den slås på
+ * tillsammans med Xcode-projektet och App.entitlements med `node scripts/ios-widget.mjs enable`
+ * (docs/WIDGET.md §8), och molnbyggena stoppar när de tre inte stämmer (`check`). Så länge den är
+ * false gör modulen ingenting på iPhone.
  */
 export const WIDGET_IOS_READY: boolean = false
 

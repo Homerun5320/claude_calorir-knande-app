@@ -18,6 +18,20 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		1A6E0B0D2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1A6E0B0C2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy */; };
 		1A6E0B112E8A4F0100C0FFEE /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1A6E0B102E8A4F0100C0FFEE /* Localizable.strings */; };
+		7A1D6E022EA0C0DE00000001 /* LagomWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000001 /* LagomWidgetBundle.swift */; };
+		7A1D6E022EA0C0DE00000002 /* LagomTodayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000002 /* LagomTodayWidget.swift */; };
+		7A1D6E022EA0C0DE00000003 /* TodayWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000003 /* TodayWidgetView.swift */; };
+		7A1D6E022EA0C0DE00000004 /* WidgetContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000004 /* WidgetContent.swift */; };
+		7A1D6E022EA0C0DE00000005 /* WidgetPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000005 /* WidgetPayload.swift */; };
+		7A1D6E022EA0C0DE00000006 /* WidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000006 /* WidgetShared.swift */; };
+		7A1D6E022EA0C0DE00000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000007 /* Assets.xcassets */; };
+		7A1D6E022EA0C0DE00000008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000008 /* PrivacyInfo.xcprivacy */; };
+		7A1D6E022EA0C0DE0000000C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE0000000C /* WidgetKit.framework */; };
+		7A1D6E022EA0C0DE0000000D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE0000000D /* SwiftUI.framework */; };
+		7A1D6E022EA0C0DE00000015 /* WidgetPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000005 /* WidgetPayload.swift */; };
+		7A1D6E022EA0C0DE00000016 /* WidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE00000006 /* WidgetShared.swift */; };
+		7A1D6E022EA0C0DE0000001E /* LagomWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE0000000E /* LagomWidgetPlugin.swift */; };
+		7A1D6E022EA0C0DE0000001F /* LagomBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D6E012EA0C0DE0000000F /* LagomBridgeViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +49,21 @@
 		1A6E0B0C2E8A4F0100C0FFEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1A6E0B0E2E8A4F0100C0FFEE /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		1A6E0B0F2E8A4F0100C0FFEE /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Localizable.strings; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000001 /* LagomWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LagomWidgetBundle.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000002 /* LagomTodayWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LagomTodayWidget.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000003 /* TodayWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayWidgetView.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000004 /* WidgetContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetContent.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000005 /* WidgetPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPayload.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000006 /* WidgetShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetShared.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE00000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE0000000A /* LagomWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LagomWidget.entitlements; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE0000000B /* LagomWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LagomWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A1D6E012EA0C0DE0000000C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		7A1D6E012EA0C0DE0000000D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		7A1D6E012EA0C0DE0000000E /* LagomWidgetPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LagomWidgetPlugin.swift; sourceTree = "<group>"; };
+		7A1D6E012EA0C0DE0000000F /* LagomBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LagomBridgeViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +75,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A1D6E032EA0C0DE00000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A1D6E022EA0C0DE0000000C /* WidgetKit.framework in Frameworks */,
+				7A1D6E022EA0C0DE0000000D /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -54,6 +92,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				7A1D6E032EA0C0DE00000001 /* LagomWidget */,
+				7A1D6E032EA0C0DE00000002 /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,6 +102,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				7A1D6E012EA0C0DE0000000B /* LagomWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -72,6 +113,8 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				7A1D6E012EA0C0DE0000000F /* LagomBridgeViewController.swift */,
+				7A1D6E012EA0C0DE0000000E /* LagomWidgetPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -83,6 +126,32 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		7A1D6E032EA0C0DE00000001 /* LagomWidget */ = {
+			isa = PBXGroup;
+			children = (
+				7A1D6E012EA0C0DE00000001 /* LagomWidgetBundle.swift */,
+				7A1D6E012EA0C0DE00000002 /* LagomTodayWidget.swift */,
+				7A1D6E012EA0C0DE00000003 /* TodayWidgetView.swift */,
+				7A1D6E012EA0C0DE00000004 /* WidgetContent.swift */,
+				7A1D6E012EA0C0DE00000005 /* WidgetPayload.swift */,
+				7A1D6E012EA0C0DE00000006 /* WidgetShared.swift */,
+				7A1D6E012EA0C0DE00000007 /* Assets.xcassets */,
+				7A1D6E012EA0C0DE00000008 /* PrivacyInfo.xcprivacy */,
+				7A1D6E012EA0C0DE00000009 /* Info.plist */,
+				7A1D6E012EA0C0DE0000000A /* LagomWidget.entitlements */,
+			);
+			path = LagomWidget;
+			sourceTree = "<group>";
+		};
+		7A1D6E032EA0C0DE00000002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7A1D6E012EA0C0DE0000000C /* WidgetKit.framework */,
+				7A1D6E012EA0C0DE0000000D /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -108,6 +177,23 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7A1D6E032EA0C0DE00000006 /* LagomWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A1D6E032EA0C0DE00000007 /* Build configuration list for PBXNativeTarget "LagomWidgetExtension" */;
+			buildPhases = (
+				7A1D6E032EA0C0DE00000003 /* Sources */,
+				7A1D6E032EA0C0DE00000004 /* Frameworks */,
+				7A1D6E032EA0C0DE00000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LagomWidgetExtension;
+			productName = LagomWidgetExtension;
+			productReference = 7A1D6E012EA0C0DE0000000B /* LagomWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -121,6 +207,9 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+					};
+					7A1D6E032EA0C0DE00000006 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -141,6 +230,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				7A1D6E032EA0C0DE00000006 /* LagomWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -161,6 +251,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A1D6E032EA0C0DE00000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A1D6E022EA0C0DE00000007 /* Assets.xcassets in Resources */,
+				7A1D6E022EA0C0DE00000008 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -170,6 +269,23 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				7A1D6E022EA0C0DE0000001F /* LagomBridgeViewController.swift in Sources */,
+				7A1D6E022EA0C0DE0000001E /* LagomWidgetPlugin.swift in Sources */,
+				7A1D6E022EA0C0DE00000015 /* WidgetPayload.swift in Sources */,
+				7A1D6E022EA0C0DE00000016 /* WidgetShared.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1D6E032EA0C0DE00000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A1D6E022EA0C0DE00000001 /* LagomWidgetBundle.swift in Sources */,
+				7A1D6E022EA0C0DE00000002 /* LagomTodayWidget.swift in Sources */,
+				7A1D6E022EA0C0DE00000003 /* TodayWidgetView.swift in Sources */,
+				7A1D6E022EA0C0DE00000004 /* WidgetContent.swift in Sources */,
+				7A1D6E022EA0C0DE00000005 /* WidgetPayload.swift in Sources */,
+				7A1D6E022EA0C0DE00000006 /* WidgetShared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -364,6 +480,64 @@
 			};
 			name = Release;
 		};
+		7A1D6E032EA0C0DE00000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = LagomWidget/LagomWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LagomWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = se.lagomappen.lagom.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A1D6E032EA0C0DE00000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = LagomWidget/LagomWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LagomWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = se.lagomappen.lagom.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -381,6 +555,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A1D6E032EA0C0DE00000007 /* Build configuration list for PBXNativeTarget "LagomWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A1D6E032EA0C0DE00000008 /* Debug */,
+				7A1D6E032EA0C0DE00000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

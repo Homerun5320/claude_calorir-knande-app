@@ -25,6 +25,12 @@
 # laddat upp byggen från Codemagic eller för hand med högre nummer). Versionen (1.0.0) tas från
 # package.json för båda apparna; vid en tagg måste taggen vara v + versionen.
 #
+# iPhone-widgeten (docs/WIDGET.md §8) är av tills App Group finns i Apple-kontot. Läget läses en
+# gång med node scripts/ios-widget.mjs status: "på" – även widgetens profil
+# (se.lagomappen.lagom.widget) hämtas, och IPA:n ska innehålla widgeten med samma version och
+# App Group i båda signaturerna; "av" – IPA:n får inte innehålla den. Halvvägs påslagen stoppar
+# bygget.
+#
 # OBS: för att pusha ändringar i .github/workflows/ krävs en token med behörigheten "workflow".
 name: Butiksbyggen
 
@@ -325,6 +331,23 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # Läses en gång, innan något steg ändrar Xcode-projektet (xcode-project use-profiles skriver i
+      # det), och gäller sedan för signeringen och kontrollen av IPA:n.
+      - name: iPhone-widgeten – av eller på (scripts/ios-widget.mjs)
+        run: |
+          set -euo pipefail
+          if ! node scripts/ios-widget.mjs check; then
+            echo "::error title=iPhone-widgeten::Widgeten är halvvägs påslagen (se felet ovan) – projektfilen, App.entitlements och WIDGET_IOS_READY ska vara på eller av tillsammans. Återställ filerna eller slå på allt med node scripts/ios-widget.mjs enable (docs/WIDGET.md §8)."
+            exit 1
+          fi
+          WIDGET="$(node scripts/ios-widget.mjs status)"
+          case "$WIDGET" in
+            på|av) ;;
+            *) echo "::error title=iPhone-widgeten::Oväntat svar från node scripts/ios-widget.mjs status: \"$WIDGET\"."; exit 1 ;;
+          esac
+          echo "iPhone-widgeten: $WIDGET"
+          echo "LAGOM_WIDGET=$WIDGET" >> "$GITHUB_ENV"
+
       - name: Xcode 26 eller senare (App Store kräver iOS 26-SDK:n)
         run: |
           # Senaste stabila Xcode 26+ (betaversioner kan inte ladda upp till App Store).
@@ -366,6 +389,12 @@ jobs:
           # och en App Store-profil för Bundle ID:t med dess förmågor (HealthKit, köp i appen).
           app-store-connect fetch-signing-files "$LAGOM_APP_ID" \
             --platform IOS --type IOS_APP_STORE --strict-match-identifier --create
+          if [ "$LAGOM_WIDGET" = "på" ]; then
+            # Widgeten har ett eget Bundle ID och en egen profil (App Groups, ingen HealthKit) – samma
+            # certifikat. use-profiles kopplar sedan varje profil till sitt mål efter Bundle ID.
+            app-store-connect fetch-signing-files "$LAGOM_APP_ID.widget" \
+              --platform IOS --type IOS_APP_STORE --strict-match-identifier --create
+          fi
           keychain add-certificates
           if [ "$INTERN" = true ]; then
             xcode-project use-profiles --project ios/App/App.xcodeproj \
@@ -410,6 +439,53 @@ jobs:
             echo
             echo "Signerad för App Store med HealthKit."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Kontrollera IPA:n (iPhone-widgeten)
+        run: |
+          set -euo pipefail
+          app="$(find "$RUNNER_TEMP/ipa/Payload" -maxdepth 1 -name '*.app' | head -1)"
+          appex="$app/PlugIns/LagomWidgetExtension.appex"
+          group=group.se.lagomappen.lagom
+          if [ "$LAGOM_WIDGET" = "på" ]; then
+            if [ ! -d "$appex" ]; then
+              echo "::error title=iPhone-widgeten::Widgeten är påslagen, men IPA:n saknar PlugIns/LagomWidgetExtension.appex – appmålet bäddar inte in den. Kör node scripts/ios-widget.mjs check (docs/WIDGET.md §8)."
+              exit 1
+            fi
+            plist="$appex/Info.plist"
+            id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist" 2>/dev/null || true)"
+            short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null || true)"
+            bundle="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist" 2>/dev/null || true)"
+            app_short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")"
+            app_bundle="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")"
+            echo "Widgeten: Bundle ID $id, version $short ($bundle)"
+            if [ "$id" != "$LAGOM_APP_ID.widget" ]; then
+              echo "::error title=iPhone-widgeten::Fel Bundle ID för widgeten i IPA:n: \"$id\" (väntade $LAGOM_APP_ID.widget)."
+              exit 1
+            fi
+            if [ "$short" != "$app_short" ] || [ "$bundle" != "$app_bundle" ]; then
+              echo "::error title=iPhone-widgeten::Widgetens version $short ($bundle) är inte appens $app_short ($app_bundle) – App Store kräver samma. Widgetmålet ska ha samma MARKETING_VERSION och CURRENT_PROJECT_VERSION som appen."
+              exit 1
+            fi
+            # Behörigheterna i signaturerna – App Group måste finnas i båda profilerna.
+            app_entitlements="$(codesign -d --entitlements - "$app" 2>/dev/null || true)"
+            widget_entitlements="$(codesign -d --entitlements - "$appex" 2>/dev/null || true)"
+            if ! grep -qF 'com.apple.security.application-groups' <<< "$app_entitlements" || ! grep -qF "$group" <<< "$app_entitlements"; then
+              echo "::error title=iPhone-widgeten::App Group $group saknas i appens behörigheter – skapa gruppen på developer.apple.com (Certificates, Identifiers & Profiles → Identifiers → App Groups → +), slå på App Groups med gruppen för Bundle ID:t $LAGOM_APP_ID och kör igen (profilen skapas då om). Se docs/WIDGET.md §8."
+              exit 1
+            fi
+            if ! grep -qF 'com.apple.security.application-groups' <<< "$widget_entitlements" || ! grep -qF "$group" <<< "$widget_entitlements"; then
+              echo "::error title=iPhone-widgeten::App Group $group saknas i widgetens behörigheter – skapa App ID:t $LAGOM_APP_ID.widget på developer.apple.com (Identifiers → + → App IDs → App, Explicit) med förmågan App Groups och gruppen $group, och kör igen (profilen skapas då om). Se docs/WIDGET.md §8."
+              exit 1
+            fi
+            echo "Med iPhone-widgeten ($id, App Group $group)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            # Av: widgeten får inte ha följt med av misstag (appens profil saknar App Group).
+            if [ -e "$appex" ]; then
+              echo "::error title=iPhone-widgeten::IPA:n innehåller PlugIns/LagomWidgetExtension.appex fast widgeten är av (node scripts/ios-widget.mjs status). Slå på den helt med node scripts/ios-widget.mjs enable, eller ta bort inbäddningen ur appmålet (docs/WIDGET.md §8)."
+              exit 1
+            fi
+            echo "Utan iPhone-widgeten (av tills App Group finns i Apple-kontot)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Artefakt – signerad IPA
         uses: actions/upload-artifact@v7

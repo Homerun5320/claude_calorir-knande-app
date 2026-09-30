@@ -13,6 +13,7 @@ interface NodeFs {
 }
 interface NodeUrl {
   fileURLToPath(url: string): string
+  pathToFileURL(path: string): { href: string }
 }
 interface NodePath {
   dirname(p: string): string
@@ -22,12 +23,44 @@ interface NodePath {
 // Node-moduler laddas dynamiskt (appens tsconfig har inte Node-typerna).
 const nodeModule = <T>(name: string): Promise<T> => import(/* @vite-ignore */ name) as Promise<T>
 
+/** En sökväg i repot (relativt roten) som absolut sökväg. */
+async function repoPath(path: string): Promise<string> {
+  const { fileURLToPath } = await nodeModule<NodeUrl>('node:url')
+  const { dirname, resolve } = await nodeModule<NodePath>('node:path')
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../..', path)
+}
+
 /** Läs en fil i repot (sökväg relativt roten). */
 async function readRepoFile(path: string): Promise<string> {
   const { readFile } = await nodeModule<NodeFs>('node:fs/promises')
-  const { fileURLToPath } = await nodeModule<NodeUrl>('node:url')
-  const { dirname, resolve } = await nodeModule<NodePath>('node:path')
-  return readFile(resolve(dirname(fileURLToPath(import.meta.url)), '../..', path), 'utf8')
+  return readFile(await repoPath(path), 'utf8')
+}
+
+/** Det testet läser ur Xcode-projektet (tolkat av scripts/pbxproj.mjs, samma som scripts/ios-widget.mjs). */
+interface PbxObject {
+  isa?: string
+  name?: string
+  buildConfigurationList?: string
+  buildConfigurations?: string[]
+  buildSettings?: Record<string, unknown>
+}
+interface PbxprojModule {
+  parsePbxproj(text: string): { objects: Record<string, PbxObject> }
+}
+
+/** `PRODUCT_BUNDLE_IDENTIFIER` för varje mål och konfiguration, t.ex. `{ 'App/Release': 'se.…' }`. */
+async function xcodeBundleIds(): Promise<Record<string, unknown>> {
+  const { pathToFileURL } = await nodeModule<NodeUrl>('node:url')
+  const { parsePbxproj } = await nodeModule<PbxprojModule>(pathToFileURL(await repoPath('scripts/pbxproj.mjs')).href)
+  const { objects } = parsePbxproj(await readRepoFile('ios/App/App.xcodeproj/project.pbxproj'))
+  const ids: Record<string, unknown> = {}
+  for (const target of Object.values(objects).filter((o) => o.isa === 'PBXNativeTarget')) {
+    const configs = objects[target.buildConfigurationList ?? '']?.buildConfigurations ?? []
+    for (const config of configs.map((id) => objects[id])) {
+      ids[`${target.name}/${config?.name}`] = config?.buildSettings?.PRODUCT_BUNDLE_IDENTIFIER
+    }
+  }
+  return ids
 }
 
 /**
@@ -149,6 +182,8 @@ const NOT_IN_PLAY = /(?<!\p{L})(?:iphone|ipad|ios|apple|app\s+store|healthkit|ic
 const PRICE = /(?<![\d,])[1-9]\d*(?:[ \u00a0]\d{3})*(?:,\d+)?\s*(?:kr|kronor|:-)(?!\p{L})/iu
 
 const APP_ID = 'se.lagomappen.lagom'
+/** iPhone-widgetens eget Bundle ID (målet LagomWidgetExtension, docs/WIDGET.md §8) – alltid appens + ".widget". */
+const WIDGET_BUNDLE_ID = `${APP_ID}.widget`
 const ARTIFACT_URL = 'https://claude.ai/artifact/7ysdpNCMhY6366LEWtjGXE'
 
 describe('app-id:t', () => {
@@ -161,9 +196,15 @@ describe('app-id:t', () => {
 
     expect(capacitor).toContain(`appId: '${APP_ID}'`)
     expect(gradle).toContain(`applicationId "${APP_ID}"`)
+    // Appen har app-id:t och widgetmålet sitt eget under det – i båda konfigurationerna.
+    expect(await xcodeBundleIds()).toEqual({
+      'App/Debug': APP_ID,
+      'App/Release': APP_ID,
+      'LagomWidgetExtension/Debug': WIDGET_BUNDLE_ID,
+      'LagomWidgetExtension/Release': WIDGET_BUNDLE_ID,
+    })
     const bundleIds = [...pbxproj.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1])
-    expect(bundleIds.length).toBeGreaterThan(0)
-    expect(new Set(bundleIds)).toEqual(new Set([APP_ID]))
+    expect(new Set(bundleIds)).toEqual(new Set([APP_ID, WIDGET_BUNDLE_ID]))
     expect(release).toContain(`LAGOM_APP_ID: ${APP_ID}`)
     expect(codemagic.match(new RegExp(`LAGOM_APP_ID: ${APP_ID.replaceAll('.', '\\.')}`, 'g'))).toHaveLength(2)
   })
@@ -279,6 +320,9 @@ describe('native.yml – kontrollbygget', () => {
       'scripts/commerce-guard.ts',
       'scripts/native-config.mjs',
       'scripts/check-android-16kb.mjs',
+      // iPhone-widgetens brytare och projektläsaren (iPhone-bygget kör dem).
+      'scripts/ios-widget.mjs',
+      'scripts/pbxproj.mjs',
     ]) {
       expect(pr, path).toContain(path)
     }
