@@ -106,7 +106,7 @@ extension WidgetContent {
         return WidgetText.titleApp
     }
 
-    /// Visa knappen "Lägg till" (i systemMedium; i systemSmall är hela widgeten ett tryck).
+    /// Visa knappen "Lägg till" (i systemMedium och systemLarge; i systemSmall är hela widgeten ett tryck).
     var showsAdd: Bool {
         switch self {
         case .noData:

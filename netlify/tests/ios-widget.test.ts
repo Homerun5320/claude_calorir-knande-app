@@ -15,7 +15,7 @@
  * ios/App/LagomWidgetTests/).
  */
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -532,6 +532,21 @@ describe('scripts/ios-widget.mjs i repot', () => {
       expect(entitlementsWidgetState(read(APP_ENTITLEMENTS_PATH)).state).toBe('på')
     }
     expect(projectWidgetState(read(PBXPROJ_PATH)).state).toBe(REPO_STATE)
+  })
+
+  it('fungerar också när skriptet startas via en symbolisk länk (annars gör kommandona inget och lyckas ändå)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lagom-ios-widget-link-'))
+    temps.push(dir)
+    const link = join(dir, 'repo')
+    symlinkSync(root, link, 'dir')
+    const run = (args: string[]) => {
+      const res = spawnSync(process.execPath, [join(link, 'scripts/ios-widget.mjs'), ...args], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' }, timeout: 20_000 })
+      return { code: res.status, out: res.stdout, err: res.stderr }
+    }
+    expect(run(['status'])).toEqual({ code: 0, out: `${REPO_STATE}\n`, err: '' })
+    const missing = run(['check', `--root=${join(dir, 'finns-inte')}`])
+    expect(missing.code).toBe(1)
+    expect(missing.err).toContain('saknas')
   })
 
   it('okända kommandon och argument ger användningen och kod 1', () => {

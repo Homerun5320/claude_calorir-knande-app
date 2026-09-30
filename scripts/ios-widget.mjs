@@ -24,9 +24,9 @@
  * resultatet och skriver sedan ut det som återstår att göra för hand. Molnbyggena läser läget med
  *   WIDGET="$(node scripts/ios-widget.mjs status)"; if [ "$WIDGET" = "på" ]; then …; fi
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { OBJECT_ID, parsePbxproj, PbxprojError } from './pbxproj.mjs'
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -584,8 +584,22 @@ function main() {
   }
 }
 
-// Kör bara när filen startas direkt (så att funktionerna kan importeras i tester).
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+/**
+ * Startades filen direkt (och inte bara importerades av ett test)? Jämförs efter realpath: startas
+ * den via en symbolisk länk (en länkad katalog, en genväg) är sökvägen i process.argv[1] en annan
+ * än filens egen, och kommandot skulle annars inte göra någonting och ändå lyckas.
+ */
+function startedDirectly() {
+  const started = process.argv[1]
+  if (started === undefined) return false
+  try {
+    return realpathSync(started) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+
+if (startedDirectly()) {
   try {
     main()
   } catch (err) {

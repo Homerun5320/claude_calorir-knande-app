@@ -206,6 +206,23 @@ describe('sammanfattningen', () => {
     expect(mocks.update).toHaveBeenCalledTimes(1)
   })
 
+  it('en ny tidszon skickas om även när innehållet är detsamma (iPhone räknar midnätterna i tidszonen)', async () => {
+    withProfile()
+    await startWidget()
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+    const before = NOON.getTimezoneOffset()
+    const zone = vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(before + 360)
+    try {
+      await expect(pushWidgetNow()).resolves.toBe(true)
+      expect(mocks.update).toHaveBeenCalledTimes(2)
+      // Samma tidszon igen: oförändrat.
+      await expect(pushWidgetNow()).resolves.toBe(false)
+      expect(mocks.update).toHaveBeenCalledTimes(2)
+    } finally {
+      zone.mockRestore()
+    }
+  })
+
   it('exempeldata och fastan följer med när de ändras', async () => {
     withProfile()
     await startWidget()

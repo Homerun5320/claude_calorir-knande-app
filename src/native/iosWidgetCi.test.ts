@@ -387,14 +387,12 @@ describe.each(STORE_BUILDS)('$file – iPhone-widgeten i butiksbygget', ({ file,
       const guard = `! grep -qF '${APP_GROUP_KEY}' <<< "$${who}_entitlements" || ! grep -qF "$group" <<< "$${who}_entitlements"`
       const message = shellIf(on, guard).ifTrue
       expect(message, who).toMatch(errorThenExit(error))
-      // Felet säger vad ägaren ska göra i Apple-kontot.
-      expect(message, who).toContain('developer.apple.com')
-      expect(message, who).toContain('App Groups')
+      // Saknas gruppen i en profil faller arkiveringen redan (se hjälpsteget i release.yml); det här
+      // fångar det som kan vara fel i repot – så felet pekar på behörighetsfilerna, inte på Apple-kontot.
+      expect(message, who).toContain(who === 'app' ? 'App.entitlements' : 'LagomWidget.entitlements')
+      expect(message, who).not.toContain('developer.apple.com')
       expect(message, who).toContain('docs/WIDGET.md §8')
     }
-    expect(shellIf(on, `! grep -qF '${APP_GROUP_KEY}' <<< "$widget_entitlements" || ! grep -qF "$group" <<< "$widget_entitlements"`).ifTrue).toContain(
-      'skapa App ID:t $LAGOM_APP_ID.widget',
-    )
 
     // Av: widgeten får inte ha följt med – och inget annat kontrolleras eller hämtas.
     expect(shellIf(off, '[ -e "$appex" ]').ifTrue).toMatch(errorThenExit(error))
@@ -408,5 +406,21 @@ describe('release.yml – kontrollen av widgeten läser samma uppackade IPA', ()
     const ios = block(await readRepoFile('.github/workflows/release.yml'), 'ios', 2)
     expect(step(ios, IPA_STEP)).toContain('work="$RUNNER_TEMP/ipa"')
     expect(step(ios, IPA_WIDGET_STEP)).toContain(`app="$(find "$RUNNER_TEMP/ipa/Payload" -maxdepth 1 -name '*.app' | head -1)"`)
+  })
+
+  it('när widgeten är på och bygget faller: ett hjälpsteg som säger vad som ska göras i Apple-kontot', async () => {
+    const ios = block(await readRepoFile('.github/workflows/release.yml'), 'ios', 2)
+    const name = 'Hjälp om bygget faller med widgeten på (App Group)'
+    const help = step(ios, name)
+    // Bara när widgeten är på (LAGOM_WIDGET skrivs av det första steget) och något har fallerat.
+    expect(help).toContain("if: failure() && env.LAGOM_WIDGET == 'på'")
+    expect(help).toContain('com.apple.security.application-groups')
+    expect(help).toContain('developer.apple.com')
+    expect(help).toContain('$LAGOM_APP_ID.widget')
+    expect(help).toContain('fetch-signing-files --create')
+    expect(help).toContain('docs/WIDGET.md §8')
+    // Efter arkiveringen, så att den visas sist i loggen.
+    const names = stepNames(ios)
+    expect(names.indexOf(name)).toBeGreaterThan(names.indexOf(IPA_WIDGET_STEP))
   })
 })

@@ -198,15 +198,17 @@ workflows:
               echo "FEL: widgetens version $short ($bundle) är inte appens $app_short ($app_bundle) – App Store kräver samma. Widgetmålet ska ha samma MARKETING_VERSION och CURRENT_PROJECT_VERSION som appen."
               exit 1
             fi
-            # Behörigheterna i signaturerna – App Group måste finnas i båda profilerna.
+            # Behörigheterna i signaturerna. Saknas App Group i en profil faller arkiveringen redan
+            # (Xcode: "Provisioning profile … doesn't include the com.apple.security.application-groups
+            # entitlement"); här fångas det som kan vara fel i repot.
             app_entitlements="$(codesign -d --entitlements - "$app" 2>/dev/null || true)"
             widget_entitlements="$(codesign -d --entitlements - "$appex" 2>/dev/null || true)"
             if ! grep -qF 'com.apple.security.application-groups' <<< "$app_entitlements" || ! grep -qF "$group" <<< "$app_entitlements"; then
-              echo "FEL: App Group $group saknas i appens behörigheter – skapa gruppen på developer.apple.com (Certificates, Identifiers & Profiles → Identifiers → App Groups → +), slå på App Groups med gruppen för Bundle ID:t $LAGOM_APP_ID och bygg igen (profilen skapas då om). Se docs/WIDGET.md §8."
+              echo "FEL: App Group $group saknas i appens behörigheter i IPA:n – kontrollera att ios/App/App/App.entitlements har com.apple.security.application-groups med gruppen (node scripts/ios-widget.mjs check). Saknas den i en profil faller redan arkiveringen, med Xcodes eget meddelande. Se docs/WIDGET.md §8."
               exit 1
             fi
             if ! grep -qF 'com.apple.security.application-groups' <<< "$widget_entitlements" || ! grep -qF "$group" <<< "$widget_entitlements"; then
-              echo "FEL: App Group $group saknas i widgetens behörigheter – skapa App ID:t $LAGOM_APP_ID.widget på developer.apple.com (Identifiers → + → App IDs → App, Explicit) med förmågan App Groups och gruppen $group, och bygg igen (profilen skapas då om). Se docs/WIDGET.md §8."
+              echo "FEL: App Group $group saknas i widgetens behörigheter i IPA:n – kontrollera att ios/App/LagomWidget/LagomWidget.entitlements har com.apple.security.application-groups med gruppen. Saknas den i widgetens profil faller redan arkiveringen, med Xcodes eget meddelande. Se docs/WIDGET.md §8."
               exit 1
             fi
             echo "Med iPhone-widgeten ($id, App Group $group)."

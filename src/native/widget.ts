@@ -143,9 +143,25 @@ export function readWidgetInput(): WidgetInput {
   }
 }
 
-/** Innehållet utan tidsstämpeln – samma innehåll skickas inte två gånger i rad. */
-function contentKey(payload: WidgetPayload): string {
-  return JSON.stringify({ ...payload, generatedAt: 0 })
+/**
+ * Telefonens tidszon och förskjutning mot UTC vid `at` (reserv: bara förskjutningen). Widgeten på
+ * iPhone räknar sina midnätter i tidszonen den hade när tidslinjen byggdes – byter telefonen
+ * tidszon (eller sommartid) ska sammanfattningen därför skickas om även när innehållet är detsamma.
+ */
+function timeZoneKey(at: Date): string {
+  const offset = at.getTimezoneOffset()
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (zone) return `${zone}|${offset}`
+  } catch {
+    /* faller tillbaka nedan */
+  }
+  return `UTC${-offset}`
+}
+
+/** Innehållet utan tidsstämpeln, men med tidszonen – samma innehåll skickas inte två gånger i rad. */
+function contentKey(payload: WidgetPayload, at: Date): string {
+  return JSON.stringify({ ...payload, generatedAt: 0, tz: timeZoneKey(at) })
 }
 
 /** Får en sammanfattning byggas just nu? Bara när datan i minnet är hela den sparade datan. */
@@ -166,8 +182,9 @@ export function pushWidgetNow(now: () => Date = () => new Date()): Promise<boole
     let data: string
     let key: string
     try {
-      const payload = buildWidgetPayload(readWidgetInput(), now())
-      key = contentKey(payload)
+      const at = now()
+      const payload = buildWidgetPayload(readWidgetInput(), at)
+      key = contentKey(payload, at)
       if (key === lastSent) return false
       data = serializeWidgetPayload(payload)
     } catch (error) {

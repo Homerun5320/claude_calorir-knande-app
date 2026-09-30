@@ -1,7 +1,7 @@
 // Widgetens utseende i SwiftUI – samma innehåll och ordning som Android-widgetens
 // res/layout/lagom_widget.xml: rubrikraden ("Idag" eller "Lagom", och knappen "Lägg till" i
-// systemMedium), energitexten, energidetaljen, energistapeln och sedan valfria rader (måltider,
-// vatten och fastan med en räknare som går av sig själv).
+// systemMedium och systemLarge), energitexten, energidetaljen, energistapeln och sedan valfria rader
+// (måltider, vatten och fastan med en räknare som går av sig själv).
 //
 // - Vad som visas bestäms av WidgetContent.swift; här ritas det bara. All text kommer färdig från
 //   appen och visas som den är (Text(verbatim:) – ingen översättning och ingen formatering).
@@ -11,8 +11,9 @@
 // - Färgerna kommer bara från widgetens asset-katalog (ljust och mörkt läge, samma som Android-
 //   widgetens values/widget_colors.xml). Staplarna har alltid samma neutrala färg, även över
 //   målet – inga röda varningar.
-// - Siffrorna (energi och vatten) är markerade som känsliga, så att systemet kan dölja dem när
-//   telefonen är låst. Staplarna är dekor för VoiceOver – texten bredvid säger samma sak.
+// - Siffrorna (energi, måltider, vatten och fastan) och staplarna är markerade som känsliga, så att
+//   systemet kan dölja dem när telefonen är låst. Staplarna är dekor för VoiceOver – texten bredvid
+//   säger samma sak.
 
 import SwiftUI
 import WidgetKit
@@ -24,7 +25,7 @@ struct TodayWidgetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            WidgetHeader(title: entry.content.title, showsAdd: family == .systemMedium && entry.content.showsAdd)
+            WidgetHeader(title: entry.content.title, showsAdd: family != .systemSmall && entry.content.showsAdd)
             switch entry.content {
             case .noData:
                 FallbackText(text: WidgetText.fallbackDefault)
@@ -149,6 +150,7 @@ private struct DayColumn: View {
                     .font(.footnote)
                     .foregroundStyle(Color("Ink2"))
                     .lineLimit(1)
+                    .privacySensitive()
                     .padding(.top, 4)
             }
             if let water = today.waterText {
@@ -241,6 +243,7 @@ private struct FastingRow: View {
                 .lineLimit(1)
                 .multilineTextAlignment(.leading)
         }
+        .privacySensitive()
         .accessibilityElement(children: .combine)
     }
 

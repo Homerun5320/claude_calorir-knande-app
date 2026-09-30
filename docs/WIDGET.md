@@ -320,10 +320,14 @@ när de tre inte stämmer (halvvägs påslagen). Båda tar `--root=<katalog>`.
 
 - Samma `WidgetPayload` version 1 och samma JS: med `WIDGET_IOS_READY = true` gör
   `src/native/widget.ts` på iPhone exakt det den gör på Android (`widgetSupported()`).
-- Storlekarna `systemSmall` och `systemMedium` på hemskärmen – **inte** låsskärmens
-  `accessory`-storlekar. StandBy (laddning i liggande läge, synligt för andra i rummet) undantas med
-  `.disfavoredLocations([.standBy], for: [.systemSmall])`, och siffrorna och staplarna är
-  `privacySensitive()`.
+- Storlekarna `systemSmall`, `systemMedium` och `systemLarge` på hemskärmen – **inte** låsskärmens
+  `accessory`-storlekar. Energin, stapeln och måltiderna tar det mesta av platsen i de två mindre
+  storlekarna, så vattnet och fastan syns i praktiken bara i `systemLarge` (som Androids större
+  storlekar). Knappen Lägg till finns i `systemMedium` och `systemLarge`. StandBy (laddning i
+  liggande läge, synligt för andra i rummet) nedprioriteras med
+  `.disfavoredLocations([.standBy], for: [.systemSmall])` men går fortfarande att välja, så energin,
+  måltiderna, vattnet, fastan och staplarna är alla `privacySensitive()` (systemet döljer dem när
+  telefonen är låst).
 - Widgetmålet kräver **iOS 17** (`IPHONEOS_DEPLOYMENT_TARGET = 17.0`; appen stöder fortfarande
   16.4), så `.containerBackground(for: .widget)` och `disfavoredLocations` används utan
   tillgänglighetskontroller. På iOS 16 finns ingen widget att välja – appen fungerar som vanligt.
@@ -335,11 +339,13 @@ när de tre inte stämmer (halvvägs påslagen). Båda tar `--root=<katalog>`.
   fasta, vatten) med `ViewThatFits`. Färgerna kommer från widgetens asset-katalog – samma som
   `values/widget_colors.xml`, ljust och mörkt. Fastan räknar upp med `Text(start, style: .timer)`.
 - **Tidslinjen:** en post nu och en vid varje lokal midnatt då datan har en ny dag (och midnatten
-  efter den sista, då `fallbackText` visas), med policyn `.never` – appen ber WidgetKit ladda om
-  tidslinjen varje gång den skickar ny data. Datumen jämförs i den gregorianska kalendern i
-  telefonens tidszon, och dygnens början räknas från kl. 12 så att sommartiden blir rätt. Byter
-  telefonen tidszon står de uträknade midnätterna kvar tills appen skickar ny data (Android ritar om
-  var 30:e minut).
+  efter den sista, då `fallbackText` visas), med policyn `.after` sex timmar fram – appen ber
+  dessutom WidgetKit ladda om tidslinjen varje gång den skickar ny data. Datumen jämförs i den
+  gregorianska kalendern i telefonens tidszon, och dygnens början räknas från kl. 12 så att
+  sommartiden blir rätt. Byter telefonen tidszon räknas midnätterna om vid nästa omladdning, senast
+  efter sex timmar (Android ritar om var 30:e minut), och appen skickar om sammanfattningen så fort
+  den öppnas igen – tidszonen ingår i nyckeln som hindrar att samma innehåll skickas två gånger
+  (`contentKey` i `src/native/widget.ts`).
 
 ### Koden
 
@@ -368,7 +374,7 @@ kräver att widgeten har samma som appen. En ny fil i `ios/App/LagomWidget/` ell
 de skriver om hela projektet som Capacitor har skapat.
 
 **Länkarna** – `widgetURL(lagom-widget://idag)` för hela widgeten och
-`Link(destination: lagom-widget://lagg-till)` för knappen i `systemMedium` (i `systemSmall` är hela
+`Link(destination: lagom-widget://lagg-till)` för knappen i `systemMedium` och `systemLarge` (i `systemSmall` är hela
 widgeten ett tryck, till Idag). De kommer fram via `SceneDelegateProxy` i `SceneDelegate.swift` –
 `scene(_:openURLContexts:)` när appen körs och `connectionOptions.urlContexts` vid kallstart – som
 `appUrlOpen` och `App.getLaunchUrl()`. iOS spelar inte upp länkar igen när en scen återställs, så
@@ -403,7 +409,12 @@ Swift och Xcode finns inte lokalt – Swift-koden kompileras först i molnbygget
 2. *Identifiers → `se.lagomappen.lagom` → App Groups → Configure*: välj gruppen och spara.
    Befintliga profiler blir ogiltiga – molnbygget skapar nya (`--create`).
 3. *Identifiers → + → App IDs → App*: *Explicit* `se.lagomappen.lagom.widget`, beskrivning "Lagom
-   widget", förmågan **App Groups** med samma grupp. Inget annat (ingen HealthKit).
+   widget", förmågan **App Groups** med samma grupp. Inget annat (ingen HealthKit). Gör steg 1–3
+   **före** det första bygget med widgeten på: saknas App ID:t skapar molnbygget det utan förmågor
+   (`fetch-signing-files --create`), och arkiveringen faller då med Xcodes "Provisioning profile …
+   doesn't include the com.apple.security.application-groups entitlement" (`release.yml` skriver ut
+   vad som ska göras). Öppna i så fall App ID:t, slå på App Groups med gruppen och kör igen – profilen
+   skapas då om. Kontrollen av IPA:n efteråt fångar bara fel i repots egna behörighetsfiler.
 4. **Molnbyggena** (`release.yml` och `codemagic.yaml`) sköter resten när widgeten är på: ett andra
    `app-store-connect fetch-signing-files se.lagomappen.lagom.widget --platform IOS --type IOS_APP_STORE --strict-match-identifier --create`
    före `xcode-project use-profiles`, som kopplar varje profil till sitt mål efter Bundle ID. App
