@@ -126,7 +126,8 @@ export default function PlanningPage() {
 
       <div {...tabPanelProps(TABS_ID, tab)} className="mx-auto max-w-3xl rounded-card">
         {!hydrated ? (
-          <div className="flex flex-col gap-3" aria-busy="true" aria-label="Laddar planeringen">
+          <div className="flex flex-col gap-3" role="status" aria-busy="true">
+            <span className="sr-only">Laddar planeringen …</span>
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-32 w-full rounded-[1.5rem]" />
             ))}

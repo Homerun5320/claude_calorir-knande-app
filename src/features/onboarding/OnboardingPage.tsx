@@ -16,6 +16,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ArchiveRestore, ArrowRight, ChevronLeft, Check, Sparkles } from 'lucide-react'
 import { Button, IconButton, Sheet, confirmDialog, toast, cx } from '../../components/ui'
 import { PageFallback } from '../../components/layout/AppShell'
+import { useBottomBarPadding } from '../../hooks/useBottomBarPadding'
 import { useToday } from '../../hooks/useToday'
 import { BackupError, parseBackup, requestPersistentStorage, summarizeBackup, type BackupFile, type ImportSummary } from '../../lib/backup'
 import { useBodyStore } from '../../stores/bodyStore'
@@ -172,6 +173,8 @@ function WebMoveCard({ onRestore }: { onRestore: () => void }) {
 function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
   const navigate = useNavigate()
   const today = useToday()
+  // Fortsätt-listan klibbar vid nederkanten – fokuserade fält ska hamna ovanför den (WCAG 2.4.11).
+  const barRef = useBottomBarPadding()
   const reduce = useReducedMotion()
   const setProfile = useProfileStore((s) => s.setProfile)
   const updateSettings = useProfileStore((s) => s.updateSettings)
@@ -457,19 +460,22 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
           </AnimatePresence>
         </div>
 
-        <div className="sticky bottom-0 z-20 bg-linear-to-t from-bg from-70% to-transparent pt-6">
+        <div ref={barRef} className="sticky bottom-0 z-20 bg-linear-to-t from-bg from-70% to-transparent pt-6">
           <div className="mx-auto w-full max-w-lg px-4 pb-[max(1rem,var(--sa-bottom))]">
             {attempted && blockedContinue && current !== 'om-dig' && (
               <p role="alert" className="mb-2 text-center text-[0.875rem] text-ink-2">
                 {current === 'mal' || current === 'aktivitet' ? 'Välj ett alternativ för att gå vidare.' : 'Kontrollera uppgifterna ovan.'}
               </p>
             )}
+            {/* Knappen går att trycka även när steget inte är klart (då visas vad som saknas), så den
+                dämpas inte med opacity – det skulle ge vit text på ljusgrön yta under 4,5:1 (WCAG
+                1.4.3). Den tonade varianten har full kontrast och visar ändå att något återstår. */}
             <Button
               type="submit"
               size="lg"
               fullWidth
+              variant={blockedContinue ? 'soft' : 'primary'}
               loading={finishing}
-              className={cx(blockedContinue && 'opacity-70')}
               iconRight={current === 'sammanfattning' ? Check : ArrowRight}
             >
               {welcome ? 'Kom igång' : current === 'sammanfattning' ? (startsStoreTrial ? `Starta ${TRIAL_DAYS} dagar gratis` : 'Börja använda Lagom') : 'Fortsätt'}

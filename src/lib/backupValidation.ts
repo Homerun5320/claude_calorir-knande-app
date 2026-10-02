@@ -283,6 +283,40 @@ function noonOf(date: ISODate): number {
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 
+// ---------------------------------------------------------------------------
+// Ordning och form som butikerna förväntar sig
+//
+// Butikerna håller sina listor i en viss ordning (se `diaryStore`, `bodyStore`, `fastingStore` och
+// `planStore`): en dags poster äldst först, vikter och mått stigande på datum med högst en per dag,
+// och fastehistoriken med den senaste först. `sanitizeBackupData` och `restoreBackup('merge')`
+// lämnar listorna i samma form, så att Idag, Dagbok, Fasta och Vikt aldrig behöver gissa. Alla är
+// stabila (lika värden behåller sin inbördes ordning) och ändrar inte indatan.
+// ---------------------------------------------------------------------------
+
+/** Äldst först på `createdAt` – dagboken, träningen och planeringen håller en dags poster så. */
+export function sortByCreatedAt<T extends { createdAt: number }>(list: readonly T[]): T[] {
+  return [...list].sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/** Senaste fastan först (sluttid fallande), som `endFast` och `restoreFast` håller historiken. */
+export function sortFastsNewestFirst(list: readonly FastRecord[]): FastRecord[] {
+  return [...list].sort((a, b) => b.end - a.end)
+}
+
+/**
+ * Högst ett kroppsmått per datum (som `addMeasurement`), stigande på datum. `keep` avgör vilken som
+ * gäller när två delar ett datum: `'first'` (den som står först i listan) eller `'newest'` (den
+ * senast sparade, och den sista av två lika nya).
+ */
+export function onePerDate<T extends { date: ISODate; createdAt: number }>(list: readonly T[], keep: 'first' | 'newest'): T[] {
+  const byDay = new Map<ISODate, T>()
+  for (const item of list) {
+    const prev = byDay.get(item.date)
+    if (!prev || (keep === 'newest' && item.createdAt >= prev.createdAt)) byDay.set(item.date, item)
+  }
+  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
 /**
  * Gå igenom ett objekt med datum som nycklar. Poster med ogiltigt datum hoppas över
  * (`countOf` avgör hur många poster de räknas som).
@@ -1148,7 +1182,7 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
         const e = record(ctx, 'entries', raw, (v, r) => sanitizeEntry(v, r, ctx, date))
         if (e) out.push(e)
       }
-      return out.length > 0 ? out : null
+      return out.length > 0 ? sortByCreatedAt(out) : null
     },
     countList,
   )
@@ -1172,7 +1206,7 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
         const x = record(ctx, 'exercise', raw, (v, r) => sanitizeExercise(v, r, ctx, date))
         if (x) out.push(x)
       }
-      return out.length > 0 ? out : null
+      return out.length > 0 ? sortByCreatedAt(out) : null
     },
     countList,
   )
@@ -1224,12 +1258,14 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
     if (!prev || w.createdAt >= prev.createdAt) weightByDate.set(w.date, w)
   }
   const weights = [...weightByDate.values()].sort((x, y) => x.date.localeCompare(y.date))
-  const measurements: MeasurementEntry[] = []
+  const allMeasurements: MeasurementEntry[] = []
   for (const value of list(b.measurements, ctx, 'measurements')) {
     const m = record(ctx, 'measurements', value, (v, r) => sanitizeMeasurement(v, r, ctx))
-    if (m) measurements.push(m)
+    if (m) allMeasurements.push(m)
   }
-  measurements.sort((x, y) => x.date.localeCompare(y.date))
+  // Som vikterna: ett mått per dag (det senast sparade gäller), sorterat på datum.
+  const measurements = onePerDate(allMeasurements, 'newest')
+  repairs.repaired += allMeasurements.length - measurements.length
 
   // Licens och provperiod (saknas i äldre säkerhetskopior)
   const license = sanitizeLicense(data.license, now)
@@ -1237,11 +1273,13 @@ export function sanitizeBackupData(data: Obj, now: number = Date.now()): { data:
   // Fasta (saknas i äldre säkerhetskopior)
   const fa = section(data.fasting)
   const active = sanitizeActiveFast(fa.active, ctx)
-  const history: FastRecord[] = []
+  const fasts: FastRecord[] = []
   for (const value of list(fa.history, ctx, 'fasts')) {
     const h = record(ctx, 'fasts', value, (v, r) => sanitizeFast(v, r, ctx))
-    if (h) history.push(h)
+    if (h) fasts.push(h)
   }
+  // Senaste fastan först, som butiken håller historiken.
+  const history = sortFastsNewestFirst(fasts)
 
   // Veckoplanering (saknas i äldre säkerhetskopior). Livsmedlen i planen kontrolleras som de
   // egna livsmedlen.

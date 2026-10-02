@@ -3,7 +3,7 @@
  * ('prov14', riktlinje 3.1.1), de senast kända köpen som sparas på telefonen (så att den som har
  * betalat inte stängs ute när butiken inte svarar) och nya försök när butiken inte svarar.
  */
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearDemoFlag, setDemoFlag } from '../lib/demoFlag'
 import { setStorePurchasesForTests, type StoreEntitlement } from '../lib/storePurchases'
@@ -11,6 +11,7 @@ import { useLicenseStore } from '../stores/licenseStore'
 import { DEFAULT_SETTINGS, useProfileStore } from '../stores/profileStore'
 import {
   STORE_CACHE_KEY,
+  STORE_REFRESH_MIN_INTERVAL_MS,
   STORE_RETRY_DELAYS_MS,
   accessStatus,
   canLog,
@@ -19,6 +20,7 @@ import {
   loadStoreCacheForTests,
   parseStoreCache,
   refreshStoreEntitlements,
+  refreshStoreEntitlementsIfStale,
   resetLicenseChecks,
   useAccess,
 } from './useAccess'
@@ -225,5 +227,95 @@ describe('nya försök när butiken inte svarar', () => {
     expect(store.calls()).toBe(1 + STORE_RETRY_DELAYS_MS.length)
     await vi.advanceTimersByTimeAsync(60 * 60_000)
     expect(store.calls()).toBe(1 + STORE_RETRY_DELAYS_MS.length)
+  })
+})
+
+describe('köpen frågas inte vid varje montering av en vy', () => {
+  it('flera vyer som monteras efter varandra ger en enda fråga till butiken', async () => {
+    const store = fakeStore(() => [])
+    const first = renderHook(() => useAccess())
+    renderHook(() => useAccess())
+    await waitFor(() => expect(first.result.current.checking).toBe(false))
+    expect(store.calls()).toBe(1)
+
+    // En ny sida (Idag, Mer, Lägg till …) monteras en stund senare: butiken frågas inte igen.
+    const third = renderHook(() => useAccess())
+    third.unmount()
+    renderHook(() => useAccess())
+    await act(async () => {})
+    expect(store.calls()).toBe(1)
+  })
+
+  it('delar en pågående hämtning mellan vyerna', async () => {
+    const store = fakeStore(() => [])
+    await Promise.all([refreshStoreEntitlementsIfStale(), refreshStoreEntitlementsIfStale(), refreshStoreEntitlementsIfStale()])
+    expect(store.calls()).toBe(1)
+  })
+
+  it('när appen återfår fokus frågas butiken som vanligt – och en vy som monteras direkt efteråt litar på svaret', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+    const store = fakeStore(() => [])
+    const { result } = renderHook(() => useAccess())
+    await waitFor(() => expect(result.current.checking).toBe(false))
+    expect(store.calls()).toBe(1)
+
+    vi.setSystemTime(NOW + 5_000)
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(store.calls()).toBe(2))
+
+    renderHook(() => useAccess())
+    await act(async () => {})
+    expect(store.calls()).toBe(2)
+  })
+
+  it('flera vyer som får fokus samtidigt delar en enda fråga', async () => {
+    const store = fakeStore(() => [])
+    const views = [renderHook(() => useAccess()), renderHook(() => useAccess()), renderHook(() => useAccess())]
+    await waitFor(() => expect(views[0].result.current.checking).toBe(false))
+    expect(store.calls()).toBe(1)
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => expect(store.calls()).toBe(2))
+    await act(async () => {})
+    expect(store.calls()).toBe(2)
+  })
+
+  it('en vy som monteras efter intervallet frågar igen', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+    const store = fakeStore(() => [])
+    await refreshStoreEntitlementsIfStale()
+    vi.setSystemTime(NOW + STORE_REFRESH_MIN_INTERVAL_MS + 1)
+    renderHook(() => useAccess())
+    await waitFor(() => expect(store.calls()).toBe(2))
+  })
+
+  it('efter ett köp eller "Återställ köp" frågas butiken alltid, även inom intervallet', async () => {
+    let owned: StoreEntitlement[] = []
+    const store = fakeStore(() => owned)
+    await refreshStoreEntitlementsIfStale()
+    owned = [{ product: 'livstid', purchasedAt: Date.now(), source: 'play' }]
+    await refreshStoreEntitlements({ fresh: true })
+    expect(store.calls()).toBe(2)
+    expect(currentStoreEntitlements()).toEqual(owned)
+    // Och en vy som monteras direkt efteråt litar på det färska svaret.
+    renderHook(() => useAccess())
+    await act(async () => {})
+    expect(store.calls()).toBe(2)
+  })
+
+  it('ett misslyckat svar ger inte en ny fråga vid varje montering – nya försök sköts av återförsöken', async () => {
+    const store = fakeStore(() => new Error('SERVICE_UNAVAILABLE'))
+    const first = renderHook(() => useAccess())
+    await waitFor(() => expect(first.result.current.checking).toBe(false))
+    expect(store.calls()).toBe(1)
+    renderHook(() => useAccess())
+    renderHook(() => useAccess())
+    await act(async () => {})
+    expect(store.calls()).toBe(1)
   })
 })

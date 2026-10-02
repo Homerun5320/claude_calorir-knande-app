@@ -42,6 +42,12 @@ export const RECIPE_MAX_BYTES = 2 * 1024 * 1024
 export const RECIPE_MAX_REDIRECTS = 3
 /** Högsta storlek på svaret till appen (alla JSON-LD-block tillsammans). */
 export const RECIPE_MAX_JSONLD_CHARS = 1024 * 1024
+/**
+ * Högsta antal JSON-LD-block i svaret. Servern tolkar inte JSON-LD:n utan skickar blocken vidare –
+ * antalet ingredienser, recept och värden begränsas i appen (src/features/recipes/importRecipe.ts)
+ * där blocket tolkas. Mikrodata-vägen nedan kapas redan här (`MAX_INGREDIENTS`).
+ */
+export const RECIPE_MAX_JSONLD_BLOCKS = 30
 const MAX_URL_LENGTH = 2048
 /** Stora cookies och säkerhetshuvuden förekommer – Nodes standard (16 KB) räcker inte alltid. */
 const MAX_HEADER_BYTES = 64 * 1024
@@ -485,6 +491,7 @@ export function extractRecipeJsonLd(html: string): string {
     if (total + content.length > RECIPE_MAX_JSONLD_CHARS) break
     total += content.length
     blocks.push(`<script type="application/ld+json">${content}</script>`)
+    if (blocks.length >= RECIPE_MAX_JSONLD_BLOCKS) break
   }
   return blocks.join('\n')
 }
@@ -599,7 +606,10 @@ export function extractRecipeMicrodata(html: string): string {
   const pop = () => {
     const frame = stack.pop()
     if (!frame) return
-    openNames.set(frame.name, (openNames.get(frame.name) ?? 1) - 1)
+    // Poster tas bort när de nått noll – en sida med hundratusentals olika taggnamn fyller inte kartan.
+    const open = (openNames.get(frame.name) ?? 1) - 1
+    if (open > 0) openNames.set(frame.name, open)
+    else openNames.delete(frame.name)
     if (frame.scope && stack.length > 0) nested--
     if (frame.capture) {
       captures.splice(captures.indexOf(frame.capture), 1)

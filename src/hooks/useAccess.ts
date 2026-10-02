@@ -24,7 +24,7 @@
  * - `useAccess()` – samma status som hook; verifierar licensnyckeln (WebCrypto) och uppdateras
  *   när appen återfår fokus.
  */
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
 import { KEY_ENTRY_BUILD, allowsLicenseKeyEntry, trialViaStore } from '../config/platform'
 import { isDemoData } from '../lib/demoFlag'
@@ -300,6 +300,8 @@ function writeStoreCache(list: readonly StoreEntitlement[]): void {
 
 let storeEntitlements: readonly StoreEntitlement[] = readStoreCache()
 let storeRefresh: Promise<void> | null = null
+/** När den senaste hämtningen från butiken tog slut (lyckad eller inte), `Date.now()` – null = ännu ingen. */
+let storeRefreshedAt: number | null = null
 /** Har butiken svarat (eller misslyckats) minst en gång sedan start? */
 let storeLoaded = false
 
@@ -384,6 +386,7 @@ export function resetLicenseChecks(): void {
   pending.clear()
   storeEntitlements = EMPTY_ENTITLEMENTS
   storeRefresh = null
+  storeRefreshedAt = null
   storeLoaded = false
   clearStoreRetry()
   storeRetryAttempt = 0
@@ -427,6 +430,7 @@ export function refreshStoreEntitlements(opts: { fresh?: boolean } = {}): Promis
       scheduleStoreRetry()
     } finally {
       storeRefresh = null
+      storeRefreshedAt = Date.now()
       if (!storeLoaded) {
         storeLoaded = true
         notifyChecks()
@@ -434,6 +438,26 @@ export function refreshStoreEntitlements(opts: { fresh?: boolean } = {}): Promis
     }
   })()
   return storeRefresh
+}
+
+/** Så länge efter en hämtning från butiken som vyerna (`useAccess`) litar på den utan att fråga igen. */
+export const STORE_REFRESH_MIN_INTERVAL_MS = 60_000
+
+/**
+ * Hämta köpen i appen när en vy monteras: delar en pågående hämtning och frågar inte butiken igen
+ * om den senaste hämtningen tog slut för mindre än en minut sedan. Varje sida som visar tillgången
+ * (Idag, Mer, Lägg till, Premium …) monterar `useAccess`, och varje fråga öppnar och stänger
+ * Google Plays eller StoreKits uppkoppling och köar bakom ett köp. Start och återfått fokus frågar
+ * som vanligt (`refreshStoreEntitlements`), och efter ett köp eller "Återställ köp" gäller
+ * `refreshStoreEntitlements({ fresh: true })`, som alltid frågar. Misslyckade hämtningar försöker
+ * `scheduleStoreRetry` om, utan det här skyddet.
+ */
+export function refreshStoreEntitlementsIfStale(): Promise<void> {
+  if (storeRefresh) return storeRefresh
+  // En klocka som har gått bakåt (age < 0) räknas som gammal – annars skulle vi aldrig fråga igen.
+  const age = storeRefreshedAt === null ? Infinity : Date.now() - storeRefreshedAt
+  if (age >= 0 && age < STORE_REFRESH_MIN_INTERVAL_MS) return Promise.resolve()
+  return refreshStoreEntitlements()
 }
 
 /**
@@ -534,9 +558,15 @@ export function useAccess(): AccessInfo {
   }, [trialStartedAt, now, ensureTrialStarted])
 
   // Köp i appen och spärrlistan: vid start och när appen återfår fokus (spärrlistan högst en
-  // gång per dygn, och bara när en licensnyckel finns).
+  // gång per dygn, och bara när en licensnyckel finns). Fokus (och den timvisa uppdateringen) byter
+  // `now` och frågar butiken – en hämtning som redan pågår delas av alla vyer. En vy som bara
+  // monteras (en ny sida) frågar inte om butiken svarade för mindre än en minut sedan, så att varje
+  // besök på Idag eller Lägg till inte öppnar Google Plays eller StoreKits uppkoppling på nytt.
+  const mountedRef = useRef(false)
   useEffect(() => {
-    void refreshStoreEntitlements()
+    const mounting = !mountedRef.current
+    mountedRef.current = true
+    void (mounting ? refreshStoreEntitlementsIfStale() : refreshStoreEntitlements())
     if (KEY_LICENSES && licenseKey) void refreshRevocations()
   }, [now, licenseKey])
 

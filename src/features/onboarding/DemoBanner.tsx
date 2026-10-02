@@ -22,7 +22,8 @@ export function DemoBanner({ className }: { className?: string }) {
       icon: UserRound,
     })
     if (!ok) return
-    void wipeAndReset()
+    // Bara exempeldatan rensas: en kopia eller bilder från en tidigare egen dagbok får ligga kvar.
+    void wipeAndReset({ keepOwnCopies: true })
     navigate('/valkommen', { replace: true })
   }
 

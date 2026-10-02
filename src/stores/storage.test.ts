@@ -24,6 +24,7 @@ const {
   guardedWrite,
   hasNewerData,
   hasProtectedData,
+  hasSlowReads,
   hasUnreadableData,
   isMemoryOnlyStorage,
   onLateRead,
@@ -89,6 +90,55 @@ describe('lagring i IndexedDB', () => {
     writes[0].resolve()
     await w
     off()
+  })
+
+  it('en långsam läsning är skyddad data – en säkerhetskopia då saknar den sparade datan', async () => {
+    expect(hasSlowReads()).toBe(false)
+    expect(hasProtectedData()).toBe(false)
+    const p = idbStorage.getItem('dagbok')
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 10)
+    expect(await p).toBeNull()
+    // Appen visas med tomma standardvärden, men den sparade datan finns kvar och är inte inläst.
+    expect(hasSlowReads()).toBe(true)
+    expect(hasProtectedData()).toBe(true)
+    // Det är varken en nyare version eller data som inte går att tolka – andra texter gäller.
+    expect(hasNewerData()).toBe(false)
+    expect(hasUnreadableData()).toBe(false)
+
+    // Läsningen blir klar: skyddet släpps så att påminnelsen om säkerhetskopia fungerar som vanligt.
+    reads[0].resolve(JSON.stringify(value(42)))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(hasSlowReads()).toBe(false)
+    expect(hasProtectedData()).toBe(false)
+  })
+
+  it('en långsam läsning som visar sig vara från en nyare version förblir skyddad', async () => {
+    const off = onLateRead((name) => void idbStorage.getItem(name))
+    const p = idbStorage.getItem(STORE_KEYS.diary)
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 10)
+    await p
+    expect(hasProtectedData()).toBe(true)
+    // Den sena läsningen ger en ny inläsning, och den hittar data från en nyare version.
+    reads[0].resolve(JSON.stringify(value(1)))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(reads).toHaveLength(2)
+    reads[1].resolve(JSON.stringify({ state: { n: 1 }, version: PERSIST_VERSIONS[STORE_KEYS.diary] + 1 }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(hasSlowReads()).toBe(false)
+    expect(hasNewerData()).toBe(true)
+    expect(hasProtectedData()).toBe(true)
+    off()
+  })
+
+  it('en långsam läsning som till slut misslyckas är inte längre "långsam" – lagringen är då i minnesläge', async () => {
+    const p = idbStorage.getItem('dagbok')
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 10)
+    await p
+    expect(hasSlowReads()).toBe(true)
+    reads[0].reject(new DOMException('Blockerad', 'SecurityError'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(hasSlowReads()).toBe(false)
+    expect(isMemoryOnlyStorage()).toBe(true)
   })
 
   it('en långsam skrivning räknas inte som fel, men en misslyckad syns tills nästa lyckas', async () => {

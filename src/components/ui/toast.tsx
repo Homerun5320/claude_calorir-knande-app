@@ -2,8 +2,9 @@
  * Enkla toast-notiser. Använd `toast('Tillagt i frukost')` eller med ångra-knapp:
  *   toast('Borttaget', { action: { label: 'Ångra', onClick: () => restore() } })
  *
- * - Notiser med åtgärd visas längre (8 s) och pausas medan pekaren är över eller fokus är inuti,
- *   så att man hinner ångra även med tangentbord eller skärmläsare.
+ * - Notiser med åtgärd visas längre (minst 8 s) och pausas medan pekaren är över eller fokus är inuti,
+ *   så att man hinner ångra även med tangentbord eller skärmläsare. Visningstiden växer med meddelandets
+ *   längd (`toastDuration`): en lång förklaring hinner läsas.
  * - Varje notis har en stängknapp (✕). Escape stänger notisen när fokus är i den.
  * - När en notis med fokus stängs (Ångra, ✕, Escape) flyttas fokus tillbaka dit det var innan –
  *   eller till ett öppet ark/sidans rubrik – så att det aldrig hamnar på <body>.
@@ -31,11 +32,26 @@ interface ToastState {
   dismiss: (id: string) => void
 }
 
-/** Visningstid i ms: längre när det finns en åtgärd (t.ex. Ångra). */
-export function toastDuration(t: Pick<ToastItem, 'duration' | 'action' | 'tone'>): number {
+/** Kortaste visningstid (ms): vanlig notis, felnotis och notis med åtgärd (t.ex. Ångra). */
+const MIN_DURATION = { default: 4000, error: 6000, action: 8000 } as const
+/** Längsta automatiska visningstid (ms) – längre än så stänger man själv med ✕. */
+const MAX_DURATION = 15_000
+/** Tid att uppfatta att något dök upp innan läsningen börjar (ms). */
+const NOTICE_MS = 2000
+/** Läsetid per tecken (ms) – cirka 200 ord i minuten. */
+const READ_MS_PER_CHAR = 60
+
+/**
+ * Visningstid i ms. Följer meddelandets längd (en lång förklaring ska hinna läsas, WCAG 2.2.1) men
+ * aldrig kortare än miniminivån: 4 s för vanliga notiser, 6 s för fel och 8 s när det finns en
+ * åtgärd (t.ex. Ångra). Längst 15 s. Ett eget `duration` gäller alltid. Notisen pausas dessutom
+ * medan pekaren är över eller fokus är inuti, och kan stängas med ✕.
+ */
+export function toastDuration(t: Pick<ToastItem, 'duration' | 'action' | 'tone'> & { message?: string }): number {
   if (t.duration !== undefined) return t.duration
-  if (t.action) return 8000
-  return t.tone === 'error' ? 6000 : 3000
+  const min = t.action ? MIN_DURATION.action : t.tone === 'error' ? MIN_DURATION.error : MIN_DURATION.default
+  const reading = NOTICE_MS + READ_MS_PER_CHAR * (t.message?.length ?? 0)
+  return Math.min(MAX_DURATION, Math.max(min, reading))
 }
 
 /** Pågående timers per notis – kan pausas och återupptas. */

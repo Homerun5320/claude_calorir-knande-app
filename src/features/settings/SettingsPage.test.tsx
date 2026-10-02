@@ -83,6 +83,25 @@ describe('SettingsPage – index', () => {
     expect(screen.getByRole('link', { name: /Mål och makron/ })).toHaveAttribute('href', '/installningar/mal')
   })
 
+  it('profilkortets länk heter det den visar – inte "Öppna profilen" (WCAG 2.5.3)', () => {
+    const { unmount } = renderAt('/installningar')
+    const card = screen.getByRole('link', { name: /Hej, Anna/ })
+    expect(card).toHaveAttribute('href', '/installningar/profil')
+    expect(card).not.toHaveAttribute('aria-label')
+    // Namnet innehåller den synliga texten: röststyrning ("Tryck Hej Anna") och sammanfattningen når skärmläsaren.
+    expect(card).toHaveAccessibleName(expect.stringMatching(/Hej, Anna/))
+    expect(card).toHaveAccessibleName(expect.stringMatching(/Kvinna · \d+ år · 168\scm · lätt aktiv/))
+    expect(card).toHaveAccessibleName(expect.stringMatching(/Med Lagom sedan/))
+    expect(screen.queryByRole('link', { name: 'Öppna profilen' })).not.toBeInTheDocument()
+    unmount()
+
+    useProfileStore.setState({ profile: null })
+    renderAt('/installningar')
+    const empty = screen.getByRole('link', { name: /Din profil/ })
+    expect(empty).toHaveAttribute('href', '/installningar/profil')
+    expect(empty).toHaveAccessibleName(expect.stringMatching(/Din profil.*Inte ifylld ännu/))
+  })
+
   it('har en rad för allergier och säger till när veckobudgeten är på', async () => {
     const { unmount } = renderAt('/installningar')
     const allergies = screen.getByRole('link', { name: /Allergier och överkänslighet/ })

@@ -39,12 +39,15 @@ export function Chip({ selected, icon, count, tone = 'gran', size = 'md', classN
       transition={{ type: 'spring', stiffness: 600, damping: 30 }}
       style={toneVars(tone, style)}
       className={cx(
-        // min-w-11: även smala chips ("g", "l", "1 h") blir minst 44 px breda.
-        'relative inline-flex min-w-11 shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold',
+        // min-w-11: även smala chips ("g", "l", "1 h") blir minst 44 px breda. shrink-0 behålls så att
+        // chips i rader som scrollar i sidled inte pressas ihop, men max-w-full låter en lång etikett
+        // radbrytas i stället för att göra sidan bredare än skärmen (stor text, WCAG 1.4.4/1.4.10).
+        'relative inline-flex min-w-11 max-w-full shrink-0 select-none items-center justify-center gap-1.5 rounded-full text-center font-semibold leading-snug',
         'transition-[background-color,color,box-shadow] duration-200 disabled:pointer-events-none disabled:opacity-45',
         // Osynlig utökning av tryckytan till minst 44 px höjd.
         'after:absolute after:inset-x-0 after:-inset-y-1.5',
-        size === 'sm' ? 'h-8 px-3 text-[0.8125rem]' : 'h-9 px-3.5 text-sm',
+        // min-h-* (inte h-*): enradig höjd som förut, men en radbruten etikett får chipen att växa.
+        size === 'sm' ? 'min-h-8 px-3 py-1 text-[0.8125rem]' : 'min-h-9 px-3.5 py-1.5 text-sm',
         isOn
           ? 'bg-(--tone-soft) text-(--tone-ink) ring-1 ring-inset ring-(--tone)/40'
           : 'bg-surface text-ink-2 ring-1 ring-inset ring-line hover:bg-surface-2 hover:text-ink',
@@ -52,7 +55,10 @@ export function Chip({ selected, icon, count, tone = 'gran', size = 'md', classN
       )}
     >
       {renderIcon(icon, cx(size === 'sm' ? 'size-3.5' : 'size-4', isOn ? 'text-(--tone)' : 'text-ink-3'), 2.3)}
-      {children}
+      {/* inline-flex + gap: flera barn (emoji + etikett, en `truncate`-rad) får luft och kan förkortas, som när de låg direkt i chipen. */}
+      {children !== undefined && children !== null && children !== false && (
+        <span className="inline-flex min-w-0 items-center justify-center gap-1.5 break-words">{children}</span>
+      )}
       {count !== undefined && (
         <span
           className={cx(

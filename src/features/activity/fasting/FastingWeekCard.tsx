@@ -1,9 +1,9 @@
 /**
- * Veckans fasta – antal fastor, nådda mål och snittlängd, plus en rad med veckans dagar.
- * Inga "streaks": en dag utan fasta är lika mycket värd som en dag med.
+ * Veckans fasta – antal fastor och snittlängd, plus en rad med veckans dagar. Inga "streaks" och
+ * ingen poängtavla (nådda mål, längsta fastan): en dag utan fasta är lika mycket värd som en dag
+ * med, och ett nått mål ska inte räknas eller firas.
  */
 import { memo, useMemo } from 'react'
-import { Check } from 'lucide-react'
 import { Card, Stat, cx } from '../../../components/ui'
 import { isoWeek, WEEKDAYS, WEEKDAYS_SHORT } from '../../../lib/dates'
 import { formatNumber } from '../../../lib/format'
@@ -25,9 +25,8 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
           Ingen avslutad fasta den här veckan ännu. Det är helt i sin ordning – fasta är ett val, aldrig ett måste.
         </p>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Stat size="sm" label="Fastor" value={formatNumber(w.count)} />
-          <Stat size="sm" label="Mål nådda" value={formatNumber(w.completed)} />
           <Stat size="sm" label="Snitt" value={formatNumber(w.averageMs / HOUR_MS, 1)} unit="h" />
         </div>
       )}
@@ -35,7 +34,7 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
       <ol className="mt-4 grid grid-cols-7 gap-1" aria-label="Veckans dagar">
         {w.days.map((d, i) => {
           const isToday = d.date === today
-          const status = d.status === 'klar' ? 'mål nått' : d.status === 'paborjad' ? 'fasta avslutad' : 'ingen fasta'
+          const status = d.ended ? 'fasta avslutad' : 'ingen fasta'
           return (
             <li key={d.date} className="flex flex-col items-center gap-1.5" aria-label={`${WEEKDAYS[i]}: ${status}`}>
               <span className={cx('text-[0.6875rem] font-semibold uppercase tracking-wide', isToday ? 'text-ink' : 'text-ink-3')}>
@@ -45,23 +44,15 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
                 aria-hidden
                 className={cx(
                   'grid size-8 place-items-center rounded-full',
-                  d.status === 'klar' && 'bg-blabar text-bg',
-                  d.status === 'paborjad' && 'bg-blabar-soft ring-2 ring-inset ring-blabar/50',
-                  d.status === null && 'bg-surface-2',
+                  d.ended ? 'bg-blabar-soft ring-2 ring-inset ring-blabar/50' : 'bg-surface-2',
                   isToday && 'outline outline-2 outline-offset-2 outline-line',
                 )}
-              >
-                {d.status === 'klar' && <Check className="size-4" strokeWidth={3} />}
-              </span>
+              />
             </li>
           )
         })}
       </ol>
-      {w.count > 0 && (
-        <p className="mt-3 text-xs leading-relaxed text-ink-3">
-          Längsta fastan i veckan: {formatNumber(w.longestMs / HOUR_MS, 1)}{'\u00a0'}h. Fastor räknas till dagen de avslutades.
-        </p>
-      )}
+      {w.count > 0 && <p className="mt-3 text-xs leading-relaxed text-ink-3">Fastor räknas till dagen de avslutades.</p>}
     </Card>
   )
 })

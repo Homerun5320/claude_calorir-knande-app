@@ -7,6 +7,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useToastStore } from '../../../components/ui'
+import { DialogHost } from '../../../components/ui/Dialog'
+import { clearDemoFlag, setDemoFlag } from '../../../lib/demoFlag'
 import { useBodyStore } from '../../../stores/bodyStore'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { useLicenseStore } from '../../../stores/licenseStore'
@@ -19,6 +21,7 @@ MotionGlobalConfig.skipAnimations = true
 const m = vi.hoisted(() => ({
   saveBackup: vi.fn<() => Promise<SaveOutcome>>(),
   saveFile: vi.fn<(name: string, content: string, mime?: string) => Promise<SaveOutcome>>(),
+  wipeAndReset: vi.fn<(opts?: { removeLicense?: boolean; keepOwnCopies?: boolean }) => Promise<void>>(async () => {}),
   flags: {
     inApp: false,
     sellsOnWeb: true,
@@ -35,6 +38,11 @@ vi.mock('../../../lib/backup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../lib/backup')>()),
   saveBackup: m.saveBackup,
   saveFile: m.saveFile,
+}))
+
+vi.mock('../wipe', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../wipe')>()),
+  wipeAndReset: m.wipeAndReset,
 }))
 
 vi.mock('../../../config/platform', async (importOriginal) => {
@@ -73,6 +81,7 @@ function renderSection() {
   return render(
     <MemoryRouter>
       <DataSection />
+      <DialogHost />
     </MemoryRouter>,
   )
 }
@@ -85,6 +94,8 @@ beforeEach(() => {
   Object.assign(m.flags, { inApp: false, sellsOnWeb: true, allowsKey: true, native: false, distribution: 'web', canLog: true, demo: false, ios: false })
   m.saveBackup.mockReset()
   m.saveFile.mockReset()
+  m.wipeAndReset.mockClear()
+  clearDemoFlag()
   localStorage.clear()
   useToastStore.setState({ toasts: [] })
   useDiaryStore.getState().clearDiary()
@@ -364,5 +375,17 @@ describe('byt från annan app', () => {
     renderSection()
     await chooseFile('Namn,Ålder\nAnna,30\n', 'personer.csv')
     await waitFor(() => expect(lastToast()).toMatchObject({ tone: 'error', message: 'Hittade ingen datumkolumn (Date eller Datum) i filen.' }))
+  })
+})
+
+describe('rensa exempeldata', () => {
+  it('lämnar användarens egen kopia och bilder kvar (keepOwnCopies) – bara "Radera all data" tar allt', async () => {
+    setDemoFlag()
+    renderSection()
+    fireEvent.click(screen.getByRole('button', { name: 'Rensa exempeldata' }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rensa och börja om' }))
+    await waitFor(() => expect(m.wipeAndReset).toHaveBeenCalledTimes(1))
+    expect(m.wipeAndReset).toHaveBeenCalledWith({ keepOwnCopies: true })
   })
 })

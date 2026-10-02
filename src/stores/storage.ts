@@ -21,8 +21,8 @@
  * - Sparad data som inte går att tolka (t.ex. en trasig månad i dagboken) skrivs aldrig över –
  *   nyckeln sparas bara i minnet under sessionen (`hasUnreadableData()`).
  * - Allt detta syns för användaren via `isMemoryOnlyStorage()` / `subscribeStorageStatus()`;
- *   `hasProtectedData()` säger om sparad data inte har lästs in (nyare version eller går inte att
- *   tolka) – då saknas den i en säkerhetskopia.
+ *   `hasProtectedData()` säger om sparad data inte har lästs in (nyare version, går inte att tolka
+ *   eller läsningen tar lång tid, `hasSlowReads()`) – då saknas den i en säkerhetskopia.
  *
  * Skydden ligger i `guardedRead`/`guardedWrite`/`guardedRemove` och används både av den vanliga
  * lagringen här (en JSON-sträng per butik) och av dagbokens egen lagring (diaryMonthStorage.ts,
@@ -322,7 +322,13 @@ export async function guardedRead<T>(name: string, read: () => Promise<ReadResul
           notify()
           lateReadListeners.forEach((l) => l(name))
         },
-        (e) => markBroken(e),
+        (e) => {
+          // Läsningen misslyckades till slut: det är inte längre en långsam läsning utan en
+          // lagring som inte går att använda (minnesläge) – visa inte "läses in långsamt" för alltid.
+          const wasSlow = slowReads.delete(name)
+          markBroken(e)
+          if (wasSlow) notify()
+        },
       )
       return memoryValue<T>(name)
     }
@@ -429,8 +435,8 @@ export const idbStorage = createJSONStorage(() => idbStateStorage)
 
 /**
  * true om ändringar just nu inte sparas på enheten: IndexedDB saknas eller är blockerad, en
- * skrivning har misslyckats, sparad data har ännu inte kunnat läsas in, sparad data kommer från en
- * nyare version av appen eller sparad data går inte att tolka.
+ * skrivning har misslyckats, sparad data har ännu inte kunnat läsas in (`hasSlowReads()`), sparad
+ * data kommer från en nyare version av appen eller sparad data går inte att tolka.
  */
 export function isMemoryOnlyStorage(): boolean {
   return !idbAvailable() || failedWrites.size > 0 || slowReads.size > 0 || newerData.size > 0 || unreadable.size > 0
@@ -454,12 +460,26 @@ export function hasUnreadableData(): boolean {
 }
 
 /**
- * true om sparad data inte har lästs in och skyddas: den kommer från en nyare version eller går inte
- * att tolka. En säkerhetskopia som görs då innehåller bara det som gjorts under sessionen – då ska
- * påminnelsen om säkerhetskopia inte tystna (`markBackupNow`).
+ * true om någon butik har sparad data vars läsning tar lång tid (mer än `READ_TIMEOUT_MS` – en
+ * stor dagbok på en äldre telefon eller en hängande webbvy). Appen visas då med tomma standardvärden,
+ * men inget är raderat: datan läses in när läsningen blir klar (`onLateRead`) och nyckeln skrivs
+ * aldrig över under tiden. Det är inte lagringens fel – visa "läses in långsamt" i stället för
+ * "Webbläsaren låter inte Lagom spara" (lib/storageTexts.ts). Blir false när läsningen är klar, och
+ * för en nyckel som visar sig vara från en nyare version eller inte går att tolka (då gäller
+ * `hasNewerData()`/`hasUnreadableData()`).
+ */
+export function hasSlowReads(): boolean {
+  return slowReads.size > 0
+}
+
+/**
+ * true om sparad data inte har lästs in och skyddas: den kommer från en nyare version, går inte att
+ * tolka eller läses fortfarande in (`hasSlowReads()`). En säkerhetskopia som görs då innehåller bara
+ * det som gjorts under sessionen – då ska påminnelsen om säkerhetskopia inte tystna
+ * (`markBackupNow`), annars ser en nästan tom fil ut som en fullgod kopia.
  */
 export function hasProtectedData(): boolean {
-  return newerData.size > 0 || unreadable.size > 0
+  return newerData.size > 0 || unreadable.size > 0 || slowReads.size > 0
 }
 
 /**
@@ -523,8 +543,8 @@ export function releaseNewerData(keep: readonly string[] = []): void {
 }
 
 /**
- * Prenumerera på ändringar av `isMemoryOnlyStorage()`, `hasNewerData()`, `hasUnreadableData()` och
- * `hasProtectedData()`. Returnerar avprenumeration.
+ * Prenumerera på ändringar av `isMemoryOnlyStorage()`, `hasNewerData()`, `hasUnreadableData()`,
+ * `hasSlowReads()` och `hasProtectedData()`. Returnerar avprenumeration.
  */
 export function subscribeStorageStatus(listener: () => void): () => void {
   statusListeners.add(listener)

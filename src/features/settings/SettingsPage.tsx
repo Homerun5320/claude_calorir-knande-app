@@ -215,7 +215,9 @@ function SettingsIndex() {
       <PageHeader title="Inställningar" subtitle="Gör Lagom till din. Allt sparas bara på din enhet." />
 
       <div className="flex flex-col gap-6">
-        <Card to="/installningar/profil" padding="md" aria-label="Öppna profilen">
+        {/* Ingen aria-label: länkens namn är den synliga texten (namn, sammanfattning, "Med Lagom sedan …"), annars
+            hör skärmläsaren inte sammanfattningen och "Tryck Hej Anna" fungerar inte med röststyrning (WCAG 2.5.3). */}
+        <Card to="/installningar/profil" padding="md">
           <div className="flex items-center gap-4">
             <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-gran-soft font-display text-[1.5rem] font-semibold text-gran">
               {initial || <UserRound className="size-6" />}

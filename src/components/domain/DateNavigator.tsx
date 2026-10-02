@@ -8,6 +8,9 @@
  * - Framtida dagar tillåts för planering, som standard upp till 7 dagar fram.
  * - Veckodagen skrivs med stor bokstav först i en rad och med liten mitt i en mening
  *   ("Föregående dag, tisdag 23 september").
+ * - Byter dagen (pilarna, svepet, datumväljaren, "Till idag" eller en ändring utifrån) läser en
+ *   osynlig statusregion upp den nya dagen för skärmläsare ("Visar tisdag 29 september, vecka 40"),
+ *   annars blir fokus kvar på en knapp vars etikett inte säger vilken dag som visas (WCAG 4.1.3).
  */
 import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
@@ -29,6 +32,13 @@ import {
 /** Mitt i en mening: "Tisdag 23 september" → "tisdag 23 september". */
 function midSentence(s: string): string {
   return s.charAt(0).toLocaleLowerCase('sv-SE') + s.slice(1)
+}
+
+/** Dagen som den läses upp: "Igår, lördag 26 september, vecka 39" (bara "Tisdag 29 september" för vanliga dagar). */
+function spokenDay(date: ISODate, today: ISODate, showWeek: boolean): string {
+  const label = relativeDayLabel(date, today)
+  const fullLabel = formatDayLong(date, today)
+  return `${label === fullLabel ? fullLabel : `${label}, ${midSentence(fullLabel)}`}${showWeek ? `, vecka ${isoWeek(date)}` : ''}`
 }
 
 // ---------------------------------------------------------------------------
@@ -128,8 +138,11 @@ export function DateNavigator({
   // Riktning för animationen härleds från föregående datum (Reacts mönster för "förra propen").
   const [prevDate, setPrevDate] = useState(date)
   const [direction, setDirection] = useState(0)
+  // Texten till statusregionen finns först efter en ändring – inget läses upp när sidan öppnas.
+  const [announcement, setAnnouncement] = useState('')
   if (prevDate !== date) {
     setDirection(date > prevDate ? 1 : -1)
+    setAnnouncement(`Visar ${midSentence(spokenDay(date, today, showWeek))}`)
     setPrevDate(date)
   }
 
@@ -167,8 +180,7 @@ export function DateNavigator({
     : showWeek
       ? week
       : ''
-  const fullLabel = formatDayLong(date, today)
-  const dateLabel = `${label === fullLabel ? fullLabel : `${label}, ${midSentence(fullLabel)}`}${showWeek ? `, vecka ${isoWeek(date)}` : ''}. Välj datum`
+  const dateLabel = `${spokenDay(date, today, showWeek)}. Välj datum`
   const offset = reduced ? 0 : 28
 
   return (
@@ -249,6 +261,10 @@ export function DateNavigator({
           }}
           className="pointer-events-none absolute bottom-0 left-1/2 h-px w-px opacity-0"
         />
+        {/* Finns i DOM:en från start (en region som dyker upp med text läses inte alltid upp). */}
+        <span role="status" className="sr-only">
+          {announcement}
+        </span>
       </div>
 
       <button

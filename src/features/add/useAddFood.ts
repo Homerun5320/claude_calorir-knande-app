@@ -140,15 +140,23 @@ function undoer(entries: readonly DiaryEntry[], fx: FoodEffects): () => void {
 }
 
 /**
+ * Ska livsmedlet sparas lokalt? Gäller det som inte finns i den inbyggda databasen eller bland
+ * användarens egna – främst produkter från Open Food Facts.
+ */
+function shouldCacheOnline(food: Food): boolean {
+  if (food.source === 'custom' || food.source === 'recipe' || food.source === 'lagom') return false
+  if (food.id.startsWith('custom:') || food.id.startsWith('recipe:') || food.id.startsWith('lagom:')) return false
+  if (food.source === 'livsmedelsverket' && getBuiltinCatalog()?.byId.has(food.id)) return false
+  return true
+}
+
+/**
  * Spara livsmedel som inte finns i den inbyggda databasen eller bland användarens egna – främst
  * produkter från Open Food Facts – så att dagboken, sökningen och streckkoden fungerar offline.
+ * Skriver inget om en identisk kopia redan finns (`cacheFood`).
  */
 export function cacheIfOnline(food: Food): void {
-  const store = useFoodStore.getState()
-  if (food.source === 'custom' || food.source === 'recipe' || food.source === 'lagom') return
-  if (food.id.startsWith('custom:') || food.id.startsWith('recipe:') || food.id.startsWith('lagom:')) return
-  if (food.source === 'livsmedelsverket' && getBuiltinCatalog()?.byId.has(food.id)) return
-  store.cacheFood(food)
+  if (shouldCacheOnline(food)) useFoodStore.getState().cacheFood(food)
 }
 
 /** Kort sammanfattning av ett livsmedel för en sparad måltid (utan onödigt stora fält). */
@@ -177,19 +185,33 @@ export function useAddFood(action: BlockedAction = 'mat'): UseAddFoodResult {
       })
     }
 
-    /** Uppdatera statistik och offlinekopia – och notera ändringarna i `fx` för "Ångra". */
-    const record = (food: Food, amount: number, unit: UnitKey, meal: MealId, fx: FoodEffects) => {
-      const store = useFoodStore.getState()
-      // Statistiken förs på det id som gäller i dag (`recordUsage` följer alias för gamla id:n).
-      const usageId = canonicalFoodId(food.id)
-      const prev = fx.usage.get(usageId)
-      const before = prev ? prev.before : store.usage[usageId]
-      const wasCached = food.id in store.cachedFoods
-      store.recordUsage(food.id, amount, unit, meal)
-      cacheIfOnline(food)
+    /**
+     * Uppdatera statistik och offlinekopior för alla poster med EN skrivning av livsmedelsbutiken
+     * (en hel korg ger inte en skrivning per rad) – och notera ändringarna i `fx` för "Ångra".
+     */
+    const record = (items: readonly AddItem[], meal: MealId, fx: FoodEffects) => {
+      const before = useFoodStore.getState()
+      const toCache = items.map((i) => i.food).filter(shouldCacheOnline)
+      // `recordUsages` följer alias för gamla id:n.
+      before.recordUsages(
+        items.map((i) => ({ foodId: i.food.id, amount: i.amount, unit: i.unit, meal })),
+        toCache,
+      )
       const after = useFoodStore.getState()
-      fx.usage.set(usageId, { before, after: after.usage[usageId], times: (prev?.times ?? 0) + 1, meal })
-      if (!wasCached && food.id in after.cachedFoods) fx.cached.add(food.id)
+      for (const { food } of items) {
+        // Statistiken förs på det id som gäller i dag.
+        const usageId = canonicalFoodId(food.id)
+        const prev = fx.usage.get(usageId)
+        fx.usage.set(usageId, {
+          before: prev ? prev.before : before.usage[usageId],
+          after: after.usage[usageId],
+          times: (prev?.times ?? 0) + 1,
+          meal,
+        })
+      }
+      for (const food of toCache) {
+        if (!(food.id in before.cachedFoods) && food.id in after.cachedFoods) fx.cached.add(food.id)
+      }
     }
 
     const toEntry = (item: AddItem, target: AddTarget): NewDiaryEntry | null => {
@@ -217,7 +239,7 @@ export function useAddFood(action: BlockedAction = 'mat'): UseAddFoodResult {
       }
       const entries = useDiaryStore.getState().addEntries(drafts)
       const fx = newFoodEffects()
-      for (const item of valid) record(item.food, item.amount, item.unit, target.meal, fx)
+      record(valid, target.meal, fx)
       const n = entries.length
       notify(entries, fx, `${countLabel(n)} ${n === 1 ? 'tillagt' : 'tillagda'} i ${nameOf(target.meal)}`, opts)
       return entries
@@ -233,7 +255,7 @@ export function useAddFood(action: BlockedAction = 'mat'): UseAddFoodResult {
         }
         const entry = useDiaryStore.getState().addEntry(draft)
         const fx = newFoodEffects()
-        record(food, amount, unit, target.meal, fx)
+        record([{ food, amount, unit }], target.meal, fx)
         notify([entry], fx, `Tillagt i ${nameOf(target.meal)}`, opts)
         return entry
       },

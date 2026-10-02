@@ -67,6 +67,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useToday } from '../../hooks/useToday'
+import { useTopBarPadding } from '../../hooks/useBottomBarPadding'
 import { useFoodResolver } from '../../hooks/useFood'
 import { useFavoriteFoods, useFoodSearch, useRecentFoods } from '../../hooks/useFoodSearch'
 import { recipeFood } from '../../lib/foodRepo'
@@ -172,6 +173,8 @@ export default function AddFoodPage() {
   const [query, setQuery] = useState(() => params.get('q') ?? '')
   const q = query.trim()
   const searchRef = useRef<HTMLInputElement>(null)
+  // Det klibbiga sökfältet täcker överkanten: tangentbordsfokus i träfflistan ska inte hamna under det.
+  const searchBarRef = useTopBarPadding()
   // Röstsökning: texten fylls i sökfältet medan man pratar. Att skriva själv avbryter lyssnandet.
   const voice = useVoiceSearch(setQuery)
   const { cancel: cancelVoice } = voice
@@ -354,7 +357,7 @@ export default function AddFoodPage() {
         <MealChips value={meal} onChange={(m) => setParam('maltid', m)} />
       </PageHeader>
 
-      <div className="sticky top-[calc(3.5rem_+_var(--sa-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
+      <div ref={searchBarRef} className="sticky top-[calc(3.5rem_+_var(--sa-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
         <TextField
           ref={searchRef}
           label="Sök livsmedel"

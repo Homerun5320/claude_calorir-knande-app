@@ -87,7 +87,7 @@ export default function FoodCalendarPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: reduce ? 0 : i * 0.05, type: 'spring', stiffness: 300, damping: 30 }}
                 >
-                  <Card onClick={() => setOpen(d)} tone={d.weekly ? 'hjortron' : 'sol'} aria-label={`${d.name}. Läs mer`}>
+                  <Card onClick={() => setOpen(d)} tone={d.weekly ? 'hjortron' : 'sol'}>
                     <div className="flex items-start gap-4">
                       <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-[1.25rem] bg-surface text-[2.25rem] leading-none shadow-card">
                         {d.emoji}

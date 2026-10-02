@@ -5,6 +5,9 @@
  * Segmenten ritas som bågar med rundade ändar och en jämn luft mellan sig. Mitten är en fri yta
  * (`children`) – när användaren pekar på ett segment eller en rad i teckenförklaringen visas
  * segmentets värde och andel där i stället.
+ *
+ * Medvetet läge (`hideNumbers`): inga siffror – varken i teckenförklaringen, vid tryck på ett
+ * segment eller i skärmläsartexten (en egen `summary` med siffror ignoreras då).
  */
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -38,6 +41,11 @@ export interface DonutChartProps {
   legend?: 'bottom' | 'right' | 'none'
   /** Visa procentandel i teckenförklaringen. Standard true. */
   showPercent?: boolean
+  /**
+   * Medvetet läge: visa inga värden eller procent (teckenförklaring, tryck på segment) och läs
+   * inte upp några siffror – `summary` ignoreras och skärmläsartexten nämner bara segmenten.
+   */
+  hideNumbers?: boolean
   title?: string
   summary?: string
   className?: string
@@ -54,6 +62,7 @@ export function DonutChart({
   formatValue,
   legend,
   showPercent = true,
+  hideNumbers = false,
   title = 'Fördelning',
   summary,
   className = '',
@@ -88,11 +97,13 @@ export function DonutChart({
   const activeArc = arcs.find((a) => a.s.key === active)
   const shareOf = (s: DonutSegment) => (sum > 0 && s.value > 0 ? (s.value / sum) * 100 : 0)
 
-  const autoSummary =
-    summary ??
-    (sum > 0
-      ? `${title}: ${segments.map((s) => `${s.label} ${fmt(Math.max(0, s.value))} (${formatPercent(shareOf(s))})`).join(', ')}.`
-      : `${title}: ingen data ännu.`)
+  const noData = `${title}: ingen data ännu.`
+  const autoSummary = hideNumbers
+    ? sum > 0
+      ? `${title}: ${positive.map((s) => s.label.toLowerCase()).join(', ')}.`
+      : noData
+    : (summary ??
+      (sum > 0 ? `${title}: ${segments.map((s) => `${s.label} ${fmt(Math.max(0, s.value))} (${formatPercent(shareOf(s))})`).join(', ')}.` : noData))
 
   const ring = (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -154,8 +165,12 @@ export function DonutChart({
         {activeArc ? (
           <div className="px-3">
             <div className="eyebrow">{activeArc.s.label}</div>
-            <div className="font-display text-xl font-semibold leading-tight text-ink tabular-nums">{fmt(activeArc.s.value)}</div>
-            <div className="text-xs text-ink-3 tabular-nums">{formatPercent(activeArc.share * 100)}</div>
+            {!hideNumbers && (
+              <>
+                <div className="font-display text-xl font-semibold leading-tight text-ink tabular-nums">{fmt(activeArc.s.value)}</div>
+                <div className="text-xs text-ink-3 tabular-nums">{formatPercent(activeArc.share * 100)}</div>
+              </>
+            )}
           </div>
         ) : (
           children
@@ -182,8 +197,8 @@ export function DonutChart({
           >
             <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: s.color }} aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate text-ink-2">{s.label}</span>
-            <span className="font-semibold text-ink tabular-nums">{fmt(Math.max(0, s.value))}</span>
-            {showPercent && <span className="w-11 text-right text-xs text-ink-3 tabular-nums">{formatPercent(shareOf(s))}</span>}
+            {!hideNumbers && <span className="font-semibold text-ink tabular-nums">{fmt(Math.max(0, s.value))}</span>}
+            {showPercent && !hideNumbers && <span className="w-11 text-right text-xs text-ink-3 tabular-nums">{formatPercent(shareOf(s))}</span>}
           </li>
         ))}
       </ul>

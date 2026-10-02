@@ -183,15 +183,9 @@ export function fastDurationMs(rec: Pick<FastRecord, 'start' | 'end'>): number {
   return Math.max(0, rec.end - rec.start)
 }
 
-/** Nåddes målet? */
+/** Nåddes målet? Används bara för en saklig text – målen räknas aldrig ihop eller visas som poäng. */
 export function fastSucceeded(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): boolean {
   return fastDurationMs(rec) >= rec.targetHours * HOUR_MS - SUCCESS_TOLERANCE_MS
-}
-
-/** Andel av målet, 0–1+. */
-export function fastRatio(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): number {
-  const target = rec.targetHours * HOUR_MS
-  return target > 0 ? fastDurationMs(rec) / target : 0
 }
 
 /** En fasta hör till dagen den avslutades. */
@@ -201,12 +195,10 @@ export function fastDate(rec: Pick<FastRecord, 'end'>): ISODate {
 
 export interface FastingWeek {
   count: number
-  completed: number
   totalMs: number
   averageMs: number
-  longestMs: number
-  /** Per dag i veckan: 'klar' om ett mål nåddes, 'pabörjad' om en fasta avslutades, annars null. */
-  days: Array<{ date: ISODate; status: 'klar' | 'paborjad' | null }>
+  /** Per dag i veckan: avslutades en fasta den dagen? Ingen poängtavla – målen räknas inte. */
+  days: Array<{ date: ISODate; ended: boolean }>
 }
 
 /**
@@ -225,30 +217,26 @@ export function fastingWeek(history: readonly FastRecord[], dates: readonly ISOD
     else byDay.set(d, [rec])
   }
   let count = 0
-  let completed = 0
   let totalMs = 0
-  let longestMs = 0
   for (const list of byDay.values()) {
     for (const rec of list) {
-      const ms = fastDurationMs(rec)
       count++
-      totalMs += ms
-      if (ms > longestMs) longestMs = ms
-      if (fastSucceeded(rec)) completed++
+      totalMs += fastDurationMs(rec)
     }
   }
-  const days = dates.map((date) => {
-    const list = byDay.get(date)
-    const status: 'klar' | 'paborjad' | null = !list ? null : list.some(fastSucceeded) ? 'klar' : 'paborjad'
-    return { date, status }
-  })
-  return { count, completed, totalMs, averageMs: count > 0 ? totalMs / count : 0, longestMs, days }
+  const days = dates.map((date) => ({ date, ended: byDay.has(date) }))
+  return { count, totalMs, averageMs: count > 0 ? totalMs / count : 0, days }
 }
 
-/** Vänlig text när en fasta avslutas. */
+/**
+ * Saklig text när en fasta avslutas. Ingen beröm och inget firande när målet nåddes – att fira
+ * att man avstått från mat kan vara en risk för den som har eller har haft en ätstörning (se
+ * lib/milestones). Avslutas fastan före målet är det helt okej att lyssna på kroppen.
+ */
 export function endMessage(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): string {
-  if (fastSucceeded(rec)) return `Snyggt – ${formatFastDuration(fastDurationMs(rec))} fasta är sparad.`
-  return `Fastan är sparad (${formatFastDuration(fastDurationMs(rec))}). Bra att lyssna på kroppen.`
+  const duration = formatFastDuration(fastDurationMs(rec))
+  if (fastSucceeded(rec)) return `Fastan är sparad (${duration}).`
+  return `Fastan är sparad (${duration}). Det är helt okej att lyssna på kroppen.`
 }
 
 /** Senast använda protokoll, eller standard. */

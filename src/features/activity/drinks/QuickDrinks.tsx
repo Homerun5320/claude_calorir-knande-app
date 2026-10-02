@@ -93,7 +93,8 @@ export const QuickDrinks = memo(function QuickDrinks({ options, kind, date, mind
 
   if (!catalog) {
     return (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-busy="true" aria-label="Laddar snabbval">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="status" aria-busy="true">
+        <span className="sr-only">Laddar snabbval …</span>
         {options.slice(0, 4).map((o) => (
           <Skeleton key={o.slug} className="h-16 rounded-2xl" />
         ))}

@@ -18,6 +18,9 @@
  *   följer aldrig med: avsändaren kan ha fel och länken kan vara ändrad. Hos mottagaren saknar de
  *   inbäddade livsmedlen därför allergenuppgifter ("Lagom har inga uppgifter om allergener …"), och
  *   receptets märkningar räknas fram ur Lagoms egna livsmedel (`recipeTags`). Vegansk blir vegetarisk.
+ * - Källänken (`sourceUrl`) delas bara som sidans adress över https: det som kommer efter "?" och "#"
+ *   (spårnings- och prenumerant-id i länkar från sociala medier och nyhetsbrev) följer aldrig med,
+ *   varken ut eller in. Delningsarket säger att länken till källan är med.
  *
  * Länken: webbplatsens adress + `#/dela?d=<data>`, där `<data>` är `z.` + base64url av JSON:en
  * komprimerad med `CompressionStream('deflate-raw')`, eller `j.` + base64url av okomprimerad JSON
@@ -273,13 +276,23 @@ function isUnitSyntax(v: unknown): v is UnitKey {
   return v.startsWith('portion:') && PORTION_ID.test(v.slice('portion:'.length))
 }
 
-/** En källänk som får delas: bara https, högst 2 000 tecken. */
+/**
+ * En källänk som får delas: bara https, högst 2 000 tecken och utan inloggningsuppgifter. Bara sidans
+ * adress följer med (protokoll, värd och sökväg) – aldrig det som kommer efter "?" eller "#". Länkar
+ * som kopierats från sociala medier och nyhetsbrev bär ofta spårnings- och prenumerant-id
+ * (`fbclid`, `igshid`, `utm_*`, `subscriber=…`), och en delad länk kan vidarebefordras av vem som
+ * helst. Avsändarens egen sparade länk ändras inte. Samma regel gäller en länk som läses in, så en
+ * äldre delning med parametrar sparas också utan dem.
+ */
 function shareableSourceUrl(url: string | undefined): string | undefined {
   if (!url || url.length > SHARE_LIMITS.sourceUrl) return undefined
   try {
     const u = new URL(url)
+    if (u.protocol !== 'https:' || u.username || u.password) return undefined
+    u.search = ''
+    u.hash = ''
     const out = u.toString()
-    return u.protocol === 'https:' && out.length <= SHARE_LIMITS.sourceUrl && !u.username && !u.password ? out : undefined
+    return out.length <= SHARE_LIMITS.sourceUrl ? out : undefined
   } catch {
     return undefined
   }
@@ -1007,7 +1020,8 @@ export function importShare(payload: SharePayload, lookup: ResolveOptions['looku
   const store = useFoodStore.getState()
   const resolved = resolveShare(payload, { lookup, customFoods: store.customFoods, now })
   if (resolved.missing.length > 0) return null
-  for (const food of resolved.newFoods) store.addCustomFood(food)
+  // En enda skrivning av butiken för alla nya livsmedel (varje set() skriver om hela butiken).
+  store.addCustomFoods(resolved.newFoods)
   if (resolved.kind === 'recipe') {
     store.saveRecipe(resolved.recipe)
     return { kind: 'recipe', id: resolved.recipe.id, name: resolved.name, newFoods: resolved.newFoods.length }

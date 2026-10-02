@@ -460,7 +460,7 @@ export default function AboutPage() {
         <Card tone="blabar">
           <div className="flex items-start gap-3">
             <Stethoscope aria-hidden className="mt-0.5 size-5 shrink-0 text-(--tone-ink)" />
-            <div>
+            <div className="min-w-0">
               <h2 className="font-display text-[1.1875rem] font-semibold tracking-tight text-ink">Inte en medicinteknisk produkt</h2>
               <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-ink-2">
                 Lagom ger allmän information om mat och näring och ersätter inte råd från vården. Mål och beräkningar är uppskattningar. Har du en sjukdom,

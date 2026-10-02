@@ -109,6 +109,42 @@ export function migrateFoodRefs<T extends FoodRefs>(state: T, aliases: ReadonlyM
   return { ...state, favorites: nextFavorites, usage: nextUsage }
 }
 
+/** Ett tillfälle då ett livsmedel loggades – underlag för användningsstatistiken (`recordUsages`). */
+export interface UsageInput {
+  foodId: string
+  amount: number
+  unit: UnitKey
+  meal: MealId
+}
+
+/**
+ * Samma livsmedel, värde för värde? En färsk sökträff från Open Food Facts är ett nytt objekt varje
+ * gång, så jämförelsen går på innehållet – annars skrivs hela butiken om utan att något ändrats.
+ */
+function sameFood(a: Food, b: Food): boolean {
+  if (a === b) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Lägg till eller byt ut sparade onlinelivsmedel. Ger `null` när inget ändras (ingen skrivning),
+ * annars en ny samling – originalet rörs aldrig.
+ */
+function withCachedFoods(cur: Record<string, Food>, foods: readonly Food[]): Record<string, Food> | null {
+  let next: Record<string, Food> | null = null
+  for (const f of foods) {
+    const have = (next ?? cur)[f.id]
+    if (have && sameFood(have, f)) continue
+    next ??= { ...cur }
+    next[f.id] = f
+  }
+  return next
+}
+
 interface FoodState {
   /** Egna livsmedel (id 'custom:*'). */
   customFoods: Record<string, Food>
@@ -121,13 +157,23 @@ interface FoodState {
   templates: MealTemplate[]
 
   addCustomFood: (f: Food) => void
+  /** Flera egna livsmedel med en enda skrivning av butiken (importer, delning). Tom lista gör inget. */
+  addCustomFoods: (foods: readonly Food[]) => void
   updateCustomFood: (id: string, patch: Partial<Food>) => void
   removeCustomFood: (id: string) => void
   saveRecipe: (r: Recipe) => void
   removeRecipe: (id: string) => void
+  /** Spara ett onlinelivsmedel för offlinebruk. Skriver inget om en identisk kopia redan finns. */
   cacheFood: (f: Food) => void
+  /** Spara flera onlinelivsmedel med en enda skrivning – hoppar över dem som redan är sparade oförändrade. */
+  cacheFoods: (foods: readonly Food[]) => void
   toggleFavorite: (id: string) => void
   recordUsage: (foodId: string, amount: number, unit: UnitKey, meal: MealId) => void
+  /**
+   * Räkna flera loggningar (och spara onlinelivsmedlen i `cache`) med EN skrivning av butiken – en
+   * hel måltid eller korg ska aldrig skriva om hela butiken en gång per rad.
+   */
+  recordUsages: (items: readonly UsageInput[], cache?: readonly Food[]) => void
   saveTemplate: (t: MealTemplate) => void
   removeTemplate: (id: string) => void
   clearFoods: () => void
@@ -143,7 +189,14 @@ export const useFoodStore = create<FoodState>()(
       usage: {},
       templates: [],
 
-      addCustomFood: (f) => set({ customFoods: { ...get().customFoods, [f.id]: { ...f, createdAt: f.createdAt ?? Date.now(), updatedAt: Date.now() } } }),
+      addCustomFood: (f) => get().addCustomFoods([f]),
+      addCustomFoods: (foods) => {
+        if (foods.length === 0) return
+        const now = Date.now()
+        const customFoods = { ...get().customFoods }
+        for (const f of foods) customFoods[f.id] = { ...f, createdAt: f.createdAt ?? now, updatedAt: now }
+        set({ customFoods })
+      },
       updateCustomFood: (id, patch) => {
         const cur = get().customFoods[id]
         if (!cur) return
@@ -160,25 +213,39 @@ export const useFoodStore = create<FoodState>()(
         delete next[id]
         set({ recipes: next, favorites: get().favorites.filter((f) => f !== id) })
       },
-      cacheFood: (f) => set({ cachedFoods: { ...get().cachedFoods, [f.id]: f } }),
+      cacheFood: (f) => get().cacheFoods([f]),
+      cacheFoods: (foods) => {
+        const cachedFoods = withCachedFoods(get().cachedFoods, foods)
+        if (cachedFoods) set({ cachedFoods })
+      },
       toggleFavorite: (id) => {
         const favs = get().favorites
         set({ favorites: favs.includes(id) ? favs.filter((f) => f !== id) : [id, ...favs] })
       },
-      recordUsage: (rawId, rawAmount, rawUnit, meal) => {
-        // Ett gammalt id (t.ex. från en sparad måltid) räknas på ersättaren.
-        const alias = resolveFoodAlias(rawId)
-        const foodId = alias?.to ?? rawId
-        const { amount, unit } = aliasAmount(alias, rawAmount, rawUnit)
-        const cur = get().usage[foodId]
-        const next: FoodUsage = {
-          count: (cur?.count ?? 0) + 1,
-          lastUsed: Date.now(),
-          lastAmount: amount,
-          lastUnit: unit,
-          meals: { ...cur?.meals, [meal]: (cur?.meals?.[meal] ?? 0) + 1 },
+      recordUsage: (foodId, amount, unit, meal) => get().recordUsages([{ foodId, amount, unit, meal }]),
+      recordUsages: (items, cache = []) => {
+        const cachedFoods = withCachedFoods(get().cachedFoods, cache)
+        if (items.length === 0) {
+          if (cachedFoods) set({ cachedFoods })
+          return
         }
-        set({ usage: { ...get().usage, [foodId]: next } })
+        const now = Date.now()
+        const usage = { ...get().usage }
+        for (const { foodId: rawId, amount: rawAmount, unit: rawUnit, meal } of items) {
+          // Ett gammalt id (t.ex. från en sparad måltid) räknas på ersättaren.
+          const alias = resolveFoodAlias(rawId)
+          const foodId = alias?.to ?? rawId
+          const { amount, unit } = aliasAmount(alias, rawAmount, rawUnit)
+          const cur = usage[foodId]
+          usage[foodId] = {
+            count: (cur?.count ?? 0) + 1,
+            lastUsed: now,
+            lastAmount: amount,
+            lastUnit: unit,
+            meals: { ...cur?.meals, [meal]: (cur?.meals?.[meal] ?? 0) + 1 },
+          }
+        }
+        set(cachedFoods ? { usage, cachedFoods } : { usage })
       },
       saveTemplate: (t) => set({ templates: [t, ...get().templates.filter((x) => x.id !== t.id)] }),
       removeTemplate: (id) => set({ templates: get().templates.filter((x) => x.id !== id) }),

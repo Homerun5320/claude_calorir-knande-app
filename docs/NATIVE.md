@@ -294,7 +294,7 @@ bra på Linux). Inställningar:
 | --- | --- |
 | `Info.plist` | `CFBundleDisplayName` Lagom, `CFBundleDevelopmentRegion` **sv** och `CFBundleLocalizations` [sv] (systemets knappar och dialoger i appen blir svenska), `ITSAppUsesNonExemptEncryption` **false**, bara **porträtt**, `UIRequiredDeviceCapabilities` arm64 |
 | `NSCameraUsageDescription` | "Lagom använder kameran för att läsa streckkoder på förpackningar – de bilderna sparas inte. Om du slår på framstegsbilder kan du också ta bilder på dig själv; de sparas bara i appen på din iPhone och lämnar den aldrig." |
-| `NSHealthShareUsageDescription` | "Om du vill läser Lagom vikt och steg från Hälsa – vikten hamnar i viktkurvan och stegen under Träning. Uppgifterna stannar på din iPhone." |
+| `NSHealthShareUsageDescription` | "Om du vill, läser Lagom vikt och steg från Hälsa – vikten hamnar i viktkurvan och stegen under Träning. Uppgifterna stannar på din iPhone." |
 | `NSHealthUpdateUsageDescription` | "Lagom sparar vikt, energi från måltider och vatten som du loggar i Hälsa om du vill. Inget skickas någon annanstans." |
 | `NSPhotoLibraryAddUsageDescription` | "Om du vill spara en produktbild i Bilder behöver Lagom lov att lägga till den där. Lagom kan inte se ditt bildbibliotek, och framstegsbilder sparas aldrig i Bilder." – en reserv: webbvyns meny "Spara bild" är avstängd i appen (`-webkit-touch-callout: none`), men utan texten skulle iOS avsluta appen om en bild ändå sparas (t.ex. via delningsbladet). Ingen läsbehörighet (`NSPhotoLibraryUsageDescription`). |
 | `App.entitlements` | HealthKit (`com.apple.developer.healthkit`). Slå också på **HealthKit** och **In-App Purchase** för Bundle ID:t på developer.apple.com (*Identifiers*) – annars misslyckas signeringen. |
@@ -314,6 +314,7 @@ bra på Linux). Inställningar:
   inte med – den ska bara skydda mot att lagringen rensas på samma telefon, och inte bli en andra
   kopia av dagboken (med vikter från Apple Hälsa) i säkerhetskopian. Kopior från de första
   testbyggena (i `Documents`) läses som reserv och tas bort när en ny kopia har skrivits.
+- **Zoom och text:** `zoomEnabled: true` är satt för både iPhone och Android i `capacitor.config.ts` (Capacitors standard är false och stänger då webbvyns nypning helt – WCAG 1.4.4). iPhones "Större text" (Dynamic Type) följer inte med in i en webbvy och är inte mappad: deklarera därför **inte** stöd för "Större text" i tillgänglighetsformuläret (*Accessibility Nutrition Labels*) i App Store Connect.
 - Xcode 26 (iOS 26-SDK) krävs för uppladdning till App Store sedan april 2026.
 - Swift-paketen hämtas från GitHub vid första bygget (`capacitor-swift-pm` låst till 8.5.2,
   `OSBarcodeLib-iOS` och `ion-ios-filesystem` från tilläggen). Checka in
@@ -372,7 +373,7 @@ Hemskärmswidgeten kräver **ingen** behörighet (se [Hemskärmswidgeten](#hemsk
 - **Play Console → Appinnehåll → Hälsoappar / Health Connect:** deklarera varje datatyp med
   motivering, t.ex.:
   - *Vikt (läsa/skriva):* "Visar viktkurvan i Lagom och sparar vikt som användaren loggar i Health Connect, om användaren vill."
-  - *Steg (läsa):* "Visar dagens steg i Lagoms träningsvy. Användaren kan själv lägga till steg utöver sin vardag som aktivitet."
+  - *Steg (läsa):* "Fyller i stegen för idag och de sex föregående dagarna i Lagoms träningsvy. Användaren kan själv lägga till steg utöver sin vardag som aktivitet."
   - *Näring och vatten (skriva):* "Sparar energi från loggade måltider och druckna glas i Health Connect när dagen är avslutad, om användaren vill."
 - Data från Health Connect sparas bara på telefonen och skickas inte vidare – enligt Googles
   definition samlas den alltså inte in (Data safety), men den ska ändå beskrivas i

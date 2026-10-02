@@ -22,7 +22,7 @@ import { NUTRIENTS, type NutrientKey } from './nutrients'
 import { todayISO } from './dates'
 import { mealName } from './meals'
 import { isRawUnit, unitLabel } from './units'
-import { describeRepairs, sanitizeBackupData, skippedCount, type BackupRepairs } from './backupValidation'
+import { describeRepairs, onePerDate, sanitizeBackupData, skippedCount, sortByCreatedAt, sortFastsNewestFirst, type BackupRepairs } from './backupValidation'
 import { MAX_EXTRAS_PER_WEEK, MAX_ITEMS_PER_DAY, type PlanData, type WeekShopping } from './planning'
 
 export const BACKUP_FORMAT = 'lagom-backup'
@@ -178,6 +178,9 @@ export function summarizeBackup(b: BackupFile): ImportSummary {
  * Återställ från säkerhetskopia.
  * - 'replace': ersätter all befintlig data.
  * - 'merge': slår ihop – poster med samma id skrivs inte dubbelt; importerad profil används bara om ingen finns.
+ *   Efteråt har listorna samma ordning och form som butikerna själva håller dem (se
+ *   `backupValidation`): en dags poster äldst först, en vikt och ett mått per dag (enhetens egna
+ *   gäller) och fastehistoriken med den senaste först.
  */
 export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   const { profile, diary, food, body, fasting, plan, reminders } = b.data
@@ -217,9 +220,9 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
     return [...a, ...bb.filter((x) => !ids.has(x.id))]
   }
   const entries: Record<ISODate, DiaryEntry[]> = { ...d.entries }
-  for (const [date, list] of Object.entries(diary.entries ?? {})) entries[date] = mergeById(entries[date], list)
+  for (const [date, list] of Object.entries(diary.entries ?? {})) entries[date] = sortByCreatedAt(mergeById(entries[date], list))
   const exercise = { ...d.exercise }
-  for (const [date, list] of Object.entries(diary.exercise ?? {})) exercise[date] = mergeById(exercise[date], list)
+  for (const [date, list] of Object.entries(diary.exercise ?? {})) exercise[date] = sortByCreatedAt(mergeById(exercise[date], list))
   const water = { ...d.water }
   for (const [date, ml] of Object.entries(diary.water ?? {})) water[date] = Math.max(water[date] ?? 0, ml)
   const days = { ...diary.days, ...d.days }
@@ -241,24 +244,27 @@ export function restoreBackup(b: BackupFile, mode: 'replace' | 'merge'): void {
   const weightDates = new Set(bo.weights.map((w) => w.date))
   useBodyStore.setState({
     weights: [...bo.weights, ...(body.weights ?? []).filter((w) => !weightDates.has(w.date))].sort((x, y) => x.date.localeCompare(y.date)),
-    measurements: mergeById(bo.measurements, body.measurements).sort((x, y) => x.date.localeCompare(y.date)),
+    // Ett mått per dag som i `addMeasurement` – enhetens eget gäller när båda har mätt samma dag.
+    measurements: onePerDate([...bo.measurements, ...(body.measurements ?? [])], 'first'),
   })
 
   const fa = useFastingStore.getState()
-  useFastingStore.setState({ history: mergeById(fa.history, fasting?.history) })
+  // Senaste fastan först – listan på Fasta visar de sju första och förvalet tas från den första.
+  useFastingStore.setState({ history: sortFastsNewestFirst(mergeById(fa.history, fasting?.history)) })
 
   // Veckoplaneringen: rader per datum som dagboken; inköpslistans bockar slås ihop och egna rader
   // läggs till (inom samma gränser som i appen).
   if (plan) {
     const pl = usePlanStore.getState()
     const items = { ...pl.items }
-    for (const [date, list] of Object.entries(plan.items)) items[date] = mergeById(items[date], list).slice(0, MAX_ITEMS_PER_DAY)
+    // Gränsen tillämpas före sorteringen så att enhetens egna rader går före kopians.
+    for (const [date, list] of Object.entries(plan.items)) items[date] = sortByCreatedAt(mergeById(items[date], list).slice(0, MAX_ITEMS_PER_DAY))
     const shopping: Record<ISODate, WeekShopping> = { ...pl.shopping }
     for (const [week, incoming] of Object.entries(plan.shopping)) {
       const local = shopping[week]
       shopping[week] = {
         checked: [...new Set([...(local?.checked ?? []), ...incoming.checked])],
-        extras: mergeById(local?.extras, incoming.extras).slice(0, MAX_EXTRAS_PER_WEEK),
+        extras: sortByCreatedAt(mergeById(local?.extras, incoming.extras).slice(0, MAX_EXTRAS_PER_WEEK)),
       }
     }
     usePlanStore.setState({ items, shopping })

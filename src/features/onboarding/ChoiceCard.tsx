@@ -84,7 +84,7 @@ export function ChoiceCard({
       <span
         aria-hidden
         className={cx(
-          'grid size-6 shrink-0 place-items-center rounded-full ring-2 ring-inset ring-line transition-colors duration-200',
+          'grid size-6 shrink-0 place-items-center rounded-full ring-2 ring-inset ring-ink-3 transition-colors duration-200',
           'group-has-[:checked]:bg-(--tone) group-has-[:checked]:ring-(--tone)',
         )}
       >

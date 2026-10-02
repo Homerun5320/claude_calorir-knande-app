@@ -18,6 +18,7 @@ import { RateLimiter } from '../lib/http.ts'
 import {
   BlockedAddressError,
   RECIPE_MAX_BYTES,
+  RECIPE_MAX_JSONLD_BLOCKS,
   extractRecipeJsonLd,
   extractRecipeMicrodata,
   fetchRecipeJsonLd,
@@ -521,6 +522,17 @@ describe('extractRecipeJsonLd', () => {
     const page = `<script>var s = "<script";</script><script data-x="${'a'.repeat(2000)}" type="application/ld+json">{"@type":"Organization"}</script><script type="application/ld+json">{"@type":"Recipe"}</script>`
     expect(extractRecipeJsonLd(page)).toBe('<script type="application/ld+json">{"@type":"Recipe"}</script>')
   })
+
+  it('skickar högst ett fast antal block – resten av en sida med hundratals recept lämnas', () => {
+    const block = (i: number) => `<script type="application/ld+json">{"@type":"Recipe","name":"R${i}"}</script>`
+    const html = Array.from({ length: 2_000 }, (_, i) => block(i)).join('\n')
+    const out = extractRecipeJsonLd(html)
+    expect(out.match(/<script /g)).toHaveLength(RECIPE_MAX_JSONLD_BLOCKS)
+    expect(out).toContain('"R0"')
+    expect(out).not.toContain(`"R${RECIPE_MAX_JSONLD_BLOCKS}"`)
+    // Ett par block är som förr.
+    expect(extractRecipeJsonLd(`${block(1)}${block(2)}`).match(/<script /g)).toHaveLength(2)
+  })
 })
 
 /** Påhittad receptsida med mikrodata (som äldre svenska receptsidor) – innehållet är skrivet för testet. */
@@ -586,6 +598,25 @@ describe('extractRecipeMicrodata', () => {
       name: 'Soppa',
       recipeIngredient: ['1 l vatten'],
     })
+  })
+
+  it('läser högst 200 ingredienser, hur många rader sidan än har', () => {
+    const start = '<div itemscope itemtype="https://schema.org/Recipe"><h1 itemprop="name">Många</h1>'
+    const asItems = parse(`${start}${'<li itemprop="recipeIngredient">1 dl mjölk'.repeat(60_000)}`)
+    expect(asItems?.recipeIngredient).toHaveLength(200)
+    // Många rader i en och samma egenskap (<br>) räknas på samma sätt.
+    const asBreaks = parse(`${start}<div itemprop="recipeIngredient">${'2 ägg<br>'.repeat(50_000)}</div>`)
+    const lines = (asBreaks?.recipeIngredient ?? []) as string[]
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.length).toBeLessThanOrEqual(200)
+  })
+
+  it('hundratusentals olika taggnamn tar linjär tid', () => {
+    const start = '<div itemscope itemtype="https://schema.org/Recipe">'
+    const names = Array.from({ length: 150_000 }, (_, i) => `<x${i}></x${i}>`).join('')
+    const t0 = performance.now()
+    extractRecipeMicrodata(`${start}${names}`)
+    expect(performance.now() - t0).toBeLessThan(1000)
   })
 
   it('tar linjär tid även på elaka sidor', () => {

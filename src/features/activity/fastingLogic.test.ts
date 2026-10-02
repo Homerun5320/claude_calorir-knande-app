@@ -5,7 +5,6 @@ import {
   endMessage,
   fastingWeek,
   fastProgress,
-  fastRatio,
   fastSucceeded,
   formatFastDuration,
   formatHms,
@@ -109,7 +108,6 @@ describe('historik', () => {
     expect(fastSucceeded(rec('a', start, 16))).toBe(true)
     expect(fastSucceeded(rec('b', start, 16 - 0.5 / 60))).toBe(true)
     expect(fastSucceeded(rec('c', start, 15))).toBe(false)
-    expect(fastRatio(rec('d', start, 8))).toBeCloseTo(0.5)
   })
 
   it('veckosummering räknar fastor till dagen de avslutades', () => {
@@ -121,11 +119,11 @@ describe('historik', () => {
     const week = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27']
     const w = fastingWeek(history, week)
     expect(w.count).toBe(2)
-    expect(w.completed).toBe(1)
     expect(w.totalMs).toBe(26 * H)
     expect(w.averageMs).toBe(13 * H)
-    expect(w.longestMs).toBe(16 * H)
-    expect(w.days.map((d) => d.status)).toEqual([null, 'klar', null, 'paborjad', null, null, null])
+    expect(w.days.map((d) => d.ended)).toEqual([false, true, false, true, false, false, false])
+    // Ingen poängtavla: varken nådda mål eller längsta fastan räknas.
+    expect(Object.keys(w).sort()).toEqual(['averageMs', 'count', 'days', 'totalMs'])
   })
 
   it('räknar inte fastor som avslutats direkt (av misstag) i veckan', () => {
@@ -146,10 +144,15 @@ describe('historik', () => {
     expect(w.averageMs).toBe(0)
   })
 
+  it('sakligt besked när målet nåddes – inget beröm eller firande', () => {
+    const start = new Date(2026, 8, 25, 20, 0)
+    expect(endMessage(rec('a', start, 16))).toBe('Fastan är sparad (16 h).')
+    expect(endMessage(rec('a', start, 18))).not.toMatch(/Snyggt|Bra jobbat|Grattis|Fantastiskt|Bra!/i)
+  })
+
   it('vänliga texter och senaste protokoll', () => {
     const start = new Date(2026, 8, 25, 20, 0)
-    expect(endMessage(rec('a', start, 16))).toMatch(/Snyggt/)
-    expect(endMessage(rec('b', start, 5))).toMatch(/lyssna på kroppen/)
+    expect(endMessage(rec('b', start, 5))).toBe('Fastan är sparad (5 h). Det är helt okej att lyssna på kroppen.')
     expect(lastProtocolId([])).toBe('16:8')
     expect(lastProtocolId([rec('a', start, 14, 14, '14:10')])).toBe('14:10')
     expect(protocolById('18:6')?.fastHours).toBe(18)

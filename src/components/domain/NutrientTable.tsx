@@ -232,8 +232,12 @@ export function NutrientTable({
                     className="flex min-h-11 w-full items-center gap-2 py-2 text-left"
                   >
                     <span className="flex-1 text-sm font-semibold text-ink">{heading}</span>
-                    <span className="text-xs text-ink-3 tabular-nums" aria-label={`${knownInGroup} av ${g.keys.length} kända`}>
+                    {/* aria-label på ett element utan roll läses inte upp – siffrorna döljs och en osynlig text ersätter dem. */}
+                    <span className="text-xs text-ink-3 tabular-nums" aria-hidden="true">
                       {knownInGroup}/{g.keys.length}
+                    </span>
+                    <span className="sr-only">
+                      {knownInGroup} av {g.keys.length} kända
                     </span>
                     <ChevronDown
                       className={`h-4 w-4 text-ink-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
@@ -334,7 +338,11 @@ function NutrientRow({
             {formatNutrient(nutrientKey, value)}
           </>
         ) : (
-          <span aria-label="okänt">–</span>
+          <>
+            {/* Ett saknat värde är okänt, inte 0: sträcket är bara för ögat, skärmläsare får ordet. */}
+            <span aria-hidden="true">–</span>
+            <span className="sr-only">okänt</span>
+          </>
         )}
       </dd>
       {reference && knownValue && pct !== undefined && (

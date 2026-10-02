@@ -65,11 +65,11 @@ function FastTile({ active }: { active: { start: number; targetHours: number; pr
           max={p.targetMin}
           size={48}
           thickness={5}
-          tone={p.done ? 'mossa' : 'blabar'}
+          tone="blabar"
           aria-label="Fastans förlopp"
           valueText={`${formatDuration(p.elapsedMin)} av ${formatDuration(p.targetMin)}`}
         >
-          <Hourglass className={`size-4 ${p.done ? 'text-mossa' : 'text-blabar'}`} strokeWidth={2.4} aria-hidden="true" />
+          <Hourglass className="size-4 text-blabar" strokeWidth={2.4} aria-hidden="true" />
         </ProgressRing>
       }
     >

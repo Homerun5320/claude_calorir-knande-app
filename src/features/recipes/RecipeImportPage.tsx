@@ -18,11 +18,11 @@ import { useNavigate } from 'react-router-dom'
 import { ChefHat, ClipboardPaste, Download, Globe, Pencil, Save } from 'lucide-react'
 import { Button, Card, NumberField, PageHeader, Stepper, TextField, toast } from '../../components/ui'
 import { API_BASE } from '../../config/commerce'
-import { plural } from '../../lib/format'
+import { formatNumber, plural } from '../../lib/format'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { useFoodStore } from '../../stores/foodStore'
 import { requireAccess } from '../premium/requireAccess'
-import { parseIngredientLines, parseRecipeJsonLd, type ParsedIngredientLine } from './importRecipe'
+import { MAX_IMPORT_INGREDIENTS, parseIngredientLines, parseRecipeJsonLd, type ParsedIngredientLine } from './importRecipe'
 import { IngredientReview, reviewSummary, useIngredientReview } from './IngredientImport'
 import { MAX_SERVINGS, emptyDraft, recipeFromDraft, safeSourceUrl, sourceHost } from './recipeLogic'
 
@@ -312,6 +312,11 @@ export default function RecipeImportPage() {
                   <p className="mt-2 text-xs leading-relaxed text-ink-3" aria-live="polite">
                     {reviewSummary(result)}
                   </p>
+                  {imported.lines.length >= MAX_IMPORT_INGREDIENTS && (
+                    <p className="mt-1 text-xs leading-relaxed text-ink-3">
+                      Lagom visar högst {formatNumber(MAX_IMPORT_INGREDIENTS)} ingredienser per recept – de första är med.
+                    </p>
+                  )}
                   {imported.pastedLines && (
                     <Button variant="ghost" size="sm" iconLeft={Pencil} className="mt-2 self-start" onClick={() => setImported({ ...imported, lines: [] })}>
                       Ändra inklistrad text

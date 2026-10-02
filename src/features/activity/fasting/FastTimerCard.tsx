@@ -1,6 +1,7 @@
 /**
  * Pågående fasta: stor ring med förfluten tid (uppdateras varje sekund medan sidan syns),
  * kvarvarande tid, start och mål, byte av protokoll, ändra starttid, avsluta och avbryt.
+ * När målet är nått står det sakligt ("Målet är nått") – ingen grön framgångsfärg, inget beröm.
  */
 import { memo } from 'react'
 import { Hourglass, Pencil, X } from 'lucide-react'
@@ -69,8 +70,9 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
     }
     const rec = useFastingStore.getState().endFast()
     if (!rec) return
-    haptic('success')
-    toast(endMessage(rec), { tone: 'success' })
+    // Saklig bekräftelse, ingen "klart"-vibration: en avslutad fasta firas aldrig (varken före eller efter målet).
+    haptic('tap')
+    toast(endMessage(rec))
     onEnded(rec)
   }
 
@@ -103,7 +105,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
   return (
     <Card padding="lg" aria-label="Pågående fasta" as="section">
       <div className="flex flex-col items-center text-center">
-        <Badge tone={p.done ? 'mossa' : 'blabar'} dot>
+        <Badge tone="blabar" dot>
           {p.done ? 'Målet är nått' : `Fastar · ${active.protocol}`}
         </Badge>
 
@@ -113,7 +115,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
           max={p.targetMs}
           size={244}
           thickness={16}
-          tone={p.done ? 'mossa' : 'blabar'}
+          tone="blabar"
           aria-label="Fastans förlopp"
           valueText={`${formatFastDuration(p.elapsedMs)} av ${active.targetHours}\u00a0timmar`}
         >

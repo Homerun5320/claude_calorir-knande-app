@@ -122,7 +122,7 @@ describe('NutrientTable', () => {
     expect(protein).not.toHaveTextContent('minst')
     // Ingen täckning alls = okänt, inte "minst 1,2 g".
     const salt = screen.getByText('Salt').closest('div') as HTMLElement
-    expect(within(salt).getByLabelText('okänt')).toBeInTheDocument()
+    expect(within(salt).getByText('okänt')).toBeInTheDocument()
     expect(screen.getByText(/”Minst” betyder/)).toBeInTheDocument()
   })
 

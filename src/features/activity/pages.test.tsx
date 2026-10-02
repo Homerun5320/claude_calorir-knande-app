@@ -271,11 +271,29 @@ describe('Fasta', () => {
     expect(active?.start).toBe(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 20, 0).getTime())
   })
 
-  it('historik med mål nått och borttagning med Ångra', () => {
+  it('avslutar en fasta som nått målet sakligt – ingen konfetti, inget beröm', async () => {
+    useFastingStore.setState({ active: { start: Date.now() - 16.5 * 3_600_000, targetHours: 16, protocol: '16:8' } })
+    renderAt('/fasta')
+    expect(screen.getByText('Målet är nått')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Avsluta och spara' }))
+    await waitFor(() => expect(useFastingStore.getState().history).toHaveLength(1))
+    expect(lastToast()?.message).toMatch(/^Fastan är sparad \(16 h 30 min\)\.$/)
+    expect(lastToast()?.message).not.toMatch(/Snyggt/)
+    expect(screen.queryByTestId('confetti')).not.toBeInTheDocument()
+    // Veckokortet och historiken är sakliga: ingen räknare för nådda mål och inget "Mål nått".
+    expect(screen.queryByText(/Mål nådda/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Mål nått')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Längsta fastan/)).not.toBeInTheDocument()
+  })
+
+  it('historik med längd och protokoll (utan märke för nått mål) och borttagning med Ångra', () => {
     const end = Date.now() - 3_600_000
     useFastingStore.setState({ history: [{ id: 'f1', start: end - 16 * 3_600_000, end, targetHours: 16, protocol: '16:8' }] })
     renderAt('/fasta')
-    expect(screen.getByText('Mål nått')).toBeInTheDocument()
+    expect(screen.queryByText('Mål nått')).not.toBeInTheDocument()
+    const history = screen.getByRole('heading', { name: 'Historik' }).closest('section')!
+    expect(within(history).getByText('16 h')).toBeInTheDocument()
+    expect(within(history).getByText('16:8')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Ta bort fastan 16 h' }))
     expect(useFastingStore.getState().history).toHaveLength(0)
     act(() => lastToast()?.action?.onClick())

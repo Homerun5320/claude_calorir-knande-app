@@ -115,6 +115,8 @@ export const DaySummaryCard = memo(function DaySummaryCard({
         showFiber={showFiber}
         variant="compact"
         hideNumbers={mindful}
+        // Poster utan protein/kolhydrater/fett (t.ex. snabbregistrerad energi) ger "–", inte 0.
+        hasEntries={entries.length > 0}
       />
 
       {/* En planerad dag har varken vatten eller träning att visa – om inte ett pass redan ligger där. */}

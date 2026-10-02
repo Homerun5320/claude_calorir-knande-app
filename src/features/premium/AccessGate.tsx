@@ -146,7 +146,8 @@ export function StartOwnProfileButton({
     setBusy(true)
     // Laddas först när den behövs – raderingen drar in säkerhetskopians kod.
     const { wipeAndReset } = await import('../settings/wipe')
-    void wipeAndReset()
+    // Bara exempeldatan rensas: en kopia eller bilder från en tidigare egen dagbok får ligga kvar.
+    void wipeAndReset({ keepOwnCopies: true })
     onNavigate?.()
     navigate('/valkommen', { replace: true })
   }

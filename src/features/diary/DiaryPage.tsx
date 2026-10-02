@@ -65,7 +65,8 @@ export default function DiaryPage() {
 
 function DiarySkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Laddar dagboken">
+    <div className="space-y-4" role="status" aria-busy="true">
+      <span className="sr-only">Laddar dagboken …</span>
       <div className="card space-y-4 p-5">
         <div className="grid grid-cols-3 gap-3">
           {Array.from({ length: 3 }, (_, i) => (

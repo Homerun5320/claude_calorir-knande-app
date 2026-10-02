@@ -477,8 +477,8 @@ Voided Purchases API, och Data safety och integritetspolicyn uppdateras före in
 streckkodsläsaren lägger till behörigheten `com.google.android.gms.permission.AD_ID`. Kontrollera
 efter första uppladdningen: *Testa och släpp → Appsamling (App bundle explorer) → versionen →
 Behörigheter* – där ska bara behörigheterna i [NATIVE.md §6](NATIVE.md#behörigheter) finnas
-(internet, kamera, notiser, start efter omstart, vibration, köp i appen och de sex
-Health Connect-behörigheterna).
+(internet, kamera, notiser, start efter omstart, vibration, köp i appen och de fem
+Health Connect-behörigheterna: vikt läsa och skriva, steg läsa, näring och vatten skriva).
 
 ### Datasäkerhet (Data safety)
 
@@ -556,7 +556,7 @@ dagar. Godkännandet gäller paketnamnet, inte en viss version.
    | --- | --- | --- |
    | `READ_WEIGHT` | Läsa | `Optional and off by default. When the user turns it on, new weight measurements (for example from a smart scale) are shown in Lagom's weight chart, so the user does not have to enter them twice. One value per day; values stay on the device.` |
    | `WRITE_WEIGHT` | Skriva | `Optional. Saves weights that the user logs in Lagom to Health Connect, so other health apps the user chooses can use them.` |
-   | `READ_STEPS` | Läsa | `Optional. Shows today's step count in the activity part of Lagom's food diary. Values stay on the device.` |
+   | `READ_STEPS` | Läsa | `Optional. Fills in the step count for today and the previous six days in the activity part of Lagom's food diary, so the user does not have to enter it by hand. Values stay on the device.` |
    | `WRITE_NUTRITION` | Skriva | `Optional. Saves the energy (kcal) of meals the user logs in Lagom's food diary to Health Connect once the day is finished, so the user's other health apps can show it.` |
    | `WRITE_HYDRATION` | Skriva | `Optional. Saves the water the user logs in Lagom to Health Connect once the day is finished.` |
 
@@ -817,6 +817,6 @@ Behövs bara för att molnbygget ska ladda upp till intern testning själv:
 - [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian, widgetens sammanfattning (`lagom-widget`) och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
 - [ ] Sluten test: minst 12 testare i 14 dagar i följd.
 - [ ] Butikstexter (och versionsinformationen för produktion), ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
-- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de sex Health Connect-typerna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
+- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de fem Health Connect-behörigheterna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
 - [ ] Länder: bara Sverige.
 - [ ] Inga omnämnanden av webbköp eller App Store i appen eller texterna.

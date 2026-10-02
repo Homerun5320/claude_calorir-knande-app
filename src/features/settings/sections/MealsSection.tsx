@@ -38,6 +38,8 @@ function MealRow({
   }
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
+      {/* Läget "av" syns på reglaget och den gråa ikonen. Fältet och hjälptexten lämnas i full färg: de går
+          fortfarande att redigera, så de ska nå 4,5:1 (WCAG 1.4.3) – opacitet drar ner dem under det. */}
       <MealIcon meal={meal.id} size="md" className={meal.enabled ? '' : 'opacity-50 grayscale'} />
       <div className="min-w-0 flex-1">
         <TextField
@@ -55,7 +57,6 @@ function MealRow({
           }}
           enterKeyHint="done"
           hint={hours(meal)}
-          className={meal.enabled ? '' : 'opacity-60'}
         />
       </div>
       <Switch

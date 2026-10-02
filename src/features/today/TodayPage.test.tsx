@@ -209,6 +209,108 @@ describe('TodayPage', () => {
     expect(screen.queryByRole('button', { name: /Väg dig/ })).not.toBeInTheDocument()
   })
 
+  describe('omtanke i medvetet läge (målet "behålla vikten" – valet "Jag vill inte räkna kalorier")', () => {
+    const MINDFUL = { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true }
+
+    it('låg vikt (BMI under 18,5): varsam notis med 1177 och Frisk & Fri, utan siffror eller knappar', async () => {
+      const today = todayISO()
+      useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+      // 168 cm och 50 kg ≈ BMI 17,7. Målet är "behålla", så energimålets viktpaus gäller inte.
+      useBodyStore.getState().logWeight(today, 50)
+      useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla' }, settings: MINDFUL })
+      renderPage()
+      const text = await screen.findByText(/under det som räknas som hälsosamt för din längd/)
+      const card = text.closest('section') as HTMLElement
+      expect(within(card).getByRole('heading', { name: 'Omtanke' })).toBeInTheDocument()
+      expect(within(card).getByRole('link', { name: /^1177/ })).toHaveAttribute('href', 'https://www.1177.se')
+      expect(within(card).getByRole('link', { name: /^Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
+      // Inga siffror (utom länktexten "1177") och inga vikt- eller målknappar.
+      expect(card.textContent?.replace('1177', '')).not.toMatch(/\d/)
+      expect(screen.queryByRole('button', { name: /Väg dig/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Byt till att behålla vikten' })).not.toBeInTheDocument()
+    })
+
+    it('vikten går ner för fort: varsam notis utan siffror (inte ens "1 %")', async () => {
+      const today = todayISO()
+      const body = useBodyStore.getState()
+      for (let k = 0; k <= 21; k++) body.logWeight(addDays(today, k - 21), 78 - k * 0.3)
+      useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+      useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla' }, settings: MINDFUL })
+      renderPage()
+      const text = await screen.findByText(/snabbare än vi rekommenderar/)
+      const card = text.closest('section') as HTMLElement
+      expect(card.textContent).not.toMatch(/%/)
+      expect(card.textContent?.replace('1177', '')).not.toMatch(/\d/)
+      expect(within(card).getByRole('link', { name: /^Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
+    })
+
+    it('normal vikt i lugn takt: inget kort alls', async () => {
+      const today = todayISO()
+      useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+      useBodyStore.getState().logWeight(today, 68)
+      useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla' }, settings: MINDFUL })
+      renderPage()
+      expect(await screen.findByText('Hur har dagen varit?')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Omtanke' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /^Frisk & Fri/ })).not.toBeInTheDocument()
+    })
+
+    it('målet att gå ner med pausat mål för låg vikt: pausbeskedet och en knapp för att byta mål, som förut', async () => {
+      const today = todayISO()
+      useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+      useBodyStore.getState().logWeight(today, 50)
+      useProfileStore.setState({ profile: { ...PROFILE, goal: 'ga_ner' }, settings: MINDFUL })
+      renderPage()
+      expect(await screen.findByText(/rekommenderar inte att gå ner mer/)).toBeInTheDocument()
+      // Samma sak som "låg vikt" – pausbeskedet räcker, ingen dubbel notis (en enda länk till stöd).
+      expect(screen.getAllByRole('link', { name: /^Frisk & Fri/ })).toHaveLength(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Byt till att behålla vikten' }))
+      expect(useProfileStore.getState().profile?.goal).toBe('behalla')
+    })
+  })
+
+  it('låg vikt med målet att behålla vikten visas även utan medvetet läge (kortet Vikt)', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    useBodyStore.getState().logWeight(today, 50)
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla' } })
+    renderPage()
+    expect(await screen.findByText(/under det som räknas som hälsosamt för din längd/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Frisk & Fri/ })).toBeInTheDocument()
+  })
+
+  it('okända makron i dagsringen är "–", inte 0 g – och en tom dag visar 0', async () => {
+    const today = todayISO()
+    // Snabbregistrerad energi: protein, kolhydrater och fett är okända.
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Lunch ute', nutrients: { kcal: 300 }, date: today, meal: 'lunch' })
+    renderPage()
+    const ring = await screen.findByRole('region', { name: 'Dagsringen' })
+    const [protein, carbs, fat] = within(ring).getAllByRole('listitem')
+    for (const li of [protein, carbs, fat]) {
+      expect(within(li).getByText('–')).toBeInTheDocument()
+      expect(li.textContent).not.toMatch(/kvar|(^|\D)0\s*\/\s*\d+\s*g/)
+    }
+    expect(within(ring).getByRole('img', { name: /^Protein: okänt/ })).toBeInTheDocument()
+  })
+
+  it('en tom dag visar 0 av målet i makrostaplarna', async () => {
+    renderPage()
+    const ring = await screen.findByRole('region', { name: 'Dagsringen' })
+    expect(within(ring).getAllByRole('progressbar').length).toBeGreaterThanOrEqual(3)
+    expect(within(ring).getAllByText(/g kvar$/).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('medvetet läge: makrostaplarna har inga siffror för skärmläsare', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
+    renderPage()
+    const ring = await screen.findByRole('region', { name: 'Dagsringen' })
+    expect(ring.querySelector('[aria-valuenow], [aria-valuemax], [aria-valuetext]')).toBeNull()
+    for (const bar of within(ring).getAllByRole('img')) expect(bar.getAttribute('aria-label')).not.toMatch(/\d|%/)
+    expect(within(ring).getByRole('img', { name: /^Protein: / })).toBeInTheDocument()
+  })
+
   it('räknar inte träningen två gånger med adaptiv förbrukning', async () => {
     const today = todayISO()
     useDiaryStore.getState().addExercise({ date: today, activityId: 'promenad', name: 'Promenad', minutes: 40, kcal: 160 })

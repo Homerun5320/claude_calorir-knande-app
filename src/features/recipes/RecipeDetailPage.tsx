@@ -100,7 +100,8 @@ export default function RecipeDetailPage() {
 
 function DetailSkeleton() {
   return (
-    <div className="px-4 pt-safe" aria-busy="true" aria-label="Laddar receptet">
+    <div className="px-4 pt-safe" role="status" aria-busy="true">
+      <span className="sr-only">Laddar receptet …</span>
       <div className="h-14" />
       <Skeleton className="mb-2 h-3 w-24" />
       <Skeleton className="mb-5 h-9 w-3/4" />
@@ -472,6 +473,7 @@ function NutritionCard({
           thickness={15}
           legend="none"
           title="Energifördelning"
+          hideNumbers={numbersHidden}
           formatValue={(v) => `${formatNumber(v)}\u00a0E%`}
         >
           <div className="flex flex-col items-center px-3 text-center">

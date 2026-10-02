@@ -1,17 +1,18 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpen, ChartNoAxesColumn, ChefHat, CloudOff, Download, Dumbbell, GlassWater, Menu, Plus, RotateCw, Scale, Sun, Timer, type LucideIcon } from 'lucide-react'
 import { motion } from 'motion/react'
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { LogoMark, Wordmark } from './Logo'
 import { ToastViewport, toast } from '../ui/toast'
 import { DialogHost } from '../ui/Dialog'
 import { useProfileStore } from '../../stores/profileStore'
 import { mealForTime } from '../../lib/meals'
 import { ensurePersistentStorage, saveBackup } from '../../lib/backup'
-import { IS_STORE_BUILD, isNativeApp } from '../../config/platform'
+import { IS_STORE_BUILD, isInApp, isNativeApp } from '../../config/platform'
 import { useTheme } from '../../hooks/useTheme'
-import { useHasNewerData, useHasUnreadableData, useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
+import { useHasNewerData, useHasSlowReads, useHasUnreadableData, useMemoryOnlyStorage } from '../../hooks/useStorageStatus'
 import { hasProtectedData } from '../../stores/storage'
+import { SLOW_READ_TITLE, slowReadText, storageBlockedCause } from '../../lib/storageTexts'
 import { markBackupNow } from '../../features/settings/backupStatus'
 import { AccessBlockedDialog, AccessSync } from '../../features/premium/AccessGate'
 import { requireAccess } from '../../features/premium/requireAccess'
@@ -167,97 +168,122 @@ function canPromptForUpdate(): boolean {
 
 const WARNING_ACTION = 'inline-flex min-h-11 items-center gap-1.5 font-semibold text-gran underline-offset-2 hover:underline'
 
+/** "Ladda om" (bara i webbversionen) och länken till Inställningar → Data. */
+function ReloadAndMoreLinks({ reload }: { reload: boolean }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+      {reload && (
+        <button type="button" className={WARNING_ACTION} onClick={() => window.location.reload()}>
+          <RotateCw className="size-4" aria-hidden />
+          Ladda om
+        </button>
+      )}
+      <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+        Mer om data
+      </Link>
+    </div>
+  )
+}
+
+/** Ramen runt en varning om lagringen: lugn ruta med molnikon, inuti sidans innehåll. */
+function WarningFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-4 pt-safe lg:pt-4 print:hidden">
+      <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
+        <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Lugn, beständig varning när ändringar inte kan sparas på enheten – eller när sparad data kommer
- * från en nyare version av Lagom eller inte går att tolka (den läses inte in och skrivs aldrig över).
+ * från en nyare version av Lagom, inte går att tolka eller läses in långsamt (den läses inte in
+ * eller skrivs aldrig över medan den är oläst). Orsaken avgör texten: aldrig "webbläsaren" i
+ * apparna, och aldrig skulden på webbläsaren när det är en långsam läsning (lib/storageTexts.ts).
  */
 function StorageWarning() {
   const memoryOnly = useMemoryOnlyStorage()
   const newerData = useHasNewerData()
   const unreadable = useHasUnreadableData()
-  if (!memoryOnly && !newerData && !unreadable) return null
+  const slowRead = useHasSlowReads()
+  if (!memoryOnly && !newerData && !unreadable && !slowRead) return null
+
+  // Appen från butiken har sin kod inbyggd och uppdateras i butiken. Webbversionen (även
+  // Play-appen, som visar webbversionen) hämtar den nya versionen när sidan laddas om.
+  const bundled = IS_STORE_BUILD || isNativeApp()
 
   if (newerData) {
-    // Appen från butiken har sin kod inbyggd och uppdateras i butiken. Webbversionen (även
-    // Play-appen, som visar webbversionen) hämtar den nya versionen när sidan laddas om.
-    const bundled = IS_STORE_BUILD || isNativeApp()
     return (
-      <div className="px-4 pt-safe lg:pt-4 print:hidden">
-        <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
-          <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">Din data är från en nyare version av Lagom – uppdatera appen innan du fortsätter. Inget skrivs över.</p>
-            <p className="text-ink-2">
-              {bundled
-                ? `Uppdatera Lagom i ${storeName()}. Det du ändrar innan dess sparas inte.`
-                : 'Ladda om sidan så att den nya versionen hämtas. Det du ändrar innan dess sparas inte.'}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              {!bundled && (
-                <button type="button" className={WARNING_ACTION} onClick={() => window.location.reload()}>
-                  <RotateCw className="size-4" aria-hidden />
-                  Ladda om
-                </button>
-              )}
-              <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
-                Mer om data
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
+      <WarningFrame>
+        <p className="font-semibold">Din data är från en nyare version av Lagom – uppdatera appen innan du fortsätter. Inget skrivs över.</p>
+        <p className="text-ink-2">
+          {bundled
+            ? `Uppdatera Lagom i ${storeName()}. Det du ändrar innan dess sparas inte.`
+            : 'Ladda om sidan så att den nya versionen hämtas. Det du ändrar innan dess sparas inte.'}
+        </p>
+        <ReloadAndMoreLinks reload={!bundled} />
+      </WarningFrame>
+    )
+  }
+
+  // Sparad data som läses in långsamt: inget är raderat och ingenting är blockerat – vänta eller
+  // starta om. Ingen säkerhetskopia erbjuds här: den skulle sakna den sparade datan och se hel ut.
+  if (slowRead && !unreadable) {
+    return (
+      <WarningFrame>
+        <p className="font-semibold">{SLOW_READ_TITLE}</p>
+        <p className="text-ink-2">{slowReadText(isInApp())}</p>
+        <ReloadAndMoreLinks reload={!bundled} />
+      </WarningFrame>
     )
   }
 
   return (
-    <div className="px-4 pt-safe lg:pt-4 print:hidden">
-      <div role="status" className="mt-3 flex items-start gap-3 rounded-2xl bg-sol-soft px-4 py-3 text-[0.875rem] leading-relaxed text-ink">
-        <CloudOff className="mt-0.5 size-5 shrink-0 text-ink-2" aria-hidden />
-        <div className="min-w-0 flex-1">
-          {unreadable ? (
-            <>
-              <p className="font-semibold">Den sparade dagboken gick inte att läsa</p>
-              <p className="text-ink-2">
-                Den lämnas orörd och skrivs inte över. Det du ändrar nu finns bara kvar tills du stänger appen – spara en säkerhetskopia och skicka gärna
-                felrapporten till supporten (Om Lagom → Felsökning).
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold">Din data sparas inte på enheten just nu</p>
-              <p className="text-ink-2">
-                Webbläsaren låter inte Lagom spara (t.ex. i privat läge eller när lagringen är full). Spara en säkerhetskopia så att inget går förlorat.
-              </p>
-            </>
-          )}
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-            <button
-              type="button"
-              className={WARNING_ACTION}
-              onClick={() => {
-                // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
-                void saveBackup().then((outcome) => {
-                  if ((outcome === 'saved' || outcome === 'shared') && !hasProtectedData()) markBackupNow()
-                  else if (outcome === 'failed') toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
-                })
-              }}
-            >
-              <Download className="size-4" aria-hidden />
-              Spara säkerhetskopia
-            </button>
-            {unreadable ? (
-              <Link to="/om" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
-                Felrapport
-              </Link>
-            ) : (
-              <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
-                Mer om data
-              </Link>
-            )}
-          </div>
-        </div>
+    <WarningFrame>
+      {unreadable ? (
+        <>
+          <p className="font-semibold">Den sparade dagboken gick inte att läsa</p>
+          <p className="text-ink-2">
+            Den lämnas orörd och skrivs inte över. Det du ändrar nu finns bara kvar tills du stänger appen – spara en säkerhetskopia och skicka gärna
+            felrapporten till supporten (Om Lagom → Felsökning).
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="font-semibold">Din data sparas inte på enheten just nu</p>
+          <p className="text-ink-2">{storageBlockedCause(isInApp())} Spara en säkerhetskopia så att inget går förlorat.</p>
+        </>
+      )}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <button
+          type="button"
+          className={WARNING_ACTION}
+          onClick={() => {
+            // Anropas direkt i klicket – delningsdialogen på telefoner kräver det.
+            void saveBackup().then((outcome) => {
+              // Med sparad data som inte har lästs in (se hasProtectedData) saknas den i kopian –
+              // då ska påminnelsen om säkerhetskopia inte tystna.
+              if ((outcome === 'saved' || outcome === 'shared') && !hasProtectedData()) markBackupNow()
+              else if (outcome === 'failed') toast('Säkerhetskopian kunde inte sparas. Försök igen.', { tone: 'error' })
+            })
+          }}
+        >
+          <Download className="size-4" aria-hidden />
+          Spara säkerhetskopia
+        </button>
+        {unreadable ? (
+          <Link to="/om" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+            Felrapport
+          </Link>
+        ) : (
+          <Link to="/installningar/data" className="inline-flex min-h-11 items-center font-semibold text-gran underline-offset-2 hover:underline">
+            Mer om data
+          </Link>
+        )}
       </div>
-    </div>
+    </WarningFrame>
   )
 }
 
@@ -340,9 +366,10 @@ export function AppShell() {
 
   return (
     <div className="grain min-h-dvh">
-      {/* Sidomeny på stora skärmar */}
+      {/* Sidomeny på stora skärmar. En <div>, inte <aside>: navigeringen inuti är landmärket
+          (en omärkt komplementär region ger dubbletter för skärmläsare). */}
       {!fullscreen && (
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-line bg-surface/70 px-4 py-6 backdrop-blur-xl lg:flex print:hidden">
+        <div className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-line bg-surface/70 px-4 py-6 backdrop-blur-xl lg:flex print:hidden">
           <div className="mb-8 flex items-center gap-3 px-2">
             <LogoMark size={36} />
             <Wordmark />
@@ -363,7 +390,7 @@ export function AppShell() {
               ))}
             </ul>
           </nav>
-        </aside>
+        </div>
       )}
 
       <main className={`mx-auto w-full max-w-3xl ${fullscreen ? '' : 'pb-nav lg:pl-64 lg:max-w-none print:pb-0 print:pl-0'}`}>

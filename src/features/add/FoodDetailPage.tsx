@@ -94,7 +94,8 @@ export default function FoodDetailPage() {
       <div className="px-4 pb-10">
         <PageHeader back title={loading ? 'Livsmedel' : 'Hittades inte'} />
         {loading ? (
-          <div className="flex flex-col gap-4" aria-busy="true" aria-label="Laddar livsmedlet">
+          <div className="flex flex-col gap-4" role="status" aria-busy="true">
+            <span className="sr-only">Laddar livsmedlet …</span>
             <div className="card flex items-center gap-4 p-5">
               <Skeleton circle className="size-20" />
               <SkeletonText lines={2} className="flex-1" />
@@ -583,6 +584,7 @@ function MacroSummary({ nutrients, mindful, caption }: { nutrients: Nutrients; m
           thickness={14}
           legend="none"
           title="Energifördelning"
+          hideNumbers={mindful}
           summary={
             known && total > 0
               ? `Energifördelning: ${segments.map((s) => `${s.label.toLowerCase()} ${formatNumber((s.value / total) * 100)} procent`).join(', ')}`

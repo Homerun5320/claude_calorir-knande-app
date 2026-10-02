@@ -38,10 +38,12 @@ export const DayRingCard = memo(function DayRingCard({ today, targets, mindful, 
   const eaten = roundEnergy(Math.max(0, day.totals.kcal ?? 0), unit)
   const budget = roundEnergy(targets.kcal, unit)
   const exerciseAdded = roundEnergy(Math.max(0, dailyBudget(targets.kcal, day.exercise, addBackPct) - targets.kcal), unit)
-  const protein = day.totals.protein ?? 0
-  const carbs = day.totals.carbs ?? 0
-  const fat = day.totals.fat ?? 0
-  const macros = useMemo(() => ({ protein, carbs, fat }), [protein, carbs, fat])
+  const { protein, carbs, fat } = day.totals
+  // Energins fördelning i ringen kräver alla tre makron – ett okänt (undefined) värde är inte 0.
+  const macros = useMemo(
+    () => (protein !== undefined && carbs !== undefined && fat !== undefined ? { protein, carbs, fat } : undefined),
+    [protein, carbs, fat],
+  )
   const note = mindful ? null : ringNote(summarizeRing(eaten, budget, exerciseAdded).status)
 
   return (
@@ -76,6 +78,8 @@ export const DayRingCard = memo(function DayRingCard({ today, targets, mindful, 
           targets={targets}
           showFiber={showFiber}
           hideNumbers={mindful}
+          // Poster utan protein/kolhydrater/fett (t.ex. snabbregistrerad energi) ger "–", inte 0.
+          hasEntries={day.entries.length > 0}
           variant={wide ? 'detailed' : 'compact'}
           className={wide ? 'min-w-0' : 'mt-6 w-full'}
         />

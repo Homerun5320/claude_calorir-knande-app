@@ -360,6 +360,7 @@ function DistributionCard({ data }: { data: InsightsData }) {
             thickness={15}
             legend="none"
             title="Energifördelning"
+            hideNumbers={mindful}
             summary={`Energifördelning: ${segments.map((s) => `${s.label.toLowerCase()} ${formatNumber(s.value)} procent`).join(', ')}.`}
             formatValue={(v) => `${formatNumber(v)}\u00a0E%`}
           >
@@ -378,7 +379,7 @@ function DistributionCard({ data }: { data: InsightsData }) {
           <ul className="w-full min-w-0 space-y-3 @md:flex-1">
             {verdicts.map((v) => (
               <li key={v.key}>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Dot color={MACRO_COLOR[v.key]} />
                   <span className="text-sm font-semibold text-ink">{v.label}</span>
                   {!mindful && <span className="text-sm text-ink-2 tabular-nums">{percentText(v.pct)}</span>}
