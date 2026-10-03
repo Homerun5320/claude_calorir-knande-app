@@ -197,6 +197,14 @@ describe('texter om data och lagring', () => {
   })
 })
 
+describe('säkerhetskopians innehåll', () => {
+  it('nämner fastorna – de ingår i kopian (createBackup) och tas bort av "Radera all data"', () => {
+    renderSection()
+    const card = screen.getByRole('heading', { name: 'Spara och återställ' }).closest('section') as HTMLElement
+    expect(card).toHaveTextContent('En fil med allt: dagbok, vikt, fastor, recept, egna livsmedel och inställningar.')
+  })
+})
+
 describe('framstegsbilder', () => {
   it('säger att bilderna inte ingår i säkerhetskopian men raderas med all data – bara när de är på', () => {
     const { unmount } = renderSection()

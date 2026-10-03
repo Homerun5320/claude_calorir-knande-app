@@ -37,7 +37,7 @@ import { CareNote } from '../today/CareNote'
 import type { InsightsTab } from './nav'
 import { weekdayInsight, weekdayPattern, MIN_PATTERN_DAYS } from './patterns'
 import { previousPeriod } from './period'
-import { CardAction, CardLink, Callout, Columns, Dot, InfoNote, ShareBar, weekdayColumns } from './ui'
+import { CardAction, CardLink, Callout, Columns, Dot, InfoNote, NameValueRow, ShareBar, weekdayColumns } from './ui'
 import type { InsightsData } from './useInsights'
 
 const MACRO_COLOR: Record<MacroRangeKey | 'alcohol', string> = {
@@ -416,10 +416,7 @@ function NutrientList({ items, tone, mindful }: { items: readonly RankedNutrient
     <ul className="space-y-2.5">
       {items.map((n) => (
         <li key={n.key}>
-          <div className="flex items-baseline justify-between gap-2 text-sm">
-            <span className="truncate font-medium text-ink">{NUTRIENTS[n.key].name}</span>
-            {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(n.percent)}{'\u00a0'}%</span>}
-          </div>
+          <NameValueRow name={NUTRIENTS[n.key].name} value={!mindful && `${formatNumber(n.percent)}\u00a0%`} />
           <ShareBar value={n.percent / 100} color={color} className="mt-1" />
         </li>
       ))}

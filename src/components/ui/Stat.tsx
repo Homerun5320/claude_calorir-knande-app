@@ -56,7 +56,7 @@ export function Stat({ label, value, unit, sublabel, trend, size = 'md', align =
         {/* Radbryts i stället för att kortas med "…" – etiketten ska gå att läsa vid stor text (WCAG 1.4.4). */}
         <span className="min-w-0 break-words">{label}</span>
       </div>
-      <div className={cx('mt-1 flex items-baseline gap-1', align === 'center' && 'justify-center')}>
+      <div className={cx('mt-1 flex flex-wrap items-baseline gap-x-1', align === 'center' && 'justify-center')}>
         <span
           className={cx('display-num font-medium leading-none', VALUE_SIZES[size], !tone && 'text-ink')}
           style={tone ? { color: toneTextColor(tone) } : undefined}

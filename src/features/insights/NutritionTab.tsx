@@ -10,7 +10,7 @@ import { formatNumber, formatNutrient } from '../../lib/format'
 import { MINERAL_KEYS, NUTRIENTS, VITAMIN_KEYS, type NutrientKey } from '../../lib/nutrients'
 import { coverageSummary, coverageText, reliableReferences, topSources, uncertainNutrients } from './aggregate'
 import { defaultSourceNutrient, isDarkHalfYear, SOURCE_NUTRIENTS, withSeasonalWatch } from './advice'
-import { Callout, InfoNote, ShareBar, SourceNote } from './ui'
+import { Callout, InfoNote, NameValueRow, ShareBar, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
 
 const STATUS_TONE: Record<NutrientStatus, 'mossa' | 'sol' | 'hjortron' | 'lingon' | 'neutral'> = {
@@ -111,8 +111,9 @@ function WatchCard({
             const status = STATUS_LABELS[w.status]
             return (
               <li key={w.key}>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-ink">{NUTRIENTS[w.key].name}</span>
+                {/* flex-wrap: vid stor text (200 %) hamnar märket under namnet i stället för utanför kortet. */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="min-w-0 break-words text-sm font-semibold text-ink">{NUTRIENTS[w.key].name}</span>
                   {!mindful && w.percent !== undefined && w.status !== 'okant' && (
                     <span className="text-xs text-ink-3 tabular-nums">{formatNumber(w.percent)}{'\u00a0'}% av RI</span>
                   )}
@@ -156,13 +157,15 @@ function SourcesCard({ entries, initial, mindful }: { entries: InsightsData['ent
             <li key={s.id} className="flex items-center gap-3">
               <CategoryIcon category={s.category} size="sm" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-ink">
-                    <span className="sr-only">{i + 1}. </span>
-                    {s.name}
-                  </span>
-                  {!mindful && <span className="shrink-0 text-xs text-ink-3 tabular-nums">{formatNumber(s.share * 100)}{'\u00a0'}%</span>}
-                </div>
+                <NameValueRow
+                  name={
+                    <>
+                      <span className="sr-only">{i + 1}. </span>
+                      {s.name}
+                    </>
+                  }
+                  value={!mindful && `${formatNumber(s.share * 100)}\u00a0%`}
+                />
                 <ShareBar value={s.share} color="var(--lg-gran)" className="mt-1" />
                 {!mindful && (
                   <span className="mt-0.5 block text-[11px] text-ink-3">
@@ -206,8 +209,8 @@ function MindfulNutrients({ data }: { data: InsightsData }) {
                   let status = nutrientStatus(avg.averages[k], refs[k])
                   if (cov !== undefined && cov < 0.5 && (status === 'lagt' || status === 'nara')) status = 'okant'
                   return (
-                    <li key={k} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="text-ink-2">{NUTRIENTS[k].name}</span>
+                    <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-sm">
+                      <span className="min-w-0 break-words text-ink-2">{NUTRIENTS[k].name}</span>
                       <Badge tone={STATUS_TONE[status]} dot>
                         {status === 'okant' ? 'Okänt' : STATUS_LABELS[status].short}
                       </Badge>

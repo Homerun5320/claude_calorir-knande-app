@@ -23,12 +23,12 @@ function FoodDayChip({ foodDay, onLandscape }: { foodDay: HeaderFoodDay; onLands
       className={
         onLandscape
           ? // Genomskinlig bakgrund av bläckfärgen – läsbar både mot dagshimmel och natthimmel.
-            'relative inline-flex h-9 max-w-full items-center gap-1.5 self-start rounded-full bg-[color-mix(in_oklab,var(--lg-ink)_10%,transparent)] py-1 pr-2.5 pl-3 text-[0.8125rem] font-semibold text-ink ring-1 ring-[color-mix(in_oklab,var(--lg-ink)_16%,transparent)] backdrop-blur-md transition-colors ring-inset after:absolute after:inset-x-0 after:-inset-y-1 hover:bg-[color-mix(in_oklab,var(--lg-ink)_16%,transparent)]'
-          : 'relative inline-flex h-9 max-w-full items-center gap-1.5 self-start rounded-full bg-sol-soft py-1 pr-2.5 pl-3 text-[0.8125rem] font-semibold text-ink ring-1 ring-sol/30 ring-inset after:absolute after:inset-x-0 after:-inset-y-1'
+            'relative inline-flex min-h-9 max-w-full items-center gap-1.5 self-start rounded-full bg-[color-mix(in_oklab,var(--lg-ink)_10%,transparent)] py-1 pr-2.5 pl-3 text-[0.8125rem] font-semibold text-ink ring-1 ring-[color-mix(in_oklab,var(--lg-ink)_16%,transparent)] backdrop-blur-md transition-colors ring-inset after:absolute after:inset-x-0 after:-inset-y-1 hover:bg-[color-mix(in_oklab,var(--lg-ink)_16%,transparent)]'
+          : 'relative inline-flex min-h-9 max-w-full items-center gap-1.5 self-start rounded-full bg-sol-soft py-1 pr-2.5 pl-3 text-[0.8125rem] font-semibold text-ink ring-1 ring-sol/30 ring-inset after:absolute after:inset-x-0 after:-inset-y-1'
       }
     >
       <span aria-hidden="true">{day.emoji}</span>
-      <span className="truncate">{text}</span>
+      <span className="min-w-0 break-words">{text}</span>
       <ChevronRight className="size-3.5 shrink-0 opacity-70" strokeWidth={2.6} aria-hidden="true" />
     </Link>
   )

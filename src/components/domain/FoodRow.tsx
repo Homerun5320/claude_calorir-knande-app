@@ -177,7 +177,7 @@ export function FoodRow({
         )}
       </span>
       {!hideEnergy && (
-        <span className="flex shrink-0 flex-col items-end self-center pl-1 text-right">
+        <span className="flex shrink-0 flex-col items-end self-center pl-1 text-right @max-[17rem]:w-full @max-[17rem]:flex-row @max-[17rem]:items-baseline @max-[17rem]:justify-between @max-[17rem]:self-stretch @max-[17rem]:pl-0">
           <span className="text-sm font-semibold text-ink">
             {kcal !== undefined ? <EnergyValue kcal={kcal} /> : <span className="text-ink-3">–</span>}
           </span>
@@ -216,10 +216,13 @@ export function FoodRow({
       .filter(Boolean)
       .join(', ')
 
-  const rowClass = `flex min-w-0 flex-1 items-center gap-3 text-left ${compact ? 'min-h-12 py-1.5' : 'min-h-14 py-2'}`
+  // @container + @max-[17rem]: raden är för smal för namn, energi och makron bredvid varandra (stor text, 200 %) –
+  // energin hamnar då på en egen rad under namnet i stället för att trycka ihop namnet. rem i en containerfråga följer
+  // rotens teckenstorlek, så vid normal text (raden ≈ 20 rem bred) ändras ingenting.
+  const rowClass = `flex min-w-0 flex-1 items-center gap-3 text-left @max-[17rem]:flex-wrap @max-[17rem]:gap-y-1 ${compact ? 'min-h-12 py-1.5' : 'min-h-14 py-2'}`
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`@container flex items-center gap-2 ${className}`}>
       {onClick ? (
         <button
           type="button"

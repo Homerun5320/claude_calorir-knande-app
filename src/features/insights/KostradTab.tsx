@@ -134,7 +134,7 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
         <div className="min-w-0 flex-1">
           {/* Får brytas: i smala fönster hamnar märket under rubriken i stället för utanför kortet. */}
           <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-            <h3 className="font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
+            <h3 className="min-w-0 break-words font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
             <Badge tone={uncertain ? 'neutral' : status.tone} dot className="shrink-0">
               {uncertain ? neutralLabel : status.label}
             </Badge>

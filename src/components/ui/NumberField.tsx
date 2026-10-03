@@ -377,7 +377,7 @@ export function NumberField({
         {suffix !== undefined && <span className="shrink-0 text-[0.9375rem] font-medium text-ink-3">{suffix}</span>}
         {showStepper && (
           // gap-3: knapparnas osynliga tryckytor (6 px runt om) får inte överlappa – då blir båda minst 44 px.
-          <div className="ml-1.5 flex shrink-0 items-center gap-3">
+          <div className="ml-[min(0.375rem,6px)] flex shrink-0 items-center gap-[min(0.75rem,12px)]">
             <StepButton direction={-1} onStep={() => stepBy(-1)} label={`Minska ${labelText}`} disabled={disabled || readOnly || atMin} size="sm" />
             <StepButton direction={1} onStep={() => stepBy(1)} label={`Öka ${labelText}`} disabled={disabled || readOnly || atMax} size="sm" />
           </div>

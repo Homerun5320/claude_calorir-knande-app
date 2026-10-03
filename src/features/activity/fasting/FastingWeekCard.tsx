@@ -20,6 +20,7 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
 
   return (
     <Card eyebrow={`Vecka ${isoWeek(today)}`} title="Veckans fasta">
+      <p className="-mt-2 mb-3 text-[0.8125rem] leading-relaxed text-ink-3">En saklig översikt över veckan – antal och snittlängd, inga poäng eller serier.</p>
       {w.count === 0 ? (
         <p className="text-[0.9375rem] leading-relaxed text-ink-2">
           Ingen avslutad fasta den här veckan ännu. Det är helt i sin ordning – fasta är ett val, aldrig ett måste.
@@ -37,13 +38,17 @@ export const FastingWeekCard = memo(function FastingWeekCard({ history, today }:
           const status = d.ended ? 'fasta avslutad' : 'ingen fasta'
           return (
             <li key={d.date} className="flex flex-col items-center gap-1.5" aria-label={`${WEEKDAYS[i]}: ${status}`}>
-              <span className={cx('text-[0.6875rem] font-semibold uppercase tracking-wide', isToday ? 'text-ink' : 'text-ink-3')}>
+              {/* Storlekarna har tak i px: kolumnen är bara ~37 px bred vid 200 % text, och 7 cirklar i rem (2 rem = 64 px) skulle skjuta ut sidan. */}
+              <span
+                style={{ fontSize: 'min(0.6875rem, 12px)' }}
+                className={cx('font-semibold uppercase tracking-wide', isToday ? 'text-ink' : 'text-ink-3')}
+              >
                 {WEEKDAYS_SHORT[i]}
               </span>
               <span
                 aria-hidden
                 className={cx(
-                  'grid size-8 place-items-center rounded-full',
+                  'grid size-[min(2rem,32px)] place-items-center rounded-full',
                   d.ended ? 'bg-blabar-soft ring-2 ring-inset ring-blabar/50' : 'bg-surface-2',
                   isToday && 'outline outline-2 outline-offset-2 outline-line',
                 )}

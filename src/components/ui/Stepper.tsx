@@ -113,10 +113,15 @@ export interface StepButtonProps {
   className?: string
 }
 
+/**
+ * Måtten har tak i px (min(rem, px)): vid stor text (200 %) skulle rem-knappar fördubblas och tillsammans med
+ * fältet skjuta ut sidan. Den osynliga ramen runt knappen (`after:`) har samma tak, så att knapparnas tryckytor inte glider
+ * ihop. Tryckytan är minst 44 px (sm: 32 px + 6 px runt om, md: 40 px + 2 px runt om, lg: 56 px).
+ */
 const STEP_SIZES = {
-  sm: { box: 'z-[1] size-8 after:absolute after:-inset-1.5 after:rounded-full', icon: 'size-4' },
-  md: { box: 'z-[1] size-10 after:absolute after:-inset-0.5 after:rounded-full', icon: 'size-[1.125rem]' },
-  lg: { box: 'size-14', icon: 'size-6' },
+  sm: { box: 'z-[1] size-[min(2rem,32px)] after:absolute after:-inset-[min(0.375rem,6px)] after:rounded-full', icon: 'size-[min(1rem,16px)]' },
+  md: { box: 'z-[1] size-[min(2.5rem,40px)] after:absolute after:-inset-[min(0.125rem,2px)] after:rounded-full', icon: 'size-[min(1.125rem,18px)]' },
+  lg: { box: 'size-[min(3.5rem,56px)]', icon: 'size-[min(1.5rem,24px)]' },
 } as const
 
 const STEP_VARIANTS = {

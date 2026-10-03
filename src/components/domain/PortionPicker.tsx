@@ -519,8 +519,11 @@ export function PortionPicker({
 
       {/* Förhandsvisning */}
       <div className="rounded-3xl bg-surface-2 p-4">
-        <div className="flex items-end justify-between gap-4">
-          <div className="min-w-0">
+        {/* flex-wrap: vid stor text (200 %) ryms inte energin och makrona bredvid varandra – makrona hamnar då under. Energin har
+            `flex-1 basis-0 min-w-16`: den räknas som 4 rem bred vid radbrytningen (inte som sin längsta rad), så att de två
+            fortfarande ligger bredvid varandra på smala telefoner (360 px) vid normal text. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div className="min-w-16 flex-1 basis-0">
             <div className="eyebrow">{mindful ? 'Portionen' : 'Energi'}</div>
             {mindful ? (
               <div className="mt-1 font-display text-2xl font-semibold leading-tight text-ink">{mindfulPortionLabel(valid ? n.kcal : undefined)}</div>

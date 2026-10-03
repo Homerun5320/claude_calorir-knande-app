@@ -606,12 +606,12 @@ function MacroSummary({ nutrients, mindful, caption }: { nutrients: Nutrients; m
             const g = nutrients[m.key]
             const pct = total > 0 ? (e[m.key] / total) * 100 : undefined
             return (
-              <div key={m.key} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-3.5 py-2.5">
-                <dt className="flex items-center gap-2 text-sm text-ink-2">
-                  <span aria-hidden className={cx('size-2.5 rounded-full', m.dot)} />
-                  {m.label}
+              <div key={m.key} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-2xl bg-surface-2 px-3.5 py-2.5">
+                <dt className="flex min-w-0 items-center gap-2 text-sm text-ink-2">
+                  <span aria-hidden className={cx('size-2.5 shrink-0 rounded-full', m.dot)} />
+                  <span className="min-w-0 break-words">{m.label}</span>
                 </dt>
-                <dd className="text-sm tabular-nums text-ink">
+                <dd className="ml-auto text-right text-sm tabular-nums text-ink">
                   {mindful ? (
                     pct !== undefined ? (
                       <span className="text-ink-2">{pct >= 40 ? 'Stor del' : pct >= 15 ? 'En del' : 'Liten del'}</span>
@@ -698,8 +698,9 @@ function ClimateCard({ food, grams, caption }: { food: Food; grams: number; capt
   const car = eq.carKm < 1 ? `${formatNumber(Math.max(10, Math.round((eq.carKm * 1000) / 10) * 10))}\u00a0meter` : `${formatNumber(eq.carKm, 1)}\u00a0km`
   return (
     <Card title="Klimatavtryck" eyebrow={caption}>
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      {/* flex-wrap: vid stor text (200 %) hamnar märket under siffran i stället för utanför kortet. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
           {/* Två decimaler under 0,1 kg; väldigt små mängder visas som "< 0,01". */}
           <span className="display-num text-4xl font-semibold text-ink">{kg > 0 && kg < 0.005 ? `< ${formatNumber(0.01, 2)}` : formatNumber(kg, kg < 0.1 ? 2 : 1)}</span>{' '}
           <span className="text-sm font-medium text-ink-3">kg CO₂e</span>

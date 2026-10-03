@@ -10,6 +10,15 @@ interface BodyState {
   measurements: MeasurementEntry[]
   /** Lägg till eller ersätt dagens vikt. */
   logWeight: (date: ISODate, kg: number, note?: string) => WeightEntry
+  /**
+   * Som `logWeight` för flera dagar, med en enda skrivning – varje `set()` skriver om hela butiken,
+   * så anropa aldrig `logWeight` i en slinga (t.ex. vikter från Apple Hälsa/Health Connect). Samma
+   * regler som `logWeight`: en vikt per dag (den senare i listan ersätter), sorterad på datum, nytt
+   * id per ersatt vikt, och ingen annan kontroll – anroparen avgör vad som är rimligt. Skillnaden: en
+   * vikt som redan är exakt densamma (datum, kg, anteckning) lämnas orörd, och ändras inget alls
+   * skrivs ingenting. Returnerar den lagrade vikten för varje angiven dag, i den ordning de gavs.
+   */
+  logWeights: (entries: ReadonlyArray<{ date: ISODate; kg: number; note?: string }>) => WeightEntry[]
   removeWeight: (id: string) => void
   addMeasurement: (m: Omit<MeasurementEntry, 'id' | 'createdAt'>) => MeasurementEntry
   removeMeasurement: (id: string) => void
@@ -27,6 +36,31 @@ export const useBodyStore = create<BodyState>()(
         const entry: WeightEntry = { id: uid('w_'), date, kg, note, createdAt: Date.now() }
         set({ weights: [...get().weights.filter((w) => w.date !== date), entry].sort(byDate) })
         return entry
+      },
+      logWeights: (entries) => {
+        if (entries.length === 0) return []
+        const now = Date.now()
+        const current = get().weights
+        const stored = new Map(current.map((w) => [w.date, w]))
+        // Vikten som gäller för varje angiven dag när alla är inlagda (den senare ersätter den förra).
+        const latest = new Map<ISODate, WeightEntry>()
+        const added = new Set<WeightEntry>()
+        for (const { date, kg, note } of entries) {
+          const prev = latest.get(date) ?? stored.get(date)
+          if (prev && prev.kg === kg && prev.note === note) {
+            latest.set(date, prev)
+            continue
+          }
+          const entry: WeightEntry = { id: uid('w_'), date, kg, note, createdAt: now }
+          if (prev) added.delete(prev)
+          added.add(entry)
+          latest.set(date, entry)
+        }
+        if (added.size > 0) {
+          const replaced = new Set([...added].map((w) => w.date))
+          set({ weights: [...current.filter((w) => !replaced.has(w.date)), ...added].sort(byDate) })
+        }
+        return entries.flatMap((e) => latest.get(e.date) ?? [])
       },
       removeWeight: (id) => set({ weights: get().weights.filter((w) => w.id !== id) }),
       addMeasurement: (m) => {

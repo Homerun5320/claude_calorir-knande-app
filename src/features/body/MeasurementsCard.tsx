@@ -94,8 +94,9 @@ export function MeasurementsCard({ today, onAdd }: MeasurementsCardProps) {
       </ul>
 
       <h3 className="eyebrow mb-2 mt-5 px-1">Alla mätningar</h3>
-      {/* En riktig kant (inte inset-ring) – den klistrade datumkolumnen målar annars över ramen. */}
-      <div className="overflow-x-auto rounded-2xl border border-line">
+      {/* En riktig kant (inte inset-ring) – den klistrade datumkolumnen målar annars över ramen. `relative` gör att
+          de dolda texterna för skärmläsare (sr-only, absolut placerade) klipps av rullningsytan i stället för att skjuta ut sidan. */}
+      <div className="relative overflow-x-auto rounded-2xl border border-line">
         <table className="w-full min-w-max border-collapse text-left text-sm tabular-nums">
           <caption className="sr-only">Kroppsmått per mättillfälle, nyaste först, med förändring mot föregående mätning</caption>
           <thead>

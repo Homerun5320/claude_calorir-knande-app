@@ -7,10 +7,11 @@ import { Hourglass, Trash2 } from 'lucide-react'
 import { Button, Card, EmptyState, IconButton, ListGroup, ListRow, SectionTitle, toast } from '../../../components/ui'
 import { useFastingStore, type FastRecord } from '../../../stores/fastingStore'
 import type { ISODate } from '../../../types'
-import { clockTime, fastDurationMs, formatFastDuration, shortDayAndTime } from '../fastingLogic'
+import { clockTime, fastDurationMs, formatFastDuration, MIN_SAVED_FAST_MS, shortDayAndTime } from '../fastingLogic'
 import { restoreFast } from '../hooks'
 
 const INITIAL_COUNT = 7
+const MIN_SAVED_MINUTES = Math.round(MIN_SAVED_FAST_MS / 60_000)
 
 export const FastHistory = memo(function FastHistory({ history, today }: { history: readonly FastRecord[]; today: ISODate }) {
   const [showAll, setShowAll] = useState(false)
@@ -23,7 +24,12 @@ export const FastHistory = memo(function FastHistory({ history, today }: { histo
 
   return (
     <section aria-labelledby="fasta-historik">
-      <SectionTitle id="fasta-historik">Historik</SectionTitle>
+      <SectionTitle
+        id="fasta-historik"
+        description={`En saklig lista: längd, tider och upplägg – inga poäng. Fastor under ${MIN_SAVED_MINUTES}\u00a0minuter sparas inte.`}
+      >
+        Historik
+      </SectionTitle>
       {history.length === 0 ? (
         <Card>
           <EmptyState

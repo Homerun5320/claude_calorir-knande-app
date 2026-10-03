@@ -329,6 +329,40 @@ describe('PlanningPage – kopiera och töm', () => {
     expect(usePlanStore.getState().items[monday]).toBeUndefined()
   })
 
+  it('ångrar en kopierad vecka med flera rader med en enda skrivning (varje set() skriver om hela planen)', async () => {
+    const prev = addDays(monday, -7)
+    plan(recipeDraft(prev))
+    plan(recipeDraft(prev, { meal: 'lunch' }))
+    plan(recipeDraft(addDays(prev, 2)))
+    plan(recipeDraft(addDays(prev, 5)))
+    const own = plan(recipeDraft(addDays(monday, 3)))
+    const inWeek = () =>
+      Object.entries(usePlanStore.getState().items)
+        .filter(([date]) => date >= monday && date <= addDays(monday, 6))
+        .reduce((n, [, list]) => n + list.length, 0)
+    // Veckan har redan en rad, så kopieringen frågas först.
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderAt()
+    fireEvent.click(screen.getByRole('button', { name: 'Kopiera förra veckan' }))
+    await waitFor(() => expect(lastToast()?.message).toBe('Förra veckans plan är kopierad'))
+    expect(inWeek()).toBe(5)
+
+    let writes = 0
+    const unsubscribe = usePlanStore.subscribe(() => {
+      writes++
+    })
+    try {
+      act(() => lastToast()?.action?.onClick())
+      expect(writes).toBe(1)
+    } finally {
+      unsubscribe()
+    }
+    // Bara de kopierade raderna försvann – den egna raden och förra veckan finns kvar.
+    expect(inWeek()).toBe(1)
+    expect(usePlanStore.getState().items[own.date]).toEqual([own])
+    expect(Object.keys(usePlanStore.getState().items)).toHaveLength(4)
+  })
+
   it('frågar innan förra veckan läggs till i en vecka som redan har rader', async () => {
     plan(recipeDraft(addDays(monday, -7)))
     plan(recipeDraft(monday))

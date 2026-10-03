@@ -34,6 +34,25 @@ export function Callout({ emoji, children, className = '' }: { emoji?: string; c
   )
 }
 
+/**
+ * Namn till vänster och värde till höger i en rad ovanför en andelsstapel. Värdet hamnar under namnet
+ * när de inte ryms bredvid varandra, och vid stor text (200 %) får namnet två rader i stället för "…" –
+ * annars trycks namnet ihop till några få tecken eller värdet sticker utanför kortet. `min-w-24` håller
+ * isär de två: smalare än så får namnet inte bli bredvid värdet.
+ * `@container` + `@max-[12rem]`: rem i en containerfråga följer rotens teckenstorlek, så vid normal text
+ * (raden ≈ 17 rem) är namnet en rad med "…" precis som förut.
+ */
+export function NameValueRow({ name, value, className = '' }: { name: ReactNode; value?: ReactNode; className?: string }) {
+  return (
+    <div className={`@container flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-sm ${className}`}>
+      <span className="min-w-24 flex-1 basis-0 truncate break-words font-medium text-ink @max-[12rem]:line-clamp-2 @max-[12rem]:whitespace-normal">{name}</span>{' '}
+      {value !== undefined && value !== null && value !== false && (
+        <span className="ml-auto max-w-full text-right text-xs text-ink-3 tabular-nums">{value}</span>
+      )}
+    </div>
+  )
+}
+
 /** Färgprick för teckenförklaringar. */
 export function Dot({ color, className = '' }: { color: string; className?: string }) {
   return <span aria-hidden="true" className={`inline-block size-2.5 shrink-0 rounded-full ${className}`} style={{ background: color }} />

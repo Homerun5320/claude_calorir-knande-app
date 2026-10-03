@@ -70,10 +70,8 @@ export function WeekPlan({ weekStart, today, days, targetsFor, resolve, entries,
       tone: 'success',
       action: {
         label: 'Ångra',
-        onClick: () => {
-          const { removeItem } = usePlanStore.getState()
-          for (const i of added) removeItem(i.date, i.id)
-        },
+        // En enda skrivning – varje set() skriver om hela planen (CLAUDE.md, "Zustand – viktigt").
+        onClick: () => usePlanStore.getState().removeItems(added),
       },
     })
   }

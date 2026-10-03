@@ -13,7 +13,7 @@ import { formatNumber } from '../../lib/format'
 import { percentText } from './fmt'
 import type { ISODate } from '../../types'
 import { climateDays, summarizeClimate, topEmitters } from './aggregate'
-import { Callout, InfoNote, ShareBar, SourceNote } from './ui'
+import { Callout, InfoNote, NameValueRow, ShareBar, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
 
 /**
@@ -152,15 +152,15 @@ export function ClimateTab({ data }: { data: InsightsData }) {
               <li key={t.id} className="flex items-center gap-3">
                 <CategoryIcon category={t.category} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="truncate font-medium text-ink">
-                      <span className="sr-only">{i + 1}. </span>
-                      {t.name}
-                    </span>{' '}
-                    <span className="shrink-0 text-xs text-ink-3 tabular-nums">
-                      {mindful ? percentText(t.share * 100) : `${kg(t.kg)} · ${percentText(t.share * 100)}`}
-                    </span>
-                  </div>
+                  <NameValueRow
+                    name={
+                      <>
+                        <span className="sr-only">{i + 1}. </span>
+                        {t.name}
+                      </>
+                    }
+                    value={mindful ? percentText(t.share * 100) : `${kg(t.kg)} · ${percentText(t.share * 100)}`}
+                  />
                   <ShareBar value={t.share} color="var(--lg-mossa)" className="mt-1" />
                 </div>
               </li>

@@ -449,8 +449,8 @@ export default function AddFoodPage() {
                   onClick={() => setLmvToggle({ q, open: !lmvOpen })}
                   className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl px-1 text-left"
                 >
-                  <span className="eyebrow">Fler från Livsmedelsverket</span>
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink-2">
+                  <span className="eyebrow min-w-0 break-words">Fler från Livsmedelsverket</span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-ink-2">
                     <span className="tabular-nums">{lmvResults.length}</span>
                     <ChevronDown className={cx('size-4 transition-transform duration-200', lmvOpen && 'rotate-180')} aria-hidden />
                   </span>
@@ -699,7 +699,10 @@ function Browse(props: BrowseProps) {
   return (
     <div className="flex flex-col gap-6">
       {/* Stora genvägar – skanna överst på mobil, snabbregistrering och tallrik bredvid varandra. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* @container + @max-[17.5rem]: vid stor text (200 %) blir två rutor bredvid varandra för smala (bokstav för bokstav) – då står de
+          under varandra. rem i en containerfråga följer rotens teckenstorlek; vid normal text (raden ≈ 22 rem, 18 rem på en 320 px-telefon)
+          ändras inget. */}
+      <div className="@container grid grid-cols-2 gap-3 sm:grid-cols-3">
         {/* Mjuka bindestreck (\u00AD) låter de långa orden brytas snyggt i smala rutor (320–390 px). */}
         <ActionTile
           icon={ScanBarcode}
@@ -709,8 +712,22 @@ function Browse(props: BrowseProps) {
           onClick={props.onScan}
           className="col-span-2 sm:col-span-1"
         />
-        <ActionTile icon={Zap} title={'Snabb\u00ADregistrera'} text="Bara energin, ungefär" tone="sol" onClick={props.onQuick} />
-        <ActionTile icon={UtensilsCrossed} title="Tallrik" text={'Uppskatta utan att väga'} tone="gran" onClick={props.onPlate} />
+        <ActionTile
+          icon={Zap}
+          title={'Snabb\u00ADregistrera'}
+          text="Bara energin, ungefär"
+          tone="sol"
+          onClick={props.onQuick}
+          className="@max-[17.5rem]:col-span-2"
+        />
+        <ActionTile
+          icon={UtensilsCrossed}
+          title="Tallrik"
+          text={'Uppskatta utan att väga'}
+          tone="gran"
+          onClick={props.onPlate}
+          className="@max-[17.5rem]:col-span-2"
+        />
       </div>
       <p className="-mt-3 flex items-start gap-1.5 px-1 text-xs text-ink-3">
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-sol" aria-hidden />

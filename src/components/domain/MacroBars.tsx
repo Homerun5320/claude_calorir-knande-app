@@ -114,14 +114,15 @@ export function MacroBars({ totals, targets, showFiber, variant = 'compact', hid
           const e = k === 'fiber' || !energyKnown ? undefined : ep[k]
           return (
             <li key={k}>
-              <div className="mb-1.5 flex items-baseline gap-2">
+              {/* flex-wrap: vid stor text (200 %) hamnar gram och mål under etiketten i stället för utanför kortet. */}
+              <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className={`h-2 w-2 shrink-0 self-center rounded-full ${meta.dot}`} aria-hidden="true" />
-                <span className="text-sm font-medium text-ink">{meta.label}</span>
+                <span className="min-w-0 break-words text-sm font-medium text-ink">{meta.label}</span>
                 {!hideNumbers && e !== undefined && eaten > 0 && (
                   <span className="text-xs text-ink-3 tabular-nums">{formatNumber(e)} E%</span>
                 )}
                 {!hideNumbers && (
-                  <span className="ml-auto text-sm tabular-nums">
+                  <span className="ml-auto text-right text-sm tabular-nums">
                     <span className="font-semibold text-ink">{known === undefined ? '–' : formatNumber(eaten)}</span>
                     <span className="text-ink-3"> / {target > 0 ? formatNumber(target) : '–'} g</span>
                   </span>
@@ -138,25 +139,30 @@ export function MacroBars({ totals, targets, showFiber, variant = 'compact', hid
     )
   }
 
+  // @container: raden är för smal för tre eller fyra kolumner (stor text, 200 %) – då delas den i 2 × 2 respektive
+  // en kolumn. rem i en containerfråga följer rotens teckenstorlek, så vid normal text (raden ≈ 20 rem, ≈ 15 rem
+  // på en 320 px-telefon) ändras ingenting. Etiketterna får brytas i stället för att klippas med "…".
+  const four = keys.length === 4
+  const span = four ? '@max-[14rem]:col-span-2' : '@max-[12rem]:col-span-3'
   return (
-    <ul className={`grid ${keys.length === 4 ? 'grid-cols-4 gap-2.5' : 'grid-cols-3 gap-3'} ${className}`}>
+    <ul className={`@container grid ${four ? 'grid-cols-4 gap-2.5' : 'grid-cols-3 gap-3'} ${className}`}>
       {keys.map((k) => {
         const meta = MACRO_META[k]
         const known = macroEaten(totals, k, withEntries)
         const eaten = known ?? 0
         const target = targets[meta.targetKey] ?? 0
         return (
-          <li key={k} className="min-w-0">
-            <div className="mb-1.5 truncate text-xs font-medium text-ink-2">{keys.length === 4 ? meta.short : meta.label}</div>
+          <li key={k} className={`min-w-0 ${span}`}>
+            <div className="mb-1.5 break-words text-xs font-medium text-ink-2">{four ? meta.short : meta.label}</div>
             <MacroBar meta={meta} eaten={known} target={target} hideNumbers={hideNumbers} />
             {!hideNumbers && (
               <>
-                <div className={`mt-1.5 truncate tabular-nums ${keys.length === 4 ? 'text-[13px] tracking-tight' : 'text-sm'}`}>
+                <div className={`mt-1.5 break-words tabular-nums ${four ? 'text-[13px] tracking-tight' : 'text-sm'}`}>
                   <span className="font-semibold text-ink">{known === undefined ? '–' : formatNumber(eaten)}</span>
                   <span className="text-ink-3">/{target > 0 ? formatNumber(target) : '–'} g</span>
                 </div>
                 {known !== undefined && target > 0 && (
-                  <div className="truncate text-[11px] text-ink-3 tabular-nums">{remainingText(eaten, target)}</div>
+                  <div className="break-words text-[11px] text-ink-3 tabular-nums">{remainingText(eaten, target)}</div>
                 )}
               </>
             )}

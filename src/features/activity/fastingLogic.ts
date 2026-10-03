@@ -18,14 +18,60 @@ export interface FastingProtocol {
   /** Kort etikett, t.ex. "Populärast". */
   title: string
   description: string
+  /**
+   * Längre förklaring (2–3 meningar): vad siffrorna betyder, ett vardagsexempel med klockslag och en
+   * varsam tanke. Saklig och utan löften – se `Evidensläget` överst. Visas under "Mer om …" i
+   * StartFastCard. Exemplets klockslag ska gå ihop med protokollets timmar (testas).
+   */
+  details: string
 }
 
 export const FASTING_PROTOCOLS: readonly FastingProtocol[] = [
-  { id: '12:12', fastHours: 12, eatHours: 12, title: 'Nybörjarvänlig', description: 'Ungefär en natt plus kvällen, t.ex. ät 08–20.' },
-  { id: '14:10', fastHours: 14, eatHours: 10, title: 'Mjuk start', description: 'Ett lite kortare ätfönster, t.ex. ät 09–19.' },
-  { id: '16:8', fastHours: 16, eatHours: 8, title: 'Vanligast', description: 'Hoppa över frukost eller kvällsmat, t.ex. ät 12–20.' },
-  { id: '18:6', fastHours: 18, eatHours: 6, title: 'För den vane', description: 'Två måltider i ett kort fönster, t.ex. ät 12–18.' },
-  { id: '20:4', fastHours: 20, eatHours: 4, title: 'Krävande', description: 'Ett mycket kort ätfönster, t.ex. ät 14–18. Passar få.' },
+  {
+    id: '12:12',
+    fastHours: 12,
+    eatHours: 12,
+    title: 'Nybörjarvänlig',
+    description: 'Ungefär en natt plus kvällen, t.ex. ät 08–20.',
+    details:
+      '12 timmar utan mat och 12 timmar då du äter – tillsammans ett dygn. Äter du mellan 08 och 20 fastar du från 20 till 08 nästa morgon, så en stor del av fastan är natten. Det kan kännas naturligt om du redan äter regelbundet – och det är helt okej att stanna här.',
+  },
+  {
+    id: '14:10',
+    fastHours: 14,
+    eatHours: 10,
+    title: 'Mjuk start',
+    description: 'Ett lite kortare ätfönster, t.ex. ät 09–19.',
+    details:
+      '14 timmar utan mat och 10 timmar då du äter. Äter du mellan 09 och 19 fastar du från 19 till 09 nästa morgon. Det kan passa om 12:12 känns lätt och du är nyfiken på ett lite kortare ätfönster – annars behöver du inte byta.',
+  },
+  {
+    id: '16:8',
+    fastHours: 16,
+    eatHours: 8,
+    title: 'Vanligast',
+    description: 'Hoppa över frukost eller kvällsmat, t.ex. ät 12–20.',
+    details:
+      '16 timmar utan mat och 8 timmar då du äter. Äter du mellan 12 och 20 fastar du från 20 till 12 nästa dag, så frukosten hoppas över. Det kan passa dig som ändå ofta väntar med frukosten. Känns det för långt går det bra att välja ett mjukare upplägg.',
+  },
+  {
+    id: '18:6',
+    fastHours: 18,
+    eatHours: 6,
+    title: 'Kort ätfönster',
+    description: 'Två måltider i ett kort fönster, t.ex. ät 12–18.',
+    details:
+      '18 timmar utan mat och 6 timmar då du äter. Äter du mellan 12 och 18 fastar du från 18 till 12 nästa dag. Det är ett kort fönster att få in dagens mat på – ett mjukare upplägg passar många bättre, och ett kortare ätfönster är inte bättre.',
+  },
+  {
+    id: '20:4',
+    fastHours: 20,
+    eatHours: 4,
+    title: 'Mycket kort ätfönster',
+    description: 'Bara fyra timmar att äta på, t.ex. ät 14–18. Passar få.',
+    details:
+      '20 timmar utan mat och bara 4 timmar då du äter. Äter du mellan 14 och 18 fastar du från 18 till 14 nästa dag. Ett så kort fönster kan göra det svårt att få i sig tillräckligt – ett mjukare upplägg passar de flesta bättre. Lyssna på kroppen.',
+  },
 ]
 
 export const DEFAULT_PROTOCOL_ID = '16:8'

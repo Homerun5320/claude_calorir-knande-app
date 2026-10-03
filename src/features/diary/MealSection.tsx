@@ -46,10 +46,15 @@ export const MealSection = memo(function MealSection({
   const names = entries.map((e) => shortFoodName(entryName(e))).join(', ')
 
   return (
-    <section aria-labelledby={headingId} className={cx('card', empty ? 'px-4 py-3' : 'p-4')}>
-      <div className="flex items-center gap-2">
-        <MealIcon meal={meal.id} size={empty ? 'sm' : 'md'} />
-        <div className="ml-1 mr-1 min-w-0 flex-1">
+    // @container + @max-[14rem]: vid stor text (200 %) är kortet för smalt för ikon, namn och två knappar på en rad – ikonen döljs och
+    // namnet får en egen rad ovanför knapparna. rem i en containerfråga följer rotens teckenstorlek; vid normal text (kortet ≈ 20 rem
+    // brett, ≈ 16 rem på en 320 px-telefon) ändras inget.
+    <section aria-labelledby={headingId} className={cx('card @container', empty ? 'px-4 py-3' : 'p-4')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="contents @max-[14rem]:hidden">
+          <MealIcon meal={meal.id} size={empty ? 'sm' : 'md'} />
+        </span>
+        <div className="ml-1 mr-1 min-w-0 flex-1 @max-[14rem]:ml-0 @max-[14rem]:basis-full">
           {/* h3: måltiderna ligger under sidans (dolda) rubrik "Måltider" (h2). */}
           <h3 id={headingId} className="font-display text-[1.0625rem] font-semibold leading-tight text-ink">
             {meal.name}
@@ -88,7 +93,7 @@ export const MealSection = memo(function MealSection({
           to={addFoodHref(meal.id, date)}
           aria-label={`Lägg till i ${lower}`}
           title={`Lägg till i ${lower}`}
-          className="relative grid size-9 shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform after:absolute after:-inset-1 after:rounded-full hover:bg-[color-mix(in_oklab,var(--lg-gran-soft)_82%,var(--lg-gran))] active:scale-95"
+          className="relative grid size-9 shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform after:absolute after:-inset-1 after:rounded-full hover:bg-[color-mix(in_oklab,var(--lg-gran-soft)_82%,var(--lg-gran))] active:scale-95 @max-[14rem]:ml-auto"
         >
           <Plus className="size-[1.125rem]" strokeWidth={2.4} aria-hidden />
         </Link>
@@ -161,7 +166,7 @@ const MindfulEntryRow = memo(function MindfulEntryRow({ entry, onOpen }: { entry
         <span className="line-clamp-2 text-[0.95rem] font-medium leading-snug text-ink" lang="sv">
           {name}
         </span>
-        {amount && <span className="mt-0.5 block truncate text-xs text-ink-3">{amount}</span>}
+        {amount && <span className="mt-0.5 block line-clamp-2 break-words text-xs text-ink-3">{amount}</span>}
       </span>
     </button>
   )

@@ -2,7 +2,7 @@
  * Röktester för Träning, Dryck och Fasta med riktiga butiker (fake-indexeddb):
  * rendering utan renderingsloopar, att lägga till och ta bort med Ångra, snabbval och fastetimern.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import ExercisePage from './ExercisePage'
 import DrinksPage from './DrinksPage'
@@ -21,6 +21,8 @@ import { nutrientsForGrams, standardDrinks } from '../../lib/nutrients'
 import { formatNumber } from '../../lib/format'
 import { useLicenseStore } from '../../stores/licenseStore'
 import { BLOCKED_ACTION_TEXT, useAccessGateStore } from '../premium/requireAccess'
+import { FASTING_PROTOCOLS } from './fastingLogic'
+import { BANNED_FASTING_WORDS } from './fastingTestUtils'
 
 const STORES = [useProfileStore, useDiaryStore, useFoodStore, useBodyStore, useFastingStore]
 
@@ -306,5 +308,155 @@ describe('Fasta', () => {
     expect(screen.getByText('Fasta passar inte just nu')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /visa timern/ }))
     expect(screen.getByRole('button', { name: 'Starta fastan nu' })).toBeInTheDocument()
+  })
+})
+
+describe('Fasta – beskrivningar', () => {
+  const guide = () => screen.getByRole('region', { name: 'Så fungerar fasta i Lagom' })
+  const summaryOf = (scope: HTMLElement, name: string | RegExp) =>
+    within(scope)
+      .getAllByText(name)
+      .map((el) => el.closest('summary'))
+      .find((el): el is HTMLElement => el !== null)!
+
+  it('förklarar det valda upplägget under "Mer om …" och byter text med upplägget', () => {
+    renderAt('/fasta')
+    const start = screen.getByRole('region', { name: 'Starta en fasta' })
+    // Förvalt upplägg är det senast använda eller 16:8 – förklaringen är stängd från början.
+    const summary = summaryOf(start, 'Mer om 16:8')
+    const details = summary.closest('details')!
+    expect(summary.tagName).toBe('SUMMARY')
+    expect(details.open).toBe(false)
+    const p168 = FASTING_PROTOCOLS.find((p) => p.id === '16:8')!
+    expect(within(start).getByText(p168.details)).toBeInTheDocument()
+
+    // Ett klick (Enter och mellanslag på en <summary> gör detsamma i webbläsaren) öppnar den.
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+
+    // En öppen förklaring förblir öppen när upplägget byts, med det nya upplägget.
+    fireEvent.click(screen.getByRole('radio', { name: '20:4' }))
+    const p204 = FASTING_PROTOCOLS.find((p) => p.id === '20:4')!
+    expect(within(start).getByText(p204.details)).toBeInTheDocument()
+    expect(within(start).queryByText(p168.details)).not.toBeInTheDocument()
+    expect(summaryOf(start, 'Mer om 20:4').closest('details')!.open).toBe(true)
+    // Den korta beskrivningen finns kvar.
+    expect(within(start).getByText(p204.description)).toBeInTheDocument()
+  })
+
+  it('guiden "Så fungerar fasta i Lagom" är hopfälld, går att öppna och är sann mot koden', () => {
+    renderAt('/fasta')
+    const card = guide()
+    expect(within(card).getByRole('heading', { level: 2, name: 'Så fungerar fasta i Lagom' })).toBeInTheDocument()
+    const questions = ['Vad är periodisk fasta?', 'Så startar och avslutar du', 'Vad sparas?', 'Påverkar fastan mitt dagsmål?']
+    for (const q of questions) {
+      const summary = summaryOf(card, q)
+      expect(summary.closest('details')!.open, q).toBe(false)
+      fireEvent.click(summary)
+      expect(summary.closest('details')!.open, q).toBe(true)
+    }
+    // Webben: ingen rad om påminnelse och widget (de finns bara i apparna).
+    expect(within(card).queryByText(/Påminnelse/)).not.toBeInTheDocument()
+
+    expect(within(card).getByText(/Fastan påverkar inte ditt dagsmål/)).toBeInTheDocument()
+    expect(within(card).getByText(/upp till 72\stimmar bakåt/)).toBeInTheDocument()
+    expect(within(card).getByText(/kortare än 30\sminuter sparas inte/)).toBeInTheDocument()
+    expect(within(card).getByText(/Allt sparas i den här webbläsaren/)).toBeInTheDocument()
+    expect(within(card).getByText(/Fastorna ingår i säkerhetskopian/)).toBeInTheDocument()
+    // Inget om vad man får äta eller dricka utöver säkerhetskortets ord (och inga hälsolöften).
+    expect(card.textContent).not.toMatch(/kaffe|vatten|\bte\b/i)
+    expect(card.textContent).not.toMatch(BANNED_FASTING_WORDS)
+  })
+
+  it('guiden nämner alltid vem fastan inte rekommenderas för, med länkar till 1177 och Frisk & Fri', () => {
+    renderAt('/fasta')
+    const card = guide()
+    expect(card).toHaveTextContent(/Det rekommenderas inte om du är gravid eller ammar, är under 18 år, har diabetes och tar blodsockersänkande läkemedel/)
+    expect(card).toHaveTextContent(/har eller har haft en ätstörning\. Prata med vårdcentralen eller 1177/)
+    expect(card).toHaveTextContent(/Stöd finns hos Frisk & Fri/)
+    const links = within(card).getAllByRole('link')
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['https://www.1177.se', 'https://www.friskfri.se', 'https://www.1177.se'])
+    for (const l of links) expect(l).toHaveAttribute('rel', 'noopener noreferrer')
+    // Samma text som i "Bra att veta".
+    const safety = screen.getByRole('region', { name: 'Bra att veta' })
+    expect(safety).toHaveTextContent(/Det rekommenderas inte om du är gravid eller ammar, är under 18 år, har diabetes och tar blodsockersänkande läkemedel/)
+  })
+
+  it('guiden syns också medan en fasta pågår, efter timern', () => {
+    useFastingStore.setState({ active: { start: Date.now() - 5 * 3_600_000, targetHours: 16, protocol: '16:8' } })
+    renderAt('/fasta')
+    const timer = screen.getByRole('region', { name: 'Pågående fasta' })
+    expect(timer.compareDocumentPosition(guide()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Mer om 16:8')).not.toBeInTheDocument()
+  })
+
+  it('göms tillsammans med starta-kortet vid graviditet, amning och under 18 år – säkerhetskortet står kvar', () => {
+    useProfileStore.setState({ profile: { ...PROFILE, lifeStage: 'ammar' } })
+    renderAt('/fasta')
+    expect(screen.getByText('Fasta passar inte just nu')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Så fungerar fasta i Lagom' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Mer om 16:8/)).not.toBeInTheDocument()
+    // 5:2-kortet (med energisiffror för två dagar) göms på samma sätt som guiden.
+    expect(screen.queryByText('Om 5:2')).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/kcal/)
+    expect(screen.getByRole('region', { name: 'Bra att veta' })).toBeInTheDocument()
+    // Först när man själv väljer att visa timern kommer guiden (och 5:2-kortet).
+    fireEvent.click(screen.getByRole('button', { name: /visa timern/ }))
+    expect(guide()).toBeInTheDocument()
+    expect(screen.getByText('Om 5:2')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Bra att veta' })).toBeInTheDocument()
+  })
+
+  it('under 18 år: ingen guide', () => {
+    const year = Number(todayISO().slice(0, 4))
+    useProfileStore.setState({ profile: { ...PROFILE, birthYear: year - 16 } })
+    renderAt('/fasta')
+    expect(screen.getByText('Fasta passar inte just nu')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Så fungerar fasta i Lagom' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Om 5:2')).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/kcal/)
+    expect(screen.getByRole('region', { name: 'Bra att veta' })).toBeInTheDocument()
+  })
+
+  it('medvetet läge: inga energisiffror (kcal) någonstans på sidan, i guiden eller i förklaringarna', () => {
+    renderAt('/fasta')
+    // Kontroll att provet kan slå till: utan medvetet läge nämner 5:2-kortet energin.
+    expect(document.body.textContent).toMatch(/kcal/)
+    cleanup()
+
+    useProfileStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true } })
+    useFastingStore.setState({ history: [{ id: 'f1', start: Date.now() - 20 * 3_600_000, end: Date.now() - 3_600_000, targetHours: 16, protocol: '16:8' }] })
+    renderAt('/fasta')
+    // Öppna allt som är hopfällt – texten i stängda <details> räknas ändå, men det blir tydligt.
+    for (const summary of document.querySelectorAll('summary')) fireEvent.click(summary)
+    expect(document.body.textContent).not.toMatch(/kcal|kalori/i)
+    expect(guide()).toBeInTheDocument()
+  })
+
+  it('timern har en förklaring för skärmläsare', () => {
+    useFastingStore.setState({ active: { start: Date.now() - 5 * 3_600_000, targetHours: 16, protocol: '16:8' } })
+    renderAt('/fasta')
+    const timer = screen.getByRole('region', { name: 'Pågående fasta' })
+    expect(timer).toHaveAccessibleDescription(/Ringen visar hur långt fastan har kommit\. I mitten står tiden som har gått och tiden som är kvar till målet\./)
+    expect(timer).toHaveAccessibleDescription(/Under ringen står när fastan började och när målet nås/)
+    // Ringen själv är kvar som förloppsindikator med uppläst värde.
+    expect(within(timer).getByRole('progressbar', { name: 'Fastans förlopp' })).toHaveAttribute('aria-valuetext', '5 h av 16\u00a0timmar')
+  })
+
+  it('veckokortet och historiken har en förklarande rad utan poäng eller serier', () => {
+    renderAt('/fasta')
+    const week = screen.getByRole('region', { name: 'Veckans fasta' })
+    expect(within(week).getByText('En saklig översikt över veckan – antal och snittlängd, inga poäng eller serier.')).toBeInTheDocument()
+    const history = screen.getByRole('heading', { name: 'Historik' }).closest('section')!
+    expect(history).toHaveTextContent(/En saklig lista: längd, tider och upplägg – inga poäng\. Fastor under 30\sminuter sparas inte\./)
+  })
+
+  it('inga hälso- eller viktlöften och inget beröm på sidan', () => {
+    useFastingStore.setState({
+      history: [{ id: 'f1', start: Date.now() - 20 * 3_600_000, end: Date.now() - 3_600_000, targetHours: 16, protocol: '16:8' }],
+    })
+    renderAt('/fasta')
+    for (const summary of document.querySelectorAll('summary')) fireEvent.click(summary)
+    expect(document.body.textContent).not.toMatch(BANNED_FASTING_WORDS)
   })
 })

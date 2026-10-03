@@ -311,8 +311,8 @@ function TroubleshootingGroup() {
             <Mail className="size-5" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[0.9375rem] font-medium leading-snug text-ink">Mejla supporten</span>
-            <span className="mt-0.5 block truncate text-[0.8125rem] leading-snug text-ink-3">Öppnar ett mejl med felrapporten</span>
+            <span className="block line-clamp-2 break-words text-[0.9375rem] font-medium leading-snug text-ink">Mejla supporten</span>
+            <span className="mt-0.5 block line-clamp-2 break-words text-[0.8125rem] leading-snug text-ink-3">Öppnar ett mejl med felrapporten</span>
           </span>
         </a>
       </div>
@@ -461,7 +461,7 @@ export default function AboutPage() {
           <div className="flex items-start gap-3">
             <Stethoscope aria-hidden className="mt-0.5 size-5 shrink-0 text-(--tone-ink)" />
             <div className="min-w-0">
-              <h2 className="font-display text-[1.1875rem] font-semibold tracking-tight text-ink">Inte en medicinteknisk produkt</h2>
+              <h2 className="break-words font-display text-[1.1875rem] font-semibold tracking-tight text-ink">Inte en medicinteknisk produkt</h2>
               <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-ink-2">
                 Lagom ger allmän information om mat och näring och ersätter inte råd från vården. Mål och beräkningar är uppskattningar. Har du en sjukdom,
                 är gravid eller ammar, eller funderar på att ändra din vikt – rådgör gärna med vården. Kontakta{' '}

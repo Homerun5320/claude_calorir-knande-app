@@ -100,8 +100,10 @@ export function Card({
   // I länkar och knappar får rubriker inte vara h-element – använd span med samma stil.
   // Huvudet byggs av span-element så att det är giltigt även inuti en <button>.
   const header = hasHeader ? (
-    <span className="mb-3 flex items-start justify-between gap-3">
-      <span className="block min-w-0">
+    // flex-wrap och en bas på 8 rem för rubriken: vid normal text ryms rubrik och åtgärd på en rad, men vid stor
+    // text (200 %) hamnar åtgärden under rubriken i stället för att pressa ihop den ("DAGSR INGEN").
+    <span className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+      <span className="block min-w-0 flex-1 basis-32 break-words">
         {eyebrow !== undefined && <span className={cx('eyebrow mb-1 block', tone && 'text-(--tone-ink)')}>{eyebrow}</span>}
         {title !== undefined &&
           (clickable ? (
@@ -114,7 +116,7 @@ export function Card({
             </TitleTag>
           ))}
       </span>
-      {action !== undefined && <span className="-my-1 flex shrink-0 items-center gap-1">{action}</span>}
+      {action !== undefined && <span className="-my-1 ml-auto flex shrink-0 items-center gap-1">{action}</span>}
     </span>
   ) : null
 

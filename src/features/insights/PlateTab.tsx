@@ -11,7 +11,7 @@ import { percentText } from './fmt'
 import { mealName } from '../../lib/meals'
 import { PLATE_GOOD_SCORE, PLATE_VARIANT_LABELS } from '../../lib/plate'
 import { mainMealPlate, mealDistribution, plateMealsText } from './aggregate'
-import { Callout, InfoNote, ShareBar, SourceNote } from './ui'
+import { Callout, InfoNote, NameValueRow, ShareBar, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
 
 export function PlateTab({ data }: { data: InsightsData }) {
@@ -60,13 +60,10 @@ export function PlateTab({ data }: { data: InsightsData }) {
                 <li key={m.meal} className="flex items-center gap-3">
                   <MealIcon meal={m.meal} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2 text-sm">
-                      <span className="truncate font-medium text-ink">{mealName(meals, m.meal)}</span>
-                      <span className="shrink-0 text-xs text-ink-3 tabular-nums">
-                        {mindful ? '' : `${formatEnergy(m.perDay, unit)}/dag · `}
-                        {percentText(m.share * 100)}
-                      </span>
-                    </div>
+                    <NameValueRow
+                      name={mealName(meals, m.meal)}
+                      value={`${mindful ? '' : `${formatEnergy(m.perDay, unit)}/dag · `}${percentText(m.share * 100)}`}
+                    />
                     <ShareBar value={m.share} color={TINT_VAR[MEAL_META[m.meal].tint]} className="mt-1" />
                   </div>
                 </li>

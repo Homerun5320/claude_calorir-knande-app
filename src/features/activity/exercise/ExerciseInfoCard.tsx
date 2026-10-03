@@ -64,7 +64,7 @@ export const ExerciseInfoCard = memo(function ExerciseInfoCard({ dayKcal, mindfu
             <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-mossa-soft text-mossa">
               <p.icon className="size-[1.125rem]" strokeWidth={2.2} />
             </span>
-            <p className="text-[0.875rem] leading-relaxed text-ink-2">
+            <p className="min-w-0 break-words text-[0.875rem] leading-relaxed text-ink-2">
               <strong className="font-semibold text-ink">{p.title}</strong> {p.text}
             </p>
           </li>

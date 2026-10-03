@@ -106,6 +106,59 @@ describe('planerade rader', () => {
     expect(usePlanStore.getState().items[MONDAY]).toBeUndefined()
   })
 
+  it('tar bort flera rader med en enda skrivning och ångrar dem med en', () => {
+    const { addItem, removeItems, restoreItems } = usePlanStore.getState()
+    const a = addItem(recipeDraft())!
+    const b = addItem(foodDraft())!
+    const c = addItem(foodDraft({ date: '2026-09-30' }))!
+    const d = addItem(foodDraft({ date: '2026-10-01' }))!
+    let writes = 0
+    const unsubscribe = usePlanStore.subscribe(() => {
+      writes++
+    })
+    try {
+      const removed = removeItems([a, b, c, { date: MONDAY, id: a.id }, { date: MONDAY, id: 'finns-inte' }, { date: '2026-12-24', id: d.id }])
+      // Varje rad en gång, bara de som fanns på rätt dag – dagar som blir tomma försvinner.
+      expect(removed.map((i) => i.id).sort()).toEqual([a.id, b.id, c.id].sort())
+      expect(writes).toBe(1)
+      expect(Object.keys(usePlanStore.getState().items)).toEqual(['2026-10-01'])
+      expect(usePlanStore.getState().items['2026-10-01']).toEqual([d])
+
+      restoreItems(removed)
+      expect(writes).toBe(2)
+      expect(usePlanStore.getState().items[MONDAY].map((i) => i.id)).toEqual([a.id, b.id])
+      expect(usePlanStore.getState().items['2026-09-30']).toEqual([c])
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('tar bara bort angivna rader på en dag med fler rader', () => {
+    const { addItem, removeItems } = usePlanStore.getState()
+    const a = addItem(recipeDraft())!
+    const b = addItem(foodDraft())!
+    const c = addItem(foodDraft())!
+    expect(removeItems([{ date: MONDAY, id: b.id }])).toEqual([b])
+    expect(usePlanStore.getState().items[MONDAY]).toEqual([a, c])
+  })
+
+  it('skriver ingenting när inget tas bort (tom lista eller rader som inte finns)', () => {
+    const a = usePlanStore.getState().addItem(recipeDraft())!
+    let writes = 0
+    const unsubscribe = usePlanStore.subscribe(() => {
+      writes++
+    })
+    try {
+      const before = usePlanStore.getState().items
+      expect(usePlanStore.getState().removeItems([])).toEqual([])
+      expect(usePlanStore.getState().removeItems([{ date: MONDAY, id: 'finns-inte' }, { date: '2026-12-24', id: a.id }])).toEqual([])
+      expect(writes).toBe(0)
+      expect(usePlanStore.getState().items).toBe(before)
+    } finally {
+      unsubscribe()
+    }
+  })
+
   it('markerar rader som loggade', () => {
     const a = usePlanStore.getState().addItem(recipeDraft())!
     usePlanStore.getState().markLogged(MONDAY, a.id, ['e_1', 'e_2'])

@@ -69,28 +69,34 @@ const MealCard = memo(function MealCard({ meal, name, today, summary, copyCount,
     if (onCopy(meal, name)) focusAfterRender(() => cardLink.current)
   }
   return (
-    <li className="card p-3 pr-2.5">
+    // @container + @max-[16rem]: vid stor text (200 %) är kortet för smalt för ikon, namn och plusknapp bredvid varandra – då döljs
+    // den dekorativa ikonen och plusknappen blir 44 px (px, inte rem). rem i en containerfråga följer rotens teckenstorlek, så vid
+    // normal text (kortet ≈ 21 rem brett) ändras inget.
+    <li className="card @container p-3 pr-2.5">
       <div className="flex items-center gap-3">
         <Link ref={cardLink} to="/dagbok" className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl">
-          <MealIcon meal={meal} size="md" variant="emoji" />
+          <span className="contents @max-[16rem]:hidden">
+            <MealIcon meal={meal} size="md" variant="emoji" />
+          </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-baseline gap-2">
-              <span className="truncate font-display text-[1.0625rem] leading-tight font-semibold tracking-tight text-ink">{name}</span>
+            {/* flex-wrap: vid stor text (200 %) hamnar energin under namnet i stället för att klippa det. */}
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className="min-w-0 break-words font-display text-[1.0625rem] leading-tight font-semibold tracking-tight text-ink">{name}</span>
               {!empty && !mindful && <EnergyValue kcal={summary.kcal} className="ml-auto text-sm font-semibold text-ink-2" />}
             </span>
-            <span className={`mt-0.5 block truncate text-[0.8125rem] ${empty ? 'text-ink-3' : 'text-ink-2'}`}>{namesText}</span>
+            <span className={`mt-0.5 block truncate text-[0.8125rem] @max-[16rem]:line-clamp-3 @max-[16rem]:whitespace-normal ${empty ? 'text-ink-3' : 'text-ink-2'}`}>{namesText}</span>
           </span>
         </Link>
         <Link
           to={`/lagg-till?maltid=${meal}&datum=${today}`}
           aria-label={`Lägg till i ${name.toLowerCase()}`}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform active:scale-90"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform active:scale-90 @max-[16rem]:size-[44px]"
         >
           <Plus className="size-5" strokeWidth={2.4} aria-hidden="true" />
         </Link>
       </div>
       {empty && copyCount > 0 && (
-        <div className="mt-2 pl-14">
+        <div className="mt-2 pl-14 @max-[16rem]:pl-0">
           <Chip size="sm" icon={Copy} onClick={copy}>
             Kopiera gårdagens {name.toLowerCase()}
           </Chip>

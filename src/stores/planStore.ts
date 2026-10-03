@@ -59,6 +59,12 @@ export interface PlanState extends PlanData {
   updateItem: (date: ISODate, id: string, patch: PlanItemPatch) => void
   /** Ta bort och returnera raden (för ångra). */
   removeItem: (date: ISODate, id: string) => PlanItem | undefined
+  /**
+   * Ta bort flera rader (dag och id) med en enda skrivning – varje `set()` skriver om hela butiken,
+   * så anropa aldrig `removeItem` i en slinga. Rader som inte finns hoppas över, och finns ingen
+   * kvar att ta bort skrivs inget. Returnerar de borttagna raderna (för ångra).
+   */
+  removeItems: (refs: ReadonlyArray<Pick<PlanItem, 'date' | 'id'>>) => PlanItem[]
   /** Lägg tillbaka borttagna rader (ångra) – rader som redan finns hoppas över. */
   restoreItems: (items: readonly PlanItem[]) => void
   /** Markera raden som loggad med dagbokspostens id:n. */
@@ -170,6 +176,24 @@ export const usePlanStore = create<PlanState>()(
           if (!list || !found) return undefined
           set({ items: withItems(get().items, date, list.filter((i) => i.id !== id)) })
           return found
+        },
+
+        removeItems: (refs) => {
+          if (refs.length === 0) return []
+          const wanted = new Set(refs.map((r) => `${r.date}|${r.id}`))
+          let items = get().items
+          const removed: PlanItem[] = []
+          for (const date of new Set(refs.map((r) => r.date))) {
+            const list = items[date]
+            if (!list) continue
+            const hit = list.filter((i) => wanted.has(`${date}|${i.id}`))
+            if (hit.length === 0) continue
+            removed.push(...hit)
+            items = withItems(items, date, list.filter((i) => !hit.includes(i)))
+          }
+          if (removed.length === 0) return []
+          set({ items })
+          return removed
         },
 
         restoreItems: (restore) => {

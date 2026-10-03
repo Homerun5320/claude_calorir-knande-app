@@ -104,7 +104,7 @@ export const SupplementsCard = memo(function SupplementsCard({ today }: { today:
                   {taken ? <Check className="size-4" strokeWidth={3} /> : <Pill className="size-3.5 text-ink-3" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[0.9375rem] font-medium text-ink">{food.name}</span>
+                  <span className="block line-clamp-2 break-words text-[0.9375rem] font-medium text-ink">{food.name}</span>
                   <span className={cx('block text-xs', taken ? 'font-semibold text-good' : 'text-ink-3')}>
                     {taken ? 'Taget idag' : (food.portions[0]?.label ?? '1 tablett')}
                   </span>

@@ -6,6 +6,7 @@
  * Filerna är YAML; här läses texten (inga nya paket).
  */
 import { describe, expect, it } from 'vitest'
+import { FASTING_PROTOCOLS, MAX_FAST_HOURS, MIN_SAVED_FAST_MS } from '../features/activity/fastingLogic'
 import { STORE_PRODUCT_IDS } from '../lib/storePurchases'
 
 interface NodeFs {
@@ -174,6 +175,9 @@ const ALLERGY_PROMISES =
 const AUTHORITY_LINK = /i\s+samarbete\s+med|godkänd\s+av|rekommenderad\s+av|på\s+uppdrag\s+av|officiell/i
 /** Tonen (CLAUDE.md "Ton"): inga streaks, ingen skuld eller skam kring mat. */
 const GUILT = /streak|fusk|synda|syndig|dåligt\s+samvete|skäms|straff/i
+/** Fastan beskrivs utan hälsopåståenden, löften eller beröm (CLAUDE.md "Ton"; samma regler som sidan Fasta i appen). */
+const FASTING_CLAIMS =
+  /bränn(?:er|a|ing)|fettförbränning|autofagi|detox|snabbare\s+viktnedgång|ämnesomsättning|insulinkänslighet|gå\s+ner\s+i\s+vikt|bra\s+jobbat|nå\s+målet|garanter/iu
 /** Andra plattformar i App Store-texterna (2.3.10). */
 const NOT_IN_APP_STORE = /android|google|health\s+connect|samsung|huawei|windows/i
 /** Andra plattformar i Play-texterna. */
@@ -587,6 +591,47 @@ describe('butikstexterna (docs/APP-STORE.md §4 och docs/GOOGLE-PLAY.md §5)', (
     expect(appStore.description).toMatch(/Fyll i från förpackningen med iPhones Skanna text eller inklistrad text/)
     expect(googlePlay.description).toMatch(/Fyll i från förpackningen med telefonens textigenkänning eller inklistrad text/)
   })
+
+  it('fastan: en kort rad utan poäng eller löften, och vem den inte rekommenderas för (App Store 1.4.1)', async () => {
+    const { appStore, googlePlay } = await storeTexts()
+    // Upplägget i raden är samma som i appen: första och sista protokollet.
+    const range = `${FASTING_PROTOCOLS[0].id} till ${FASTING_PROTOCOLS[FASTING_PROTOCOLS.length - 1].id}`
+    for (const [store, description] of [
+      ['App Store', appStore.description],
+      ['Google Play', googlePlay.description],
+    ] as const) {
+      const line = description.split('\n').find((l) => l.startsWith('• Fasta')) ?? ''
+      expect(line, store).toBe(`• Fasta om du vill – en enkel timer för ${range}, utan poäng eller serier`)
+      // Samma ord som "Fasta passar inte alla" i appen (NotRecommendedFor) och på supportsidan, med hänvisning till vården.
+      const care = description.split('\n').find((l) => l.startsWith('Lagom dömer inte')) ?? ''
+      expect(care, store).toContain(
+        'Fasta rekommenderas inte vid graviditet, amning, under 18 år, ätstörning eller diabetes med blodsockersänkande läkemedel – prata med vården först.',
+      )
+      expect(care, store).toContain('1177 och Frisk & Fri')
+      expect(description, store).not.toMatch(FASTING_CLAIMS)
+    }
+    // Play: versionsinformationen tar med fastan bland funktionerna, och widgetraden säger att den visar en pågående fasta.
+    expect(googlePlay.releaseNotes).toContain('träning och fasta')
+    expect(googlePlay.description).toContain('• Widget på hemskärmen om du vill – dagens energi, måltider, vatten och en pågående fasta')
+    expect(googlePlay.releaseNotes).not.toMatch(FASTING_CLAIMS)
+  })
+
+  it('granskningsanteckningarna beskriver fastan – och spärren för gravida, ammande och under 18 år finns i koden', async () => {
+    for (const path of ['docs/APP-STORE.md', 'docs/GOOGLE-PLAY.md']) {
+      const doc = await readRepoFile(path)
+      const note = doc.split('\n').find((l) => l.startsWith('Fasting (Mer → Fasta, optional)')) ?? ''
+      expect(note, path).toContain('a simple timer for 12:12 to 20:4')
+      expect(note, path).toContain('no scores, streaks or health claims and does not change the daily goal')
+      expect(note, path).toContain('pregnancy or breastfeeding, under 18, diabetes treated with blood-sugar-lowering medicine, a current or past eating disorder')
+      expect(note, path).toContain('the start button is replaced by a caution message until they choose to show the timer')
+      expect(note, path).toContain('Fasts are stored only on the device')
+    }
+    // Spärren som anteckningarna beskriver: varsam text i stället för starta-kortet tills man väljer att visa timern.
+    const page = (await readRepoFile('src/features/activity/FastingPage.tsx')).replace(/\s+/g, ' ')
+    expect(page).toMatch(/lifeStage === 'gravid' \|\| lifeStage === 'ammar'/)
+    expect(page).toMatch(/youngestAge\(birthYear, today\) < 18/)
+    expect(page).toMatch(/caution && !showAnyway \? \( <FastingCautionCard[^>]*onShowAnyway/)
+  })
 })
 
 describe('supportsidan (Support-URL i båda butikerna)', () => {
@@ -609,6 +654,7 @@ describe('supportsidan (Support-URL i båda butikerna)', () => {
       'Vad betyder allergiflaggorna?',
       'Hur fungerar Fyll i från förpackningen?',
       'Hur fungerar veckobudgeten?',
+      'Hur fungerar fastan?',
       'Sparas steg och anteckningar automatiskt?',
     ]) {
       expect(sections.some((s) => s.querySelector('h2')?.textContent?.trim() === title), title).toBe(true)
@@ -637,5 +683,79 @@ describe('supportsidan (Support-URL i båda butikerna)', () => {
     const commerce = await readRepoFile('src/config/commerce.ts')
     expect(trialButton).toContain('Starta {TRIAL_DAYS} dagar gratis')
     expect(commerce).toMatch(/export const TRIAL_DAYS = 14\b/)
+  })
+
+  it('Hur fungerar fastan?: allt som står stämmer med koden – upplägg, gränser, knappar, dagsmålet och säkerhetstexten', async () => {
+    const html = await readRepoFile('public/support/index.html')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const section = doc.getElementById('fasta')
+    expect(section?.tagName).toBe('SECTION')
+    expect(section?.getAttribute('aria-labelledby')).toBe('fasta-rubrik')
+    expect(doc.getElementById('fasta-rubrik')?.textContent?.trim()).toBe('Hur fungerar fastan?')
+    const text = (section?.textContent ?? '').replace(/\s+/g, ' ')
+
+    // Upplägg och gränser kommer ur fastingLogic – inte egna siffror på sidan.
+    for (const protocol of FASTING_PROTOCOLS) expect(text, protocol.id).toContain(protocol.id)
+    expect(text).toContain(`upp till ${MAX_FAST_HOURS} timmar bakåt`)
+    expect(text).toContain(`kortare än ${MIN_SAVED_FAST_MS / 60_000} minuter sparas inte`)
+
+    // Varje knapp och menyväg som nämns finns i appen.
+    const labels: Array<[string, string]> = [
+      ['Starta fastan nu', 'src/features/activity/fasting/StartFastCard.tsx'],
+      ['Jag började tidigare', 'src/features/activity/fasting/StartFastCard.tsx'],
+      ['Avbryt', 'src/features/activity/fasting/FastTimerCard.tsx'],
+      ['Veckans fasta', 'src/features/activity/fasting/FastingWeekCard.tsx'],
+      ['När fastan är klar', 'src/features/settings/sections/RemindersSection.tsx'],
+      ['Radera all data', 'src/features/settings/sections/DataSection.tsx'],
+    ]
+    const spans = [...(section?.querySelectorAll('.vag') ?? [])].map((el) => (el.textContent ?? '').trim())
+    for (const [label, file] of labels) {
+      expect(spans, label).toContain(label)
+      expect(await readRepoFile(file), `${label} i ${file}`).toContain(label)
+    }
+    expect(spans).toContain('Mer → Fasta')
+    expect(await readRepoFile('src/features/more/MorePage.tsx')).toMatch(/title: 'Fasta', to: '\/fasta'/)
+    expect(spans).toContain('Inställningar → Påminnelser')
+    expect(await readRepoFile('src/features/settings/SettingsPage.tsx')).toMatch(/paminnelser: \{ title: 'Påminnelser'/)
+
+    // Dagsmålet: ingen del av målberäkningen läser fastan.
+    expect(text).toContain('Fastan påverkar inte ditt dagsmål')
+    for (const file of ['src/lib/energy.ts', 'src/hooks/useTargets.ts', 'src/lib/weeklyBudget.ts', 'src/lib/targetsInfo.ts', 'src/lib/diary.ts']) {
+      expect(await readRepoFile(file), file).not.toMatch(/fasting|fastingStore/i)
+    }
+
+    // Lagring: bara på enheten, med i säkerhetskopian och borta med "Radera all data".
+    expect(text).toContain('Fastorna följer med i säkerhetskopian och raderas med Radera all data')
+    const backup = await readRepoFile('src/lib/backup.ts')
+    expect(backup).toContain('fasting: { active: fa.active, history: fa.history }')
+    expect(backup).toContain('useFastingStore.getState().clearFasting()')
+
+    // Ingen poäng, inga serier, ingen timer för 5:2 – och inga hälsopåståenden eller löften.
+    expect(text).toContain('Det finns inga poäng eller serier')
+    expect(text).toContain('5:2 har ingen timer i Lagom')
+    expect(text).not.toMatch(FASTING_CLAIMS)
+    const weekCard = await readRepoFile('src/features/activity/fasting/FastingWeekCard.tsx')
+    expect(weekCard).toContain('inga poäng eller serier')
+    expect(await readRepoFile('src/features/activity/fasting/FastingInfoCards.tsx')).toContain('Lagom har ingen timer för 5:2')
+
+    // Säkerhetstexten: samma ord som "Fasta passar inte alla" i appen (NotRecommendedFor, SupportLinks och kortet "Bra att veta").
+    const info = (await readRepoFile('src/features/activity/fasting/FastingInfoCards.tsx')).replace(/\s+/g, ' ')
+    for (const sentence of [
+      'Fasta passar inte alla.',
+      'Det rekommenderas inte om du är gravid eller ammar, är under 18 år, har diabetes och tar blodsockersänkande läkemedel',
+      'eller har eller har haft en ätstörning. Prata med vårdcentralen eller',
+      'Drick vatten, te eller svart kaffe under fastan. Blir du yr, svag eller mår dåligt – ät något. Det är inget misslyckande.',
+    ]) {
+      expect(text, sentence).toContain(sentence.replace(/ eller$/, ''))
+      expect(info, sentence).toContain(sentence)
+    }
+    expect(text).toContain('(till exempel insulin)')
+    // Externa länkar på den fristående sidan: vanliga länkar med rel, aldrig target="_blank".
+    const links = [...(section?.querySelectorAll('a[href^="https://"]') ?? [])]
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['https://www.1177.se', 'https://www.friskfri.se', 'https://www.1177.se'])
+    for (const a of links) {
+      expect(a.getAttribute('rel')).toBe('noopener noreferrer')
+      expect(a.hasAttribute('target')).toBe(false)
+    }
   })
 })

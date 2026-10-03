@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Support – Lagom</title>
-    <meta name="description" content="Hjälp med Lagom: byta telefon, återställa köp, exportera eller radera din data, provperioden, licensnyckeln, delade recept, framstegsbilder, allergiflaggor, Fyll i från förpackningen, veckobudgeten och widgeten på hemskärmen." />
+    <meta name="description" content="Hjälp med Lagom: byta telefon, återställa köp, exportera eller radera din data, provperioden, licensnyckeln, delade recept, framstegsbilder, allergiflaggor, Fyll i från förpackningen, veckobudgeten, fastan och widgeten på hemskärmen." />
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <!--
       Fristående supportsida (ingen JavaScript) – adressen anges som Support-URL i App Store Connect
@@ -98,6 +98,7 @@
           <li><a href="#allergier">Allergiflaggor</a></li>
           <li><a href="#forpackningen">Fyll i från förpackningen</a></li>
           <li><a href="#veckobudget">Veckobudget</a></li>
+          <li><a href="#fasta">Fasta</a></li>
           <li><a href="#sparas-automatiskt">Steg och anteckningar</a></li>
           <li><a href="#widget">Widget på hemskärmen</a></li>
           <li><a href="#kontakt">Kontakta oss</a></li>
@@ -134,7 +135,7 @@
         <h2 id="exportera-rubrik">Hur exporterar jag min data?</h2>
         <p>Allt du har loggat är ditt, och du kan ta med dig det när du vill – även efter provperioden.</p>
         <ul>
-          <li><strong>Säkerhetskopia:</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera (JSON)</span>. En fil med dagbok, vikt, recept, egna livsmedel och inställningar – för att flytta eller återställa. Framstegsbilder ingår inte.</li>
+          <li><strong>Säkerhetskopia:</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera (JSON)</span>. En fil med dagbok, vikt, fastor, recept, egna livsmedel och inställningar – för att flytta eller återställa. Framstegsbilder ingår inte.</li>
           <li><strong>Dagboken i Excel:</strong> <span class="vag">Inställningar → Data och säkerhetskopia → Exportera dagbok som CSV</span>. Alla poster med datum, måltid, mängd och näringsvärden – öppnas direkt i svenska Excel och Numbers.</li>
         </ul>
       </section>
@@ -142,7 +143,7 @@
       <section class="kort" id="radera" aria-labelledby="radera-rubrik">
         <h2 id="radera-rubrik">Hur raderar jag allt?</h2>
         <p>
-          Välj <span class="vag">Inställningar → Data och säkerhetskopia → Radera all data</span> och bekräfta. Då raderas dagbok, vikt, recept, egna livsmedel,
+          Välj <span class="vag">Inställningar → Data och säkerhetskopia → Radera all data</span> och bekräfta. Då raderas dagbok, vikt, fastor, recept, egna livsmedel,
           framstegsbilder, widgetens sammanfattning och inställningar från telefonen. Spara gärna en säkerhetskopia först om du vill kunna ångra dig.
         </p>
         <p>
@@ -312,6 +313,56 @@
           Kalorigolvet gäller varje enskild dag, och protein och fibrer är desamma alla dagar. Fördelningen gäller från dagen du slår på den – dagar som redan har
           varit behåller sitt jämna mål. Under graviditet, när du ammar och under 18 år används ingen veckobudget: då behöver kroppen jämn energi varje dag, och
           dagsmålet är detsamma alla dagar.
+        </p>
+      </section>
+
+      <section class="kort" id="fasta" aria-labelledby="fasta-rubrik">
+        <h2 id="fasta-rubrik">Hur fungerar fastan?</h2>
+        <p>
+          Under <span class="vag">Mer → Fasta</span> finns en enkel timer för periodisk fasta i din egen takt – om det passar dig. Du delar dygnet i en tid
+          utan mat och en tid då du äter som vanligt. Siffrorna är timmar: 16:8 är 16 timmar utan mat och 8 timmar då du äter.
+        </p>
+        <ul>
+          <li>
+            <strong>Starta:</strong> välj 12:12, 14:10, 16:8, 18:6 eller 20:4 och tryck på <span class="vag">Starta fastan nu</span>. Har du redan slutat
+            äta trycker du på <span class="vag">Jag började tidigare</span> och anger när – upp till 72 timmar bakåt.
+          </li>
+          <li>
+            <strong>Under fastan:</strong> timern visar hur länge du har fastat, hur lång tid som är kvar och när målet nås. Du kan ändra starttiden och
+            byta mål medan fastan pågår, och den syns också på Idag. När målet är nått fortsätter timern tills du själv avslutar fastan.
+          </li>
+          <li>
+            <strong>Avsluta när du vill:</strong> före målet ber Lagom bara om en bekräftelse – det är inget misslyckande. <span class="vag">Avbryt</span>
+            tar bort fastan utan att spara den, och en fasta som har varat kortare än 30 minuter sparas inte.
+          </li>
+          <li>
+            <strong>Historik:</strong> avslutade fastor sparas med längd, tider och upplägg, och <span class="vag">Veckans fasta</span> visar antal och
+            snittlängd. Det finns inga poäng eller serier. Du kan ta bort en fasta ur historiken.
+          </li>
+          <li><strong>5:2</strong> har ingen timer i Lagom – där räcker dagboken.</li>
+        </ul>
+        <p>
+          <strong>Påverkar fastan mitt dagsmål?</strong> Nej. Fastan påverkar inte ditt dagsmål, och du loggar maten som vanligt i dagboken.
+        </p>
+        <p>
+          <strong>Var sparas den?</strong> Bara på din enhet, tillsammans med resten av din data – vi har ingen kopia. Fastorna följer med i
+          säkerhetskopian och raderas med <span class="vag">Radera all data</span>.
+        </p>
+        <p>
+          <strong>Påminnelse och widget:</strong> i appen kan du under <span class="vag">Inställningar → Påminnelser</span> slå på
+          <span class="vag">När fastan är klar</span>, en notis när timern når ditt mål. Den är avstängd från början. <a href="#widget">Widgeten i Android-appen</a>
+          kan också visa en pågående fasta, om widgeten är tillräckligt stor.
+        </p>
+        <p>
+          <strong>Fasta passar inte alla.</strong> Det rekommenderas inte om du är gravid eller ammar, är under 18 år, har diabetes och tar blodsockersänkande
+          läkemedel (till exempel insulin), eller har eller har haft en ätstörning. Prata med vårdcentralen eller
+          <a href="https://www.1177.se" rel="noopener noreferrer">1177</a> först. Är du gravid, ammar eller är under 18 år visar Lagom en varsam text i
+          stället för startknappen, tills du själv väljer att visa timern.
+        </p>
+        <p>
+          Drick vatten, te eller svart kaffe under fastan. Blir du yr, svag eller mår dåligt – ät något. Det är inget misslyckande. Tar tankar på mat mycket
+          plats? Du är inte ensam. Stöd finns hos <a href="https://www.friskfri.se" rel="noopener noreferrer">Frisk &amp; Fri</a> och
+          <a href="https://www.1177.se" rel="noopener noreferrer">1177</a>.
         </p>
       </section>
 

@@ -24,8 +24,9 @@ export const WeeklyMovementCard = memo(function WeeklyMovementCard({ date, today
   const active = Math.round(m.activeMinutes)
 
   return (
-    <Card eyebrow={`Vecka ${isoWeek(date)}`} title="Veckans rörelse">
-      <div className="flex items-center gap-4">
+    <Card eyebrow={`Vecka ${isoWeek(date)}`} title="Veckans rörelse" className="@container">
+      {/* @max-[15rem]: vid stor text (200 %) hamnar texten under ringen i stället för i en smal kolumn bredvid. */}
+      <div className="flex items-center gap-4 @max-[15rem]:flex-col @max-[15rem]:items-start">
         <ProgressRing
           value={active}
           max={goal}
@@ -38,7 +39,7 @@ export const WeeklyMovementCard = memo(function WeeklyMovementCard({ date, today
           <span className="display-num text-[2rem] font-semibold leading-none text-ink">{formatNumber(active)}</span>
           <span className="mt-1 text-xs text-ink-3">av {goal}{'\u00a0'}min</span>
         </ProgressRing>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 @max-[15rem]:w-full">
           <p className="text-[0.9375rem] leading-snug text-ink">{movementMessage(active, m.totalMinutes)}</p>
           <ul className="mt-2 space-y-1 text-[0.8125rem] leading-snug text-ink-2">
             <li>Aktiv {plural(m.activeDays, 'dag', 'dagar')} av 7</li>

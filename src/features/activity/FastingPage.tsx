@@ -4,9 +4,11 @@
  *  1. Pågående fasta: stor ring med live-timer (varje sekund, bara medan sidan syns), start/mål,
  *     ändra starttid, byt mål, avsluta (bekräftelse om det är före målet) eller avbryt.
  *     Annars: välj protokoll och starta nu eller "Jag började tidigare".
- *  2. Veckans fasta – antal och längd, utan streaks och utan poängtavla.
- *  3. Historik med längd, tider och protokoll – sakligt, utan poäng eller beröm.
- *  4. Om 5:2 samt hälsa och säkerhet (graviditet/amning, diabetes med läkemedel, ätstörning).
+ *  2. "Så fungerar fasta i Lagom" – en hopfällbar guide (göms tillsammans med starta-kortet och
+ *     5:2-kortet för den som är gravid, ammar eller är under 18 år, tills man väljer att visa timern).
+ *  3. Veckans fasta – antal och längd, utan streaks och utan poängtavla.
+ *  4. Historik med längd, tider och protokoll – sakligt, utan poäng eller beröm.
+ *  5. Om 5:2 samt hälsa och säkerhet (graviditet/amning, diabetes med läkemedel, ätstörning).
  */
 import { useCallback, useState } from 'react'
 import { PageHeader, toast } from '../../components/ui'
@@ -16,6 +18,7 @@ import { useFastingStore, type FastRecord } from '../../stores/fastingStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { DEFAULT_PROTOCOL_ID, lastProtocolId, protocolById } from './fastingLogic'
 import { FastHistory } from './fasting/FastHistory'
+import { FastingGuideCard } from './fasting/FastingGuideCard'
 import { FastingCautionCard, FastingSafetyCard, FiveTwoCard } from './fasting/FastingInfoCards'
 import { FastingWeekCard } from './fasting/FastingWeekCard'
 import { FastTimerCard } from './fasting/FastTimerCard'
@@ -51,6 +54,9 @@ export default function FastingPage() {
 
   const caution: 'graviditet' | 'ung' | null =
     lifeStage === 'gravid' || lifeStage === 'ammar' ? 'graviditet' : birthYear !== undefined && youngestAge(birthYear, today) < 18 ? 'ung' : null
+  // Samma spärr för vägledningen som för starta-kortet: ingen guide och inget om 5:2 (med energisiffror) förrän man själv
+  // väljer att visa timern. "Bra att veta" står kvar – den är säkerhetstexten.
+  const showGuide = !(caution && !showAnyway)
 
   const protocol = protocolById(protocolId) ?? protocolById(DEFAULT_PROTOCOL_ID)
   const sheetTarget = sheet.mode === 'edit' && active ? active.targetHours : (protocol?.fastHours ?? 16)
@@ -83,9 +89,10 @@ export default function FastingPage() {
         ) : (
           <StartFastCard protocolId={protocolId} onProtocol={setProtocolId} onStartEarlier={() => requireAccess('fasta') && openSheet('new')} today={today} />
         )}
+        {showGuide && <FastingGuideCard />}
         <FastingWeekCard history={history} today={today} />
         <FastHistory history={history} today={today} />
-        <FiveTwoCard mindful={mindful} />
+        {showGuide && <FiveTwoCard mindful={mindful} />}
         <FastingSafetyCard />
       </div>
 

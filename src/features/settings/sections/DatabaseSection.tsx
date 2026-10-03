@@ -53,14 +53,14 @@ function BuiltinCard() {
         <p className="text-[0.9375rem] text-ink-2">{catalog.error}</p>
       ) : (
         <>
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="display-num text-[2.5rem] font-semibold leading-none text-gran">{formatNumber(counts.total)}</span>
             <span className="text-[0.9375rem] text-ink-2">livsmedel att söka bland</span>
           </div>
           <ul className="mt-4 flex flex-col gap-2.5 text-[0.9375rem] leading-relaxed text-ink-2">
             <li className="flex gap-3">
               <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-mossa" />
-              <span>
+              <span className="min-w-0 break-words">
                 <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} granskade svenska livsmedel</strong> med svenska portioner och mått –{' '}
                 {formatNumber(counts.lagomFromLmv)} med värden direkt från Livsmedelsverket, övriga samlingsvärden för vanliga märken, värden från förpackningar
                 eller beräknade recept. Källan visas på varje livsmedel.
@@ -69,7 +69,7 @@ function BuiltinCard() {
             {counts.lmv > 0 && (
               <li className="flex gap-3">
                 <Landmark aria-hidden className="mt-0.5 size-5 shrink-0 text-blabar" />
-                <span>
+                <span className="min-w-0 break-words">
                   <strong className="font-semibold text-ink">{formatNumber(counts.lmv)} från Livsmedelsverkets databas</strong>
                   {catalog.lmv?.version ? ` (hämtad ${formatDayLong(catalog.lmv.version).toLocaleLowerCase('sv-SE')})` : ''}. Licens:{' '}
                   <LicenseLink />.
@@ -78,7 +78,7 @@ function BuiltinCard() {
             )}
             <li className="flex gap-3">
               <Barcode aria-hidden className="mt-0.5 size-5 shrink-0 text-hjortron" />
-              <span>Produkter med streckkod hämtas från Open Food Facts när du skannar eller söker – och märks tydligt.</span>
+              <span className="min-w-0 break-words">Produkter med streckkod hämtas från Open Food Facts när du skannar eller söker – och märks tydligt.</span>
             </li>
           </ul>
           <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">Saknas ett värde visas ”–”, aldrig 0. Okänt är inte samma sak som ingenting.</p>

@@ -318,7 +318,7 @@ export function DataSection() {
 
       <Card eyebrow="Säkerhetskopia" title="Spara och återställ">
         <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-          En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
+          En fil med allt: dagbok, vikt, fastor, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
           eller återställa om något händer.
         </p>
         {/* Framstegsbilderna ligger utanför säkerhetskopian (src/lib/progressPhotos.ts). */}
