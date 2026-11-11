@@ -87,8 +87,10 @@ export default function FoodCalendarPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: reduce ? 0 : i * 0.05, type: 'spring', stiffness: 300, damping: 30 }}
                 >
-                  <Card onClick={() => setOpen(d)} tone={d.weekly ? 'hjortron' : 'sol'} aria-label={`${d.name}. Läs mer`}>
-                    <div className="flex items-start gap-4">
+                  {/* @container + @max-[14rem]: vid stor text (200 %) är kortet för smalt för ikon och text bredvid varandra –
+                      ikonen hamnar då ovanför och beskrivningen visas hel. Vid normal text (kortet ≈ 20 rem) ändras inget. */}
+                  <Card onClick={() => setOpen(d)} tone={d.weekly ? 'hjortron' : 'sol'} className="@container">
+                    <div className="flex items-start gap-4 @max-[14rem]:flex-col @max-[14rem]:gap-3">
                       <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-[1.25rem] bg-surface text-[2.25rem] leading-none shadow-card">
                         {d.emoji}
                       </span>
@@ -97,8 +99,8 @@ export default function FoodCalendarPage() {
                           <Badge tone={d.weekly ? 'hjortron' : 'sol'}>{d.weekly ? `Varje ${WEEKDAYS[(fromISODate(today).getDay() + 6) % 7]}` : FOOD_DAY_KIND_LABELS[d.kind]}</Badge>
                           {d.redDay && <Badge tone="lingon">Röd dag</Badge>}
                         </span>
-                        <span className="mt-1.5 block font-display text-[1.375rem] font-semibold leading-tight tracking-tight">{d.name}</span>
-                        <span className="mt-1 line-clamp-3 text-[0.9375rem] leading-relaxed text-ink-2">{d.description}</span>
+                        <span className="mt-1.5 block break-words font-display text-[1.375rem] font-semibold leading-tight tracking-tight">{d.name}</span>
+                        <span className="mt-1 line-clamp-3 break-words text-[0.9375rem] leading-relaxed text-ink-2 @max-[14rem]:line-clamp-none">{d.description}</span>
                       </span>
                     </div>
                   </Card>
@@ -123,7 +125,7 @@ export default function FoodCalendarPage() {
                     <span className="block text-[0.75rem] font-semibold text-ink-3">
                       {nextWeekly.inDays === 1 ? 'Imorgon' : `På ${WEEKDAYS[(fromISODate(nextWeekly.day.date).getDay() + 6) % 7]}`}
                     </span>
-                    <span className="block font-semibold text-ink">{nextWeekly.day.name}</span>
+                    <span className="block break-words font-semibold text-ink">{nextWeekly.day.name}</span>
                   </span>
                 </button>
               )}
@@ -153,10 +155,10 @@ export default function FoodCalendarPage() {
                     {/* Under 360 px hamnar nedräkningen under texten i stället för att klämma ihop namnet – och
                         bredare än så när ett långt ord i namnet ("Världslivsmedelsdagen") inte får plats bredvid. */}
                     <span className="flex min-w-0 flex-1 flex-col items-start gap-1.5 min-[360px]:flex-row min-[360px]:flex-wrap min-[360px]:items-center min-[360px]:gap-x-3">
-                      <span className="min-w-0 self-stretch min-[360px]:min-w-auto min-[360px]:flex-[1_1_9rem]">
+                      <span className="max-w-full min-w-0 self-stretch min-[360px]:min-w-auto min-[360px]:flex-[1_1_9rem]">
                         <span className="line-clamp-2 text-[0.9375rem] leading-snug font-medium break-words text-ink">{d.name}</span>
                         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-ink-3">
-                          <span className="whitespace-nowrap">{capitalize(shortDateText(d))}</span>
+                          <span className="break-words">{capitalize(shortDateText(d))}</span>
                           <Badge tone="neutral" variant="outline">{FOOD_DAY_KIND_LABELS[d.kind]}</Badge>
                         </span>
                       </span>
@@ -195,7 +197,7 @@ export default function FoodCalendarPage() {
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[0.75rem] font-semibold text-ink-3">{capitalize(WEEKDAYS[t.weekday])}</span>
-                      <span className="block text-[0.9375rem] font-semibold leading-snug text-ink">{t.name}</span>
+                      <span className="block break-words text-[0.9375rem] font-semibold leading-snug text-ink">{t.name}</span>
                     </span>
                   </button>
                 </li>
@@ -250,8 +252,9 @@ function DaylightCard({ today }: { today: string }) {
         Dagsljus i Stockholm
       </SectionHeading>
       <Card>
-        <div className="flex items-end justify-between gap-4">
-          <div>
+        {/* flex-wrap: vid stor text (200 %) hamnar soluppgång och solnedgång under dagsljuset i stället för utanför kortet. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
             <div className="eyebrow">Solen är uppe</div>
             <div className="display-num mt-1 text-[2.25rem] font-semibold leading-none text-ink">{formatDaylight(t.daylightHours)}</div>
             <div className="mt-1.5 text-[0.875rem] text-ink-2">{describeDaylightDelta(delta)}</div>

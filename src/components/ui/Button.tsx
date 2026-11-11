@@ -2,7 +2,8 @@
  * Button – Lagoms grundknapp.
  *
  * Varianter: primary (granskog), secondary (yta), soft (tonad gran), ghost, danger (lingon), outline.
- * Storlekar sm/md/lg (md = 44 px, sm har utökad osynlig tryckyta). Kan visa laddning och
+ * Storlekar sm/md/lg (md = 44 px, sm har utökad osynlig tryckyta). Texten radbryts i stället för att
+ * klippas när den inte får plats (stor text, smala skärmar) – höjderna är därför `min-h-*`. Kan visa laddning och
  * fungera som länk via `to` (react-router). Ett subtilt "tryck" animeras med motion.
  *
  * Filen exporterar också små delade hjälpare för UI-kittet: `cx`, `IconLike` och `renderIcon`.
@@ -57,18 +58,20 @@ export const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
     'bg-transparent text-ink ring-1 ring-inset ring-line hover:bg-surface-2 hover:ring-[color-mix(in_oklab,var(--lg-line)_60%,var(--lg-ink-3))]',
 }
 
+// min-h-* (inte h-*): en enradig knapp har exakt samma höjd som förut, men en text som radbryts
+// vid stor text (WCAG 1.4.4/1.4.10) får knappen att växa i stället för att klippas eller flöda över.
 const SIZES: Record<ButtonSize, string> = {
   // sm är 36 px hög men får en osynlig tryckyta på 44 px via ::after.
-  sm: 'h-9 gap-1.5 rounded-xl px-3.5 text-[0.8125rem] after:absolute after:inset-x-0 after:-inset-y-1',
-  md: 'h-11 gap-2 rounded-2xl px-5 text-[0.9375rem]',
-  lg: 'h-14 gap-2.5 rounded-[1.25rem] px-6 text-base',
+  sm: 'min-h-9 gap-1.5 rounded-xl px-3.5 py-1.5 text-[0.8125rem] after:absolute after:inset-x-0 after:-inset-y-1',
+  md: 'min-h-11 gap-2 rounded-2xl px-5 py-2 text-[0.9375rem]',
+  lg: 'min-h-14 gap-2.5 rounded-[1.25rem] px-6 py-3 text-base',
 }
 
 const ICON_SIZES: Record<ButtonSize, string> = { sm: 'size-4', md: 'size-[1.125rem]', lg: 'size-5' }
 
 /** Gemensam basklass för knappar och knapplänkar. */
 export const BUTTON_BASE =
-  'relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold tracking-[-0.005em] ' +
+  'relative inline-flex max-w-full select-none items-center justify-center text-center font-semibold leading-snug tracking-[-0.005em] ' +
   'transition-[background-color,color,box-shadow,opacity] duration-200 ' +
   'disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45 ' +
   'aria-busy:pointer-events-none'
@@ -132,7 +135,7 @@ function ButtonContent({ size, iconLeft, iconRight, loading, children }: Pick<Bu
     <>
       <span className={cx('inline-flex min-w-0 items-center justify-center gap-[inherit] transition-opacity duration-150', loading && 'opacity-0')}>
         {renderIcon(iconLeft, iconClass, 2.2)}
-        {children !== undefined && children !== null && children !== false && <span className="truncate">{children}</span>}
+        {children !== undefined && children !== null && children !== false && <span className="min-w-0 break-words">{children}</span>}
         {renderIcon(iconRight, iconClass, 2.2)}
       </span>
       {loading && (

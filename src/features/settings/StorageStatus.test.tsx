@@ -9,11 +9,12 @@ import { vi } from 'vitest'
 import { StorageStatus } from './sections/DataSection'
 import { BACKUP_REMINDER_DAYS, SAFARI_BACKUP_REMINDER_DAYS, backupDue, backupReminderDays } from './backupStatus'
 
-const status = vi.hoisted(() => ({ memoryOnly: false, newer: false, unreadable: false, inApp: false }))
+const status = vi.hoisted(() => ({ memoryOnly: false, newer: false, unreadable: false, slowRead: false, inApp: false }))
 vi.mock('../../hooks/useStorageStatus', () => ({
   useMemoryOnlyStorage: () => status.memoryOnly,
   useHasNewerData: () => status.newer,
   useHasUnreadableData: () => status.unreadable,
+  useHasSlowReads: () => status.slowRead,
 }))
 vi.mock('../../config/platform', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../config/platform')>()
@@ -33,7 +34,7 @@ function renderStatus(lastBackup: number | null = null) {
 }
 
 describe('StorageStatus', () => {
-  beforeEach(() => Object.assign(status, { memoryOnly: false, newer: false, unreadable: false, inApp: false }))
+  beforeEach(() => Object.assign(status, { memoryOnly: false, newer: false, unreadable: false, slowRead: false, inApp: false }))
 
   it('säger att allt sparas på enheten och påminner om säkerhetskopia', () => {
     renderStatus()
@@ -58,6 +59,38 @@ describe('StorageStatus', () => {
     expect(box).toHaveTextContent(/privat läge/)
     expect(box).toHaveTextContent(/tills du stänger fliken/)
     expect(screen.getByRole('button', { name: 'Spara säkerhetskopia nu' })).toBeInTheDocument()
+  })
+
+  it('talar om appen – inte webbläsaren eller privat läge – när lagringen är blockerad i apparna', () => {
+    status.memoryOnly = true
+    status.inApp = true
+    renderStatus()
+    const box = screen.getByRole('status')
+    expect(box).toHaveTextContent('Lagom kan inte spara på enheten just nu')
+    expect(box).toHaveTextContent(/tills du stänger appen/)
+    expect(box.textContent).not.toMatch(/webbläsar|privat läge|fliken/i)
+    expect(screen.getByRole('button', { name: 'Spara säkerhetskopia nu' })).toBeInTheDocument()
+  })
+
+  it('en långsam läsning: inget är raderat, ingen skuld på webbläsaren och ingen kopia som ser hel ut', () => {
+    status.memoryOnly = true
+    status.slowRead = true
+    renderStatus()
+    const box = screen.getByRole('status')
+    expect(box).toHaveTextContent('Din sparade data läses in långsamt')
+    expect(box).toHaveTextContent(/Inget är raderat/)
+    expect(box.textContent).not.toMatch(/Webbläsaren låter|privat läge|lagringen är full/)
+    expect(screen.queryByRole('button', { name: /Spara säkerhetskopia/ })).not.toBeInTheDocument()
+  })
+
+  it('en långsam läsning i apparna: starta om appen', () => {
+    status.memoryOnly = true
+    status.slowRead = true
+    status.inApp = true
+    renderStatus()
+    const box = screen.getByRole('status')
+    expect(box).toHaveTextContent(/starta om appen/)
+    expect(box.textContent).not.toMatch(/webbläsar|ladda om sidan/i)
   })
 
   it('ber om en uppdatering när datan kommer från en nyare version', () => {

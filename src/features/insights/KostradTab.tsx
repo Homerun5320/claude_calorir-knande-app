@@ -2,7 +2,7 @@
  * Kostråd – Livsmedelsverkets kostråd för vuxna utvärderade för perioden, med en mjuk
  * sammanfattande kostrådspoäng (0–100). Bara loggade dagar räknas.
  */
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Badge, Card, ExternalLink, ProgressBar, ProgressRing } from '../../components/ui'
 import { evaluateKostrad, isAssessable, isUsable, kostradScore, tooFewDays, type KostradResult } from '../../lib/kostrad'
@@ -28,6 +28,7 @@ export function usePeriodKostrad(data: InsightsData): KostradResult[] {
 
 export function KostradTab({ data }: { data: InsightsData }) {
   const results = usePeriodKostrad(data)
+  const listHeadingId = useId()
   const score = useMemo(() => kostradScore(results), [results])
   const reduce = useReducedMotion()
   const { mindful } = data
@@ -73,7 +74,8 @@ export function KostradTab({ data }: { data: InsightsData }) {
             )}
           </ProgressRing>
           <div className="min-w-0">
-            <p className="eyebrow">Kostrådspoäng</p>
+            {/* Rubriknivå 2 (sidans h1 är "Insikter"): rubrikerna får inte hoppa från h1 till h3. */}
+            <h2 className="eyebrow">Kostrådspoäng</h2>
             <p className="mt-1 font-display text-2xl leading-tight font-semibold tracking-tight">{label.title}</p>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{label.text}</p>
             <p className="mt-2 text-xs text-ink-3">
@@ -87,7 +89,10 @@ export function KostradTab({ data }: { data: InsightsData }) {
         </InfoNote>
       </Card>
 
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Kostråden">
+      <h2 id={listHeadingId} className="sr-only">
+        Kostråden
+      </h2>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-labelledby={listHeadingId}>
         {results.map((r, i) => (
           <motion.li
             key={r.id}
@@ -129,7 +134,7 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
         <div className="min-w-0 flex-1">
           {/* Får brytas: i smala fönster hamnar märket under rubriken i stället för utanför kortet. */}
           <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-            <h3 className="font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
+            <h3 className="min-w-0 break-words font-display text-[1.0625rem] leading-snug font-semibold tracking-tight">{r.title}</h3>
             <Badge tone={uncertain ? 'neutral' : status.tone} dot className="shrink-0">
               {uncertain ? neutralLabel : status.label}
             </Badge>

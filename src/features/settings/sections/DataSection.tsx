@@ -47,7 +47,8 @@ import { currentAccess } from '../../../hooks/useAccess'
 import { useProfileStore } from '../../../stores/profileStore'
 import { useLicenseStore } from '../../../stores/licenseStore'
 import { hasProtectedData } from '../../../stores/storage'
-import { useHasNewerData, useHasUnreadableData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
+import { useHasNewerData, useHasSlowReads, useHasUnreadableData, useMemoryOnlyStorage } from '../../../hooks/useStorageStatus'
+import { slowReadText, storageBlockedCause, storageMemoryOnlyScope } from '../../../lib/storageTexts'
 import { relativeDayLabel, todayISO, toISODate } from '../../../lib/dates'
 import { useDiaryStore } from '../../../stores/diaryStore'
 import { SUPPORT_EMAIL } from '../../../config/commerce'
@@ -78,8 +79,9 @@ const WEB_PURCHASES: boolean = typeof __LAGOM_DISTRIBUTION__ === 'string' ? __LA
 async function exportBackup(): Promise<SaveOutcome> {
   const outcome = await saveBackup()
   if (outcome === 'saved' || outcome === 'shared') {
-    // Med data från en nyare version – eller en sparad dagbok som inte gick att läsa – innehåller
-    // kopian bara det som gjorts nu. Den sparade datan är inte med, så påminnelsen ska inte tystna.
+    // Med data från en nyare version – eller en sparad dagbok som inte gick att läsa eller som läses
+    // in långsamt – innehåller kopian bara det som gjorts nu. Den sparade datan är inte med, så
+    // påminnelsen ska inte tystna.
     if (!hasProtectedData()) markBackupNow()
     toast(outcome === 'saved' ? 'Säkerhetskopian är sparad – lägg den gärna i molnet eller mejla den till dig själv.' : sharedFileToast(), { tone: 'success' })
   } else if (outcome === 'failed') {
@@ -273,7 +275,8 @@ export function DataSection() {
       tone: 'danger',
     })
     if (!ok) return
-    void wipeAndReset()
+    // Bara exempeldatan rensas: en kopia eller bilder från en tidigare egen dagbok får ligga kvar.
+    void wipeAndReset({ keepOwnCopies: true })
     navigate('/valkommen', { replace: true })
   }
 
@@ -315,7 +318,7 @@ export function DataSection() {
 
       <Card eyebrow="Säkerhetskopia" title="Spara och återställ">
         <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-          En fil med allt: dagbok, vikt, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
+          En fil med allt: dagbok, vikt, fastor, recept, egna livsmedel och inställningar. Spara den på ett säkert ställe – då kan du flytta till en ny enhet
           eller återställa om något händer.
         </p>
         {/* Framstegsbilderna ligger utanför säkerhetskopian (src/lib/progressPhotos.ts). */}
@@ -583,6 +586,7 @@ export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
   const memoryOnly = useMemoryOnlyStorage()
   const newer = useHasNewerData()
   const unreadable = useHasUnreadableData()
+  const slowRead = useHasSlowReads()
   const inApp = isInApp()
   if (memoryOnly) {
     return (
@@ -596,15 +600,18 @@ export function StorageStatus({ lastBackup }: { lastBackup: number | null }) {
                 ? 'Din data är från en nyare version av Lagom – uppdatera appen. Den sparade datan lämnas orörd, och det du gör nu finns bara kvar tills du stänger appen.'
                 : unreadable
                   ? 'Den sparade dagboken gick inte att läsa. Den lämnas orörd och skrivs inte över, och det du gör nu finns bara kvar tills du stänger appen. Spara en säkerhetskopia och skicka gärna felrapporten till supporten (Om Lagom → Felsökning).'
-                  : inApp
-                    ? 'Lagom kan inte spara på enheten just nu – t.ex. när lagringen är full. Det du gör finns kvar tills du stänger appen, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'
-                    : 'Webbläsaren låter inte Lagom spara – t.ex. i privat läge, när lagringen är full eller när webbplatsdata är avstängd. Det du gör finns kvar tills du stänger fliken, men inte längre. Spara en säkerhetskopia nu, så går inget förlorat.'}
+                  : slowRead
+                    ? `Din sparade data läses in långsamt. ${slowReadText(inApp)}`
+                    : `${storageBlockedCause(inApp)} ${storageMemoryOnlyScope(inApp)} Spara en säkerhetskopia nu, så går inget förlorat.`}
             </p>
           </div>
         </div>
-        <Button size="sm" iconLeft={Download} onClick={() => void exportBackup()}>
-          Spara säkerhetskopia nu
-        </Button>
+        {/* Vid en långsam läsning saknar kopian den sparade datan – bara de andra orsakerna erbjuder en. */}
+        {(!slowRead || newer || unreadable) && (
+          <Button size="sm" iconLeft={Download} onClick={() => void exportBackup()}>
+            Spara säkerhetskopia nu
+          </Button>
+        )}
       </div>
     )
   }
@@ -672,7 +679,9 @@ function BrowserStorageDetails() {
     <>
       <div className="mt-4">
         {estimate === undefined ? (
-          <div className="h-10 animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Läser lagring" />
+          <div className="h-10 animate-pulse rounded-xl bg-surface-2" role="status" aria-busy="true">
+            <span className="sr-only">Läser lagring …</span>
+          </div>
         ) : estimate ? (
           <ProgressBar
             value={estimate.usage}

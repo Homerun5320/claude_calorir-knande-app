@@ -132,7 +132,7 @@ export const WeekCard = memo(function WeekCard({ today, targetKcal, weeklyPlan =
           />
           <Link
             to="/insikter"
-            className="-mx-2 mt-2 flex min-h-11 items-center gap-2 rounded-2xl px-2 text-sm transition-colors hover:bg-surface-2"
+            className="-mx-2 mt-2 flex min-h-11 flex-wrap items-center gap-x-2 rounded-2xl px-2 text-sm transition-colors hover:bg-surface-2"
           >
             <span className="text-ink-3">Snitt</span>
             {average !== undefined ? (

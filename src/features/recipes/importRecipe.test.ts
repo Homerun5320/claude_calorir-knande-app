@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Food } from '../../types'
 import {
+  MAX_IMPORT_INGREDIENTS,
   cleanText,
   ingredientAmount,
   ingredientQuery,
@@ -575,5 +576,91 @@ Forma biffarna och stek dem i smör.
     expect(parseIngredientLines('Sätt ugnen på 200 grader och låt den bli ordentligt varm innan du börjar.\n2 dl mjölk')).toEqual([
       { raw: '2 dl mjölk', amount: 2, unit: 'dl', name: 'mjölk', check: false },
     ])
+  })
+})
+
+describe('en elak receptsida (opålitlig data)', () => {
+  /** Ett JSON-LD-block nära serverns tak på 1 MiB (RECIPE_MAX_JSONLD_CHARS). */
+  const MIB = 1024 * 1024
+  const timed = <T,>(fn: () => T): { value: T; ms: number } => {
+    const t0 = performance.now()
+    const value = fn()
+    return { value, ms: performance.now() - t0 }
+  }
+
+  it('ett recept med en sida full av ingredienser ger högst 200 rader, och säger att det kortades', () => {
+    const row = '"1 dl mjölk",'
+    const html = ld(`{"@type":"Recipe","name":"Mjölk","recipeIngredient":[${row.repeat(Math.floor(MIB / row.length))}"1 dl till"]}`)
+    expect(html.length).toBeGreaterThan(MIB * 0.99)
+    const { value, ms } = timed(() => parseRecipeJsonLd(html))
+    expect(value).toHaveLength(1)
+    expect(value[0].ingredients).toHaveLength(MAX_IMPORT_INGREDIENTS)
+    expect(value[0].ingredients[0]).toBe('1 dl mjölk')
+    expect(value[0].truncated).toBe(true)
+    expect(ms).toBeLessThan(1500)
+    // Det som granskningen får är lika litet.
+    expect(parseIngredientLines(value[0].ingredients.join('\n'))).toHaveLength(MAX_IMPORT_INGREDIENTS)
+  })
+
+  it('ett vanligt, stort recept kortas inte', () => {
+    const rows = Array.from({ length: MAX_IMPORT_INGREDIENTS }, (_, i) => `${i + 1} g ingrediens ${i}`)
+    const [recipe] = parseRecipeJsonLd(ld(JSON.stringify({ '@type': 'Recipe', name: 'Stort', recipeIngredient: rows })))
+    expect(recipe.ingredients).toEqual(rows)
+    expect(recipe.truncated).toBeUndefined()
+  })
+
+  it('en enda sträng med hundratusentals rader, grupper och objekt kortas på samma sätt', () => {
+    const asString = ld(JSON.stringify({ '@type': 'Recipe', name: 'A', recipeIngredient: '1 dl mjölk\n'.repeat(90_000) }))
+    const asBr = ld(JSON.stringify({ '@type': 'Recipe', name: 'B', recipeIngredient: ['2 ägg<br>'.repeat(90_000)] }))
+    const group = { '@type': 'HowToSection', itemListElement: Array.from({ length: 30 }, () => ({ '@type': 'HowToSupply', name: 'smör', requiredQuantity: 2 })) }
+    const asGroups = ld(JSON.stringify({ '@type': 'Recipe', name: 'C', recipeIngredient: Array.from({ length: 400 }, () => group) }))
+    for (const html of [asString, asBr, asGroups]) {
+      const { value, ms } = timed(() => parseRecipeJsonLd(html))
+      expect(value[0].ingredients, value[0].name).toHaveLength(MAX_IMPORT_INGREDIENTS)
+      expect(value[0].truncated).toBe(true)
+      expect(ms).toBeLessThan(1500)
+    }
+  })
+
+  it('en rad som är orimligt lång är ingen ingrediens', () => {
+    const html = ld(JSON.stringify({ '@type': 'Recipe', name: 'L', recipeIngredient: ['x'.repeat(5_000), '2 ägg'] }))
+    expect(parseRecipeJsonLd(html)[0].ingredients).toEqual(['2 ägg'])
+  })
+
+  it('tusentals recept i en @graph ger högst 20, och för många block läses inte alla', () => {
+    const graph = Array.from({ length: 5_000 }, (_, i) => ({ '@type': 'Recipe', name: `Recept ${i}`, recipeIngredient: ['1 dl mjölk'] }))
+    const { value, ms } = timed(() => parseRecipeJsonLd(ld(JSON.stringify({ '@graph': graph }))))
+    expect(value).toHaveLength(20)
+    expect(value[0].name).toBe('Recept 0')
+    expect(ms).toBeLessThan(1500)
+
+    const blocks = Array.from({ length: 500 }, (_, i) => `<script type="application/ld+json">{"@type":"Recipe","name":"B${i}","recipeIngredient":["2 ägg"]}</script>`).join('')
+    const many = parseRecipeJsonLd(`<html><head>${blocks}</head></html>`)
+    expect(many.length).toBeGreaterThan(0)
+    expect(many.length).toBeLessThanOrEqual(20)
+  })
+
+  it('arbetet har ett tak även när sidan bara är tomma värden', () => {
+    // Hundratusentals tomma listor och objekt som aldrig blir ett recept – arbetet stannar ändå.
+    const filler = JSON.stringify(Array.from({ length: 150_000 }, (_, i) => (i % 2 ? [] : {})))
+    const html = ld(`{"@graph":[{"junk":${filler}},{"@type":"Recipe","name":"Sist","recipeIngredient":["2 ägg"]}]}`)
+    const { value, ms } = timed(() => parseRecipeJsonLd(html))
+    expect(value).toEqual([])
+    expect(ms).toBeLessThan(1500)
+    // Ett riktigt recept med många block och noder runt omkring hittas däremot som vanligt.
+    const normal = ld(JSON.stringify({ '@graph': [...Array.from({ length: 200 }, (_, i) => ({ '@type': 'Thing', name: `n${i}`, tags: ['a', 'b'] })), { '@type': 'Recipe', name: 'Mitt', recipeIngredient: ['2 ägg'] }] }))
+    expect(parseRecipeJsonLd(normal).map((r) => r.name)).toEqual(['Mitt'])
+  })
+
+  it('namn och adress från sidan har en längdgräns', () => {
+    const html = ld(JSON.stringify({ '@type': 'Recipe', name: 'N'.repeat(100_000), url: `https://recept.example/${'a'.repeat(5_000)}`, recipeIngredient: ['2 ägg'] }))
+    const [recipe] = parseRecipeJsonLd(html)
+    expect(recipe.name).toHaveLength(200)
+    expect(recipe.url).toBeUndefined()
+  })
+
+  it('en inklistrad text med tusentals rader ger högst 200 rader', () => {
+    const lines = parseIngredientLines('1 dl mjölk\n'.repeat(5_000))
+    expect(lines).toHaveLength(MAX_IMPORT_INGREDIENTS)
   })
 })

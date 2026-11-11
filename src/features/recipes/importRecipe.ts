@@ -7,6 +7,8 @@
  *   (HowToSection/ItemList) eller som objekt, och portioner som tal, text eller lista – och plockar ut
  *   namn, portioner, tid och ingrediensrader. Instruktionerna importeras inte (bara länken sparas).
  *   Sidor med mikrodata får ett motsvarande JSON-LD-block av serverfunktionen (netlify/lib/recipeFetch.ts).
+ *   Sidan är opålitlig: högst `MAX_IMPORT_INGREDIENTS` rader per recept, och antalet recept, block och
+ *   besökta JSON-värden är begränsade så att en elak sida inte kan frysa appen.
  * - `parseIngredientLines` delar upp en ingredienslista i rader med mängd, enhet och namn – med
  *   fritextens `parseQuantity` (lib/freeText.ts) och receptens egna former ("ca", "2–3", "à 400 g",
  *   "1 msk + 1 tsk", "2 x 400 g"). Rader utan mängd markeras "kontrollera". Rubriker ("Sås:",
@@ -36,6 +38,32 @@ export interface ImportedRecipe {
   ingredients: string[]
   /** Receptets egen adress om sidan anger den. */
   url?: string
+  /** Sidan hade fler än `MAX_IMPORT_INGREDIENTS` rader – bara de första är med. */
+  truncated?: true
+}
+
+// Gränser för det som läses från en receptsida. Sidan är opålitlig data: ett JSON-LD-block på 1 MiB
+// rymmer tiotusentals ingredienser, och varje rad blir en egen rad i granskningen (livsmedelssökning
+// mot hela katalogen). Gränserna är rikliga för riktiga recept – de flesta har under 30 rader – men
+// håller arbetet litet vad sidan än skickar.
+
+/** Högsta antal ingrediensrader från ett recept (som mikrodata-vägen på servern) – och i en inklistrad lista. */
+export const MAX_IMPORT_INGREDIENTS = 200
+/** Högsta antal recept som tas ur en sida. */
+const MAX_IMPORT_RECIPES = 20
+/** Högsta antal JSON-LD-block som läses. */
+const MAX_LD_BLOCKS = 30
+/** Högsta antal JSON-värden (objekt, listor och strängar) som besöks på en hel sida. */
+const MAX_JSON_NODES = 50_000
+/** En ingrediensrad längre än så här (före rensning) är ingen ingrediens – hoppas över utan att tolkas. */
+const MAX_RAW_LINE_CHARS = 2000
+/** Längsta namn och adress som tas med från sidan. */
+const MAX_IMPORT_NAME_CHARS = 200
+const MAX_IMPORT_URL_CHARS = 2000
+
+/** Återstående arbete för en sida (delas av alla block och recept). */
+interface Budget {
+  nodes: number
 }
 
 type Json = unknown
@@ -186,61 +214,82 @@ function quantityText(v: Json, depth = 0): string {
 }
 
 /**
- * Ingrediensraderna: strängar (även flera rader i en sträng, med radbrytningar eller <br>), listor,
- * grupper (HowToSection/ItemList med itemListElement) och objekt (HowToSupply, ListItem).
+ * Ingrediensraderna läggs i `out`: strängar (även flera rader i en sträng, med radbrytningar eller
+ * <br>), listor, grupper (HowToSection/ItemList med itemListElement) och objekt (HowToSupply,
+ * ListItem). Läsningen slutar när `out` har `MAX_IMPORT_INGREDIENTS + 1` rader (en extra så att
+ * anroparen ser att det fanns fler) eller när sidans arbetsbudget är slut.
  */
-function ingredientList(v: Json, depth = 0): string[] {
-  if (depth > 5) return []
+function collectIngredients(v: Json, out: string[], budget: Budget, depth = 0): void {
+  if (depth > 5 || out.length > MAX_IMPORT_INGREDIENTS || budget.nodes <= 0) return
+  budget.nodes--
   if (typeof v === 'string') {
-    return v
-      .split(/\r?\n|<br\s*\/?>/i)
-      .map((line) => cleanText(line))
-      .filter(Boolean)
+    for (const line of v.split(/\r?\n|<br\s*\/?>/i)) {
+      if (out.length > MAX_IMPORT_INGREDIENTS) return
+      if (line.length > MAX_RAW_LINE_CHARS) continue
+      const text = cleanText(line)
+      if (text) out.push(text)
+    }
+    return
   }
-  if (Array.isArray(v)) return v.flatMap((x) => ingredientList(x, depth + 1))
-  if (!isObj(v)) return []
-  if (v.itemListElement !== undefined) return ingredientList(v.itemListElement, depth + 1)
-  if (v.recipeIngredient !== undefined) return ingredientList(v.recipeIngredient, depth + 1)
-  if (isObj(v.item)) return ingredientList(v.item, depth + 1)
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      if (out.length > MAX_IMPORT_INGREDIENTS || budget.nodes <= 0) return
+      collectIngredients(x, out, budget, depth + 1)
+    }
+    return
+  }
+  if (!isObj(v)) return
+  if (v.itemListElement !== undefined) return collectIngredients(v.itemListElement, out, budget, depth + 1)
+  if (v.recipeIngredient !== undefined) return collectIngredients(v.recipeIngredient, out, budget, depth + 1)
+  if (isObj(v.item)) return collectIngredients(v.item, out, budget, depth + 1)
   const name = textOf(v.name ?? v.text ?? v['@value'] ?? v.item)
-  if (!name) return []
+  if (!name) return
   const amount = quantityText(v.requiredQuantity ?? v.amount ?? v.quantity, depth)
-  return [amount && !name.startsWith(amount) ? `${amount} ${name}` : name]
+  out.push(amount && !name.startsWith(amount) ? `${amount} ${name}` : name)
 }
 
-function toRecipe(o: Obj): ImportedRecipe | null {
-  const name = textOf(o.name) ?? textOf(o.headline)
-  const ingredients = ingredientList(o.recipeIngredient ?? o.ingredients)
+function toRecipe(o: Obj, budget: Budget): ImportedRecipe | null {
+  const name = (textOf(o.name) ?? textOf(o.headline))?.slice(0, MAX_IMPORT_NAME_CHARS).trim()
+  const lines: string[] = []
+  collectIngredients(o.recipeIngredient ?? o.ingredients, lines, budget)
+  const truncated = lines.length > MAX_IMPORT_INGREDIENTS
+  const ingredients = truncated ? lines.slice(0, MAX_IMPORT_INGREDIENTS) : lines
   if (!name && ingredients.length === 0) return null
   const total = parseRecipeDuration(o.totalTime)
   const prep = parseRecipeDuration(o.prepTime)
   const cook = parseRecipeDuration(o.cookTime)
   const minutes = total ?? (prep !== undefined || cook !== undefined ? (prep ?? 0) + (cook ?? 0) : undefined)
-  const recipe: ImportedRecipe = { name: name ?? 'Importerat recept', ingredients }
+  const recipe: ImportedRecipe = { name: name || 'Importerat recept', ingredients }
+  if (truncated) recipe.truncated = true
   const servings = parseYield(o.recipeYield ?? o.yield)
   if (servings !== undefined) recipe.servings = servings
   if (minutes !== undefined && minutes > 0) recipe.totalMinutes = minutes
   const url = typeof o.url === 'string' ? o.url : typeof o['@id'] === 'string' ? o['@id'] : undefined
-  if (url && /^https?:\/\//i.test(url)) recipe.url = url
+  if (url && url.length <= MAX_IMPORT_URL_CHARS && /^https?:\/\//i.test(url)) recipe.url = url
   return recipe
 }
 
 /** Leta igenom JSON-LD (listor, @graph och nästlade objekt som mainEntity) efter recept. */
-function collect(node: Json, out: ImportedRecipe[], depth: number): void {
-  if (depth > 6) return
+function collect(node: Json, out: ImportedRecipe[], depth: number, budget: Budget): void {
+  if (depth > 6 || out.length >= MAX_IMPORT_RECIPES || budget.nodes <= 0) return
+  budget.nodes--
   if (Array.isArray(node)) {
-    for (const x of node) collect(x, out, depth + 1)
+    for (const x of node) {
+      if (out.length >= MAX_IMPORT_RECIPES || budget.nodes <= 0) return
+      collect(x, out, depth + 1, budget)
+    }
     return
   }
   if (!isObj(node)) return
   if (isRecipeType(node['@type'])) {
-    const r = toRecipe(node)
+    const r = toRecipe(node, budget)
     if (r) out.push(r)
     return
   }
   for (const [key, value] of Object.entries(node)) {
+    if (out.length >= MAX_IMPORT_RECIPES || budget.nodes <= 0) return
     if (key === '@context') continue
-    if (typeof value === 'object' && value !== null) collect(value, out, depth + 1)
+    if (typeof value === 'object' && value !== null) collect(value, out, depth + 1, budget)
   }
 }
 
@@ -272,11 +321,14 @@ export function parseRecipeJsonLd(html: string): ImportedRecipe[] {
   if (typeof html !== 'string' || html.trim() === '' || typeof DOMParser === 'undefined') return []
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const out: ImportedRecipe[] = []
+  const budget: Budget = { nodes: MAX_JSON_NODES }
+  let blocks = 0
   for (const script of Array.from(doc.querySelectorAll('script'))) {
     const type = (script.getAttribute('type') ?? '').toLowerCase()
     if (!type.includes('ld+json')) continue
+    if (++blocks > MAX_LD_BLOCKS || out.length >= MAX_IMPORT_RECIPES || budget.nodes <= 0) break
     const json = parseJsonBlock(script.textContent ?? '')
-    if (json !== undefined) collect(json, out, 0)
+    if (json !== undefined) collect(json, out, 0, budget)
   }
   return out
 }
@@ -463,6 +515,8 @@ const YIELD_ONLY = /^(?:portioner|portion|personer|pers|bitar|stycken|st|port|mi
 export function parseIngredientLines(text: string): ParsedIngredientLine[] {
   const out: ParsedIngredientLine[] = []
   for (const line of (text ?? '').split(/\r?\n/)) {
+    // Samma gräns som för en receptsida: en text med tusentals rader ska inte frysa granskningen.
+    if (out.length >= MAX_IMPORT_INGREDIENTS) break
     const raw = line.replace(BULLET, '').replace(/\s+/g, ' ').trim()
     if (!raw || raw.length > 200) continue
     const bare = raw.replace(/[\s:.]+$/u, '')

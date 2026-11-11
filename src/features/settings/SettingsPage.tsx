@@ -215,14 +215,19 @@ function SettingsIndex() {
       <PageHeader title="Inställningar" subtitle="Gör Lagom till din. Allt sparas bara på din enhet." />
 
       <div className="flex flex-col gap-6">
-        <Card to="/installningar/profil" padding="md" aria-label="Öppna profilen">
+        {/* Ingen aria-label: länkens namn är den synliga texten (namn, sammanfattning, "Med Lagom sedan …"), annars
+            hör skärmläsaren inte sammanfattningen och "Tryck Hej Anna" fungerar inte med röststyrning (WCAG 2.5.3). */}
+        {/* @container + @max-[14rem]: vid stor text (200 %) är kortet för smalt för avatar och text bredvid varandra – avataren döljs
+            och namn och sammanfattning får två rader i stället för "…". rem i en containerfråga följer rotens teckenstorlek; vid
+            normal text (kortet ≈ 20 rem, ≈ 15,5 rem på en 320 px-telefon) ändras inget. */}
+        <Card to="/installningar/profil" padding="md" className="@container">
           <div className="flex items-center gap-4">
-            <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-gran-soft font-display text-[1.5rem] font-semibold text-gran">
+            <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-gran-soft font-display text-[1.5rem] font-semibold text-gran @max-[14rem]:hidden">
               {initial || <UserRound className="size-6" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-display text-[1.1875rem] font-semibold tracking-tight">{profile?.name ? `Hej, ${profile.name}` : 'Din profil'}</span>
-              <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-3">{profileSummary(profile, today)}</span>
+              <span className="block truncate break-words font-display text-[1.1875rem] font-semibold tracking-tight @max-[14rem]:line-clamp-2 @max-[14rem]:whitespace-normal">{profile?.name ? `Hej, ${profile.name}` : 'Din profil'}</span>
+              <span className="mt-0.5 block truncate break-words text-[0.8125rem] text-ink-3 @max-[14rem]:line-clamp-3 @max-[14rem]:whitespace-normal">{profileSummary(profile, today)}</span>
               {profile && (
                 <span className="mt-1 flex items-center gap-1.5 text-[0.75rem] text-ink-3">
                   <CalendarHeart aria-hidden className="size-3.5" />

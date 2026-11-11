@@ -82,9 +82,10 @@ export function energyRows(energy: EnergyBreakdown, unit: 'kcal' | 'kJ' = 'kcal'
 function MacroTile({ label, ariaLabel, value, unit, tone, sub }: { label: ReactNode; ariaLabel: string; value: string; unit: string; tone: Tone; sub?: string }) {
   return (
     <div role="group" aria-label={ariaLabel} style={toneVars(tone)} className="min-w-0 rounded-2xl bg-(--tone-soft) px-2.5 py-2.5 min-[400px]:px-3">
-      <div className="flex min-w-0 items-center gap-1.5 truncate text-[0.75rem] font-semibold text-(--tone-ink)">
+      {/* Etiketten radbryts (inte "…"): vid stor text (200 %) ska "Protein" och "Kolhydrater" gå att läsa. */}
+      <div className="flex min-w-0 items-center gap-1.5 text-[0.75rem] font-semibold text-(--tone-ink)">
         <span aria-hidden className="hidden size-2 shrink-0 rounded-full bg-(--tone) min-[400px]:inline-block" />
-        {label}
+        <span className="min-w-0 break-words">{label}</span>
       </div>
       <div className="mt-0.5 text-ink">
         <span className="font-display text-[1.25rem] font-semibold tabular-nums tracking-tight">{value}</span>
@@ -96,6 +97,14 @@ function MacroTile({ label, ariaLabel, value, unit, tone, sub }: { label: ReactN
     </div>
   )
 }
+
+/**
+ * En rad i uträkningen: etikett till vänster och värde till höger. Vid stor text (200 %) ryms de inte bredvid
+ * varandra – då hamnar värdet under etiketten (`flex-wrap`; etikettens bas 8 rem gör att raden bara bryts när det behövs).
+ */
+const ROW = 'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line/70 py-2.5 first:pt-0'
+const ROW_LABEL = 'min-w-0 flex-1 basis-32'
+const ROW_VALUE = 'ml-auto shrink-0 text-[0.9375rem] font-semibold tabular-nums text-ink'
 
 export interface TargetsSummaryProps {
   energy: EnergyBreakdown
@@ -123,26 +132,26 @@ export function TargetsSummary({ energy, targets, showBreakdown = true, extraNot
       {showBreakdown && (
         <dl className="flex flex-col">
           {rows.map((r) => (
-            <div key={r.label} className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 first:pt-0">
-              <dt className="min-w-0">
+            <div key={r.label} className={ROW}>
+              <dt className={ROW_LABEL}>
                 <span className="block text-[0.9375rem] text-ink">{r.label}</span>
                 {r.hint && <span className="block text-[0.75rem] leading-snug text-ink-3">{r.hint}</span>}
               </dt>
-              <dd className="shrink-0 text-[0.9375rem] font-semibold tabular-nums text-ink">{r.value}</dd>
+              <dd className={ROW_VALUE}>{r.value}</dd>
             </div>
           ))}
           {custom && (
-            <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5">
-              <dt className="min-w-0">
+            <div className={ROW}>
+              <dt className={ROW_LABEL}>
                 <span className="block text-[0.9375rem] text-ink">Beräknat dagsmål</span>
                 <span className="block text-[0.75rem] leading-snug text-ink-3">Du har ett eget energimål som gäller i stället</span>
               </dt>
-              <dd className="shrink-0 text-[0.9375rem] font-semibold tabular-nums text-ink">{total}</dd>
+              <dd className={ROW_VALUE}>{total}</dd>
             </div>
           )}
-          <div className="flex items-baseline justify-between gap-3 pt-3">
-            <dt className="font-display text-[1.0625rem] font-semibold text-ink">{custom ? 'Ditt dagsmål' : 'Dagsmål'}</dt>
-            <dd className="display-num text-[1.75rem] font-semibold text-gran">{custom ? `${formatNumber(Math.round(unit === 'kJ' ? targets.kcal * KJ_PER_KCAL : targets.kcal))} ${unit}` : total}</dd>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3">
+            <dt className="min-w-0 break-words font-display text-[1.0625rem] font-semibold text-ink">{custom ? 'Ditt dagsmål' : 'Dagsmål'}</dt>
+            <dd className="ml-auto display-num text-[1.75rem] font-semibold text-gran">{custom ? `${formatNumber(Math.round(unit === 'kJ' ? targets.kcal * KJ_PER_KCAL : targets.kcal))} ${unit}` : total}</dd>
           </div>
         </dl>
       )}
@@ -154,25 +163,28 @@ export function TargetsSummary({ energy, targets, showBreakdown = true, extraNot
         </p>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        <MacroTile label="Protein" ariaLabel="Protein" tone="protein" value={formatNumber(targets.proteinG)} unit="g" />
-        <MacroTile
-          // "Kolhydrater" får inte plats i en tredjedel av en smal skärm (under 360 px).
-          label={
-            <>
-              <span className="min-[360px]:hidden">Kolhydr.</span>
-              <span className="hidden min-[360px]:inline">Kolhydrater</span>
-            </>
-          }
-          ariaLabel="Kolhydrater"
-          tone="carbs"
-          value={formatNumber(targets.carbsG)}
-          unit="g"
-        />
-        <MacroTile label="Fett" ariaLabel="Fett" tone="fat" value={formatNumber(targets.fatG)} unit="g" />
-        <MacroTile label="Fibrer" ariaLabel="Fibrer" tone="fiber" value={formatNumber(targets.fiberG)} unit="g" sub="minst" />
-        <MacroTile label="Dryck" ariaLabel="Dryck" tone="water" value={formatNumber(targets.waterMl / 1000, 2)} unit="liter" sub="per dag" />
-        <MacroTile label="Salt" ariaLabel="Salt" tone="neutral" value={formatNumber(targets.saltMaxG, 1)} unit="g" sub="högst" />
+      {/* Containerfråga i rem (följer rotens teckenstorlek): vid stor text ryms inte tre rutor bredvid varandra. */}
+      <div className="@container">
+        <div className="grid grid-cols-3 gap-2 @max-[15rem]:grid-cols-2 @max-[11rem]:grid-cols-1">
+          <MacroTile label="Protein" ariaLabel="Protein" tone="protein" value={formatNumber(targets.proteinG)} unit="g" />
+          <MacroTile
+            // "Kolhydrater" får inte plats i en tredjedel av en smal skärm (under 360 px).
+            label={
+              <>
+                <span className="min-[360px]:hidden">Kolhydr.</span>
+                <span className="hidden min-[360px]:inline">Kolhydrater</span>
+              </>
+            }
+            ariaLabel="Kolhydrater"
+            tone="carbs"
+            value={formatNumber(targets.carbsG)}
+            unit="g"
+          />
+          <MacroTile label="Fett" ariaLabel="Fett" tone="fat" value={formatNumber(targets.fatG)} unit="g" />
+          <MacroTile label="Fibrer" ariaLabel="Fibrer" tone="fiber" value={formatNumber(targets.fiberG)} unit="g" sub="minst" />
+          <MacroTile label="Dryck" ariaLabel="Dryck" tone="water" value={formatNumber(targets.waterMl / 1000, 2)} unit="liter" sub="per dag" />
+          <MacroTile label="Salt" ariaLabel="Salt" tone="neutral" value={formatNumber(targets.saltMaxG, 1)} unit="g" sub="högst" />
+        </div>
       </div>
 
       {notes.length > 0 && (

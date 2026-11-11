@@ -9,6 +9,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { CalendarHeart, Check, UserRound } from 'lucide-react'
 import { Button, Card, EmptyState, NumberField, SegmentedControl, Select, confirmDialog, toast } from '../../../components/ui'
 import { useEnergyUnit } from '../../../components/domain/EnergyValue'
+import { useBottomBarPadding } from '../../../hooks/useBottomBarPadding'
 import { useTargets } from '../../../hooks/useTargets'
 import { useToday } from '../../../hooks/useToday'
 import { ageFromBirthYear } from '../../../lib/dates'
@@ -74,6 +75,9 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
   const unit = useEnergyUnit()
   const goalLabelId = useId()
   const rateLabelId = useId()
+  // "Spara profilen"-listan klibbar ovanför bottennavigeringen – fokuserade fält ska hamna ovanför
+  // den (WCAG 2.4.11). Mäts inklusive felraden som visas när något saknas.
+  const barRef = useBottomBarPadding()
 
   const initial = useMemo(() => draftFromProfile(profile, currentWeight), [profile, currentWeight])
   const [draft, setDraft] = useState<ProfileDraft>(initial)
@@ -277,6 +281,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
       <AnimatePresence>
         {(dirty || attempted) && (
           <motion.div
+            ref={barRef}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: 24 }}

@@ -470,14 +470,18 @@ en lyckad skrivning (§9). `hasProtectedData()` är true när sparad data inte h
 version eller går inte att tolka) – en säkerhetskopia saknar den då, och påminnelsen om
 säkerhetskopia ska inte tystna.
 
-- **Går inte att tolka – kvar att göra i gränssnittet** (utanför lagringen): varningen i
-  `AppShell.tsx` säger i dag "Webbläsaren låter inte Lagom spara" även för en trasig dagbok, och
-  `markBackupNow()` i `AppShell.tsx`, `DataSection.tsx` och `RouteError.tsx` kontrollerar bara
-  `hasNewerData()` – de ska använda `hasUnreadableData()` (egen text) och `hasProtectedData()`.
-  Hela dagboken skyddas, inte bara den trasiga månaden; att läsa in resten och aldrig skriva den
-  trasiga nyckeln, och att kunna återställa från en säkerhetskopia eller speglingen utan "Radera
-  all data", är beslut för version B. Speglingen skrivs inte medan något är skyddat
-  (`isMemoryOnlyStorage()`) – så att den sista hela kopian inte skrivs över med en tom dagbok.
+- **Går inte att tolka – gränssnittet** (utanför lagringen): varningen i `AppShell.tsx` har egna
+  texter för "nyare version", "gick inte att läsa" och "läses in långsamt", och texterna om att
+  lagringen inte går att använda delas med Inställningar → Data i `src/lib/storageTexts.ts` (aldrig
+  "webbläsaren" eller "privat läge" i apparna). `markBackupNow()` i `AppShell.tsx`, `DataSection.tsx`
+  och `RouteError.tsx` anropas bara när `hasProtectedData()` är false; den räknar också sparad data
+  som fortfarande läses in (`hasSlowReads()` – en långsam läsning som är klar släpps igen), så att
+  en säkerhetskopia utan den datan inte räknas som gjord. Den långsamma läsningen har en egen lugn
+  banner utan knapp för säkerhetskopia. Hela dagboken skyddas, inte bara den trasiga månaden; att
+  läsa in resten och aldrig skriva den trasiga nyckeln, och att kunna återställa från en
+  säkerhetskopia eller speglingen utan "Radera all data", är beslut för version B. Speglingen
+  skrivs inte medan något är skyddat (`isMemoryOnlyStorage()`) – så att den sista hela kopian inte
+  skrivs över med en tom dagbok.
 
 - **"Radera all data"** (`clearDiary`) tar bort månaderna och kopian (skrivaren av: en tom dagbok i
   version 1; på: ett tomt index), och `removeItem` tar bort allt i en transaktion.

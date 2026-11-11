@@ -198,12 +198,12 @@ export function CalendarHeatmap({
 
   return (
     <div className={className}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="font-display text-lg font-semibold text-ink" aria-live="polite">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <h3 className="min-w-0 break-words font-display text-lg font-semibold text-ink" aria-live="polite">
           {heading}
         </h3>
         {onMonthChange && (
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => canPrev && onMonthChange(shiftMonth(first, -1))}

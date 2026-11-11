@@ -23,12 +23,17 @@ export function mergeRefs<T>(...refs: Array<Ref<T> | undefined>): RefCallback<T>
   }
 }
 
-/** Ytan runt ett inmatningsfält. Fokus markeras på ramen (focus-within), inte på själva input. */
+/**
+ * Ytan runt ett inmatningsfält. Fokus markeras på ramen (focus-within), inte på själva input.
+ * Den tunna ramen (`field-line`) har minst 3:1 mot sidan och korten i båda temana (WCAG 1.4.11) –
+ * fyllningen ensam (surface-2) skulle bara ge cirka 1,1:1. Ogiltigt fält: kraftigare lingonram.
+ */
 export const FIELD_SHELL =
-  'relative flex items-center gap-2 rounded-2xl bg-surface-2 px-3.5 text-ink ring-1 ring-inset ring-transparent ' +
-  'transition-[box-shadow,background-color] duration-150 hover:ring-line ' +
+  'relative flex items-center gap-2 rounded-2xl bg-surface-2 px-3.5 text-ink ring-1 ring-inset ring-field-line ' +
+  'transition-[box-shadow,background-color] duration-150 hover:ring-ink-3 ' +
   'focus-within:bg-surface focus-within:ring-2 focus-within:ring-gran focus-within:hover:ring-gran ' +
-  'data-[invalid=true]:ring-lingon/60 data-[invalid=true]:focus-within:ring-lingon ' +
+  'data-[invalid=true]:ring-2 data-[invalid=true]:ring-lingon data-[invalid=true]:hover:ring-lingon ' +
+  'data-[invalid=true]:focus-within:ring-lingon data-[invalid=true]:focus-within:hover:ring-lingon ' +
   'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50'
 
 /** Själva input-elementet inne i ramen. 16 px text förhindrar zoom i iOS. */
@@ -53,12 +58,25 @@ export interface FieldProps {
   optional?: boolean
   /** Innehåll till höger om etiketten, t.ex. en länk. */
   labelAction?: ReactNode
+  /**
+   * Läs upp felmeddelandet för skärmläsare när det dyker upp (standard true). NumberField slår av
+   * det för gränsmeddelandet medan man skriver och läser upp det efter en paus och vid blur i stället.
+   */
+  announceError?: boolean
   className?: string
   children: ReactNode
 }
 
-/** Etikett + fält + hjälp-/feltext. */
-export function Field({ id, label, hint, error, labelHidden, optional, labelAction, className, children }: FieldProps) {
+/**
+ * Etikett + fält + hjälp-/feltext.
+ *
+ * Felet ligger i en beständig levande region (`aria-live="polite"`): ett fel som dyker upp medan man
+ * fyller i läses upp (WCAG 3.3.1/4.1.3), men ett fel som redan finns när fältet visas läses inte upp
+ * på en gång – till skillnad från `role="alert"`, som annars ropar ut varje tomt obligatoriskt fält
+ * när ett ark öppnas. Fältet pekar på felet med aria-describedby och aria-invalid (se `fieldDescribedBy`).
+ * Regionen är tom (och tar ingen plats, `empty:-mt-1.5` tar bort radavståndet) när inget fel visas.
+ */
+export function Field({ id, label, hint, error, labelHidden, optional, labelAction, announceError = true, className, children }: FieldProps) {
   return (
     <div className={cx('flex min-w-0 flex-col gap-1.5', className)}>
       {(label !== undefined || labelAction !== undefined) && (
@@ -73,12 +91,15 @@ export function Field({ id, label, hint, error, labelHidden, optional, labelActi
         </div>
       )}
       {children}
-      {error ? (
-        <p id={`${id}-error`} className="flex items-start gap-1.5 text-[0.8125rem] leading-snug text-lingon">
-          <CircleAlert aria-hidden className="mt-px size-4 shrink-0" strokeWidth={2.2} />
-          <span>{error}</span>
-        </p>
-      ) : hint ? (
+      <div aria-live={announceError ? 'polite' : 'off'} aria-atomic="true" className="empty:-mt-1.5">
+        {error ? (
+          <p id={`${id}-error`} className="flex items-start gap-1.5 text-[0.8125rem] leading-snug text-lingon">
+            <CircleAlert aria-hidden className="mt-px size-4 shrink-0" strokeWidth={2.2} />
+            <span>{error}</span>
+          </p>
+        ) : null}
+      </div>
+      {!error && hint ? (
         <p id={`${id}-hint`} className="text-[0.8125rem] leading-snug text-ink-3">
           {hint}
         </p>

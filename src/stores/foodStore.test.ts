@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DiaryEntry, Food, FoodAlias } from '../types'
-import { migrateFoodRefs, usageFromEntries, type FoodUsage } from './foodStore'
+import { migrateFoodRefs, usageFromEntries, useFoodStore, type FoodUsage } from './foodStore'
 
 const food = (id: string): Food => ({ id, name: id, source: 'lagom', category: 'ovrigt', nutrients: { kcal: 100 }, portions: [] })
 
@@ -109,5 +109,125 @@ describe('migrateFoodRefs', () => {
     // Utan mängd och enhet flyttas posten men mängden lämnas orörd; saknade måltider tål sammanslagning.
     expect(out.usage['lagom:kycklingfile-stekt']).toEqual({ count: 1, lastUsed: 1 })
     expect(out.usage['lagom:havredryck']).toMatchObject({ count: 1, lastAmount: 2, lastUnit: 'dl' })
+  })
+})
+
+/**
+ * Varje `set()` i en persisterad butik skriver om hela butiken – antalet meddelanden till
+ * prenumeranter är därför antalet skrivningar. En hel korg får inte skriva en gång per rad, och en
+ * åtgärd som inte ändrar något ska inte skriva alls.
+ */
+describe('skrivningar till livsmedelsbutiken', () => {
+  const off = (n: number, kcal = 100): Food => ({ id: `off:${n}`, name: `Produkt ${n}`, source: 'openfoodfacts', category: 'ovrigt', nutrients: { kcal }, portions: [] })
+  let writes = 0
+  let unsubscribe = () => {}
+
+  beforeEach(() => {
+    useFoodStore.setState({ customFoods: {}, cachedFoods: {}, usage: {}, favorites: [], recipes: {}, templates: [] })
+    writes = 0
+    unsubscribe = useFoodStore.subscribe(() => writes++)
+  })
+  afterEach(() => {
+    unsubscribe()
+    useFoodStore.setState({ customFoods: {}, cachedFoods: {}, usage: {}, favorites: [], recipes: {}, templates: [] })
+  })
+
+  describe('cacheFood', () => {
+    it('skriver inget när samma livsmedel redan är sparat – varken samma objekt eller en identisk kopia', () => {
+      const a = off(1)
+      useFoodStore.getState().cacheFood(a)
+      expect(writes).toBe(1)
+      const saved = useFoodStore.getState().cachedFoods
+
+      useFoodStore.getState().cacheFood(a)
+      // En färsk sökträff är ett nytt objekt med samma innehåll.
+      useFoodStore.getState().cacheFood({ ...a, nutrients: { ...a.nutrients } })
+      expect(writes).toBe(1)
+      expect(useFoodStore.getState().cachedFoods).toBe(saved)
+    })
+
+    it('skriver när värdena ändrats eller livsmedlet är nytt', () => {
+      useFoodStore.getState().cacheFood(off(1, 100))
+      useFoodStore.getState().cacheFood(off(1, 120))
+      expect(writes).toBe(2)
+      expect(useFoodStore.getState().cachedFoods['off:1']?.nutrients.kcal).toBe(120)
+      useFoodStore.getState().cacheFood(off(2))
+      expect(writes).toBe(3)
+    })
+  })
+
+  describe('cacheFoods', () => {
+    it('sparar flera med en enda skrivning och hoppar över dem som redan finns oförändrade', () => {
+      useFoodStore.getState().cacheFoods([off(1), off(2), off(3)])
+      expect(writes).toBe(1)
+      expect(Object.keys(useFoodStore.getState().cachedFoods).sort()).toEqual(['off:1', 'off:2', 'off:3'])
+
+      useFoodStore.getState().cacheFoods([off(1), off(2)])
+      useFoodStore.getState().cacheFoods([])
+      expect(writes).toBe(1)
+
+      useFoodStore.getState().cacheFoods([off(1), off(4)])
+      expect(writes).toBe(2)
+      expect(Object.keys(useFoodStore.getState().cachedFoods)).toHaveLength(4)
+    })
+  })
+
+  describe('recordUsages', () => {
+    const lunch = (foodId: string, amount = 1) => ({ foodId, amount, unit: 'portion:st' as const, meal: 'lunch' as const })
+
+    it('räknar flera loggningar och sparar onlinelivsmedlen med EN skrivning', () => {
+      useFoodStore.getState().recordUsages([lunch('lagom:a'), lunch('lagom:a', 2), lunch('off:1'), lunch('off:2')], [off(1), off(2)])
+      expect(writes).toBe(1)
+      const s = useFoodStore.getState()
+      expect(s.usage['lagom:a']).toMatchObject({ count: 2, lastAmount: 2, meals: { lunch: 2 } })
+      expect(s.usage['off:1']).toMatchObject({ count: 1 })
+      expect(Object.keys(s.cachedFoods).sort()).toEqual(['off:1', 'off:2'])
+    })
+
+    it('en loggning av ett redan sparat livsmedel skriver bara statistiken, en gång', () => {
+      useFoodStore.getState().cacheFood(off(1))
+      writes = 0
+      const cached = useFoodStore.getState().cachedFoods
+      useFoodStore.getState().recordUsages([lunch('off:1')], [off(1)])
+      expect(writes).toBe(1)
+      expect(useFoodStore.getState().cachedFoods).toBe(cached)
+    })
+
+    it('följer alias för gamla id:n, som recordUsage', () => {
+      useFoodStore.getState().recordUsages([{ foodId: 'lagom:kycklingfile-ra', amount: 150, unit: 'g', meal: 'middag' }])
+      expect(writes).toBe(1)
+      expect(Object.keys(useFoodStore.getState().usage)).not.toContain('lagom:kycklingfile-ra')
+    })
+
+    it('inga loggningar och inget att spara skriver ingenting', () => {
+      useFoodStore.getState().recordUsages([])
+      useFoodStore.getState().recordUsages([], [])
+      expect(writes).toBe(0)
+    })
+
+    it('recordUsage är en loggning med en skrivning', () => {
+      useFoodStore.getState().recordUsage('lagom:a', 1, 'portion:st', 'lunch')
+      expect(writes).toBe(1)
+      expect(useFoodStore.getState().usage['lagom:a']).toMatchObject({ count: 1, meals: { lunch: 1 } })
+    })
+  })
+
+  describe('addCustomFoods', () => {
+    it('lägger till flera egna livsmedel med en enda skrivning och sätter tidsstämplar', () => {
+      const custom = (n: number): Food => ({ ...off(n), id: `custom:${n}`, source: 'custom' })
+      useFoodStore.getState().addCustomFoods([custom(1), custom(2), custom(3)])
+      expect(writes).toBe(1)
+      const list = Object.values(useFoodStore.getState().customFoods)
+      expect(list).toHaveLength(3)
+      expect(list.every((f) => typeof f.createdAt === 'number' && typeof f.updatedAt === 'number')).toBe(true)
+    })
+
+    it('en tom lista skriver ingenting, och addCustomFood fungerar som förut', () => {
+      useFoodStore.getState().addCustomFoods([])
+      expect(writes).toBe(0)
+      useFoodStore.getState().addCustomFood({ ...off(9), id: 'custom:9', source: 'custom', createdAt: 5 })
+      expect(writes).toBe(1)
+      expect(useFoodStore.getState().customFoods['custom:9']).toMatchObject({ createdAt: 5 })
+    })
   })
 })

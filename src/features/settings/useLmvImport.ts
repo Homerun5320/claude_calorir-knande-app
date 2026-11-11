@@ -4,6 +4,7 @@
  * förlorat om man avbryter halvvägs, och blir sökbara direkt.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { logError } from '../../lib/errorLog'
 import { LivsmedelsverketError, importAll, type LmvImportProgress } from '../../lib/livsmedelsverket'
 import { useFoodStore } from '../../stores/foodStore'
 import type { Food } from '../../types'
@@ -17,8 +18,18 @@ export interface LmvImportState {
   /** Antal livsmedel som sparats under den här körningen. */
   saved: number
   error?: string
-  /** true om felet troligen beror på att tjänsten inte tillåter anrop från webbläsare (CORS). */
-  likelyBlocked?: boolean
+}
+
+/** Texten när Livsmedelsverket inte gick att nå (inget svar alls) – samma i alla byggen. */
+export const LMV_UNREACHABLE_TEXT = 'Kunde inte nå Livsmedelsverket just nu. Försök igen om en stund.'
+
+/**
+ * Felet som visas för användaren: alltid ett kort, vänligt meddelande på svenska – aldrig tekniska
+ * detaljer, adresser till skript eller ord som "CORS".
+ */
+export function lmvImportErrorText(err: unknown): string {
+  if (err instanceof LivsmedelsverketError) return err.code === 'network' ? LMV_UNREACHABLE_TEXT : err.message
+  return 'Importen avbröts av ett oväntat fel. Försök igen om en stund.'
 }
 
 const FLUSH_EVERY = 150
@@ -62,15 +73,9 @@ export function useLmvImport() {
       if (ctrl.signal.aborted) {
         setState((s) => ({ ...s, status: 'cancelled', saved }))
       } else {
-        const code = err instanceof LivsmedelsverketError ? err.code : 'network'
-        setState((s) => ({
-          ...s,
-          status: 'error',
-          saved,
-          error: err instanceof LivsmedelsverketError ? err.message : 'Importen avbröts av ett oväntat fel.',
-          // "network" utan svar alls är typiskt för CORS-blockering i webbläsaren.
-          likelyBlocked: code === 'network' && saved === 0,
-        }))
+        // Nätverksfel och serverfel är väntade och behöver inte loggas – bara det oväntade.
+        if (!(err instanceof LivsmedelsverketError)) logError(err, 'lmv-import')
+        setState((s) => ({ ...s, status: 'error', saved, error: lmvImportErrorText(err) }))
       }
     } finally {
       ctrlRef.current = null

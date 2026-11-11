@@ -283,7 +283,8 @@ function EnabledContent({
       )}
 
       {photos === null ? (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-busy="true" aria-label="Laddar bilderna">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="status" aria-busy="true">
+          <span className="sr-only">Laddar bilderna …</span>
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="aspect-[3/4] w-full rounded-2xl" />
           ))}
@@ -677,7 +678,8 @@ function CompareCard({ photos, today }: { photos: readonly ProgressPhotoMeta[]; 
 
 function PhotosSkeleton() {
   return (
-    <div className="px-4 pt-safe" aria-busy="true" aria-label="Laddar framstegsbilder">
+    <div className="px-4 pt-safe" role="status" aria-busy="true">
+      <span className="sr-only">Laddar framstegsbilder …</span>
       <div className="pb-4 pt-[4.25rem]">
         <Skeleton className="h-9 w-56" />
         <Skeleton className="mt-3 h-4 w-64" />

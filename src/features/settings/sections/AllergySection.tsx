@@ -183,7 +183,7 @@ function ReadMore({ href, children }: { href: string; children: ReactNode }) {
         className="flex min-h-11 items-center gap-2.5 rounded-2xl py-2 text-[0.9375rem] font-semibold text-gran underline-offset-4 hover:underline"
       >
         <BookOpen aria-hidden className="size-4 shrink-0" />
-        <span>{children}</span>
+        <span className="min-w-0">{children}</span>
       </ExternalLink>
     </li>
   )

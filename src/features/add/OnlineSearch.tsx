@@ -31,9 +31,15 @@ export function OnlineSearch({ query, onPick, onQuickAdd, onDetails, basketCount
   const ctrl = useRef<AbortController | null>(null)
   const allergyProfile = useAllergenProfile().length > 0
 
-  // Avbryt en pågående sökning när söktexten ändras eller sidan lämnas.
+  // Avbryt en pågående sökning när söktexten ändras eller sidan lämnas. Den avbrutna sökningen
+  // svarar aldrig, så "laddar" måste nollställas här – annars visas en evig skelettlista (utan
+  // knapp eller "Försök igen") när man skriver tillbaka samma söktext. Då visas knappen igen.
   useEffect(() => {
-    return () => ctrl.current?.abort()
+    return () => {
+      ctrl.current?.abort()
+      ctrl.current = null
+      setState((s) => (s?.status === 'loading' ? null : s))
+    }
   }, [q])
 
   const current = state && state.q === q ? state : null

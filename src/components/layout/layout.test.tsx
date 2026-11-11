@@ -13,6 +13,8 @@ import { isChunkLoadError, RouteError } from './RouteError'
 import UpdatePrompt, { UPDATE_CHECK_INTERVAL_MS } from './UpdatePrompt'
 import { toast, toastDuration, ToastViewport, useToastStore } from '../ui/toast'
 import { clearErrorLog, readErrorLog } from '../../lib/errorLog'
+import { clearLastBackup, readLastBackup } from '../../features/settings/backupStatus'
+import { guardedRead, READ_TIMEOUT_MS, resetStorageStateForTests } from '../../stores/storage'
 
 MotionGlobalConfig.skipAnimations = true
 
@@ -36,11 +38,12 @@ vi.mock('virtual:pwa-register/react', () => ({
 }))
 
 /** Lagringens status i AppShell – styrs av testerna. */
-const storageStatus = vi.hoisted(() => ({ memoryOnly: false, newerData: false, unreadable: false }))
+const storageStatus = vi.hoisted(() => ({ memoryOnly: false, newerData: false, unreadable: false, slowRead: false }))
 vi.mock('../../hooks/useStorageStatus', () => ({
   useMemoryOnlyStorage: () => storageStatus.memoryOnly,
   useHasNewerData: () => storageStatus.newerData,
   useHasUnreadableData: () => storageStatus.unreadable,
+  useHasSlowReads: () => storageStatus.slowRead,
 }))
 
 /** Säkerhetskopian och beständig lagring (grupp C) – spioneras på, resten är som vanligt. */
@@ -69,6 +72,8 @@ vi.mock('../../config/platform', async (importOriginal) => {
     get DISTRIBUTION() {
       return build.appstore ? 'appstore' : original.DISTRIBUTION
     },
+    // `isInApp` i originalmodulen läser sin egen konstant – följ App Store-bygget här också.
+    isInApp: () => build.appstore || original.isInApp(),
   }
 })
 
@@ -326,6 +331,9 @@ describe('AppShell – lagring', () => {
     storageStatus.memoryOnly = false
     storageStatus.newerData = false
     storageStatus.unreadable = false
+    storageStatus.slowRead = false
+    clearLastBackup()
+    resetStorageStateForTests()
     backup.saveBackup.mockClear()
     backup.ensurePersistentStorage.mockClear()
   })
@@ -388,6 +396,100 @@ describe('AppShell – lagring', () => {
     expect(screen.queryByText(/Webbläsaren låter inte Lagom spara/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Spara säkerhetskopia' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Felrapport' })).toHaveAttribute('href', '/om')
+  })
+
+  it('förklarar blockerad lagring med webbläsarens ord på webben', () => {
+    storageStatus.memoryOnly = true
+    renderShell()
+    expect(screen.getByText(/Webbläsaren låter inte Lagom spara/)).toHaveTextContent(/privat läge/)
+  })
+
+  it('talar om appen – aldrig webbläsaren, privat läge eller en annan butik – när lagringen är blockerad i apparna', () => {
+    build.appstore = true
+    try {
+      storageStatus.memoryOnly = true
+      renderShell()
+      const banner = screen.getByRole('status')
+      expect(banner).toHaveTextContent('Din data sparas inte på enheten just nu')
+      expect(banner).toHaveTextContent(/Lagom kan inte spara på enheten just nu/)
+      expect(banner.textContent).not.toMatch(/webbläsar|privat läge|Android|Google|Play|fliken/i)
+      expect(screen.getByRole('button', { name: 'Spara säkerhetskopia' })).toBeInTheDocument()
+    } finally {
+      build.appstore = false
+    }
+  })
+
+  it('en långsam läsning: lugn text utan att skylla på webbläsaren, och ingen kopia som ser hel ut', () => {
+    storageStatus.memoryOnly = true
+    storageStatus.slowRead = true
+    renderShell()
+    const banner = screen.getByRole('status')
+    expect(banner).toHaveTextContent('Din sparade data läses in långsamt')
+    expect(banner).toHaveTextContent(/Inget är raderat/)
+    expect(banner).toHaveTextContent(/ladda om sidan/)
+    expect(banner.textContent).not.toMatch(/Webbläsaren låter|privat läge|lagringen är full/)
+    expect(screen.getByRole('button', { name: 'Ladda om' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spara säkerhetskopia' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mer om data' })).toHaveAttribute('href', '/installningar/data')
+  })
+
+  it('en långsam läsning i apparna: starta om appen – utan "Ladda om" och utan annan butik eller webbläsare', () => {
+    build.appstore = true
+    try {
+      storageStatus.memoryOnly = true
+      storageStatus.slowRead = true
+      renderShell()
+      const banner = screen.getByRole('status')
+      expect(banner).toHaveTextContent(/starta om appen/)
+      expect(banner.textContent).not.toMatch(/webbläsar|privat läge|Android|Google|Play|ladda om/i)
+      expect(screen.queryByRole('button', { name: 'Ladda om' })).not.toBeInTheDocument()
+    } finally {
+      build.appstore = false
+    }
+  })
+
+  it('en kopia stämplas som gjord – men inte medan sparad data är oläst (trasig eller långsam)', async () => {
+    // Knappen visas för en trasig dagbok (hooken); själva skyddet kommer från den riktiga lagringen.
+    storageStatus.memoryOnly = true
+    storageStatus.unreadable = true
+    renderShell()
+    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Spara säkerhetskopia' }))
+
+    // Dagboken går inte att tolka: kopian saknar den, så påminnelsen tystnar inte.
+    await guardedRead('lagom-diary', () => Promise.resolve({ status: 'unreadable' as const }))
+    backup.saveBackup.mockResolvedValueOnce('saved')
+    save()
+    await waitFor(() => expect(backup.saveBackup).toHaveBeenCalledTimes(1))
+    await act(async () => {})
+    expect(readLastBackup()).toBeNull()
+
+    // Dagboken läses fortfarande in efter tidsgränsen (äldre telefon, stor dagbok): samma skydd.
+    resetStorageStateForTests()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const slow = guardedRead('lagom-diary', () => new Promise(() => {}))
+      await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 10)
+      await slow
+    } finally {
+      vi.useRealTimers()
+    }
+    backup.saveBackup.mockResolvedValueOnce('saved')
+    save()
+    await waitFor(() => expect(backup.saveBackup).toHaveBeenCalledTimes(2))
+    await act(async () => {})
+    expect(readLastBackup()).toBeNull()
+
+    // Inget oläst: kopian är hel och stämplas.
+    resetStorageStateForTests()
+    backup.saveBackup.mockResolvedValueOnce('saved')
+    save()
+    await waitFor(() => expect(readLastBackup()).not.toBeNull())
+  })
+
+  it('sidomenyn är inget eget landmärke (ingen omärkt <aside>) – navigeringen inuti är det', () => {
+    renderShell()
+    expect(screen.queryAllByRole('complementary')).toHaveLength(0)
+    expect(screen.getAllByRole('navigation', { name: 'Huvudmeny' })).toHaveLength(2)
   })
 
   it('ber om en uppdatering i App Store i App Store-bygget – utan "Ladda om"', () => {

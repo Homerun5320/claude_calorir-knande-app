@@ -45,6 +45,7 @@
   --color-surface-2: var(--lg-surface-2);
   --color-surface-3: var(--lg-surface-3);
   --color-line: var(--lg-line);
+  --color-field-line: var(--lg-field-line);
   --color-ink: var(--lg-ink);
   --color-ink-2: var(--lg-ink-2);
   --color-ink-3: var(--lg-ink-3);
@@ -119,6 +120,8 @@
   --lg-surface-2: #efeae0;
   --lg-surface-3: #e5ddcd;
   --lg-line: #e3dccd;
+  /* Ramen runt inmatningsfält (WCAG 1.4.11): minst 3:1 mot sidan, kortet, fältets fyllning och surface-3. */
+  --lg-field-line: #767e78;
   --lg-ink: #16201c;
   --lg-ink-2: #48524d;
   /* Minst 4,5:1 mot alla ytor (även surface-3 och -soft-tonerna) – används för liten text. */
@@ -180,6 +183,8 @@
     --lg-surface-2: #1a2522;
     --lg-surface-3: #23302b;
     --lg-line: #26332e;
+    /* Minst 3:1 mot bg, surface, surface-2 och surface-3. */
+    --lg-field-line: #737d78;
     --lg-ink: #eeebe3;
     --lg-ink-2: #b9beb8;
     --lg-ink-3: #99a29c;
@@ -247,6 +252,19 @@
     font-feature-settings: 'cv11', 'ss01';
     min-height: 100dvh;
     overscroll-behavior-y: none;
+    /*
+     * Ett långt ord som inte ryms på raden bryts i stället för att göra sidan bredare än skärmen –
+     * viktigt vid stor text (WCAG 1.4.4/1.4.10), t.ex. "makadamianöt/Queenslandsnöt" i Allergier.
+     * Påverkar bara ord som annars skulle flöda över (inte radbrytningen i övrigt).
+     */
+    overflow-wrap: break-word;
+  }
+  /*
+   * fieldset har min-width: min-content som standard och kan därför inte krympa under sitt bredaste
+   * obrytbara innehåll – det tryckte ut Allergier-listan ur kortet vid stor text.
+   */
+  fieldset {
+    min-width: 0;
   }
   ::selection {
     background: var(--lg-gran-soft);

@@ -289,7 +289,9 @@ function RecipeList({ query, lookup, mindful, onPick }: { query: string; lookup:
           </h3>
         )}
         {lookup.builtinLoading ? (
-          <div className="flex flex-col gap-2 px-2" aria-label="Laddar recepten">
+          // role="status" + osynlig text: aria-label på en div utan roll läses inte upp av skärmläsare.
+          <div className="flex flex-col gap-2 px-2" role="status">
+            <span className="sr-only">Laddar recepten …</span>
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-12 w-full rounded-2xl" />
             ))}
@@ -396,7 +398,8 @@ function FoodList({ query, meal, mindful, onPick }: { query: string; meal: MealI
   }
   if (loading && results.length === 0) {
     return (
-      <div className="flex flex-col gap-2" aria-busy="true" aria-label="Söker">
+      <div className="flex flex-col gap-2" role="status">
+        <span className="sr-only">Söker …</span>
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-14 w-full rounded-2xl" />
         ))}

@@ -44,7 +44,8 @@ function BuiltinCard() {
   return (
     <Card eyebrow="Inbyggt" title="Lagoms livsmedelsdatabas">
       {!catalog || !counts ? (
-        <div aria-busy="true" aria-label="Läser in databasen" className="flex flex-col gap-2">
+        <div role="status" aria-busy="true" className="flex flex-col gap-2">
+          <span className="sr-only">Läser in databasen …</span>
           <Skeleton className="h-10 w-32" />
           <Skeleton className="h-4 w-full" />
         </div>
@@ -52,14 +53,14 @@ function BuiltinCard() {
         <p className="text-[0.9375rem] text-ink-2">{catalog.error}</p>
       ) : (
         <>
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="display-num text-[2.5rem] font-semibold leading-none text-gran">{formatNumber(counts.total)}</span>
             <span className="text-[0.9375rem] text-ink-2">livsmedel att söka bland</span>
           </div>
           <ul className="mt-4 flex flex-col gap-2.5 text-[0.9375rem] leading-relaxed text-ink-2">
             <li className="flex gap-3">
               <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-mossa" />
-              <span>
+              <span className="min-w-0 break-words">
                 <strong className="font-semibold text-ink">{formatNumber(counts.lagom)} granskade svenska livsmedel</strong> med svenska portioner och mått –{' '}
                 {formatNumber(counts.lagomFromLmv)} med värden direkt från Livsmedelsverket, övriga samlingsvärden för vanliga märken, värden från förpackningar
                 eller beräknade recept. Källan visas på varje livsmedel.
@@ -68,7 +69,7 @@ function BuiltinCard() {
             {counts.lmv > 0 && (
               <li className="flex gap-3">
                 <Landmark aria-hidden className="mt-0.5 size-5 shrink-0 text-blabar" />
-                <span>
+                <span className="min-w-0 break-words">
                   <strong className="font-semibold text-ink">{formatNumber(counts.lmv)} från Livsmedelsverkets databas</strong>
                   {catalog.lmv?.version ? ` (hämtad ${formatDayLong(catalog.lmv.version).toLocaleLowerCase('sv-SE')})` : ''}. Licens:{' '}
                   <LicenseLink />.
@@ -77,7 +78,7 @@ function BuiltinCard() {
             )}
             <li className="flex gap-3">
               <Barcode aria-hidden className="mt-0.5 size-5 shrink-0 text-hjortron" />
-              <span>Produkter med streckkod hämtas från Open Food Facts när du skannar eller söker – och märks tydligt.</span>
+              <span className="min-w-0 break-words">Produkter med streckkod hämtas från Open Food Facts när du skannar eller söker – och märks tydligt.</span>
             </li>
           </ul>
           <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3">Saknas ett värde visas ”–”, aldrig 0. Okänt är inte samma sak som ingenting.</p>
@@ -133,6 +134,9 @@ function UserFoodsCard() {
 
 function LmvImportCard() {
   const imp = useLmvImport()
+  // Hela databasen följer redan med i appen (och fungerar utan uppkoppling) – importen är bara ett
+  // sätt att hämta den på nytt direkt från Livsmedelsverket.
+  const bundled = (useBuiltinCatalog()?.lmv?.count ?? 0) > 0
   const running = imp.status === 'running'
   const p = imp.progress
   const phaseText =
@@ -141,10 +145,20 @@ function LmvImportCard() {
       : `Hämtar näringsvärden: ${formatNumber(p.done)} av ${formatNumber(p.total)}`
 
   return (
-    <Card eyebrow="Livsmedelsverket" title="Hämta hela databasen">
+    <Card eyebrow="Livsmedelsverket" title={bundled ? 'Hämta på nytt från Livsmedelsverket' : 'Hämta hela databasen'}>
       <p className="-mt-1 text-[0.9375rem] leading-relaxed text-ink-2">
-        Livsmedelsverkets öppna databas har cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen och publiceras under licensen <LicenseLink />. Importen tar
-        några minuter och sparas på din enhet, så att allt går att söka även offline.
+        {bundled ? (
+          <>
+            Livsmedelsverkets öppna databas (cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen, licens <LicenseLink />) följer redan med i Lagom och fungerar
+            utan uppkoppling. Vill du ha de allra senaste värdena kan du hämta den på nytt direkt från Livsmedelsverket. Det tar några minuter och sparas på din
+            enhet.
+          </>
+        ) : (
+          <>
+            Livsmedelsverkets öppna databas har cirka 2{'\u00a0'}600 livsmedel med ett 50-tal näringsämnen och publiceras under licensen <LicenseLink />. Importen tar
+            några minuter och sparas på din enhet, så att allt går att söka även offline.
+          </>
+        )}
       </p>
 
       {running && p && (
@@ -176,15 +190,8 @@ function LmvImportCard() {
         <div role="alert" className="mt-4 rounded-2xl bg-hjortron-soft p-3.5 text-[0.9375rem] leading-relaxed text-ink">
           <p className="flex items-start gap-2 font-semibold">
             <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-hjortron" />
-            {imp.likelyBlocked ? 'Webbläsaren fick inte kontakt med Livsmedelsverket.' : imp.error}
+            {imp.error}
           </p>
-          {imp.likelyBlocked && (
-            <p className="mt-1.5 text-ink-2">
-              Oftast beror det på att tjänsten inte tillåter anrop direkt från webbläsare (CORS). Den som driftar Lagom kan i stället hämta databasen en gång
-              med skriptet <code className="rounded bg-surface px-1 py-0.5 text-[0.8125rem]">scripts/import-livsmedelsverket.mjs</code> (
-              <code className="rounded bg-surface px-1 py-0.5 text-[0.8125rem]">npm run data:lmv</code>) – då följer den med appen automatiskt.
-            </p>
-          )}
           {imp.saved > 0 && <p className="mt-1.5 text-ink-2">{plural(imp.saved, 'livsmedel', 'livsmedel')} hann sparas innan felet.</p>}
         </div>
       )}
@@ -242,8 +249,8 @@ function SourcesCard() {
             <Database className="size-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-[0.9375rem] font-medium text-ink">
-              {s.title}
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.9375rem] font-medium text-ink">
+              <span className="min-w-0 break-words">{s.title}</span>
               {s.badge && <Badge>{s.badge}</Badge>}
             </span>
             <span className="mt-0.5 block text-[0.8125rem] leading-snug text-ink-3">{s.text}</span>

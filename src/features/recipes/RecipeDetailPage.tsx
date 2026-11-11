@@ -100,7 +100,8 @@ export default function RecipeDetailPage() {
 
 function DetailSkeleton() {
   return (
-    <div className="px-4 pt-safe" aria-busy="true" aria-label="Laddar receptet">
+    <div className="px-4 pt-safe" role="status" aria-busy="true">
+      <span className="sr-only">Laddar receptet …</span>
       <div className="h-14" />
       <Skeleton className="mb-2 h-3 w-24" />
       <Skeleton className="mb-5 h-9 w-3/4" />
@@ -236,15 +237,18 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
       >
         <div className="flex items-center gap-4">
           <RecipeEmoji emoji={recipe.emoji} size="lg" />
-          <dl className="grid min-w-0 flex-1 grid-cols-3 gap-2 text-center">
-            <HeroStat icon={Clock} label="Tid" value={recipe.prepMinutes ? formatDuration(recipe.prepMinutes) : '–'} />
-            <HeroStat icon={Users} label={capitalizeSv(noun[1])} value={formatNumber(recipe.servings)} />
-            <HeroStat
-              icon={Utensils}
-              label={perServingText(noun)}
-              value={numbersHidden ? mindfulShort(perServing.kcal) : <EnergyValue kcal={perServing.kcal} unitClassName="text-[0.72em] font-medium text-ink-3" />}
-            />
-          </dl>
+          {/* Containerfråga i rem (följer rotens teckenstorlek): vid stor text (200 %) ryms inte tre rutor – då en kolumn. */}
+          <div className="@container min-w-0 flex-1">
+            <dl className="grid grid-cols-3 gap-2 text-center @max-[12rem]:grid-cols-1">
+              <HeroStat icon={Clock} label="Tid" value={recipe.prepMinutes ? formatDuration(recipe.prepMinutes) : '–'} />
+              <HeroStat icon={Users} label={capitalizeSv(noun[1])} value={formatNumber(recipe.servings)} />
+              <HeroStat
+                icon={Utensils}
+                label={perServingText(noun)}
+                value={numbersHidden ? mindfulShort(perServing.kcal) : <EnergyValue kcal={perServing.kcal} unitClassName="text-[0.72em] font-medium text-ink-3" />}
+              />
+            </dl>
+          </div>
         </div>
         {tags.length > 0 && (
           <div className="mt-4">
@@ -298,7 +302,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
                     >
                       {i + 1}
                     </span>
-                    <span className="pt-0.5 text-[0.9375rem] leading-relaxed text-ink">{step}</span>
+                    <span className="min-w-0 break-words pt-0.5 text-[0.9375rem] leading-relaxed text-ink">{step}</span>
                   </li>
                 ))}
               </ol>
@@ -307,7 +311,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
         )}
 
         {((showPlate && plateShown) || (showClimate && climate)) && (
-          <motion.div {...enter(3)} className="grid gap-4 sm:grid-cols-2">
+          <motion.div {...enter(3)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showPlate && plateShown && (
               <Card title="Tallriksmodellen" eyebrow="Livsmedelsverket">
                 <div className="flex justify-center">
@@ -472,6 +476,7 @@ function NutritionCard({
           thickness={15}
           legend="none"
           title="Energifördelning"
+          hideNumbers={numbersHidden}
           formatValue={(v) => `${formatNumber(v)}\u00a0E%`}
         >
           <div className="flex flex-col items-center px-3 text-center">
@@ -491,13 +496,13 @@ function NutritionCard({
             {MACROS.map((m) => {
               const grams = perServing[m.key]
               return (
-                <li key={m.key} className="flex items-center gap-2.5 py-2.5">
+                <li key={m.key} className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2.5">
                   <span aria-hidden className={cx('size-2.5 shrink-0 rounded-full', m.dot)} />
-                  <span className="flex-1 text-sm font-medium text-ink">{m.label}</span>
+                  <span className="min-w-0 flex-1 break-words text-sm font-medium text-ink">{m.label}</span>
                   {!numbersHidden && (
                     <>
                       <span className="text-xs text-ink-3 tabular-nums">{hasEnergy ? `${formatNumber(dist[m.key])}\u00a0E%` : ''}</span>
-                      <span className="w-16 text-right text-sm font-semibold text-ink tabular-nums">
+                      <span className="ml-auto min-w-16 text-right text-sm font-semibold text-ink tabular-nums">
                         {grams !== undefined ? `${formatNumber(grams, grams < 10 ? 1 : 0)}\u00a0g` : '–'}
                       </span>
                     </>
@@ -507,10 +512,10 @@ function NutritionCard({
               )
             })}
             {!numbersHidden && (
-              <li className="flex items-center gap-2.5 py-2.5">
+              <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2.5">
                 <span aria-hidden className="size-2.5 shrink-0 rounded-full bg-fiber" />
-                <span className="flex-1 text-sm font-medium text-ink">Fibrer</span>
-                <span className="w-16 text-right text-sm font-semibold text-ink tabular-nums">
+                <span className="min-w-0 flex-1 break-words text-sm font-medium text-ink">Fibrer</span>
+                <span className="ml-auto min-w-16 text-right text-sm font-semibold text-ink tabular-nums">
                   {perServing.fiber !== undefined ? `${formatNumber(perServing.fiber, 1)}\u00a0g` : '–'}
                 </span>
               </li>
@@ -582,19 +587,20 @@ function IngredientsCard({
           </button>
         </p>
       )}
-      <ul className="divide-y divide-line">
+      {/* Containerfråga i rem: vid stor text (200 %) får gramvikten radbrytas i stället för att skjuta ut sidan. */}
+      <ul className="@container divide-y divide-line">
         {recipe.ingredients.map((ing) => {
           const s = scaleIngredient(ing, factor)
           const amount = formatIngredientAmount(ing.food, s.amount, ing.unit)
           return (
             <li key={ing.id} className="flex items-baseline gap-3 py-2.5">
-              <span className="w-28 shrink-0 text-[0.9375rem] font-semibold text-ink tabular-nums">{amount.text}</span>
+              <span className="w-28 max-w-[45%] shrink-0 break-words text-[0.9375rem] font-semibold text-ink tabular-nums">{amount.text}</span>
               <span className="min-w-0 flex-1 text-[0.9375rem] leading-snug text-ink-2">
                 {ing.food.name}
                 {amount.grams && (
                   <>
                     {' '}
-                    <span className="ml-1 whitespace-nowrap text-xs text-ink-3 tabular-nums">({amount.grams})</span>
+                    <span className="ml-1 whitespace-nowrap text-xs text-ink-3 tabular-nums @max-[14rem]:whitespace-normal">({amount.grams})</span>
                   </>
                 )}
               </span>

@@ -1,17 +1,17 @@
 /**
- * Historik över avslutade fastor: längd, tider, protokoll och om målet nåddes.
- * Ta bort med "Ångra".
+ * Historik över avslutade fastor: längd, tider och protokoll – bara fakta. Inga märken för nådda
+ * mål och inga procent av målet: det blir lätt en poängtavla. Ta bort med "Ångra".
  */
 import { memo, useState } from 'react'
 import { Hourglass, Trash2 } from 'lucide-react'
-import { Badge, Button, Card, EmptyState, IconButton, ListGroup, ListRow, SectionTitle, toast } from '../../../components/ui'
-import { formatPercent } from '../../../lib/format'
+import { Button, Card, EmptyState, IconButton, ListGroup, ListRow, SectionTitle, toast } from '../../../components/ui'
 import { useFastingStore, type FastRecord } from '../../../stores/fastingStore'
 import type { ISODate } from '../../../types'
-import { clockTime, fastDurationMs, fastRatio, fastSucceeded, formatFastDuration, shortDayAndTime } from '../fastingLogic'
+import { clockTime, fastDurationMs, formatFastDuration, MIN_SAVED_FAST_MS, shortDayAndTime } from '../fastingLogic'
 import { restoreFast } from '../hooks'
 
 const INITIAL_COUNT = 7
+const MIN_SAVED_MINUTES = Math.round(MIN_SAVED_FAST_MS / 60_000)
 
 export const FastHistory = memo(function FastHistory({ history, today }: { history: readonly FastRecord[]; today: ISODate }) {
   const [showAll, setShowAll] = useState(false)
@@ -24,7 +24,12 @@ export const FastHistory = memo(function FastHistory({ history, today }: { histo
 
   return (
     <section aria-labelledby="fasta-historik">
-      <SectionTitle id="fasta-historik">Historik</SectionTitle>
+      <SectionTitle
+        id="fasta-historik"
+        description={`En saklig lista: längd, tider och upplägg – inga poäng. Fastor under ${MIN_SAVED_MINUTES}\u00a0minuter sparas inte.`}
+      >
+        Historik
+      </SectionTitle>
       {history.length === 0 ? (
         <Card>
           <EmptyState
@@ -38,17 +43,15 @@ export const FastHistory = memo(function FastHistory({ history, today }: { histo
         <>
           <ListGroup>
             {shown.map((rec) => {
-              const ok = fastSucceeded(rec)
               const duration = formatFastDuration(fastDurationMs(rec))
               return (
                 <ListRow
                   key={rec.id}
                   leading={Hourglass}
-                  leadingTone={ok ? 'mossa' : 'blabar'}
+                  leadingTone="blabar"
                   title={duration}
                   subtitle={`${shortDayAndTime(rec.start, today)}–${clockTime(rec.end)}`}
-                  value={ok ? <Badge tone="mossa">Mål nått</Badge> : <span className="text-[0.8125rem] font-medium text-ink-3">{formatPercent(fastRatio(rec) * 100)}</span>}
-                  valueSub={ok ? rec.protocol : `av ${rec.protocol}`}
+                  value={<span className="text-[0.8125rem] font-medium text-ink-3">{rec.protocol}</span>}
                   action={<IconButton icon={Trash2} size="sm" aria-label={`Ta bort fastan ${duration}`} onClick={() => remove(rec)} />}
                 />
               )

@@ -50,7 +50,7 @@ import { TipCard } from './TipCard'
 import { TodayHeader } from './TodayHeader'
 import { WaterCard } from './WaterCard'
 import { WeekCard } from './WeekCard'
-import { GoalCareCard, WeightCard } from './WeightCard'
+import { MindfulCareCard, WeightCard } from './WeightCard'
 import { WelcomeCard } from './WelcomeCard'
 import { isDiaryEmpty } from './todayLogic'
 import { TrialBanner } from '../premium/TrialBanner'
@@ -99,7 +99,8 @@ function hasSupplementFoods(customFoods: Record<string, Food>): boolean {
 
 function TodaySkeleton() {
   return (
-    <div className="pb-6" aria-busy="true" aria-label="Laddar dagens översikt">
+    <div className="pb-6" role="status" aria-busy="true">
+      <span className="sr-only">Laddar dagens översikt …</span>
       <div className="lg:px-4 lg:pt-4">
         <Skeleton className="h-[212px] w-full rounded-none lg:rounded-[1.75rem]" />
       </div>
@@ -169,9 +170,10 @@ export default function TodayPage() {
     week: firstDay ? null : (
       <WeekCard today={today} targetKcal={baseTargets.kcal} weeklyPlan={weeklyPlan} addBackPct={addBackPct} mindful={mindful} unit={unit} />
     ),
-    // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt). Är viktmålet
-    // pausat för att vikten redan är låg visas ändå en varsam notis, utan siffror.
-    weight: mindful ? goalPause === 'lowBmi' ? <GoalCareCard today={today} /> : null : <WeightCard today={today} goalPause={goalPause} />,
+    // Vikten är siffror – i medvetet läge får den vila (den finns kvar under Vikt). Är vikten låg,
+    // går den ner för fort eller är viktmålet pausat visas ändå en varsam notis, utan siffror –
+    // oavsett mål (medvetet läge ger oftast målet "behålla vikten"). Kortet renderar annars inget.
+    weight: mindful ? <MindfulCareCard today={today} goalPause={goalPause} /> : <WeightCard today={today} goalPause={goalPause} />,
     kostrad: firstDay ? null : <KostradCard today={today} mindful={mindful} />,
     tip: <TipCard today={today} />,
     context: (

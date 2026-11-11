@@ -83,7 +83,8 @@ export default function CustomFoodPage() {
       <div className="px-4 pb-10">
         <PageHeader back title={editId ? 'Redigera livsmedel' : 'Nytt livsmedel'} />
         {loading ? (
-          <div className="flex flex-col gap-4" aria-busy="true" aria-label="Laddar">
+          <div className="flex flex-col gap-4" role="status" aria-busy="true">
+            <span className="sr-only">Laddar …</span>
             <Skeleton className="h-56 w-full rounded-[1.5rem]" />
             <Skeleton className="h-96 w-full rounded-[1.5rem]" />
           </div>

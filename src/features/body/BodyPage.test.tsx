@@ -116,6 +116,33 @@ describe('BodyPage', () => {
     expect(useProfileStore.getState().profile?.goal).toBe('ga_ner')
   })
 
+  it('låg vikt med målet att behålla vikten ger samma varsamma omtanke – även i medvetet läge, utan siffror', async () => {
+    // 168 cm: BMI 18,5 ≈ 52,2 kg. "Jag vill inte räkna kalorier" ger målet behålla + medvetet läge.
+    const today = todayISO()
+    useBodyStore.setState({ weights: [{ id: 'w1', date: today, kg: 50, createdAt: 0 }], measurements: [] })
+    useProfileStore.setState({
+      profile: { ...PROFILE, goal: 'behalla', targetWeightKg: undefined },
+      settings: { ...DEFAULT_SETTINGS, onboardingDone: true, mindfulMode: true },
+    })
+    renderPage()
+    const text = await screen.findByText(/under det som räknas som hälsosamt för din längd/)
+    const note = text.closest('[role="note"]') as HTMLElement
+    expect(within(note).getByRole('link', { name: /^1177/ })).toBeInTheDocument()
+    expect(within(note).getByRole('link', { name: /^Frisk & Fri/ })).toHaveAttribute('href', 'https://www.friskfri.se')
+    expect(note.textContent).not.toMatch(/\d{1,2}\s?(kg|%)/)
+    // Målet är redan att behålla vikten – ingen knapp som inte gör något.
+    expect(screen.queryByRole('button', { name: 'Byt till att behålla vikten' })).not.toBeInTheDocument()
+  })
+
+  it('normal vikt ger ingen omtanke-notis (bara det vanliga stödet längst ned)', async () => {
+    seedWeights()
+    useProfileStore.setState({ profile: { ...PROFILE, goal: 'behalla', targetWeightKg: undefined } })
+    renderPage()
+    expect(await screen.findByText('Trendvikt', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.queryByText(/under det som räknas som hälsosamt/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/snabbare än vi rekommenderar/)).not.toBeInTheDocument()
+  })
+
   it('erbjuder att byta till att behålla vikten när målvikten är nådd', async () => {
     const today = todayISO()
     useBodyStore.setState({ weights: [{ id: 'w1', date: today, kg: 67.5, createdAt: 0 }], measurements: [] })

@@ -26,25 +26,62 @@ const TREND_ICON = { up: ArrowUpRight, down: ArrowDownRight, flat: ArrowRight } 
 /** Skärmläsartext före trendetiketten: "Trenden går uppåt: +0,3 kg/vecka", "Trenden är stabil". */
 const TREND_SR = { up: 'Trenden går uppåt:', down: 'Trenden går nedåt:', flat: 'Trenden är stabil' } as const
 
-function cautionText(caution: WeightCaution, age: number | undefined): string {
+/**
+ * Omtanke-texten vid för snabb nedgång eller låg vikt. Med `mindful` utan siffror (inte ens "1 %").
+ */
+export function cautionText(caution: WeightCaution, age: number | undefined, mindful = false): string {
   if (caution === 'snabb') {
-    return 'Vikten går ner snabbare än vi rekommenderar – högst ungefär 1\u00a0% av kroppsvikten i veckan. Ät gärna lite mer; kroppen mår bäst av en lugn takt.'
+    return mindful
+      ? 'Vikten går ner snabbare än vi rekommenderar. Ät gärna lite mer; kroppen mår bäst av en lugn takt.'
+      : 'Vikten går ner snabbare än vi rekommenderar – högst ungefär 1\u00a0% av kroppsvikten i veckan. Ät gärna lite mer; kroppen mår bäst av en lugn takt.'
   }
   const forWhom = age !== undefined && age >= OLDER_ADULT_AGE ? 'för din längd och ålder' : 'för din längd'
   return `Din trendvikt ligger under det som räknas som hälsosamt ${forWhom}. Ät gärna lite mer, och prata med vården om du är osäker.`
 }
 
 /**
- * Medvetet läge: Vikt-kortet vilar, men är viktmålet pausat för att vikten redan är låg visas
- * samma varsamma besked som under Vikt – utan siffror.
+ * Behöver Idag säga något varsamt om vikten? Oberoende av valt mål och av medvetet läge – den som
+ * är underviktig eller går ner för fort ska få samma omtanke och vägar till stöd (1177, Frisk & Fri)
+ * vare sig målet är att gå ner, behålla eller gå upp, och vare sig siffrorna visas eller inte.
  */
-export const GoalCareCard = memo(function GoalCareCard({ today }: { today: ISODate }) {
+export function useWeightCare(today: ISODate) {
+  const weights = useBodyStore((s) => s.weights)
+  const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
   const birthYear = useProfileStore((s) => s.profile?.birthYear)
+  const heightCm = useProfileStore((s) => s.profile?.heightCm)
+
+  const snap = useMemo(() => weightSnapshot(weights, today), [weights, today])
+  // 70-årsgränsen räknas på åldern enligt födelseåret, 18-årsgränsen försiktigt (yngsta möjliga).
   const age = birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined
+  const young = birthYear !== undefined ? youngestAge(birthYear, today) : undefined
+  // För snabb nedgång eller låg vikt tonas aldrig grönt – då visas en varsam notis i stället.
+  const caution = snap ? weightCaution(snap, { heightCm, age, youngestAge: young, lifeStage }) : null
+  return { snap, caution, age, young }
+}
+
+/**
+ * Medvetet läge: Vikt-kortet vilar – inga siffror på Idag – men omtanken gör det inte. Är viktmålet
+ * pausat för att vikten redan är låg, eller är vikten låg eller på väg ner för fort (även med målet
+ * att behålla vikten, som valet "Jag vill inte räkna kalorier" ger), visas samma varsamma besked
+ * som när siffrorna syns, utan siffror. Annars renderas ingenting.
+ */
+export const MindfulCareCard = memo(function MindfulCareCard({ today, goalPause = null }: { today: ISODate; goalPause?: GoalPause | null }) {
+  const goal = useProfileStore((s) => s.profile?.goal)
+  const { caution, age } = useWeightCare(today)
+  const lowPause = goalPause === 'lowBmi'
+  // Pausat mål för att vikten redan är låg säger samma sak som "lag" – visa bara pausbeskedet.
+  const shownCaution = lowPause && caution === 'lag' ? null : caution
+  if (!lowPause && shownCaution === null) return null
   return (
-    <Card title="Ditt mål">
-      <CareNote>{goalPauseNote('lowBmi', age)}</CareNote>
-      <SwitchToMaintainButton />
+    <Card title={lowPause ? 'Ditt mål' : 'Omtanke'}>
+      {lowPause && (
+        <>
+          <CareNote>{goalPauseNote('lowBmi', age)}</CareNote>
+          {/* Redan "behålla vikten" – då finns inget att byta till. */}
+          {goal !== 'behalla' && <SwitchToMaintainButton />}
+        </>
+      )}
+      {shownCaution && <CareNote className={lowPause ? 'mt-3' : undefined}>{cautionText(shownCaution, age, true)}</CareNote>}
     </Card>
   )
 })
@@ -56,20 +93,12 @@ export interface WeightCardProps {
 }
 
 export const WeightCard = memo(function WeightCard({ today, goalPause = null }: WeightCardProps) {
-  const weights = useBodyStore((s) => s.weights)
   const goal = useProfileStore((s) => s.profile?.goal)
   const lifeStage = useProfileStore((s) => s.profile?.lifeStage)
-  const birthYear = useProfileStore((s) => s.profile?.birthYear)
   const startWeight = useProfileStore((s) => s.profile?.startWeightKg)
-  const heightCm = useProfileStore((s) => s.profile?.heightCm)
 
-  const snap = useMemo(() => weightSnapshot(weights, today), [weights, today])
-  // 70-årsgränsen räknas på åldern enligt födelseåret, 18-årsgränsen försiktigt (yngsta möjliga).
-  const age = birthYear !== undefined ? ageFromBirthYear(birthYear, today) : undefined
-  const young = birthYear !== undefined ? youngestAge(birthYear, today) : undefined
+  const { snap, caution, age, young } = useWeightCare(today)
   const good = goalPause ? undefined : weightGoodDirection(goal, lifeStage, young)
-  // För snabb nedgång eller låg vikt tonas aldrig grönt – då visas en varsam notis i stället.
-  const caution = snap ? weightCaution(snap, { heightCm, age, youngestAge: young, lifeStage }) : null
   // Pausat mål för att vikten redan är låg säger samma sak som "lag" – visa bara pausbeskedet.
   const shownCaution = goalPause === 'lowBmi' && caution === 'lag' ? null : caution
 

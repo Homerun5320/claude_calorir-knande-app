@@ -2,8 +2,9 @@
  * Hemskärmswidgeten i Android-appen (src/native/widget.ts) med ett mockat LagomWidget-tillägg och
  * App-tillägg: sammanfattningen skickas vid start, efter en paus i ändringarna, när appen öppnas
  * igen och direkt när den går till bakgrunden – aldrig samma innehåll två gånger i rad. Bara
- * widgetens två länkar leder någonstans. iPhone och webben gör ingenting, fel loggas och kastas
- * aldrig, och "Radera all data" tömmer widgeten.
+ * widgetens två länkar leder någonstans. Webben gör ingenting – iPhone inte heller förrän
+ * `WIDGET_IOS_READY` är true (testerna gäller båda lägena) –, fel loggas och kastas aldrig, och
+ * "Radera all data" tömmer widgeten.
  */
 import { clearDemoFlag, setDemoFlag } from '../lib/demoFlag'
 import type { WidgetPayload } from '../lib/widgetSummary'
@@ -144,12 +145,12 @@ afterEach(() => {
 })
 
 describe('tillägget', () => {
-  it('heter LagomWidget och finns bara på Android (iPhone väntar)', () => {
+  it('heter LagomWidget och finns på Android – på iPhone först när WIDGET_IOS_READY är true', () => {
     expect(mocks.pluginNames).toEqual(['LagomWidget'])
-    expect(WIDGET_IOS_READY).toBe(false)
     expect(widgetSupported()).toBe(true)
+    // Slås på med node scripts/ios-widget.mjs enable (docs/WIDGET.md §8) – testerna gäller båda lägena.
     mocks.platform = 'ios'
-    expect(widgetSupported()).toBe(false)
+    expect(widgetSupported()).toBe(WIDGET_IOS_READY)
     mocks.platform = 'web'
     expect(widgetSupported()).toBe(false)
   })
@@ -203,6 +204,23 @@ describe('sammanfattningen', () => {
     vi.setSystemTime(new Date(2026, 8, 28, 18, 0))
     await expect(pushWidgetNow()).resolves.toBe(false)
     expect(mocks.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('en ny tidszon skickas om även när innehållet är detsamma (iPhone räknar midnätterna i tidszonen)', async () => {
+    withProfile()
+    await startWidget()
+    expect(mocks.update).toHaveBeenCalledTimes(1)
+    const before = NOON.getTimezoneOffset()
+    const zone = vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(before + 360)
+    try {
+      await expect(pushWidgetNow()).resolves.toBe(true)
+      expect(mocks.update).toHaveBeenCalledTimes(2)
+      // Samma tidszon igen: oförändrat.
+      await expect(pushWidgetNow()).resolves.toBe(false)
+      expect(mocks.update).toHaveBeenCalledTimes(2)
+    } finally {
+      zone.mockRestore()
+    }
   })
 
   it('exempeldata och fastan följer med när de ändras', async () => {
@@ -363,8 +381,23 @@ describe('länkar från widgeten', () => {
   })
 })
 
+/** Där widgeten inte finns: webben, och iPhone så länge WIDGET_IOS_READY är false. */
+const UNSUPPORTED: ReadonlyArray<'ios' | 'web'> = WIDGET_IOS_READY ? ['web'] : ['ios', 'web']
+
 describe('iPhone och webben', () => {
-  it.each(['ios', 'web'] as const)('%s: ingenting startas, skickas eller töms', async (platform) => {
+  it('iPhone: som på Android precis när WIDGET_IOS_READY är true', async () => {
+    mocks.platform = 'ios'
+    withProfile()
+    logLunch(760)
+    await startWidget()
+    expect(mocks.update).toHaveBeenCalledTimes(WIDGET_IOS_READY ? 1 : 0)
+    expect(mocks.addListener).toHaveBeenCalledTimes(WIDGET_IOS_READY ? 2 : 0)
+    if (WIDGET_IOS_READY) expect(lastSent()?.days[0]).toMatchObject({ date: '2026-09-28', mealsText: '1 måltid loggad' })
+    await clearWidget()
+    expect(mocks.clear).toHaveBeenCalledTimes(WIDGET_IOS_READY ? 1 : 0)
+  })
+
+  it.each(UNSUPPORTED)('%s: ingenting startas, skickas eller töms', async (platform) => {
     mocks.platform = platform
     mocks.launchUrl = 'lagom-widget://lagg-till'
     withProfile()

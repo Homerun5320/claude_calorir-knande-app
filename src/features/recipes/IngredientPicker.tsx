@@ -189,7 +189,8 @@ export const IngredientSearch = forwardRef<IngredientSearchHandle, IngredientSea
             </div>
           )
         ) : loading && results.length === 0 ? (
-          <div className="mt-2" aria-label="Söker">
+          <div className="mt-2" role="status">
+            <span className="sr-only">Söker …</span>
             <SkeletonRow />
             <SkeletonRow />
           </div>

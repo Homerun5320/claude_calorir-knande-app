@@ -8,7 +8,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        // Appens egen bryggvy registrerar appens lokala tillägg (LagomWidget) – se
+        // LagomBridgeViewController.swift. Länkar (även från widgeten) går vidare via proxyn nedan.
+        window?.rootViewController = LagomBridgeViewController()
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)

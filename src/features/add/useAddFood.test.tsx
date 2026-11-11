@@ -85,6 +85,52 @@ describe('useAddFood', () => {
     expect(useDiaryStore.getState().entries[target.date]).toBeUndefined()
   })
 
+  it('en korg skriver livsmedelsbutiken en gång – inte en gång per rad', () => {
+    const { result } = renderHook(() => useAddFood())
+    let writes = 0
+    const unsubscribe = useFoodStore.subscribe(() => writes++)
+    const items = [
+      { food: bulle, amount: 1, unit: 'portion:st' as const },
+      { food: mjolk, amount: 2, unit: 'dl' as const },
+      { food: offBar, amount: 1, unit: 'portion:serving' as const },
+      { food: { ...offBar, id: 'off:2222222222222', name: 'Proteinbar 2' }, amount: 1, unit: 'portion:serving' as const },
+      { food: { ...offBar, id: 'off:3333333333333', name: 'Proteinbar 3' }, amount: 1, unit: 'portion:serving' as const },
+    ]
+    act(() => {
+      result.current.addMany(items, target)
+    })
+    expect(writes).toBe(1)
+    const s = useFoodStore.getState()
+    expect(Object.keys(s.usage)).toHaveLength(5)
+    expect(Object.keys(s.cachedFoods).sort()).toEqual(['off:2222222222222', 'off:3333333333333', offBar.id].sort())
+
+    // Ångra är också en enda skrivning och tar bort de nysparade onlineprodukterna igen.
+    writes = 0
+    act(() => useToastStore.getState().toasts.at(-1)?.action?.onClick())
+    expect(writes).toBe(1)
+    expect(useFoodStore.getState().usage).toEqual({})
+    expect(useFoodStore.getState().cachedFoods).toEqual({})
+    unsubscribe()
+  })
+
+  it('att logga samma onlineprodukt igen skriver bara statistiken – kopian rörs inte', () => {
+    const { result } = renderHook(() => useAddFood())
+    act(() => {
+      result.current.addFood(offBar, 1, 'portion:serving', target)
+    })
+    const cached = useFoodStore.getState().cachedFoods
+    let writes = 0
+    const unsubscribe = useFoodStore.subscribe(() => writes++)
+    act(() => {
+      // En ny sökträff: nytt objekt med samma innehåll.
+      result.current.addFood({ ...offBar, nutrients: { ...offBar.nutrients } }, 1, 'portion:serving', target)
+    })
+    unsubscribe()
+    expect(writes).toBe(1)
+    expect(useFoodStore.getState().cachedFoods).toBe(cached)
+    expect(useFoodStore.getState().usage[offBar.id]?.count).toBe(2)
+  })
+
   it('ångra återställer användningsstatistiken exakt', () => {
     const before = { count: 3, lastUsed: 1_000, lastAmount: 1, lastUnit: 'portion:st' as const, meals: { frukost: 2, fika: 1 } }
     useFoodStore.setState({ usage: { [bulle.id]: before } })

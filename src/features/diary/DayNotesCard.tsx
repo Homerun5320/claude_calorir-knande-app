@@ -83,10 +83,12 @@ function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | u
   const labelId = useId()
   const reduce = useReducedMotion() ?? false
   const chosen = value !== undefined ? def.options[value - 1] : undefined
+  // @container + @max-[15rem]: fem knappar bredvid varandra är för trångt för emojin vid stor text (200 %) – den krymper då.
+  // rem i en containerfråga följer rotens teckenstorlek; vid normal text (≈ 20 rem) ändras inget.
   return (
-    <div>
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span id={labelId} className="text-sm font-semibold text-ink">
+    <div className="@container">
+      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2">
+        <span id={labelId} className="min-w-0 break-words text-sm font-semibold text-ink">
           {def.label}
         </span>
         <span className="text-xs text-ink-3" aria-hidden="true">
@@ -106,7 +108,7 @@ function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | u
               onClick={() => onChange(selected ? undefined : v)}
               whileTap={reduce ? undefined : { scale: 0.9 }}
               className={cx(
-                'grid h-12 place-items-center rounded-2xl text-[1.5rem] leading-none transition-[background-color,box-shadow,opacity,filter] duration-200',
+                'grid h-12 place-items-center rounded-2xl text-[1.5rem] leading-none @max-[15rem]:text-[1.125rem] transition-[background-color,box-shadow,opacity,filter] duration-200',
                 selected
                   ? 'bg-gran-soft ring-2 ring-inset ring-gran'
                   : value !== undefined

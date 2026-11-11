@@ -724,16 +724,21 @@ async function importWeights(ctx: SyncContext): Promise<void> {
   if (actions.length === 0) return
   const imported = { ...state.ledger.weights }
   const note = importNote()
+  const toLog: Array<{ date: ISODate; kg: number; at: string }> = []
   for (const action of actions) {
     if ('noteOnly' in action) {
       const rec = imported[action.date]
       if (rec) imported[action.date] = { id: rec.id, at: action.at }
       continue
     }
-    const entry = useBodyStore.getState().logWeight(action.date, action.kg, note)
-    imported[action.date] = { id: entry.id, at: action.at }
-    summary.weights++
+    toLog.push(action)
   }
+  // En enda skrivning för alla vikter (upp till 90 dagar) – varje set() skriver om hela butiken.
+  const entries = useBodyStore.getState().logWeights(toLog.map(({ date, kg }) => ({ date, kg, note })))
+  toLog.forEach(({ date, at }, i) => {
+    imported[date] = { id: entries[i].id, at }
+  })
+  summary.weights += toLog.length
   update({ ledger: { ...state.ledger, weights: imported } })
 }
 

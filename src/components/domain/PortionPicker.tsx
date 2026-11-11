@@ -481,8 +481,10 @@ export function PortionPicker({
             const chip = unitChipLabel(food, u)
             return (
               <Chip key={u} selected={u === unit} onClick={() => changeUnit(u)} className="max-w-full">
-                <span className="truncate">{chip.label}</span>
-                {chip.detail && <span className={cx('font-medium', u === unit ? 'opacity-75' : 'text-ink-3')}>· {chip.detail}</span>}
+                {chip.label}
+                {/* Heltäckande färg i stället för opacitet: gramvikten ska nå 4,5:1 mot den valda chipens fyllning (WCAG 1.4.3).
+                    Chipens text ligger i ett enda element – mellanslaget ger luft mellan etikett och vikt. */}
+                {chip.detail && <span className={cx('font-medium', u === unit ? 'text-ink-2' : 'text-ink-3')}> · {chip.detail}</span>}
               </Chip>
             )
           })}
@@ -517,8 +519,11 @@ export function PortionPicker({
 
       {/* Förhandsvisning */}
       <div className="rounded-3xl bg-surface-2 p-4">
-        <div className="flex items-end justify-between gap-4">
-          <div className="min-w-0">
+        {/* flex-wrap: vid stor text (200 %) ryms inte energin och makrona bredvid varandra – makrona hamnar då under. Energin har
+            `flex-1 basis-0 min-w-16`: den räknas som 4 rem bred vid radbrytningen (inte som sin längsta rad), så att de två
+            fortfarande ligger bredvid varandra på smala telefoner (360 px) vid normal text. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div className="min-w-16 flex-1 basis-0">
             <div className="eyebrow">{mindful ? 'Portionen' : 'Energi'}</div>
             {mindful ? (
               <div className="mt-1 font-display text-2xl font-semibold leading-tight text-ink">{mindfulPortionLabel(valid ? n.kcal : undefined)}</div>

@@ -4,6 +4,8 @@
  * Visar trendvikten i stället för dag-till-dag-svängningar, en lugn prognos mot målet,
  * viktkurva, nyckeltal (BMI, midjemått), adaptiv energiförbrukning, kroppsmått och historik.
  * Medvetet läge döljer siffrorna (kan visas på begäran) och tonen är aldrig dömande.
+ * Låg vikt eller för snabb nedgång ger en varsam notis med vägar till stöd – oavsett mål och även
+ * i medvetet läge.
  * Framstegsbilderna (valfria, av som standard) har ett eget kort här – aldrig på Idag – och döljs
  * helt i medvetet läge, även när siffrorna visas på begäran.
  */
@@ -27,6 +29,8 @@ import { WeightChartCard } from './WeightChartCard'
 import { MindfulHero, WeightHero } from './WeightHero'
 import { WeightHistory } from './WeightHistory'
 import { requireAccess } from '../premium/requireAccess'
+import { CareNote } from '../today/CareNote'
+import { cautionText, useWeightCare } from '../today/WeightCard'
 
 export default function BodyPage() {
   const hydrated = useHydrated()
@@ -54,6 +58,11 @@ function BodyContent() {
   }
 
   const overview = useMemo(() => bodyOverview(weights, profile, today), [weights, profile, today])
+  // Omtanke vid låg vikt eller för snabb nedgång – oavsett mål och medvetet läge (utan siffror när
+  // de är dolda). Pausat mål för låg vikt har redan sin egen text i översikten ovan.
+  const care = useWeightCare(today)
+  const lowPaused = overview.status.kind === 'paused' && overview.status.reason === 'lowBmi'
+  const shownCaution = lowPaused && care.caution === 'lag' ? null : care.caution
   const waist = useMemo(() => latestMeasure(measurements, 'waistCm'), [measurements])
   const hasWeights = overview.sorted.length > 0
   const targetKg = profile?.targetWeightKg
@@ -92,6 +101,12 @@ function BodyContent() {
             ) : (
               <WeightHero overview={overview} goal={profile?.goal} targetKg={targetKg} today={today} />
             )}
+          </Reveal>
+        )}
+
+        {hasWeights && shownCaution && (
+          <Reveal delay={0.02}>
+            <CareNote>{cautionText(shownCaution, care.age, hideNumbers)}</CareNote>
           </Reveal>
         )}
 
@@ -157,7 +172,7 @@ function BodyContent() {
 /** Varm påminnelse om stöd vid oro kring mat, vikt och kropp. */
 function SupportNote() {
   return (
-    <aside className="mt-2 flex items-start gap-3 rounded-[var(--radius-card)] bg-surface-2 p-4 text-[0.8125rem] leading-relaxed text-ink-2">
+    <div role="note" className="mt-2 flex items-start gap-3 rounded-[var(--radius-card)] bg-surface-2 p-4 text-[0.8125rem] leading-relaxed text-ink-2">
       <HeartHandshake aria-hidden className="mt-0.5 size-5 shrink-0 text-lingon" strokeWidth={2} />
       <p>
         Din vikt är bara en del av hälsan – sömn, rörelse, glädje och gemenskap räknas lika mycket. Känns tankar kring mat,
@@ -171,13 +186,14 @@ function SupportNote() {
         </ExternalLink>
         .
       </p>
-    </aside>
+    </div>
   )
 }
 
 function BodySkeleton() {
   return (
-    <div className="px-4 pt-safe" aria-busy="true" aria-label="Laddar vikt och mått">
+    <div className="px-4 pt-safe" role="status" aria-busy="true">
+      <span className="sr-only">Laddar vikt och mått …</span>
       <div className="pb-4 pt-[4.25rem]">
         <Skeleton className="h-9 w-48" />
         <Skeleton className="mt-3 h-4 w-64" />

@@ -505,6 +505,59 @@ describe('vikt', () => {
     expect(useBodyStore.getState().weights.map((w) => w.date)).toEqual([YESTERDAY])
   })
 
+  it('många vikter hämtas med en enda skrivning till viktkurvan (varje set() skriver om hela butiken) – orimliga hoppas över', async () => {
+    const d = (n: number) => addDays(TODAY, -n)
+    mocks.weightSamples = [
+      weightSample(TODAY, 7, 70.1),
+      weightSample(d(1), 7, 70.4),
+      weightSample(d(2), 7, 70.8),
+      weightSample(d(3), 7, 5), // under 20 kg
+      weightSample(d(4), 7, 500), // över 400 kg
+      weightSample(d(5), 6, 71.04),
+    ]
+    connected()
+    let writes = 0
+    const unsubscribe = useBodyStore.subscribe(() => {
+      writes++
+    })
+    try {
+      const summary = await syncHealth()
+      expect(summary).toMatchObject({ weights: 4 })
+      expect(writes).toBe(1)
+      const weights = useBodyStore.getState().weights
+      expect(weights.map((w) => [w.date, w.kg, w.note])).toEqual([
+        [d(5), 71, 'Från Apple Hälsa'],
+        [d(2), 70.8, 'Från Apple Hälsa'],
+        [d(1), 70.4, 'Från Apple Hälsa'],
+        [TODAY, 70.1, 'Från Apple Hälsa'],
+      ])
+      // Loggen pekar på de lagrade vikterna, så att ingen hämtas igen.
+      expect(stored().ledger.weights).toEqual(
+        Object.fromEntries(weights.map((w) => [w.date, { id: w.id, at: at(w.date, w.date === d(5) ? 6 : 7) }])),
+      )
+      await syncHealth()
+      expect(writes).toBe(1)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('inga hämtade vikter – ingen skrivning till viktkurvan', async () => {
+    mocks.weightSamples = [weightSample(TODAY, 7, 5), weightSample(YESTERDAY, 7, 500)]
+    connected()
+    let writes = 0
+    const unsubscribe = useBodyStore.subscribe(() => {
+      writes++
+    })
+    try {
+      await expect(syncHealth()).resolves.toMatchObject({ weights: 0 })
+      expect(writes).toBe(0)
+      expect(useBodyStore.getState().weights).toEqual([])
+    } finally {
+      unsubscribe()
+    }
+  })
+
   it('en senare hämtning börjar tre dagar före den förra', async () => {
     connected({ lastImport: NOW.getTime() - 86_400_000 })
     await syncHealth()

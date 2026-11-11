@@ -1,6 +1,6 @@
 /**
- * Starta en fasta: välj protokoll (12:12–20:4), se dygnets fördelning och när målet nås,
- * och starta nu – eller ange att du började tidigare.
+ * Starta en fasta: välj protokoll (12:12–20:4), läs vad upplägget innebär ("Mer om …"), se dygnets
+ * fördelning och när målet nås, och starta nu – eller ange att du började tidigare.
  */
 import { memo } from 'react'
 import { History, Play } from 'lucide-react'
@@ -11,6 +11,7 @@ import { dayAndTime, DEFAULT_PROTOCOL_ID, FASTING_PROTOCOLS, protocolById, type 
 import { useNow } from '../hooks'
 import { requireAccess } from '../../premium/requireAccess'
 import { haptic } from '../../../native'
+import { Disclosure } from './Disclosure'
 
 export interface StartFastCardProps {
   protocolId: string
@@ -47,6 +48,11 @@ export const StartFastCard = memo(function StartFastCard({ protocolId, onProtoco
         <p className="mt-0.5 text-[0.875rem] leading-relaxed text-ink-2">{protocol.description}</p>
       </div>
 
+      {/* Samma <details> byter text när upplägget byts, så att en öppen förklaring förblir öppen. */}
+      <Disclosure summary={`Mer om ${protocol.id}`} className="mt-3">
+        <p>{protocol.details}</p>
+      </Disclosure>
+
       <DayBar protocol={protocol} />
 
       <p className="mt-4 text-[0.875rem] leading-relaxed text-ink-2">
@@ -74,7 +80,7 @@ function DayBar({ protocol }: { protocol: FastingProtocol }) {
         <div className="h-full rounded-l-full bg-blabar transition-[width] duration-500 ease-spring" style={{ width: `${fastPct}%` }} />
         <div className="h-full flex-1 rounded-r-full bg-hjortron-soft ring-1 ring-inset ring-hjortron/30" />
       </div>
-      <div className="mt-1.5 flex justify-between text-xs font-medium">
+      <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs font-medium">
         <span className="text-blabar">Fasta {protocol.fastHours}{'\u00a0'}h</span>
         <span className="text-ink-2">Ätfönster {protocol.eatHours}{'\u00a0'}h</span>
       </div>

@@ -9,10 +9,13 @@
  *   ("Ange ett värde mellan 20 och 400 kg.") och skickas som `undefined`, så att föräldern aldrig
  *   får ett ogiltigt värde. Enter skickar inte formuläret då. Värdet kläms först när fältet
  *   lämnas eller när man stegar (knappar/piltangenter), och texten snyggas till.
+ * - Gränsmeddelandet läses upp för skärmläsare (WCAG 3.3.1, 4.1.3) men inte vid varje tecken:
+ *   efter en kort paus i skrivandet, direkt vid Enter och när fältet lämnas (då med besked om vad
+ *   värdet blev). Förälderns eget fel (`error`) läses upp artigt av fältramen när det dyker upp.
  * - Piltangenter upp/ned stegar (Shift = ×10). Valfria −/+-knappar med håll-för-att-upprepa.
  * - `size="lg"` är den stora portionsväljaren med siffror i Fraunces.
  */
-import { useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { formatNumber, parseSwedishNumber } from '../../lib/format'
 import { cx, renderIcon, type IconLike } from './Button'
 import { FIELD_INPUT, FIELD_SHELL, Field, fieldDescribedBy, mergeRefs } from './TextField'
@@ -67,6 +70,9 @@ function toEditText(value: number | undefined, decimals: number): string {
   const n = Number(value.toFixed(decimals))
   return String(Object.is(n, -0) ? 0 : n).replace('.', ',')
 }
+
+/** Så länge man ska ha pausat skrivandet innan gränsmeddelandet läses upp för skärmläsare. */
+export const RANGE_ANNOUNCE_DELAY_MS = 800
 
 /** Typografi för den stora portionsväljaren (delas av fältet och dess breddspegel). */
 const LARGE_TEXT = 'display-num text-[3.5rem] font-medium leading-none'
@@ -159,8 +165,16 @@ export function NumberField({
   const outOfRange = !Number.isNaN(typed) && !inRange(typed)
   const unitText = typeof suffix === 'string' ? suffix : undefined
   const rangeError = outOfRange ? rangeMessage(min, max, unitText, dec) : undefined
-  // Uppläses när Enter stoppas av ett värde utanför gränserna.
+  // Uppläses (aria-live) när man pausar, trycker Enter eller lämnar fältet med ett värde utanför gränserna.
   const [announcement, setAnnouncement] = useState('')
+
+  // En paus i skrivandet: läs upp gränsmeddelandet en gång (nästa tecken nollställer det). Inte vid
+  // varje tecken – "7,24" ska gå att skriva utan att skärmläsaren avbryter efter första siffran.
+  useEffect(() => {
+    if (!rangeError) return
+    const handle = window.setTimeout(() => setAnnouncement(rangeError), RANGE_ANNOUNCE_DELAY_MS)
+    return () => window.clearTimeout(handle)
+  }, [rangeError, text])
 
   const handleInput = (raw: string) => {
     if (!allowed.test(raw)) return
@@ -179,6 +193,7 @@ export function NumberField({
 
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     const trimmed = text.trim()
+    let spoken = ''
     if (trimmed !== '') {
       const parsed = parseInput(trimmed)
       if (Number.isNaN(parsed)) {
@@ -188,11 +203,13 @@ export function NumberField({
         const next = Number(clampNumber(parsed, min, max).toFixed(dec))
         emit(next)
         setText(toEditText(next, dec))
+        // Värdet ändras av sig självt här – säg det, annars försvinner felet utan förklaring.
+        if (rangeError) spoken = `${rangeError} Värdet sattes till ${formatNumber(next, dec)}${unitText ? `\u00a0${unitText}` : ''}.`
       }
     } else if (text !== '') {
       setText('')
     }
-    setAnnouncement('')
+    setAnnouncement(spoken)
     onBlur?.(e)
   }
 
@@ -220,8 +237,10 @@ export function NumberField({
     }
   }
 
-  // Gränsmeddelandet går före förälderns fel (som ofta bara säger att värdet saknas).
+  // Gränsmeddelandet går före förälderns fel (som ofta bara säger att värdet saknas). Det läses upp
+  // av `live` ovan (efter en paus, vid Enter och vid blur) – fältramen läser bara upp förälderns fel.
   const shownError = rangeError ?? error
+  const announceError = rangeError === undefined
   const invalid = Boolean(shownError)
   const describedBy = fieldDescribedBy(id, hint, shownError)
   const unitSuffix = unitText ? ` ${unitText}` : ''
@@ -289,7 +308,17 @@ export function NumberField({
 
   if (large) {
     return (
-      <Field id={id} label={label} hint={hint} error={shownError} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+      <Field
+        id={id}
+        label={label}
+        hint={hint}
+        error={shownError}
+        announceError={announceError}
+        labelHidden={labelHidden}
+        optional={optional}
+        labelAction={labelAction}
+        className={className}
+      >
         {live}
         <div
           data-invalid={invalid}
@@ -317,7 +346,7 @@ export function NumberField({
               aria-hidden
               className={cx(
                 'mt-2 h-[3px] w-14 rounded-full transition-[background-color,width] duration-200',
-                invalid ? 'bg-lingon' : 'bg-line group-focus-within/num:w-20 group-focus-within/num:bg-gran',
+                invalid ? 'bg-lingon' : 'bg-field-line group-focus-within/num:w-20 group-focus-within/num:bg-gran',
               )}
             />
           </div>
@@ -330,7 +359,17 @@ export function NumberField({
   }
 
   return (
-    <Field id={id} label={label} hint={hint} error={shownError} labelHidden={labelHidden} optional={optional} labelAction={labelAction} className={className}>
+    <Field
+      id={id}
+      label={label}
+      hint={hint}
+      error={shownError}
+      announceError={announceError}
+      labelHidden={labelHidden}
+      optional={optional}
+      labelAction={labelAction}
+      className={className}
+    >
       {live}
       <div data-invalid={invalid} data-disabled={Boolean(disabled)} className={cx(FIELD_SHELL, 'h-12', showStepper && 'pr-1.5', fieldClassName)}>
         {prefix !== undefined && <span className="flex shrink-0 items-center text-ink-3">{renderIcon(prefix, 'size-5')}</span>}
@@ -338,7 +377,7 @@ export function NumberField({
         {suffix !== undefined && <span className="shrink-0 text-[0.9375rem] font-medium text-ink-3">{suffix}</span>}
         {showStepper && (
           // gap-3: knapparnas osynliga tryckytor (6 px runt om) får inte överlappa – då blir båda minst 44 px.
-          <div className="ml-1.5 flex shrink-0 items-center gap-3">
+          <div className="ml-[min(0.375rem,6px)] flex shrink-0 items-center gap-[min(0.75rem,12px)]">
             <StepButton direction={-1} onStep={() => stepBy(-1)} label={`Minska ${labelText}`} disabled={disabled || readOnly || atMin} size="sm" />
             <StepButton direction={1} onStep={() => stepBy(1)} label={`Öka ${labelText}`} disabled={disabled || readOnly || atMax} size="sm" />
           </div>

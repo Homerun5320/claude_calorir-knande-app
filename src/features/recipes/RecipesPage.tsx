@@ -125,7 +125,8 @@ export default function RecipesPage() {
               ))}
             </div>
             {builtinList === null ? (
-              <div className="grid gap-3 sm:grid-cols-2" aria-busy="true" aria-label="Laddar recept">
+              <div className="grid gap-3 sm:grid-cols-2" role="status" aria-busy="true">
+                <span className="sr-only">Laddar recept …</span>
                 {Array.from({ length: 6 }, (_, i) => (
                   <RecipeCardSkeleton key={i} />
                 ))}

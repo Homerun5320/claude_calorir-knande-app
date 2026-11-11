@@ -67,6 +67,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import { useFoodStore, type FoodUsage } from '../../stores/foodStore'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useToday } from '../../hooks/useToday'
+import { useTopBarPadding } from '../../hooks/useBottomBarPadding'
 import { useFoodResolver } from '../../hooks/useFood'
 import { useFavoriteFoods, useFoodSearch, useRecentFoods } from '../../hooks/useFoodSearch'
 import { recipeFood } from '../../lib/foodRepo'
@@ -172,6 +173,8 @@ export default function AddFoodPage() {
   const [query, setQuery] = useState(() => params.get('q') ?? '')
   const q = query.trim()
   const searchRef = useRef<HTMLInputElement>(null)
+  // Det klibbiga sökfältet täcker överkanten: tangentbordsfokus i träfflistan ska inte hamna under det.
+  const searchBarRef = useTopBarPadding()
   // Röstsökning: texten fylls i sökfältet medan man pratar. Att skriva själv avbryter lyssnandet.
   const voice = useVoiceSearch(setQuery)
   const { cancel: cancelVoice } = voice
@@ -354,7 +357,7 @@ export default function AddFoodPage() {
         <MealChips value={meal} onChange={(m) => setParam('maltid', m)} />
       </PageHeader>
 
-      <div className="sticky top-[calc(3.5rem_+_var(--sa-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
+      <div ref={searchBarRef} className="sticky top-[calc(3.5rem_+_var(--sa-top))] z-20 -mx-4 bg-bg/85 px-4 pb-3 pt-1 backdrop-blur-xl">
         <TextField
           ref={searchRef}
           label="Sök livsmedel"
@@ -446,8 +449,8 @@ export default function AddFoodPage() {
                   onClick={() => setLmvToggle({ q, open: !lmvOpen })}
                   className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl px-1 text-left"
                 >
-                  <span className="eyebrow">Fler från Livsmedelsverket</span>
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink-2">
+                  <span className="eyebrow min-w-0 break-words">Fler från Livsmedelsverket</span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-ink-2">
                     <span className="tabular-nums">{lmvResults.length}</span>
                     <ChevronDown className={cx('size-4 transition-transform duration-200', lmvOpen && 'rotate-180')} aria-hidden />
                   </span>
@@ -696,7 +699,10 @@ function Browse(props: BrowseProps) {
   return (
     <div className="flex flex-col gap-6">
       {/* Stora genvägar – skanna överst på mobil, snabbregistrering och tallrik bredvid varandra. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* @container + @max-[17.5rem]: vid stor text (200 %) blir två rutor bredvid varandra för smala (bokstav för bokstav) – då står de
+          under varandra. rem i en containerfråga följer rotens teckenstorlek; vid normal text (raden ≈ 22 rem, 18 rem på en 320 px-telefon)
+          ändras inget. */}
+      <div className="@container grid grid-cols-2 gap-3 sm:grid-cols-3">
         {/* Mjuka bindestreck (\u00AD) låter de långa orden brytas snyggt i smala rutor (320–390 px). */}
         <ActionTile
           icon={ScanBarcode}
@@ -706,8 +712,22 @@ function Browse(props: BrowseProps) {
           onClick={props.onScan}
           className="col-span-2 sm:col-span-1"
         />
-        <ActionTile icon={Zap} title={'Snabb\u00ADregistrera'} text="Bara energin, ungefär" tone="sol" onClick={props.onQuick} />
-        <ActionTile icon={UtensilsCrossed} title="Tallrik" text={'Uppskatta utan att väga'} tone="gran" onClick={props.onPlate} />
+        <ActionTile
+          icon={Zap}
+          title={'Snabb\u00ADregistrera'}
+          text="Bara energin, ungefär"
+          tone="sol"
+          onClick={props.onQuick}
+          className="@max-[17.5rem]:col-span-2"
+        />
+        <ActionTile
+          icon={UtensilsCrossed}
+          title="Tallrik"
+          text={'Uppskatta utan att väga'}
+          tone="gran"
+          onClick={props.onPlate}
+          className="@max-[17.5rem]:col-span-2"
+        />
       </div>
       <p className="-mt-3 flex items-start gap-1.5 px-1 text-xs text-ink-3">
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-sol" aria-hidden />

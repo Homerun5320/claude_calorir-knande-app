@@ -28,6 +28,7 @@ import {
   shareFileName,
   type SharePayload,
 } from '../../lib/shareLink'
+import { sourceHost } from './recipeLogic'
 
 export type ShareTarget = { kind: 'recipe'; recipe: Recipe } | { kind: 'meal'; template: MealTemplate }
 
@@ -124,6 +125,8 @@ function ShareSheet({ target, open, onClose }: { target: ShareTarget; open: bool
   const close = onClose
   const words = wordsFor(kind)
   const name = payload?.name ?? source.name
+  // Receptets källänk följer med (bara sidans adress, se `shareableSourceUrl`) – säg det i arket.
+  const sourceLinkHost = payload?.kind === 'recipe' && payload.sourceUrl ? sourceHost(payload.sourceUrl) : undefined
 
   // Delningen måste starta i samma klick – ingen await före anropen.
   const shareLink = (mode: 'share' | 'copy') => {
@@ -183,6 +186,12 @@ function ShareSheet({ target, open, onClose }: { target: ShareTarget; open: bool
           <Lock aria-hidden className="mt-0.5 size-4 shrink-0 text-ink-3" />
           <p>
             <strong className="font-semibold text-ink">Alla som har länken kan se {words.noun}.</strong> Bara {words.noun} följer med – {words.contents}.
+            {sourceLinkHost && (
+              <>
+                {' '}
+                Länken till källan ({sourceLinkHost}) följer också med – bara sidans adress, utan parametrar.
+              </>
+            )}{' '}
             Ingenting från din dagbok eller dina allergiinställningar. {capitalize(words.noun)} ligger i själva länken och skickas inte till Lagoms server – bara
             dit du själv skickar länken.
           </p>

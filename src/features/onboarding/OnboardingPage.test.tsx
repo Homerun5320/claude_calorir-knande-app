@@ -398,3 +398,58 @@ describe('stegräknaren', () => {
     expect(stepText(['valkommen', 'mal', 'om-dig', 'aktivitet', 'kost', 'sammanfattning'], 4)).toBe('Steg 4 av 5')
   })
 })
+
+describe('Fortsätt-listan (tillgänglighet)', () => {
+  it('dämpas inte med opacity när steget är ofullständigt – knappen går att trycka och full kontrast behålls', async () => {
+    renderFlow()
+    fireEvent.click(screen.getByRole('button', { name: /Kom igång/ }))
+    await screen.findByRole('heading', { name: 'Vad vill du med Lagom?' })
+
+    // Ofullständigt steg: tonad knapp, inte disabled/aria-disabled, ingen opacity (vit text på 70 %
+    // gran gav 3,9:1 i ljust läge, under WCAG 1.4.3).
+    const blocked = screen.getByRole('button', { name: /Fortsätt/ })
+    expect(blocked).not.toBeDisabled()
+    expect(blocked).not.toHaveAttribute('aria-disabled')
+    expect(blocked.className).not.toMatch(/(^|\s)opacity-/)
+    expect(blocked.className).toContain('bg-gran-soft')
+    expect(blocked.className).not.toMatch(/(^|\s)bg-gran(\s|$)/)
+    // Den går att trycka och förklarar då vad som saknas.
+    next()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Välj ett alternativ')
+
+    // Klart steg: den vanliga huvudknappen.
+    fireEvent.click(screen.getByRole('radio', { name: /Behålla/ }))
+    const ready = screen.getByRole('button', { name: /Fortsätt/ })
+    expect(ready.className).toMatch(/(^|\s)bg-gran(\s|$)/)
+    expect(ready.className).not.toContain('bg-gran-soft')
+    expect(ready.className).not.toMatch(/(^|\s)opacity-/)
+  })
+
+  it('Om dig: ofullständiga uppgifter ger en tonad knapp som visar felen, och den blir huvudknapp när allt är ifyllt', async () => {
+    renderFlow('/valkommen?steg=mal')
+    fireEvent.click(await screen.findByRole('radio', { name: /Behålla/ }))
+    next()
+    await screen.findByRole('heading', { name: 'Lite om dig' })
+
+    const blocked = screen.getByRole('button', { name: /Fortsätt/ })
+    expect(blocked.className).toContain('bg-gran-soft')
+    expect(blocked.className).not.toMatch(/(^|\s)opacity-/)
+
+    await fillAboutYou()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Fortsätt/ }).className).toMatch(/(^|\s)bg-gran(\s|$)/))
+  })
+
+  it('håller fokuserade fält ovanför listan: scroll-padding-bottom följer listans höjd och återställs', async () => {
+    // jsdom har ingen layout – listan (sticky, 96 px hög i verkligheten) får en höjd här.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains('sticky') && this.classList.contains('bottom-0') ? 96 : 0
+      return { x: 0, y: 0, left: 0, top: 0, right: 0, bottom: height, width: 0, height, toJSON: () => ({}) }
+    })
+    const { unmount } = renderFlow()
+    // 96 px lista + 8 px luft för fokusramen (sticky utan layout i jsdom: avståndet till kanten 0).
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('104px')
+    unmount()
+    expect(document.documentElement.style.scrollPaddingBottom).toBe('')
+    vi.restoreAllMocks()
+  })
+})

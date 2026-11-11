@@ -39,6 +39,7 @@ export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, li
 
   return (
     <Card
+      className="@container"
       title={isToday ? 'Dagens aktiviteter' : 'Aktiviteter'}
       action={
         list.length > 0 ? (
@@ -62,7 +63,9 @@ export const ExerciseDayCard = memo(function ExerciseDayCard({ date, isToday, li
         />
       ) : (
         <>
-          <div className={`grid gap-2 rounded-2xl bg-surface-2 p-3 ${mindful ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {/* @container + @max-[15rem]: vid stor text (200 %) ryms inte tre tal bredvid varandra – de staplas. rem i en containerfråga
+              följer rotens teckenstorlek; vid normal text (kortet ≈ 20 rem brett) ändras inget. */}
+          <div className={`grid gap-2 rounded-2xl bg-surface-2 p-3 @max-[15rem]:grid-cols-1 ${mindful ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <Stat size="sm" label="Tid" value={formatNumber(minutes)} unit="min" />
             {mindful ? (
               <Stat size="sm" label="Aktiviteter" value={formatNumber(list.length)} />

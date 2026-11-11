@@ -82,7 +82,8 @@ export default function InsightsPage() {
 
 function InsightsSkeleton() {
   return (
-    <div className="px-4 pt-safe pb-8" aria-busy="true" aria-label="Laddar insikter">
+    <div className="px-4 pt-safe pb-8" role="status" aria-busy="true">
+      <span className="sr-only">Laddar insikter …</span>
       <div className="pt-16 pb-4">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="mt-3 h-9 w-40" />

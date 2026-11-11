@@ -136,6 +136,175 @@ describe('backup', () => {
     expect(useDiaryStore.getState().entries['2026-09-21'].map((x) => x.id)).toEqual([e.id])
   })
 
+  describe('sammanfoga: ordning och form som butikerna förväntar sig', () => {
+    const H = 3_600_000
+    const T0 = Date.UTC(2026, 8, 20, 10)
+    const isAscending = (xs: number[]) => xs.every((x, i) => i === 0 || xs[i - 1] <= x)
+    const fast = (id: string, hoursAgo: number, protocol: string) => ({
+      id,
+      start: T0 - (hoursAgo + 16) * H,
+      end: T0 - hoursAgo * H,
+      targetHours: 16,
+      protocol,
+    })
+    const lunch = (id: string, createdAt: number, name: string) => ({
+      kind: 'quick' as const,
+      id,
+      name,
+      nutrients: { kcal: 400 },
+      date: '2026-09-20',
+      meal: 'lunch' as const,
+      createdAt,
+    })
+
+    /** Spara en kopia av det som finns nu, töm och lägg in "enhetens egna" data med `local`. */
+    const otherDevice = (local: () => void): ReturnType<typeof parseBackup> => {
+      const backup = parseBackup(JSON.stringify(createBackup()))
+      wipeAllData()
+      local()
+      return backup
+    }
+
+    it('fastehistoriken blir senaste först även när kopian har nyare fastor än enheten', () => {
+      useFastingStore.setState({ history: [fast('b1', 2, '16:8'), fast('b2', 30, '16:8'), fast('b3', 54, '16:8')] })
+      const backup = otherDevice(() => useFastingStore.setState({ history: [fast('l1', 100, '5:2'), fast('l2', 130, '5:2')] }))
+      restoreBackup(backup, 'merge')
+      const history = useFastingStore.getState().history
+      expect(history.map((h) => h.id)).toEqual(['b1', 'b2', 'b3', 'l1', 'l2'])
+      // Fasta-sidan visar de sju första och förväljer protokollet från den första: den nyaste.
+      expect(history[0].protocol).toBe('16:8')
+    })
+
+    it('fastehistoriken blir senaste först när fastorna växlar mellan enheterna', () => {
+      useFastingStore.setState({ history: [fast('b1', 10, '16:8'), fast('b2', 80, '16:8')] })
+      const backup = otherDevice(() => useFastingStore.setState({ history: [fast('l1', 1, '5:2'), fast('l2', 40, '5:2')] }))
+      restoreBackup(backup, 'merge')
+      expect(useFastingStore.getState().history.map((h) => h.id)).toEqual(['l1', 'b1', 'l2', 'b2'])
+    })
+
+    it('en fasta som finns på båda enheterna räknas bara en gång', () => {
+      useFastingStore.setState({ history: [fast('same', 5, '16:8'), fast('b2', 30, '16:8')] })
+      const backup = otherDevice(() => useFastingStore.setState({ history: [fast('same', 5, '16:8')] }))
+      restoreBackup(backup, 'merge')
+      expect(useFastingStore.getState().history.map((h) => h.id)).toEqual(['same', 'b2'])
+    })
+
+    it('två enheter som mätt samma dag ger ett mått för dagen – enhetens eget gäller', () => {
+      useBodyStore.setState({
+        measurements: [
+          { id: 'mb1', date: '2026-09-10', waistCm: 82, createdAt: 2 },
+          { id: 'mb2', date: '2026-09-01', waistCm: 85, createdAt: 1 },
+        ],
+      })
+      const backup = otherDevice(() =>
+        useBodyStore.setState({
+          measurements: [
+            { id: 'ml1', date: '2026-09-10', waistCm: 80, createdAt: 3 },
+            { id: 'ml2', date: '2026-09-15', waistCm: 79, createdAt: 4 },
+          ],
+        }),
+      )
+      restoreBackup(backup, 'merge')
+      const m = useBodyStore.getState().measurements
+      expect(m.map((x) => x.date)).toEqual(['2026-09-01', '2026-09-10', '2026-09-15'])
+      expect(m.find((x) => x.date === '2026-09-10')).toMatchObject({ id: 'ml1', waistCm: 80 })
+    })
+
+    it('en dags poster ligger i tidsordning efter sammanslagningen', () => {
+      useDiaryStore.setState({ entries: { '2026-09-20': [lunch('b-12', T0 + 2 * H, 'Lunch hos mamma'), lunch('b-14', T0 + 4 * H, 'Fika')] } })
+      const backup = otherDevice(() => useDiaryStore.setState({ entries: { '2026-09-20': [lunch('l-1230', T0 + 2.5 * H, 'Lunch på kontoret')] } }))
+      restoreBackup(backup, 'merge')
+      expect(useDiaryStore.getState().entries['2026-09-20'].map((e) => e.id)).toEqual(['b-12', 'l-1230', 'b-14'])
+    })
+
+    it('träningen ligger i tidsordning efter sammanslagningen', () => {
+      const run = (id: string, createdAt: number) => ({ id, date: '2026-09-20', activityId: 'custom', name: 'Promenad', minutes: 30, kcal: 100, createdAt })
+      useDiaryStore.setState({ exercise: { '2026-09-20': [run('b1', T0)] } })
+      const backup = otherDevice(() => useDiaryStore.setState({ exercise: { '2026-09-20': [run('l1', T0 + H)] } }))
+      restoreBackup(backup, 'merge')
+      expect(useDiaryStore.getState().exercise['2026-09-20'].map((x) => x.id)).toEqual(['b1', 'l1'])
+    })
+
+    it('planerade rader och egna inköpsrader ligger i den ordning de lades till', () => {
+      const monday = '2026-09-28'
+      const first = usePlanStore.getState().addItem({ kind: 'food', date: monday, meal: 'frukost', food: mjolk, amount: 1, unit: 'portion:glas', grams: 206 })!
+      const firstExtra = usePlanStore.getState().addExtra(monday, 'Kaffe')!
+      const backup = otherDevice(() => {
+        usePlanStore.getState().addItem({ kind: 'food', date: monday, meal: 'frukost', food: mjolk, amount: 2, unit: 'portion:glas', grams: 412 })
+        usePlanStore.getState().addExtra(monday, 'Te')
+      })
+      restoreBackup(backup, 'merge')
+      const items = usePlanStore.getState().items[monday]
+      expect(items.map((i) => i.id)).toContain(first.id)
+      expect(isAscending(items.map((i) => i.createdAt))).toBe(true)
+      const extras = usePlanStore.getState().shopping[monday].extras
+      expect(extras.map((e) => e.id)).toContain(firstExtra.id)
+      expect(isAscending(extras.map((e) => e.createdAt))).toBe(true)
+    })
+  })
+
+  describe('en fil i fel ordning läses in i butikens ordning', () => {
+    const file = (data: Record<string, unknown>) =>
+      JSON.stringify({ format: 'lagom-backup', version: 1, exportedAt: '2026-09-20T10:00:00.000Z', app: 'Lagom', data })
+    const sections = { profile: {}, diary: {}, food: {}, body: {} }
+
+    it('fastorna sorteras med den senaste först, mått och poster likaså', () => {
+      const NOW = new Date(2026, 8, 27, 12).getTime()
+      const H = 3_600_000
+      const parsed = parseBackup(
+        file({
+          ...sections,
+          diary: {
+            entries: {
+              '2026-09-20': [
+                { kind: 'quick', id: 'e2', name: 'Lunch', nutrients: { kcal: 400 }, meal: 'lunch', createdAt: 2000 },
+                { kind: 'quick', id: 'e1', name: 'Frukost', nutrients: { kcal: 300 }, meal: 'frukost', createdAt: 1000 },
+              ],
+            },
+          },
+          body: {
+            weights: [],
+            measurements: [
+              { id: 'm-old', date: '2026-09-10', waistCm: 82, createdAt: 1 },
+              { id: 'm-new', date: '2026-09-10', waistCm: 80, createdAt: 2 },
+              { id: 'm-early', date: '2026-09-01', waistCm: 85, createdAt: 3 },
+            ],
+          },
+          fasting: {
+            active: null,
+            history: [
+              { id: 'f-old', start: NOW - 60 * H, end: NOW - 44 * H, targetHours: 16, protocol: '16:8' },
+              { id: 'f-new', start: NOW - 20 * H, end: NOW - 4 * H, targetHours: 16, protocol: '16:8' },
+            ],
+          },
+        }),
+        NOW,
+      )
+      expect(parsed.data.fasting.history.map((h) => h.id)).toEqual(['f-new', 'f-old'])
+      expect(parsed.data.body.measurements.map((m) => m.id)).toEqual(['m-early', 'm-new'])
+      expect(parsed.data.diary.entries['2026-09-20'].map((e) => e.id)).toEqual(['e1', 'e2'])
+      restoreBackup(parsed, 'replace')
+      expect(useFastingStore.getState().history[0].id).toBe('f-new')
+    })
+
+    it('ett mått per dag: det andra måttet för samma dag räknas som en rättning', () => {
+      const parsed = parseBackup(
+        file({
+          ...sections,
+          body: {
+            weights: [],
+            measurements: [
+              { id: 'm1', date: '2026-09-10', waistCm: 82, createdAt: 1 },
+              { id: 'm2', date: '2026-09-10', waistCm: 80, createdAt: 2 },
+            ],
+          },
+        }),
+      )
+      expect(parsed.data.body.measurements).toEqual([expect.objectContaining({ id: 'm2', waistCm: 80 })])
+      expect(parsed.repairs?.repaired).toBe(1)
+    })
+  })
+
   it('avvisar felaktiga filer med svensk text', () => {
     expect(() => parseBackup('inte json')).toThrow(BackupError)
     expect(() => parseBackup('{"format":"annat"}')).toThrow('ingen säkerhetskopia')

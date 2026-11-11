@@ -29,7 +29,7 @@ interface TileProps {
 
 function Tile({ to, tone, icon: Icon, eyebrow, visual, children }: TileProps) {
   return (
-    <Card to={to} padding="none" className="p-3.5">
+    <Card to={to} padding="none" className="@container p-3.5">
       <span className="flex items-center gap-3.5">
         {visual ?? (
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-(--tone-soft) text-(--tone)" style={toneVars(tone)} aria-hidden="true">
@@ -65,11 +65,11 @@ function FastTile({ active }: { active: { start: number; targetHours: number; pr
           max={p.targetMin}
           size={48}
           thickness={5}
-          tone={p.done ? 'mossa' : 'blabar'}
+          tone="blabar"
           aria-label="Fastans förlopp"
           valueText={`${formatDuration(p.elapsedMin)} av ${formatDuration(p.targetMin)}`}
         >
-          <Hourglass className={`size-4 ${p.done ? 'text-mossa' : 'text-blabar'}`} strokeWidth={2.4} aria-hidden="true" />
+          <Hourglass className="size-4 text-blabar" strokeWidth={2.4} aria-hidden="true" />
         </ProgressRing>
       }
     >
@@ -107,7 +107,7 @@ function ExerciseTile({
   const added = (kcal * Math.max(0, Math.min(100, addBackPct))) / 100
   return (
     <Tile to="/traning" tone="mossa" icon={Dumbbell} eyebrow="Träning idag">
-      <span className="mt-0.5 block truncate font-display text-lg leading-tight font-semibold text-ink">
+      <span className="mt-0.5 block truncate break-words font-display text-lg leading-tight font-semibold text-ink @max-[14rem]:line-clamp-2 @max-[14rem]:whitespace-normal">
         {names.slice(0, 2).join(' och ')}
         {names.length > 2 ? ` +${names.length - 2}` : ''}
       </span>

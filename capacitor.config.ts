@@ -35,6 +35,10 @@ const config: CapacitorConfig = {
     // Ingen förhandsvisning av länkar vid långt tryck – externa länkar öppnas i Safari.
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
+    // Nypa för att zooma ska fungera som på webben (WCAG 1.4.4). Capacitors standard är false, då
+    // stänger webbvyn av nypningen helt. (iPhones "Större text"/Dynamic Type följer inte med in i
+    // en webbvy och är inte mappad – appen deklarerar inte stöd för "Större text" i App Store Connect.)
+    zoomEnabled: true,
     // Bakgrunden följer systemets ljusa/mörka läge (systemBackground) när den inte sätts här.
   },
   android: {
@@ -42,6 +46,8 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     // Tangentbordets inmatning går via webbvyns vanliga fält.
     captureInput: false,
+    // Nypa för att zooma ska fungera som på webben (WCAG 1.4.4). Standard är false.
+    zoomEnabled: true,
   },
   server: {
     // Standardvärdena skrivs ut för tydlighet – se varningen överst.

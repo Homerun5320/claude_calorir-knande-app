@@ -116,16 +116,18 @@ export function Badge({ tone = 'neutral', variant = 'soft', size = 'sm', icon, d
       title={title}
       style={toneVars(tone)}
       className={cx(
-        'inline-flex max-w-full shrink-0 items-center gap-1 whitespace-nowrap rounded-full font-semibold leading-none tabular-nums',
-        size === 'sm' ? 'h-5 px-2 text-[0.6875rem]' : 'h-6 px-2.5 text-xs',
+        // shrink-0 + max-w-full: behåller sin storlek bredvid andra element men radbryts när den ensam är
+        // bredare än raden (stor text, WCAG 1.4.4/1.4.10). min-h-* – enradig höjd som förut.
+        'inline-flex max-w-full shrink-0 items-center gap-1 rounded-full text-center font-semibold leading-none tabular-nums',
+        size === 'sm' ? 'min-h-5 px-2 py-0.5 text-[0.6875rem]' : 'min-h-6 px-2.5 py-0.5 text-xs',
         VARIANTS[variant],
         className,
       )}
     >
       {dot && <span aria-hidden className={cx('size-1.5 rounded-full', variant === 'solid' ? 'bg-bg' : 'bg-(--tone)')} />}
       {renderIcon(icon, size === 'sm' ? 'size-3' : 'size-3.5', 2.4)}
-      {/* Egen radhöjd: med leading-none klipper overflow:hidden (truncate) prickarna över Ö/Ä och ringen på Å. */}
-      {children !== undefined && <span className="truncate leading-[1.3]">{children}</span>}
+      {/* Egen radhöjd (leading-none på pillret klipper annars prickarna över Ö/Ä och ringen på Å). */}
+      {children !== undefined && <span className="min-w-0 break-words leading-[1.3]">{children}</span>}
     </span>
   )
 }

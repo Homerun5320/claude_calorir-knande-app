@@ -10,6 +10,7 @@ import { Button, IconButton, Sheet, TextField, cx, toast } from '../../component
 import { CategoryIcon, EnergyValue, FoodRow, describeAmount, useEnergyFormatter } from '../../components/domain'
 import { useProfileStore } from '../../stores/profileStore'
 import { mealName } from '../../lib/meals'
+import { useBottomBarPadding } from '../../hooks/useBottomBarPadding'
 import { relativeDayLabel } from '../../lib/dates'
 import { formatNutrient } from '../../lib/format'
 import { nutrientsForGrams } from '../../lib/nutrients'
@@ -26,12 +27,15 @@ export function BasketBar({ meal, onOpen, onCommit }: { meal: MealId; onOpen: ()
   const fmtEnergy = useEnergyFormatter()
   const totals = useMemo(() => itemTotals(items), [items])
   const show = items.length > 0
+  // Listan täcker nederkanten – håll fokuserade livsmedel ovanför den (WCAG 2.4.11).
+  const barRef = useBottomBarPadding()
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
           key="basket-bar"
+          ref={barRef}
           initial={reduce ? { opacity: 0 } : { y: 96, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={reduce ? { opacity: 0 } : { y: 96, opacity: 0 }}

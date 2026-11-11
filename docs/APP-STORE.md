@@ -139,10 +139,10 @@ Logga svensk mat med Livsmedelsverkets näringsvärden och svenska mått. Spara 
 Lagom är en svensk kost- och näringsdagbok för dig som vill ha koll på vad du äter – utan pekpinnar. Allt är på svenska, med svensk mat, svenska mått och Livsmedelsverkets näringsvärden.
 
 LOGGA MAT SNABBT
-• Sök bland svenska vardagslivsmedel – de flesta med näringsvärden från Livsmedelsverkets livsmedelsdatabas
+• Sök bland svenska vardagslivsmedel
 • Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
-• Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
-• Skanna streckkoden på förpackningen för att hitta produkten
+• Kött, fisk, pasta och ris anges tillagade – ange vikten rå eller okokt, så räknar Lagom om
+• Skanna streckkoden för att hitta produkten
 • Saknas en vara? Fyll i från förpackningen med iPhones Skanna text eller inklistrad text – du granskar innan du sparar
 • Spara måltider du äter ofta och lägg in dem med ett tryck
 
@@ -153,6 +153,7 @@ NÄRING OCH MÅL
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Allergiprofil: markera det du inte tål, så visar Lagom vad Open Food Facts anger om allergener och spår i produkten, med källan – läs alltid förpackningen
 • Vatten, träning, steg och vikt på samma ställe
+• Fasta om du vill – en enkel timer för 12:12 till 20:4, utan poäng eller serier
 • Koppla till Apple Hälsa om du vill: hämta vikt och steg, och spara energi, vatten och vikt
 • Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
 
@@ -166,7 +167,7 @@ RECEPT, PLANERING OCH INSIKTER
 • Framstegsbilder om du vill – avstängda från början, sparas bara i telefonen och följer inte med i säkerhetskopian
 
 LUGNT OCH UTAN SKULD
-Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
+Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Fasta rekommenderas inte vid graviditet, amning, under 18 år, ätstörning eller diabetes med blodsockersänkande läkemedel – prata med vården först. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
 
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
@@ -184,7 +185,7 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(3 861 tecken med radbrytningar.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
+(3 988 tecken med radbrytningar.) Rubriken är medvetet inte "Lagom är bäst" – ordet "bäst" kan uppfattas som ett
 rankingord vid granskningen. Veckoplaneringen, receptimporten, påminnelserna och Apple Hälsa ska
 finnas i version 1.0 – kontrollera ändå i det bygge du skickar in att allt i texten finns i appen
 (2.3.1). Raden om Apple Hälsa ska stå kvar så länge kopplingen finns: Apple kräver att en app som
@@ -197,6 +198,17 @@ skanningen) och milstolparna (Mer → Milstolpar) – finns i App Store-bygget (
 2026-09-29 med `VITE_DISTRIBUTION=appstore`). Delning som länk kräver webbplatsens adress
 (`VITE_API_BASE`), som byggkontrollen redan kräver i butiksbyggen; utan den går det bara att dela
 som fil. Röstsökningen är webbens och finns inte i appen – den står därför inte i texterna.
+
+Fastan (Mer → Fasta, en enkel timer för 12:12 till 20:4) finns i alla byggen – ingen byggkonstant
+styr sidan (kontrollerat 2026-10-03 i `src/App.tsx` och `features/more/MorePage.tsx`). Raden i
+beskrivningen är medvetet kort och utan hälsopåståenden: inget om viktnedgång, fettförbränning eller
+effekt på kroppen och inget beröm – bara att den är valfri och utan poäng eller serier. Meningen om
+vem fastan inte rekommenderas för (graviditet, amning, under 18 år, ätstörning, diabetes med
+blodsockersänkande läkemedel) står i stycket "Lugnt och utan skuld", tillsammans med 1177 och
+Frisk & Fri och förbehållet sist i texten ("prata med vården", riktlinje 1.4.1). Den ska stå kvar så
+länge raden finns, och orden ska stämma med sidan Fasta i appen och med supportsidans avsnitt "Hur
+fungerar fastan?" (`public/support/index.html`). Skriv aldrig "bränner fett", "autofagi", "detox"
+eller "snabbare viktnedgång" i butikstexterna.
 
 ### Nyckelord (högst 100 byte, kommaseparerade utan mellanslag)
 
@@ -462,7 +474,7 @@ kan skilja något):
 | --- | --- | --- |
 | Alcohol, Tobacco, or Drug Use or References | **Infrequent** | Dryck kan loggas, med alkoholenheter och Livsmedelsverkets råd. Alkohol framställs aldrig positivt. |
 | Medical or Treatment Information | **Infrequent** | Kostråd, NNR 2023 och hänvisningar till 1177 och Frisk & Fri – allmän information, inte behandling. |
-| Health or Wellness Topics | **Ja** | Kost, vikt och näring. |
+| Health or Wellness Topics | **Ja** | Kost, vikt, näring och fasta. |
 | Sexual content, violence, horror, profanity, gambling, contests | Nej / None | – |
 | Unrestricted Web Access | Nej | Externa länkar öppnas i Safari, inte i en webbläsare i appen. |
 | User-Generated Content, Messaging and Chat, sociala medier | **Nej** | Ingen kontakt mellan användare. |
@@ -502,6 +514,8 @@ The sample data is read-only. To try logging food, tap 'Börja med min egen prof
 In-app purchases: 'prov14' (14-day Trial, non-consumable, free – follows the Apple ID and is restored with Restore Purchases, so it cannot be restarted by reinstalling), 'livstid' (Lifetime licence, non-consumable) and 'ar' (Annual licence, non-renewing subscription, 365 days, does not auto-renew; an Annual licence bought during the last 30 days starts when the current one ends). Prices are loaded from the App Store. Restore Purchases is on Mer → Lagom Premium and in Inställningar → Licens.
 
 Native features (all optional and off by default): Apple Health (HealthKit) in Inställningar → Apple Hälsa reads weight and steps and writes weight that the user logs, and dietary energy and water for finished days (HealthKit samples cannot be edited by the app afterwards, so only completed days are sent); health data stays on the device and is never used for advertising or shared. Reminders (Inställningar → Påminnelser) are local notifications only. The barcode scanner uses the camera with Apple's Vision framework; no images are stored or sent. Progress photos (off by default, Vikt & mått → Framstegsbilder) may use the camera or the photo picker; the photos are downscaled, stripped of location data and stored only in the app on the device – never uploaded or included in backups. Export and backup use the iOS share sheet. The whole app works offline with on-device storage.
+
+Fasting (Mer → Fasta, optional): a simple timer for 12:12 to 20:4 with a history. It has no scores, streaks or health claims and does not change the daily goal. The page says who fasting is not recommended for (pregnancy or breastfeeding, under 18, diabetes treated with blood-sugar-lowering medicine, a current or past eating disorder), tells users to talk to their healthcare provider (1177) first and links to support (Frisk & Fri, 1177). For users who are pregnant, breastfeeding or under 18 the start button is replaced by a caution message until they choose to show the timer. Fasts are stored only on the device.
 
 The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```
@@ -583,7 +597,7 @@ I korthet:
 | 2.5.1 / 5.1.3 HealthKit | Kopplingen nämns inte i beskrivningen, syns inte tydligt i appen eller saknas i integritetspolicyn. | Raden om Apple Hälsa i beskrivningen, Inställningar → Apple Hälsa i appen, och ett stycke om Hälsa i policyn. |
 | 5.1.1 Behörigheter | Appen frågar om kamera, Hälsa eller notiser utan att det behövs just då. | Frågorna kommer först när användaren själv startar streckkodsläsaren, kopplar Hälsa eller slår på en påminnelse. |
 | 5.1.1 Integritet | Integritetspolicyn saknas eller stämmer inte med App Privacy. | Samma uppgifter i båda (se avsnitt 7). |
-| 1.4.1 Hälsa | Påståenden om medicinsk effekt. | Texten säger "allmän information och uppskattningar – inte medicinsk rådgivning". |
+| 1.4.1 Hälsa | Påståenden om medicinsk effekt. | Texten säger "allmän information och uppskattningar – inte medicinsk rådgivning". Fastan beskrivs utan hälsopåståenden, med vem den inte rekommenderas för och en uppmaning att prata med vården. |
 
 Blir appen avvisad: läs meddelandet i *Resolution Center*, svara lugnt och sakligt (gärna på
 engelska) och rätta det som efterfrågas. Det går att överklaga via *App Review Board* om du

@@ -1,8 +1,9 @@
 /**
  * Pågående fasta: stor ring med förfluten tid (uppdateras varje sekund medan sidan syns),
  * kvarvarande tid, start och mål, byte av protokoll, ändra starttid, avsluta och avbryt.
+ * När målet är nått står det sakligt ("Målet är nått") – ingen grön framgångsfärg, inget beröm.
  */
-import { memo } from 'react'
+import { memo, useId } from 'react'
 import { Hourglass, Pencil, X } from 'lucide-react'
 import { Badge, Button, Card, ProgressRing, SegmentedControl, confirmDialog, toast } from '../../../components/ui'
 import { useFastingStore, type FastRecord } from '../../../stores/fastingStore'
@@ -40,6 +41,7 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
   const now = useNow(1000)
   const p = fastProgress(active, now)
   const known = protocolById(active.protocol)
+  const descriptionId = useId()
 
   const end = async () => {
     const current = fastProgress(active, Date.now())
@@ -69,8 +71,9 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
     }
     const rec = useFastingStore.getState().endFast()
     if (!rec) return
-    haptic('success')
-    toast(endMessage(rec), { tone: 'success' })
+    // Saklig bekräftelse, ingen "klart"-vibration: en avslutad fasta firas aldrig (varken före eller efter målet).
+    haptic('tap')
+    toast(endMessage(rec))
     onEnded(rec)
   }
 
@@ -101,9 +104,14 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
   }
 
   return (
-    <Card padding="lg" aria-label="Pågående fasta" as="section">
+    <Card padding="lg" aria-label="Pågående fasta" aria-describedby={descriptionId} as="section">
+      {/* Ringens innehåll är presentationellt för skärmläsare (en förloppsindikator har inga läsbara barn) – förklaringen står här. */}
+      <p id={descriptionId} className="sr-only">
+        Ringen visar hur långt fastan har kommit. I mitten står tiden som har gått och tiden som är kvar till målet. Under ringen står när fastan började och
+        när målet nås. Du kan ändra starttiden, byta mål eller avsluta fastan när du vill.
+      </p>
       <div className="flex flex-col items-center text-center">
-        <Badge tone={p.done ? 'mossa' : 'blabar'} dot>
+        <Badge tone="blabar" dot>
           {p.done ? 'Målet är nått' : `Fastar · ${active.protocol}`}
         </Badge>
 
@@ -113,18 +121,22 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
           max={p.targetMs}
           size={244}
           thickness={16}
-          tone={p.done ? 'mossa' : 'blabar'}
+          tone="blabar"
           aria-label="Fastans förlopp"
           valueText={`${formatFastDuration(p.elapsedMs)} av ${active.targetHours}\u00a0timmar`}
         >
           <span className="eyebrow">{p.done ? 'Fastat' : 'Har fastat'}</span>
-          <span className="display-num mt-1.5 text-[2.75rem] font-semibold leading-none text-ink">{formatHms(p.elapsedMs)}</span>
+          {/* Taket i px: ringen är 244 px, så siffrorna får inte växa med rotens teckenstorlek (vid 150 % lade de sig över ringen). */}
+          <span className="display-num mt-1.5 font-semibold leading-none text-ink" style={{ fontSize: 'min(2.75rem, 44px)' }}>
+            {formatHms(p.elapsedMs)}
+          </span>
           <span className="mt-2 text-sm text-ink-2">
             {p.done ? `Målet nåddes ${clockTime(p.goalAt)}` : `${formatFastDuration(p.remainingMs)} kvar`}
           </span>
         </ProgressRing>
 
-        <dl className="mt-5 grid w-full grid-cols-2 gap-2 text-left">
+        {/* Två kolumner när det får plats, annars en under den andra (stor text). */}
+        <dl className="mt-5 grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-2 text-left">
           <div className="rounded-2xl bg-surface-2 px-3.5 py-2.5">
             <dt className="eyebrow">Start</dt>
             <dd className="mt-0.5 text-[0.9375rem] font-semibold text-ink first-letter:uppercase">{dayAndTime(active.start, today)}</dd>
@@ -155,11 +167,11 @@ export const FastTimerCard = memo(function FastTimerCard({ active, today, onEdit
           <Button size="lg" fullWidth onClick={() => void end()} variant={p.done ? 'primary' : 'secondary'}>
             {p.done ? 'Avsluta och spara' : 'Avsluta fastan'}
           </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="ghost" iconLeft={Pencil} onClick={onEditStart}>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" className="flex-[1_1_8rem]" iconLeft={Pencil} onClick={onEditStart}>
               Ändra start
             </Button>
-            <Button variant="ghost" iconLeft={X} onClick={() => void cancel()}>
+            <Button variant="ghost" className="flex-[1_1_8rem]" iconLeft={X} onClick={() => void cancel()}>
               Avbryt
             </Button>
           </div>

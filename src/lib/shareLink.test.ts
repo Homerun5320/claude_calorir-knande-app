@@ -244,6 +244,27 @@ describe('buildRecipeShare', () => {
     expect(payload.sourceUrl).toBeUndefined()
     expect(payload.emoji).toBeUndefined()
   })
+
+  it('delar bara källsidans adress – aldrig frågedel eller fragment med spårnings- och personliga id', () => {
+    const share = (sourceUrl: string) => buildRecipeShare({ ...makeRecipe(), sourceUrl }).sourceUrl
+    expect(share('https://www.exempel.se/recept/x?igshid=ABC&subscriber=123')).toBe('https://www.exempel.se/recept/x')
+    expect(share('https://x.se/r?id=5&utm_source=a&fbclid=b#c')).toBe('https://x.se/r')
+    expect(share('https://x.se/recept/pannkakor/#steg-2')).toBe('https://x.se/recept/pannkakor/')
+    // Bara ett frågetecken eller en fyrkant, och en adress utan sökväg.
+    expect(share('https://x.se/r?#')).toBe('https://x.se/r')
+    expect(share('https://x.se?gclid=1')).toBe('https://x.se/')
+    // Rena adresser är oförändrade, och reglerna för protokoll och inloggningsuppgifter gäller som förut.
+    expect(share('https://recept.example/frukost')).toBe('https://recept.example/frukost')
+    expect(share('http://x.se/r?a=1')).toBeUndefined()
+    expect(share('https://anvandare:losen@x.se/r?a=1')).toBeUndefined()
+    expect(share('javascript:alert(1)')).toBeUndefined()
+    // Avsändarens egna recept ändras inte.
+    const own = { ...makeRecipe(), sourceUrl: 'https://x.se/r?id=5&fbclid=b' }
+    buildRecipeShare(own)
+    expect(own.sourceUrl).toBe('https://x.se/r?id=5&fbclid=b')
+    // Inget spår av parametrarna i det som skickas (länk eller fil).
+    expect(JSON.stringify(buildRecipeShare({ ...makeRecipe(), sourceUrl: 'https://x.se/r?igshid=HEMLIGT#frag' }))).not.toMatch(/HEMLIGT|igshid|frag/)
+  })
 })
 
 describe('rundresa', () => {
@@ -449,6 +470,13 @@ describe('skadad eller illasinnad data', () => {
     expect(parse(recipe)).toEqual({ ok: false, error: 'invalid' })
   })
 
+  it('en äldre delning med parametrar i källänken läses in utan dem', () => {
+    const recipe = { ...validMeal(), kind: 'recipe', servings: 2, sourceUrl: 'https://recept.example/r?id=5&igshid=ABC#steg' }
+    delete (recipe as { meal?: unknown }).meal
+    const read = parse(recipe)
+    expect(read.ok && read.payload.kind === 'recipe' ? read.payload.sourceUrl : undefined).toBe('https://recept.example/r')
+  })
+
   it('känner igen säkerhetskopior, nyare versioner och annat', () => {
     expect(parse({ format: 'lagom-backup', version: 1, data: {} })).toEqual({ ok: false, error: 'backup' })
     expect(parse({ ...validMeal(), v: 2 })).toEqual({ ok: false, error: 'newer' })
@@ -591,6 +619,21 @@ describe('importShare', () => {
     expect(customIds).toContain(recipe.ingredients[1].food.id)
     // Allergener följer aldrig med – hos mottagaren saknas uppgifterna.
     expect(state.customFoods[recipe.ingredients[1].food.id].extra).toBeUndefined()
+  })
+
+  it('skriver livsmedelsbutiken en enda gång för alla nya livsmedel', () => {
+    let writes = 0
+    const unsubscribe = useFoodStore.subscribe(() => {
+      writes++
+    })
+    try {
+      const result = importShare(buildRecipeShare(makeRecipe()), lookup)
+      expect(result?.newFoods).toBe(2)
+      // En skrivning för de två nya livsmedlen och en för receptet – inte en per livsmedel.
+      expect(writes).toBe(2)
+    } finally {
+      unsubscribe()
+    }
   })
 
   it('skapar inga dubbletter när samma recept importeras igen', () => {

@@ -84,7 +84,8 @@ export function ShoppingListView({ weekStart, today, list, loading, planned, onP
   // t.ex. en klassiker se ut att saknas).
   if (loading) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Hämtar recepten">
+      <div className="flex flex-col gap-3" role="status" aria-busy="true">
+        <span className="sr-only">Hämtar recepten …</span>
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-28 w-full rounded-[1.5rem]" />
         ))}
@@ -174,13 +175,18 @@ export function ShoppingListView({ weekStart, today, list, loading, planned, onP
   )
 }
 
+/**
+ * Den synliga rutan till en dold riktig kryssruta (`peer sr-only`). Den obockade ramen är den enda
+ * synliga gränsen för kontrollen, så den använder `border-ink-3` (minst 4,5:1 mot kortet i båda
+ * temana) i stället för `border-line` (1,4:1) – WCAG 1.4.11 kräver 3:1.
+ */
 function CheckBox({ checked }: { checked: boolean }) {
   return (
     <span
       aria-hidden
       className={cx(
         'mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg border-2 transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gran',
-        checked ? 'border-gran bg-gran text-on-gran' : 'border-line bg-surface',
+        checked ? 'border-gran bg-gran text-on-gran' : 'border-ink-3 bg-surface',
       )}
     >
       {checked && <Check className="size-4" strokeWidth={3} />}

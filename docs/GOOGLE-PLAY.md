@@ -170,13 +170,13 @@ Svensk kostdagbok med Livsmedelsverkets värden, svenska mått och streckkoder
 Lagom är en svensk kost- och näringsdagbok för dig som vill ha koll på vad du äter – utan pekpinnar. Allt är på svenska, med svensk mat, svenska mått och Livsmedelsverkets näringsvärden.
 
 LOGGA MAT SNABBT
-• Sök bland svenska vardagslivsmedel – de flesta med näringsvärden från Livsmedelsverkets livsmedelsdatabas
-• Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en smörgås, en kopp)
-• Kött, fisk, pasta och ris anges tillagade – du kan också ange vikten rå eller okokt, så räknar Lagom om
-• Skanna streckkoden på förpackningen för att hitta produkten
+• Sök bland svenska vardagslivsmedel
+• Ange mängden som du är van vid: gram, dl, msk, tsk, krm eller portioner (en skiva, en kopp)
+• Kött, fisk, pasta och ris anges tillagade – ange vikten rå eller okokt, så räknar Lagom om
+• Skanna streckkoden för att hitta produkten
 • Saknas en vara? Fyll i från förpackningen med telefonens textigenkänning eller inklistrad text – du granskar innan du sparar
 • Spara måltider du äter ofta och lägg in dem med ett tryck
-• Widget på hemskärmen om du vill – dagens energi, måltider och vatten och en knapp för att lägga till
+• Widget på hemskärmen om du vill – dagens energi, måltider, vatten och en pågående fasta
 
 NÄRING OCH MÅL
 • Dagsringen visar energi, protein, kolhydrater, fett och fibrer mot ditt dagsmål
@@ -185,20 +185,21 @@ NÄRING OCH MÅL
 • Livsmedelsverkets kostråd och Tallriksmodellen, förklarade enkelt
 • Allergiprofil: markera det du inte tål, så visar Lagom vad Open Food Facts anger om allergener och spår i produkten, med källan – läs alltid förpackningen
 • Vatten, träning, steg och vikt på samma ställe
+• Fasta om du vill – en enkel timer för 12:12 till 20:4, utan poäng eller serier
 • Koppla till Health Connect om du vill: hämta vikt och steg, och spara energi, vatten och vikt
-• Påminnelser om måltider och vatten om du vill – lugna, lokala notiser
+• Påminnelser om måltider och vatten om du vill – lokala notiser
 
 RECEPT, PLANERING OCH INSIKTER
 • Svenska klassiker och dina egna recept, med näring per portion
 • Hämta recept från en webbadress
-• Dela dina recept och sparade måltider som länk eller fil – mottagaren ser allt innan något sparas
+• Dela dina recept och sparade måltider som länk eller fil
 • Planera veckans måltider och få en inköpslista
 • Insikter för veckan, 30 och 90 dagar – bara dagar du har loggat räknas
 • Vikt och mått med en lugn trendlinje i stället för dagliga svängningar
 • Framstegsbilder om du vill – avstängda från början, sparas bara i telefonen och följer inte med i säkerhetskopian
 
 LUGNT OCH UTAN SKULD
-Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
+Lagom dömer inte. Går du över målet en dag står det "helt okej, det jämnar ut sig över veckan" – inga röda varningar. Milstolparna firar att du är igång, aldrig dagar i rad, vikt eller kalorier. Appen räknar med ett kalorigolv och föreslår aldrig viktnedgång under graviditet eller amning – då används inte heller veckobudgeten. Fasta rekommenderas inte vid graviditet, amning, under 18 år, ätstörning eller diabetes med blodsockersänkande läkemedel – prata med vården först. Är du orolig för din relation till mat finns hjälp hos 1177 och Frisk & Fri.
 
 DIN DATA STANNAR HOS DIG
 • Inget konto och ingen inloggning
@@ -208,7 +209,7 @@ DIN DATA STANNAR HOS DIG
 • Sökord och streckkoder skickas till Open Food Facts för att hitta produkter – utan ditt namn, din e-post eller din dagbok
 
 PRIS
-14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen via Google Play, utan automatisk förnyelse. Priserna visas i Google Play innan du köper. Provperioden startar först när du skapar din profil – exempeldatan kan du titta på så länge du vill. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
+14 dagar utan kostnad, sedan årslicens eller livstidslicens som köp i appen via Google Play, utan automatisk förnyelse. Priserna visas i Google Play innan du köper. Provperioden startar först när du skapar din profil. När provperioden är slut kan du fortfarande se, exportera och radera allt du har loggat.
 
 KÄLLOR
 Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de flesta näringsvärdena kommer från Livsmedelsverkets öppna livsmedelsdatabas (CC BY 4.0), övriga är samlingsvärden för vanliga märken och värden från förpackningar. Källa: https://soknaringsinnehall.livsmedelsverket.se. Produktuppgifter från streckkoder kommer från Open Food Facts (ODbL). Rekommendationerna bygger på Nordiska näringsrekommendationer 2023 och Livsmedelsverkets kostråd.
@@ -216,7 +217,7 @@ Lagom är en fristående app och är inte kopplad till Livsmedelsverket; de fles
 Lagom ger allmän information och uppskattningar – inte medicinsk rådgivning. Har du en sjukdom, är gravid eller har frågor om din hälsa: prata med vården.
 ```
 
-(3 986 tecken med radbrytningar.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
+(3 992 tecken med radbrytningar.) Beskriv aldrig en funktion som inte finns i det bygge du laddar upp –
 veckoplaneringen, receptimporten, påminnelserna, Health Connect och widgeten ska finnas i version 1.0,
 men kontrollera i den version du laddar upp (Inställningar → Påminnelser, Inställningar → Health
 Connect och hemskärmens lista över widgetar, där den heter **Idag** under Lagom). Saknas någon: ta
@@ -236,9 +237,21 @@ Widgeten på hemskärmen är Android-appens egen kod (det lokala tillägget `Lag
 `android/app/src/main/java/se/lagomappen/lagom/widget/`, registrerat i `MainActivity`, se
 [WIDGET.md](WIDGET.md)) och finns bara i Play-appen. Den lägger inte till några behörigheter eller
 beroenden, och inget lämnar telefonen – Data safety är därför oförändrad. Raden säger bara det
-widgeten visar: energin (inga siffror i medvetet läge), antal måltider, vatten och knappen "Lägg
-till" – aldrig exempeldata. Den byggs i molnbygget men kan bara provas på en riktig telefon
+widgeten visar: energin (inga siffror i medvetet läge), antal måltider, vatten och en pågående
+fasta – aldrig exempeldata. Den byggs i molnbygget men kan bara provas på en riktig telefon
 ([WIDGET.md §7](WIDGET.md#7-testa-på-en-telefon)) – gör det innan raden följer med till produktion.
+
+Fastan (Mer → Fasta, en enkel timer för 12:12 till 20:4) finns i alla byggen – ingen byggkonstant
+styr sidan (kontrollerat 2026-10-03 i `src/App.tsx` och `features/more/MorePage.tsx`). Raden i
+beskrivningen är medvetet kort och utan hälsopåståenden: inget om viktnedgång, fettförbränning eller
+effekt på kroppen och inget beröm – bara att den är valfri och utan poäng eller serier. Meningen om
+vem fastan inte rekommenderas för (graviditet, amning, under 18 år, ätstörning, diabetes med
+blodsockersänkande läkemedel) står i stycket "Lugnt och utan skuld", tillsammans med 1177 och
+Frisk & Fri och förbehållet sist i texten ("prata med vården"). Den ska stå kvar så länge raden
+finns, och orden ska stämma med sidan Fasta i appen och med supportsidans avsnitt "Hur fungerar
+fastan?" (`public/support/index.html`). Skriv aldrig "bränner fett", "autofagi", "detox" eller
+"snabbare viktnedgång" i butikstexterna. Fastan kräver ingen ny behörighet och ingen ny uppgift i
+Data safety – den sparas bara i telefonen, som resten av dagboken.
 
 ### Versionsinformation (högst 500 tecken)
 
@@ -247,7 +260,7 @@ mellan språktaggarna `<sv-SE>` och `</sv-SE>` i rutan. För de första testvers
 kort rad (avsnitt 10); den här texten gäller version 1.0 i produktion.
 
 ```
-Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare och "Fyll i från förpackningen", recept som du kan dela som länk eller fil, veckoplanering och veckobudget, allergiprofil, insikter, milstolpar, vikt och mått, vatten och träning – och om du vill framstegsbilder, påminnelser, en widget på hemskärmen och koppling till Health Connect. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
+Välkommen till Lagom! Den första versionen innehåller matdagbok med Livsmedelsverkets näringsvärden och svenska mått, streckkodsläsare och "Fyll i från förpackningen", recept att dela som länk eller fil, veckoplanering och veckobudget, allergiprofil, insikter, milstolpar, vikt och mått, vatten, träning och fasta – och om du vill framstegsbilder, påminnelser, en widget på hemskärmen och koppling till Health Connect. Hittar du något som inte fungerar? Skriv till oss via Om Lagom → Felsökning.
 ```
 
 (495 tecken.)
@@ -477,8 +490,8 @@ Voided Purchases API, och Data safety och integritetspolicyn uppdateras före in
 streckkodsläsaren lägger till behörigheten `com.google.android.gms.permission.AD_ID`. Kontrollera
 efter första uppladdningen: *Testa och släpp → Appsamling (App bundle explorer) → versionen →
 Behörigheter* – där ska bara behörigheterna i [NATIVE.md §6](NATIVE.md#behörigheter) finnas
-(internet, kamera, notiser, start efter omstart, vibration, köp i appen och de sex
-Health Connect-behörigheterna).
+(internet, kamera, notiser, start efter omstart, vibration, köp i appen och de fem
+Health Connect-behörigheterna: vikt läsa och skriva, steg läsa, näring och vatten skriva).
 
 ### Datasäkerhet (Data safety)
 
@@ -556,7 +569,7 @@ dagar. Godkännandet gäller paketnamnet, inte en viss version.
    | --- | --- | --- |
    | `READ_WEIGHT` | Läsa | `Optional and off by default. When the user turns it on, new weight measurements (for example from a smart scale) are shown in Lagom's weight chart, so the user does not have to enter them twice. One value per day; values stay on the device.` |
    | `WRITE_WEIGHT` | Skriva | `Optional. Saves weights that the user logs in Lagom to Health Connect, so other health apps the user chooses can use them.` |
-   | `READ_STEPS` | Läsa | `Optional. Shows today's step count in the activity part of Lagom's food diary. Values stay on the device.` |
+   | `READ_STEPS` | Läsa | `Optional. Fills in the step count for today and the previous six days in the activity part of Lagom's food diary, so the user does not have to enter it by hand. Values stay on the device.` |
    | `WRITE_NUTRITION` | Skriva | `Optional. Saves the energy (kcal) of meals the user logs in Lagom's food diary to Health Connect once the day is finished, so the user's other health apps can show it.` |
    | `WRITE_HYDRATION` | Skriva | `Optional. Saves the water the user logs in Lagom to Health Connect once the day is finished.` |
 
@@ -634,7 +647,9 @@ After the trial, viewing, export and deletion always work; only new logging requ
 
 Optional features, all off by default: Health Connect (Inställningar → Health Connect) reads weight and steps and writes weight, dietary energy and water (energy and water for finished days); data stays on the device. Reminders (Inställningar → Påminnelser) are local notifications. The camera is only used to scan barcodes; no images are stored or sent.
 
-Home screen widget (optional): long-press the home screen, choose Widgets and add 'Idag' under Lagom. It shows today's remaining energy, logged meals and water, and opens the app ('Lägg till' opens the add-food screen). It never shows sample data, so create a profile first to see numbers. The summary is stored only on the device.
+Fasting (Mer → Fasta, optional): a simple timer for 12:12 to 20:4 with a history. It has no scores, streaks or health claims and does not change the daily goal. The page says who fasting is not recommended for (pregnancy or breastfeeding, under 18, diabetes treated with blood-sugar-lowering medicine, a current or past eating disorder), tells users to talk to their healthcare provider (1177) first and links to support (Frisk & Fri, 1177). For users who are pregnant, breastfeeding or under 18 the start button is replaced by a caution message until they choose to show the timer. Fasts are stored only on the device.
+
+Home screen widget (optional): long-press the home screen, choose Widgets and add 'Idag' under Lagom. It shows today's remaining energy, logged meals and water (and an ongoing fast), and opens the app ('Lägg till' opens the add-food screen). It never shows sample data, so create a profile first to see numbers. The summary is stored only on the device.
 
 The app is in Swedish and only available in Sweden. Nutrition values come from the Swedish Food Agency's open database (CC BY 4.0); the app is independent and not affiliated with the agency. The app gives general information and estimates, not medical advice.
 ```
@@ -817,6 +832,6 @@ Behövs bara för att molnbygget ska ladda upp till intern testning själv:
 - [x] Integritetspolicyn beskriver Health Connect, påminnelser, den automatiska kopian, widgetens sammanfattning (`lagom-widget`) och köp via Google Play Billing (kontrollera att den publicerade versionen är uppdaterad).
 - [ ] Sluten test: minst 12 testare i 14 dagar i följd.
 - [ ] Butikstexter (och versionsinformationen för produktion), ikon, funktionsgrafik och 2–8 skärmdumpar från butiksbygget uppladdade.
-- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de sex Health Connect-typerna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
+- [ ] Appinnehåll: integritetspolicy, annonser, annons-id, datasäkerhet, hälsoappar med de fem Health Connect-behörigheterna, IARC, målgrupp 18+, appåtkomst med granskarlicens.
 - [ ] Länder: bara Sverige.
 - [ ] Inga omnämnanden av webbköp eller App Store i appen eller texterna.

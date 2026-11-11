@@ -18,14 +18,60 @@ export interface FastingProtocol {
   /** Kort etikett, t.ex. "Populärast". */
   title: string
   description: string
+  /**
+   * Längre förklaring (2–3 meningar): vad siffrorna betyder, ett vardagsexempel med klockslag och en
+   * varsam tanke. Saklig och utan löften – se `Evidensläget` överst. Visas under "Mer om …" i
+   * StartFastCard. Exemplets klockslag ska gå ihop med protokollets timmar (testas).
+   */
+  details: string
 }
 
 export const FASTING_PROTOCOLS: readonly FastingProtocol[] = [
-  { id: '12:12', fastHours: 12, eatHours: 12, title: 'Nybörjarvänlig', description: 'Ungefär en natt plus kvällen, t.ex. ät 08–20.' },
-  { id: '14:10', fastHours: 14, eatHours: 10, title: 'Mjuk start', description: 'Ett lite kortare ätfönster, t.ex. ät 09–19.' },
-  { id: '16:8', fastHours: 16, eatHours: 8, title: 'Vanligast', description: 'Hoppa över frukost eller kvällsmat, t.ex. ät 12–20.' },
-  { id: '18:6', fastHours: 18, eatHours: 6, title: 'För den vane', description: 'Två måltider i ett kort fönster, t.ex. ät 12–18.' },
-  { id: '20:4', fastHours: 20, eatHours: 4, title: 'Krävande', description: 'Ett mycket kort ätfönster, t.ex. ät 14–18. Passar få.' },
+  {
+    id: '12:12',
+    fastHours: 12,
+    eatHours: 12,
+    title: 'Nybörjarvänlig',
+    description: 'Ungefär en natt plus kvällen, t.ex. ät 08–20.',
+    details:
+      '12 timmar utan mat och 12 timmar då du äter – tillsammans ett dygn. Äter du mellan 08 och 20 fastar du från 20 till 08 nästa morgon, så en stor del av fastan är natten. Det kan kännas naturligt om du redan äter regelbundet – och det är helt okej att stanna här.',
+  },
+  {
+    id: '14:10',
+    fastHours: 14,
+    eatHours: 10,
+    title: 'Mjuk start',
+    description: 'Ett lite kortare ätfönster, t.ex. ät 09–19.',
+    details:
+      '14 timmar utan mat och 10 timmar då du äter. Äter du mellan 09 och 19 fastar du från 19 till 09 nästa morgon. Det kan passa om 12:12 känns lätt och du är nyfiken på ett lite kortare ätfönster – annars behöver du inte byta.',
+  },
+  {
+    id: '16:8',
+    fastHours: 16,
+    eatHours: 8,
+    title: 'Vanligast',
+    description: 'Hoppa över frukost eller kvällsmat, t.ex. ät 12–20.',
+    details:
+      '16 timmar utan mat och 8 timmar då du äter. Äter du mellan 12 och 20 fastar du från 20 till 12 nästa dag, så frukosten hoppas över. Det kan passa dig som ändå ofta väntar med frukosten. Känns det för långt går det bra att välja ett mjukare upplägg.',
+  },
+  {
+    id: '18:6',
+    fastHours: 18,
+    eatHours: 6,
+    title: 'Kort ätfönster',
+    description: 'Två måltider i ett kort fönster, t.ex. ät 12–18.',
+    details:
+      '18 timmar utan mat och 6 timmar då du äter. Äter du mellan 12 och 18 fastar du från 18 till 12 nästa dag. Det är ett kort fönster att få in dagens mat på – ett mjukare upplägg passar många bättre, och ett kortare ätfönster är inte bättre.',
+  },
+  {
+    id: '20:4',
+    fastHours: 20,
+    eatHours: 4,
+    title: 'Mycket kort ätfönster',
+    description: 'Bara fyra timmar att äta på, t.ex. ät 14–18. Passar få.',
+    details:
+      '20 timmar utan mat och bara 4 timmar då du äter. Äter du mellan 14 och 18 fastar du från 18 till 14 nästa dag. Ett så kort fönster kan göra det svårt att få i sig tillräckligt – ett mjukare upplägg passar de flesta bättre. Lyssna på kroppen.',
+  },
 ]
 
 export const DEFAULT_PROTOCOL_ID = '16:8'
@@ -183,15 +229,9 @@ export function fastDurationMs(rec: Pick<FastRecord, 'start' | 'end'>): number {
   return Math.max(0, rec.end - rec.start)
 }
 
-/** Nåddes målet? */
+/** Nåddes målet? Används bara för en saklig text – målen räknas aldrig ihop eller visas som poäng. */
 export function fastSucceeded(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): boolean {
   return fastDurationMs(rec) >= rec.targetHours * HOUR_MS - SUCCESS_TOLERANCE_MS
-}
-
-/** Andel av målet, 0–1+. */
-export function fastRatio(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): number {
-  const target = rec.targetHours * HOUR_MS
-  return target > 0 ? fastDurationMs(rec) / target : 0
 }
 
 /** En fasta hör till dagen den avslutades. */
@@ -201,12 +241,10 @@ export function fastDate(rec: Pick<FastRecord, 'end'>): ISODate {
 
 export interface FastingWeek {
   count: number
-  completed: number
   totalMs: number
   averageMs: number
-  longestMs: number
-  /** Per dag i veckan: 'klar' om ett mål nåddes, 'pabörjad' om en fasta avslutades, annars null. */
-  days: Array<{ date: ISODate; status: 'klar' | 'paborjad' | null }>
+  /** Per dag i veckan: avslutades en fasta den dagen? Ingen poängtavla – målen räknas inte. */
+  days: Array<{ date: ISODate; ended: boolean }>
 }
 
 /**
@@ -225,30 +263,26 @@ export function fastingWeek(history: readonly FastRecord[], dates: readonly ISOD
     else byDay.set(d, [rec])
   }
   let count = 0
-  let completed = 0
   let totalMs = 0
-  let longestMs = 0
   for (const list of byDay.values()) {
     for (const rec of list) {
-      const ms = fastDurationMs(rec)
       count++
-      totalMs += ms
-      if (ms > longestMs) longestMs = ms
-      if (fastSucceeded(rec)) completed++
+      totalMs += fastDurationMs(rec)
     }
   }
-  const days = dates.map((date) => {
-    const list = byDay.get(date)
-    const status: 'klar' | 'paborjad' | null = !list ? null : list.some(fastSucceeded) ? 'klar' : 'paborjad'
-    return { date, status }
-  })
-  return { count, completed, totalMs, averageMs: count > 0 ? totalMs / count : 0, longestMs, days }
+  const days = dates.map((date) => ({ date, ended: byDay.has(date) }))
+  return { count, totalMs, averageMs: count > 0 ? totalMs / count : 0, days }
 }
 
-/** Vänlig text när en fasta avslutas. */
+/**
+ * Saklig text när en fasta avslutas. Ingen beröm och inget firande när målet nåddes – att fira
+ * att man avstått från mat kan vara en risk för den som har eller har haft en ätstörning (se
+ * lib/milestones). Avslutas fastan före målet är det helt okej att lyssna på kroppen.
+ */
 export function endMessage(rec: Pick<FastRecord, 'start' | 'end' | 'targetHours'>): string {
-  if (fastSucceeded(rec)) return `Snyggt – ${formatFastDuration(fastDurationMs(rec))} fasta är sparad.`
-  return `Fastan är sparad (${formatFastDuration(fastDurationMs(rec))}). Bra att lyssna på kroppen.`
+  const duration = formatFastDuration(fastDurationMs(rec))
+  if (fastSucceeded(rec)) return `Fastan är sparad (${duration}).`
+  return `Fastan är sparad (${duration}). Det är helt okej att lyssna på kroppen.`
 }
 
 /** Senast använda protokoll, eller standard. */

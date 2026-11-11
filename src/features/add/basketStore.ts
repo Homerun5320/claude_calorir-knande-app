@@ -86,3 +86,17 @@ export const useBasketStore = create<BasketState>()(
     },
   ),
 )
+
+/**
+ * Töm korgen helt – både i minnet och ur sessionStorage (`lagom-korg`). Används av "Radera all
+ * data": korgen håller hela livsmedelsposter (även egna livsmedel) och anteckningar, och annars
+ * hamnade den förra profilens varor i den nya profilens "Lägg till". Kastar aldrig.
+ */
+export function wipeBasket(): void {
+  try {
+    useBasketStore.getState().clear()
+    useBasketStore.persist.clearStorage()
+  } catch {
+    /* blockerad lagring – minnet är redan tömt */
+  }
+}

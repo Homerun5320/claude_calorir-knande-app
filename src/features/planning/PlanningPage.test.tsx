@@ -5,9 +5,10 @@
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom'
 import { MotionGlobalConfig } from 'motion/react'
 import PlanningPage from './PlanningPage'
+import { ShoppingListView } from './ShoppingListView'
 import { useToastStore } from '../../components/ui/toast'
 import { useDiaryStore } from '../../stores/diaryStore'
 import { useFoodStore } from '../../stores/foodStore'
@@ -328,6 +329,40 @@ describe('PlanningPage – kopiera och töm', () => {
     expect(usePlanStore.getState().items[monday]).toBeUndefined()
   })
 
+  it('ångrar en kopierad vecka med flera rader med en enda skrivning (varje set() skriver om hela planen)', async () => {
+    const prev = addDays(monday, -7)
+    plan(recipeDraft(prev))
+    plan(recipeDraft(prev, { meal: 'lunch' }))
+    plan(recipeDraft(addDays(prev, 2)))
+    plan(recipeDraft(addDays(prev, 5)))
+    const own = plan(recipeDraft(addDays(monday, 3)))
+    const inWeek = () =>
+      Object.entries(usePlanStore.getState().items)
+        .filter(([date]) => date >= monday && date <= addDays(monday, 6))
+        .reduce((n, [, list]) => n + list.length, 0)
+    // Veckan har redan en rad, så kopieringen frågas först.
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderAt()
+    fireEvent.click(screen.getByRole('button', { name: 'Kopiera förra veckan' }))
+    await waitFor(() => expect(lastToast()?.message).toBe('Förra veckans plan är kopierad'))
+    expect(inWeek()).toBe(5)
+
+    let writes = 0
+    const unsubscribe = usePlanStore.subscribe(() => {
+      writes++
+    })
+    try {
+      act(() => lastToast()?.action?.onClick())
+      expect(writes).toBe(1)
+    } finally {
+      unsubscribe()
+    }
+    // Bara de kopierade raderna försvann – den egna raden och förra veckan finns kvar.
+    expect(inWeek()).toBe(1)
+    expect(usePlanStore.getState().items[own.date]).toEqual([own])
+    expect(Object.keys(usePlanStore.getState().items)).toHaveLength(4)
+  })
+
   it('frågar innan förra veckan läggs till i en vecka som redan har rader', async () => {
     plan(recipeDraft(addDays(monday, -7)))
     plan(recipeDraft(monday))
@@ -356,6 +391,22 @@ describe('PlanningPage – kopiera och töm', () => {
   })
 })
 
+describe('PlanningPage – laddning läses upp', () => {
+  it('inköpslistan som väntar på recepten är en statusregion med osynlig text (aria-label på en div hörs inte)', () => {
+    render(
+      <MemoryRouter>
+        <ShoppingListView weekStart={monday} today={today} list={{ groups: [], count: 0, missingRecipes: [] }} loading planned={1} onPlan={() => {}} />
+      </MemoryRouter>,
+    )
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent('Hämtar recepten')
+    expect(status.querySelector('.sr-only')).toHaveTextContent('Hämtar recepten …')
+    expect(status).not.toHaveAttribute('aria-label')
+    // Själva skelettet är dolt för skärmläsare.
+    for (const bone of Array.from(status.querySelectorAll('[data-skeleton]'))) expect(bone).toHaveAttribute('aria-hidden', 'true')
+  })
+})
+
 describe('PlanningPage – inköpslista', () => {
   it('sammanställer veckans ingredienser per avdelning i rå vikt och svenska mått', () => {
     plan(recipeDraft(monday, { servings: 4 }))
@@ -370,6 +421,23 @@ describe('PlanningPage – inköpslista', () => {
     expect(within(kött).getByText('750 g rå')).toBeInTheDocument()
     expect(within(kött).getByText('Till Veckans gryta')).toBeInTheDocument()
     expect(screen.getByText('2 varor kvar')).toBeInTheDocument()
+  })
+
+  it('den obockade rutan har en ram med minst 3:1 (border-ink-3, inte border-line) – både på listan och på egna varor', () => {
+    plan(recipeDraft(monday))
+    usePlanStore.getState().addExtra(monday, 'Diskmedel')
+    renderAt('/planering?flik=inkop')
+    for (const name of [/Gul lök/, 'Diskmedel']) {
+      const box = screen.getByRole('checkbox', { name })
+      // Den riktiga kryssrutan är osynlig (sr-only); rutan efter den är det man ser.
+      const visible = box.nextElementSibling as HTMLElement
+      expect(visible).toHaveAttribute('aria-hidden', 'true')
+      expect(visible).toHaveClass('border-2', 'border-ink-3')
+      expect(visible).not.toHaveClass('border-line')
+      fireEvent.click(box)
+      expect(screen.getByRole('checkbox', { name })).toBeChecked()
+      expect((screen.getByRole('checkbox', { name }).nextElementSibling as HTMLElement)).toHaveClass('border-gran', 'bg-gran')
+    }
   })
 
   it('bockar av, lägger till egna varor och kopierar listan som text', async () => {

@@ -57,7 +57,7 @@ export const DaySummaryCard = memo(function DaySummaryCard({
   const over = balance.over > 0 && balance.status !== 'lagom'
 
   return (
-    <section aria-label="Dagens summering" className="card p-5">
+    <section aria-label="Dagens summering" className="card @container p-5">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="eyebrow mr-auto">{future ? 'Planering' : 'Dagens summering'}</span>
         {future && (
@@ -76,7 +76,9 @@ export const DaySummaryCard = memo(function DaySummaryCard({
         <MindfulSummary ratio={balance.ratio} empty={entries.length === 0} plate={plate} future={future} />
       ) : (
         <>
-          <div className="grid grid-cols-3 divide-x divide-line/70 text-center">
+          {/* @max-[15rem]: bredden i rem följer textstorleken – vid stor text (200 %) ryms inte tre tal bredvid varandra, då staplas de.
+              Vid normal text är kortets innehåll ≈ 20 rem brett och inget ändras. */}
+          <div className="grid grid-cols-3 divide-x divide-line/70 text-center @max-[15rem]:grid-cols-1 @max-[15rem]:gap-y-3 @max-[15rem]:divide-x-0">
             <SummaryStat label={future ? 'Planerat' : 'Ätit'} kcal={balance.eaten} unit={energyUnit} strong />
             <SummaryStat label="Budget" kcal={balance.budget} unit={energyUnit} />
             <SummaryStat
@@ -115,11 +117,13 @@ export const DaySummaryCard = memo(function DaySummaryCard({
         showFiber={showFiber}
         variant="compact"
         hideNumbers={mindful}
+        // Poster utan protein/kolhydrater/fett (t.ex. snabbregistrerad energi) ger "–", inte 0.
+        hasEntries={entries.length > 0}
       />
 
       {/* En planerad dag har varken vatten eller träning att visa – om inte ett pass redan ligger där. */}
       {(!future || exercise.length > 0) && (
-        <div className={cx('mt-5 grid gap-2', future ? 'grid-cols-1' : 'grid-cols-2')}>
+        <div className={cx('mt-5 grid gap-2', future ? 'grid-cols-1' : 'grid-cols-2 @max-[15rem]:grid-cols-1')}>
           <MiniStat
             icon={<Dumbbell className="size-3.5" aria-hidden />}
             tint="bg-mossa-soft text-mossa"
@@ -180,13 +184,13 @@ function MiniStat({
       onClick={onClick}
       className="flex min-h-14 min-w-0 flex-col items-start rounded-2xl bg-surface-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-3"
     >
-      <span className="flex items-center gap-1.5">
+      <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5">
         <span aria-hidden className={cx('grid size-6 shrink-0 place-items-center rounded-lg', tint)}>
           {icon}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{label}</span>
+        <span className="min-w-0 break-words text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{label}</span>
       </span>
-      <span className="mt-1 block max-w-full truncate text-[0.9375rem] font-semibold text-ink tabular-nums">{value}</span>
+      <span className="mt-1 block max-w-full break-words text-[0.9375rem] font-semibold text-ink tabular-nums">{value}</span>
       {sub && <span className="block max-w-full text-[11px] leading-snug text-ink-3 tabular-nums">{sub}</span>}
     </button>
   )

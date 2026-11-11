@@ -100,8 +100,9 @@ export function ListRow({
     <>
       {leading !== undefined && leading !== null && <Leading leading={leading} tone={leadingTone} />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[0.9375rem] font-medium leading-snug text-ink">{title}</span>
-        {subtitle !== undefined && <span className="mt-0.5 block truncate text-[0.8125rem] leading-snug text-ink-3">{subtitle}</span>}
+        {/* Högst två rader: långa titlar och stor text ska inte klippas till en rad (WCAG 1.4.4). */}
+        <span className="line-clamp-2 break-words text-[0.9375rem] font-medium leading-snug text-ink">{title}</span>
+        {subtitle !== undefined && <span className="mt-0.5 line-clamp-2 break-words text-[0.8125rem] leading-snug text-ink-3">{subtitle}</span>}
       </span>
       {(value !== undefined || valueSub !== undefined) && (
         <span className="flex shrink-0 flex-col items-end text-right">

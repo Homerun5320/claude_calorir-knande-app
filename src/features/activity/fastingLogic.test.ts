@@ -3,9 +3,9 @@ import {
   dayAndTime,
   defaultStartTime,
   endMessage,
+  FASTING_PROTOCOLS,
   fastingWeek,
   fastProgress,
-  fastRatio,
   fastSucceeded,
   formatFastDuration,
   formatHms,
@@ -18,6 +18,7 @@ import {
   startParts,
   validateStart,
 } from './fastingLogic'
+import { BANNED_FASTING_WORDS } from './fastingTestUtils'
 
 const H = 3_600_000
 const M = 60_000
@@ -109,7 +110,6 @@ describe('historik', () => {
     expect(fastSucceeded(rec('a', start, 16))).toBe(true)
     expect(fastSucceeded(rec('b', start, 16 - 0.5 / 60))).toBe(true)
     expect(fastSucceeded(rec('c', start, 15))).toBe(false)
-    expect(fastRatio(rec('d', start, 8))).toBeCloseTo(0.5)
   })
 
   it('veckosummering räknar fastor till dagen de avslutades', () => {
@@ -121,11 +121,11 @@ describe('historik', () => {
     const week = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27']
     const w = fastingWeek(history, week)
     expect(w.count).toBe(2)
-    expect(w.completed).toBe(1)
     expect(w.totalMs).toBe(26 * H)
     expect(w.averageMs).toBe(13 * H)
-    expect(w.longestMs).toBe(16 * H)
-    expect(w.days.map((d) => d.status)).toEqual([null, 'klar', null, 'paborjad', null, null, null])
+    expect(w.days.map((d) => d.ended)).toEqual([false, true, false, true, false, false, false])
+    // Ingen poängtavla: varken nådda mål eller längsta fastan räknas.
+    expect(Object.keys(w).sort()).toEqual(['averageMs', 'count', 'days', 'totalMs'])
   })
 
   it('räknar inte fastor som avslutats direkt (av misstag) i veckan', () => {
@@ -146,13 +146,68 @@ describe('historik', () => {
     expect(w.averageMs).toBe(0)
   })
 
+  it('sakligt besked när målet nåddes – inget beröm eller firande', () => {
+    const start = new Date(2026, 8, 25, 20, 0)
+    expect(endMessage(rec('a', start, 16))).toBe('Fastan är sparad (16 h).')
+    expect(endMessage(rec('a', start, 18))).not.toMatch(/Snyggt|Bra jobbat|Grattis|Fantastiskt|Bra!/i)
+  })
+
   it('vänliga texter och senaste protokoll', () => {
     const start = new Date(2026, 8, 25, 20, 0)
-    expect(endMessage(rec('a', start, 16))).toMatch(/Snyggt/)
-    expect(endMessage(rec('b', start, 5))).toMatch(/lyssna på kroppen/)
+    expect(endMessage(rec('b', start, 5))).toBe('Fastan är sparad (5 h). Det är helt okej att lyssna på kroppen.')
     expect(lastProtocolId([])).toBe('16:8')
     expect(lastProtocolId([rec('a', start, 14, 14, '14:10')])).toBe('14:10')
     expect(protocolById('18:6')?.fastHours).toBe(18)
     expect(protocolById('okänt')).toBeUndefined()
+  })
+})
+
+describe('upplägg med längre förklaring', () => {
+  it('har en förklaring för varje upplägg, utöver den korta beskrivningen', () => {
+    expect(FASTING_PROTOCOLS.map((p) => p.id)).toEqual(['12:12', '14:10', '16:8', '18:6', '20:4'])
+    for (const p of FASTING_PROTOCOLS) {
+      expect(p.details.length, p.id).toBeGreaterThan(80)
+      expect(p.details, p.id).not.toBe(p.description)
+      // 2–4 meningar.
+      const sentences = p.details.split(/(?<=[.!?])\s+/)
+      expect(sentences.length, p.id).toBeGreaterThanOrEqual(2)
+      expect(sentences.length, p.id).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('timmarna i förklaringen är protokollets och exemplets klockslag går ihop', () => {
+    for (const p of FASTING_PROTOCOLS) {
+      expect(p.fastHours + p.eatHours, p.id).toBe(24)
+      expect(p.details, p.id).toContain(`${p.fastHours} timmar utan mat`)
+      expect(p.details, p.id).toContain(`${p.eatHours} timmar då du äter`)
+      const eat = /mellan (\d{2}) och (\d{2})/.exec(p.details)
+      const fast = /fastar du från (\d{2}) till (\d{2})/.exec(p.details)
+      expect(eat, p.id).not.toBeNull()
+      expect(fast, p.id).not.toBeNull()
+      const [eatFrom, eatTo] = [Number(eat?.[1]), Number(eat?.[2])]
+      const [fastFrom, fastTo] = [Number(fast?.[1]), Number(fast?.[2])]
+      // Ätfönstret är lika långt som protokollet säger och fastan tar vid där det slutar.
+      expect(eatTo - eatFrom, p.id).toBe(p.eatHours)
+      expect(fastFrom, p.id).toBe(eatTo)
+      expect(fastTo, p.id).toBe(eatFrom)
+      expect((fastTo - fastFrom + 24) % 24, p.id).toBe(p.fastHours)
+      // Samma exempel som i den korta beskrivningen ("ät 12–20").
+      expect(p.description, p.id).toContain(`${String(eatFrom).padStart(2, '0')}–${String(eatTo).padStart(2, '0')}`)
+    }
+  })
+
+  it('inga löften om hälsa eller viktnedgång, inget beröm och inga energisiffror', () => {
+    for (const p of FASTING_PROTOCOLS) {
+      for (const text of [p.title, p.description, p.details]) {
+        expect(text, p.id).not.toMatch(BANNED_FASTING_WORDS)
+        expect(text, p.id).not.toMatch(/kcal|kalori/i)
+      }
+      // Varsam ton: varje förklaring slutar i en lugn tanke, inte i ett krav.
+      expect(p.details, p.id).not.toMatch(/måste|ska nå|nå målet/i)
+      // Inget som gör upplägget till en trappa att gå uppför: ett kortare ätfönster är inte bättre (och ett längre inte sämre).
+      for (const text of [p.title, p.description, p.details]) {
+        expect(text, p.id).not.toMatch(/börja gärna med|för den vane|krävande|nästa nivå|trappa|jobba dig|avancerad/i)
+      }
+    }
   })
 })

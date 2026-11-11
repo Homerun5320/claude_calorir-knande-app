@@ -40,7 +40,8 @@ export default function ReportPrintPage() {
   useDocumentTitle('Rapport')
   if (!hydrated) {
     return (
-      <div className="px-4 pt-safe pb-8" aria-busy="true" aria-label="Laddar rapporten">
+      <div className="px-4 pt-safe pb-8" role="status" aria-busy="true">
+        <span className="sr-only">Laddar rapporten …</span>
         <Skeleton className="mt-16 h-9 w-56" />
         <Skeleton className="mt-6 h-64 w-full rounded-card" />
       </div>

@@ -88,7 +88,7 @@ export function WaterGlasses({
   }
 
   return (
-    <div className={className}>
+    <div className={`@container ${className}`}>
       <div
         className="flex flex-wrap items-end"
         style={interactive ? rowVars : undefined}
@@ -127,8 +127,11 @@ export function WaterGlasses({
       </div>
 
       {showSummary && (
-        <div className="mt-3 flex items-center gap-3">
-          <p className="min-w-0 flex-1" aria-live="polite">
+        // @container + @max-[14rem]: vid stor text (200 %) ryms inte texten och två knappar på en rad – texten får då en egen rad
+        // och knapparna blir 44 px (px, inte rem). rem i en containerfråga följer rotens teckenstorlek; vid normal text (≈ 20 rem,
+        // ≈ 15,5 rem på en 320 px-telefon) ändras inget.
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 @max-[14rem]:basis-full" aria-live="polite">
             <span className="font-display text-xl font-semibold text-ink tabular-nums">{formatNumber(drunk / 1000, 2)}</span>
             <span className="text-sm text-ink-3">
               {'\u00a0'}liter av {formatLitersLong(targetMl)}
@@ -141,7 +144,7 @@ export function WaterGlasses({
               onClick={() => onRemove(Math.round(Math.min(size, drunk)))}
               disabled={drunk <= 0}
               aria-label={`Ta bort ett glas (${formatNumber(size)} ml)`}
-              className="grid h-11 w-11 place-items-center rounded-full bg-surface-2 text-ink-2 transition-transform active:scale-90 disabled:opacity-40"
+              className="grid h-11 w-11 place-items-center rounded-full bg-surface-2 text-ink-2 transition-transform active:scale-90 disabled:opacity-40 @max-[14rem]:h-[44px] @max-[14rem]:w-[44px]"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -151,7 +154,7 @@ export function WaterGlasses({
               type="button"
               onClick={() => onAdd(size)}
               aria-label={`Lägg till ett glas (${formatNumber(size)} ml)`}
-              className="grid h-11 w-11 place-items-center rounded-full bg-fjall-soft text-fjall transition-transform active:scale-90"
+              className="grid h-11 w-11 place-items-center rounded-full bg-fjall-soft text-fjall transition-transform active:scale-90 @max-[14rem]:h-[44px] @max-[14rem]:w-[44px]"
             >
               <Plus className="h-5 w-5" />
             </button>
