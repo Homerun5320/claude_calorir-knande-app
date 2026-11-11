@@ -1,0 +1,60 @@
+# Privat webbversion på GitHub Pages: bygger webbappen (testläge, utan butiker) och lägger ut den,
+# så att ägaren kan lägga Lagom på hemskärmen utan App Store eller Google Play.
+# Körs när något hamnar på main och för hand (Actions → GitHub Pages → Run workflow).
+#
+# Kräver en gång: Settings → Pages → Source: "GitHub Actions". Serverfunktionerna (netlify/) finns inte
+# på Pages – appen fungerar ändå, eftersom all data ligger på enheten.
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Bygg webbappen
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      - name: Node enligt .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Bygg (dist/)
+        run: npx vite build
+
+      - name: Ladda upp bygget
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Lägg ut på GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicera
+        id: deployment
+        uses: actions/deploy-pages@v4
