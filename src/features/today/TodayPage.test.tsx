@@ -104,6 +104,20 @@ describe('TodayPage', () => {
     expect(screen.getByText('Veckan')).toBeInTheDocument()
   })
 
+  it('samlar veckan, vikt, kostråd och tips under en hopfälld rad så att Idag förblir kort', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'food', food: GROT, amount: 300, unit: 'g', grams: 300, date: today, meal: 'frukost' })
+    renderPage()
+    const summary = (await screen.findByText('Mer om din dag')).closest('summary')!
+    const details = summary.closest('details')!
+    // Stängd från början – och veckan ligger inuti, inte bredvid.
+    expect(details).not.toHaveAttribute('open')
+    expect(within(details).getByText('Veckan')).toBeInTheDocument()
+    // Det dagliga ligger utanför raden.
+    expect(within(details).queryByText('Havregrynsgröt')).not.toBeInTheDocument()
+    expect(screen.getByText('Havregrynsgröt')).toBeInTheDocument()
+  })
+
   it('visar en avstängd måltid som ändå har poster idag – allt i ringen går att hitta', async () => {
     const today = todayISO()
     useDiaryStore.getState().addEntry({ kind: 'food', food: LAX, amount: 150, unit: 'g', grams: 150, date: today, meal: 'mellanmal' })

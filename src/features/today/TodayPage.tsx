@@ -7,23 +7,20 @@
  *  3. Måltiderna
  *  4. Vatten
  *  5. Kosttillskott (bara när användaren har lagt till tillskott)
- *  6. Dagens tallrik
- *  7. Veckans fokus (bara när ett fokus är valt)
- *  8. Veckan
- *  9. Vikt
- * 10. Kostråden i veckan
- * 11. Dagens tips
- * 12. Sammanhangskort (fasta, träning, koffein, alkohol)
- * 13. Kvällsreflektion (med veckans fokus summerat på söndagar)
+ *  6. Veckans fokus (bara när ett fokus är valt)
+ *  7. Kvällsreflektion (med veckans fokus summerat på söndagar)
+ *  8. "Mer om din dag" – en hopfälld rad med dagens tallrik, veckan, vikt, kostråd, dagens tips och
+ *     sammanhangskort (fasta, träning, koffein, alkohol), så att sidan förblir lugn och kort
  *
  * Överst (när det behövs): markeringen för exempeldata och provperioden – diskret som ett chip,
  * tydligare de sista dagarna och som ett lugnt kort när den är slut.
  *
- * På bredare skärmar (≥ 768 px) ligger Dagsringen över två kolumner.
+ * På bredare skärmar (≥ 768 px) ligger Dagsringen över två kolumner och "Mer om din dag" under dem.
  *
  * Varje sektion prenumererar själv på det den behöver ur butikerna och är memoiserad, så att
  * t.ex. ett glas vatten inte renderar om hela sidan.
  */
+import { ChevronDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Skeleton, useMediaQuery } from '../../components/ui'
 import { useTargets } from '../../hooks/useTargets'
@@ -72,29 +69,38 @@ type SectionId =
   | 'context'
   | 'evening'
 
-const MOBILE_ORDER: readonly SectionId[] = [
-  'welcome',
-  'ring',
-  'meals',
-  'water',
-  'supplements',
-  'plate',
-  'focus',
-  'week',
-  'weight',
-  'kostrad',
-  'tip',
-  'context',
-  'evening',
-]
+/** Det man använder varje dag – alltid synligt. */
+const MOBILE_ORDER: readonly SectionId[] = ['welcome', 'ring', 'meals', 'water', 'supplements', 'focus', 'evening']
+/** Resten ligger samlat under raden "Mer om din dag" (se MoreOfDay). */
+const MORE_ORDER: readonly SectionId[] = ['plate', 'week', 'weight', 'kostrad', 'tip', 'context']
 const WIDE_TOP: readonly SectionId[] = ['welcome', 'ring']
-const WIDE_LEFT: readonly SectionId[] = ['meals', 'supplements', 'plate', 'evening']
-const WIDE_RIGHT: readonly SectionId[] = ['context', 'water', 'focus', 'week', 'weight', 'kostrad', 'tip']
+const WIDE_LEFT: readonly SectionId[] = ['meals', 'supplements', 'evening']
+const WIDE_RIGHT: readonly SectionId[] = ['water', 'focus']
 
 /** Har användaren lagt till kosttillskott? (Boolean – stabilt värde för selektorn.) */
 function hasSupplementFoods(customFoods: Record<string, Food>): boolean {
   for (const id in customFoods) if (isSupplementFood(customFoods[id])) return true
   return false
+}
+
+/**
+ * "Mer om din dag": tallrik, vecka, vikt, kostråd, tips och sammanhangskort bakom en enda lugn rad,
+ * så att Idag är kort och går att ta in i ett ögonkast. Ett vanligt <details>: tangentbord och
+ * skärmläsare fungerar utan egen kod, och innehållet ligger kvar i sidan (utskrift och sökning på sidan).
+ */
+function MoreOfDay({ children }: { children: ReactNode }) {
+  return (
+    <details className="group rounded-card border border-line bg-surface/60 print:border-0 print:bg-transparent">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-card px-4 py-2 marker:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gran [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block font-display text-lg text-ink">Mer om din dag</span>
+          <span className="block text-sm text-ink-3">Tallrik, veckan, vikt, kostråd och tips</span>
+        </span>
+        <ChevronDown aria-hidden className="size-5 shrink-0 text-ink-2 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" />
+      </summary>
+      <div className="flex flex-col gap-4 px-2 pb-3 pt-1 print:px-0">{children}</div>
+    </details>
+  )
 }
 
 function TodaySkeleton() {
@@ -197,6 +203,13 @@ export default function TodayPage() {
         </Reveal>
       ))
 
+  // "Mer om din dag" visas bara när något av korten under den har något att visa.
+  const more = MORE_ORDER.some((id) => sections[id] !== null) ? (
+    <Reveal index={MOBILE_ORDER.length}>
+      <MoreOfDay>{column(MORE_ORDER)}</MoreOfDay>
+    </Reveal>
+  ) : null
+
   return (
     <div className="pb-6">
       <TodayHeader today={today} />
@@ -213,9 +226,13 @@ export default function TodayPage() {
               <div className="flex min-w-0 flex-col gap-4">{column(WIDE_LEFT, 2)}</div>
               <div className="flex min-w-0 flex-col gap-4">{column(WIDE_RIGHT, 3)}</div>
             </div>
+            {more}
           </div>
         ) : (
-          <div className="flex flex-col gap-4">{column(MOBILE_ORDER)}</div>
+          <div className="flex flex-col gap-4">
+            {column(MOBILE_ORDER)}
+            {more}
+          </div>
         )}
       </div>
     </div>
