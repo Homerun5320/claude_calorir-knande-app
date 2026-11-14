@@ -243,8 +243,12 @@
       scroll-padding-bottom: calc(7rem + var(--sa-bottom));
     }
   }
-  /* Sidrubriker som får fokus vid sidbyte (tabIndex -1) behöver ingen fokusram vid musklick. */
-  h1[tabindex='-1']:focus:not(:focus-visible) {
+  /*
+   * Sidrubriker som får fokus vid sidbyte (tabIndex -1, se useFocusOnNavigate i AppShell) är inget man kan
+   * trycka på eller tabba till, så de behöver ingen fokusram. Utan den här regeln visar iPhone-Safari en grön
+   * ram runt rubriken efter ett tryck, eftersom den räknar skriptfokus som synligt (:focus-visible).
+   */
+  h1[tabindex='-1'] {
     outline: none;
   }
   body {
