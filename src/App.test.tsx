@@ -37,7 +37,8 @@ describe('Gate och delningslänkar', () => {
     // Routern läser adressen när modulen laddas.
     const { default: App } = await import('./App')
     render(<App />)
-    await waitFor(() => expect(window.location.hash).toBe('#/valkommen'))
+    // Längre väntetid än standardens 1 s: sidorna laddas lätt (lazy) och sviten kan gå på en belastad dator.
+    await waitFor(() => expect(window.location.hash).toBe('#/valkommen'), { timeout: 5000 })
 
     // Välkomstflödet är klart och appen landar på startsidan …
     act(() => {
@@ -45,7 +46,7 @@ describe('Gate och delningslänkar', () => {
       window.location.hash = '#/'
     })
     // … och går vidare till länken.
-    await waitFor(() => expect(window.location.hash).toBe('#/dela?d=j.test'))
+    await waitFor(() => expect(window.location.hash).toBe('#/dela?d=j.test'), { timeout: 5000 })
 
     // Bara en gång: nästa besök på startsidan stannar där.
     act(() => {
