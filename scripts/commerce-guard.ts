@@ -259,6 +259,14 @@ export function checkCommerceBuild(env: BuildEnv, ctx: CommerceBuildContext = {}
     )
   }
 
+  // --- Privat användning (full åtkomst utan köp) ---
+  if ((env.VITE_OWNER_ONLY ?? '').trim() === '1' && (ctx.netlifyContext === 'production' || store)) {
+    errors.push(
+      'VITE_OWNER_ONLY=1 i ett produktionsbygge eller butiksbygge – då får alla full åtkomst utan att betala. ' +
+        'Variabeln är bara till för ägarens privata webbversion (t.ex. GitHub Pages).',
+    )
+  }
+
   // --- Butiksbyggen ---
   if (store) {
     const apiBase = env.VITE_API_BASE?.trim() ?? ''
