@@ -16,6 +16,7 @@ import { SAVE_DELAY_MS, useDeferredSave } from '../../hooks/useDeferredSave'
 import { useDiaryStore } from '../../stores/diaryStore'
 import type { DayMeta, ISODate } from '../../types'
 import { DAY_SCALES, normalizeNote, type ScaleDef, type ScaleKey } from './diaryLogic'
+import { Glyph } from '../../components/icons/Glyph'
 
 const EMPTY_META: DayMeta = {}
 /** Hur länge vi väntar efter sista tangenttrycket innan anteckningen sparas. */
@@ -116,7 +117,9 @@ function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | u
                     : 'bg-surface-2 hover:bg-surface-3',
               )}
             >
-              <span aria-hidden="true">{o.emoji}</span>
+              <span aria-hidden="true" className="text-gran">
+                <Glyph emoji={o.emoji} />
+              </span>
             </motion.button>
           )
         })}

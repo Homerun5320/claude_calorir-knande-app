@@ -9,6 +9,7 @@ import { CalendarRange, ChevronRight, Info } from 'lucide-react'
 import { Button, EmptyState } from '../../components/ui'
 import { WEEKDAYS, WEEKDAYS_SHORT } from '../../lib/dates'
 import type { Period } from './period'
+import { Glyph } from '../../components/icons/Glyph'
 
 /** Liten förklarande text med informationsikon. */
 export function InfoNote({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -25,8 +26,8 @@ export function Callout({ emoji, children, className = '' }: { emoji?: string; c
   return (
     <div className={`flex items-start gap-3 rounded-2xl bg-surface-2/70 px-3.5 py-3 text-sm leading-relaxed text-ink-2 ${className}`}>
       {emoji && (
-        <span className="text-lg leading-none" aria-hidden="true">
-          {emoji}
+        <span className="text-lg leading-none text-gran" aria-hidden="true">
+          <Glyph emoji={emoji} />
         </span>
       )}
       <div className="min-w-0 flex-1">{children}</div>

@@ -3,7 +3,7 @@
  * som ändå har poster idag visas också (samma regel som i dagboken), så att allt som räknas
  * i Dagsringen går att hitta.
  *
- * Varje kort visar energi och de första livsmedlen, och har en "+" som öppnar Lägg till
+ * Varje måltid är en fyrkant (två per rad) som visar energi och de första livsmedlen, och har en "+" som öppnar Lägg till
  * med rätt måltid och datum. Tomma måltider får en vänlig uppmaning – och om samma måltid
  * finns registrerad igår kan den kopieras med ett tryck (med ångra).
  */
@@ -69,34 +69,29 @@ const MealCard = memo(function MealCard({ meal, name, today, summary, copyCount,
     if (onCopy(meal, name)) focusAfterRender(() => cardLink.current)
   }
   return (
-    // @container + @max-[16rem]: vid stor text (200 %) är kortet för smalt för ikon, namn och plusknapp bredvid varandra – då döljs
-    // den dekorativa ikonen och plusknappen blir 44 px (px, inte rem). rem i en containerfråga följer rotens teckenstorlek, så vid
-    // normal text (kortet ≈ 21 rem brett) ändras inget.
-    <li className="card @container p-3 pr-2.5">
-      <div className="flex items-center gap-3">
-        <Link ref={cardLink} to="/dagbok" className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl">
-          <span className="contents @max-[16rem]:hidden">
-            <MealIcon meal={meal} size="md" variant="emoji" />
-          </span>
-          <span className="min-w-0 flex-1">
-            {/* flex-wrap: vid stor text (200 %) hamnar energin under namnet i stället för att klippa det. */}
-            <span className="flex flex-wrap items-baseline gap-x-2">
-              <span className="min-w-0 break-words font-display text-[1.0625rem] leading-tight font-semibold tracking-tight text-ink">{name}</span>
-              {!empty && !mindful && <EnergyValue kcal={summary.kcal} className="ml-auto text-sm font-semibold text-ink-2" />}
-            </span>
-            <span className={`mt-0.5 block truncate text-[0.8125rem] @max-[16rem]:line-clamp-3 @max-[16rem]:whitespace-normal ${empty ? 'text-ink-3' : 'text-ink-2'}`}>{namesText}</span>
-          </span>
-        </Link>
+    // Fyrkant (två per rad, ca 170 px): ikon och plusknapp överst, namn, energi och innehåll nederst. @min-[19.5rem] är en
+    // containerfråga i rem (följer rotens teckenstorlek): vid stor text (rotstorlek ca 24 px eller mer) blir det i stället
+    // en kolumn utan fast form, så att inget klipps. Containern är wrappern i MealsOverview.
+    <li className="card flex min-h-[10.5rem] flex-col p-3 @min-[19.5rem]:aspect-square">
+      <div className="flex items-start justify-between gap-2">
+        <span aria-hidden="true" className="contents">
+          <MealIcon meal={meal} size="md" variant="emoji" />
+        </span>
         <Link
           to={`/lagg-till?maltid=${meal}&datum=${today}`}
           aria-label={`Lägg till i ${name.toLowerCase()}`}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform active:scale-90 @max-[16rem]:size-[44px]"
+          className="grid size-[44px] shrink-0 place-items-center rounded-full bg-gran-soft text-gran transition-transform active:scale-90"
         >
           <Plus className="size-5" strokeWidth={2.4} aria-hidden="true" />
         </Link>
       </div>
+      <Link ref={cardLink} to="/dagbok" className="mt-auto flex min-h-11 min-w-0 flex-col justify-end rounded-2xl pt-2">
+        <span className="min-w-0 break-words font-display text-[1.125rem] leading-tight font-semibold tracking-tight text-ink">{name}</span>
+        {!empty && !mindful && <EnergyValue kcal={summary.kcal} className="mt-0.5 text-sm font-semibold text-ink-2" />}
+        <span className={`mt-0.5 line-clamp-2 text-[0.8125rem] leading-snug ${empty ? 'text-ink-3' : 'text-ink-2'}`}>{namesText}</span>
+      </Link>
       {empty && copyCount > 0 && (
-        <div className="mt-2 pl-14 @max-[16rem]:pl-0">
+        <div className="mt-1.5">
           <Chip size="sm" icon={Copy} onClick={copy}>
             Kopiera gårdagens {name.toLowerCase()}
           </Chip>
@@ -131,20 +126,22 @@ export const MealsOverview = memo(function MealsOverview({ today, meals, mindful
       <SectionTitle id={headingId} actionLabel="Dagbok" actionTo="/dagbok">
         Måltider
       </SectionTitle>
-      <ul className="space-y-2.5">
-        {shown.map((m) => (
-          <MealCard
-            key={m.id}
-            meal={m.id}
-            name={m.name}
-            today={today}
-            summary={summaries[m.id]}
-            copyCount={copyableCount(yesterday, m.id)}
-            mindful={mindful}
-            onCopy={onCopy}
-          />
-        ))}
-      </ul>
+      <div className="@container">
+        <ul className="grid grid-cols-1 gap-3 @min-[19.5rem]:grid-cols-2">
+          {shown.map((m) => (
+            <MealCard
+              key={m.id}
+              meal={m.id}
+              name={m.name}
+              today={today}
+              summary={summaries[m.id]}
+              copyCount={copyableCount(yesterday, m.id)}
+              mindful={mindful}
+              onCopy={onCopy}
+            />
+          ))}
+        </ul>
+      </div>
     </section>
   )
 })

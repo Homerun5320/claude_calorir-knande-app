@@ -152,7 +152,7 @@ function WeeklyFocusCard() {
   const updateSettings = useProfileStore((s) => s.updateSettings)
   const current = focusGoal(focusId)
   const options = useMemo(
-    () => [{ value: NO_FOCUS, label: 'Inget fokus' }, ...FOCUS_GOALS.map((g) => ({ value: g.id as string, label: `${g.emoji} ${g.title}` }))],
+    () => [{ value: NO_FOCUS, label: 'Inget fokus' }, ...FOCUS_GOALS.map((g) => ({ value: g.id as string, label: g.title }))],
     [],
   )
 
@@ -232,7 +232,7 @@ function AddSupplementSheet({ open, onClose }: { open: boolean; onClose: () => v
   const [templateId, setTemplateId] = useState<SupplementTemplateId>('d-vitamin')
   const template = supplementTemplate(templateId) ?? SUPPLEMENT_TEMPLATES[0]
   const [strengths, setStrengths] = useState<Strengths>(() => defaultStrengths(template))
-  const options = useMemo(() => SUPPLEMENT_TEMPLATES.map((t) => ({ value: t.id, label: `${t.emoji} ${t.name}` })), [])
+  const options = useMemo(() => SUPPLEMENT_TEMPLATES.map((t) => ({ value: t.id, label: t.name })), [])
 
   const chooseTemplate = (id: SupplementTemplateId) => {
     const next = supplementTemplate(id)

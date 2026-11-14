@@ -16,6 +16,7 @@ import type { DayMeta, ISODate } from '../../types'
 import { focusAfterRender } from '../diary/focus'
 import { useClock } from './hooks'
 import { showEveningCheckIn } from './todayLogic'
+import { Glyph } from '../../components/icons/Glyph'
 
 const EMPTY_META: DayMeta = {}
 
@@ -55,7 +56,9 @@ function EmojiScale({ def, value, onChange }: { def: ScaleDef; value: number | u
                     : 'bg-surface-2 hover:bg-surface-3'
               }`}
             >
-              <span aria-hidden="true">{o.emoji}</span>
+              <span aria-hidden="true" className="text-gran">
+                <Glyph emoji={o.emoji} />
+              </span>
             </motion.button>
           )
         })}

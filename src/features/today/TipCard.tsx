@@ -10,6 +10,7 @@ import { SEASONS, swedishSeason } from '../../lib/season'
 import type { ISODate } from '../../types'
 import { focusAfterRender, focusableNear } from '../diary/focus'
 import { useDismissedForDay } from './hooks'
+import { Glyph } from '../../components/icons/Glyph'
 
 const STORAGE_KEY = 'lagom-idag-tips-dolt'
 
@@ -44,14 +45,14 @@ export const TipCard = memo(function TipCard({ today }: { today: ISODate }) {
         >
           <Card
             tone="sol"
-            eyebrow={seasonal ? `Dagens tips · ${season.label} ${season.emoji}` : `Dagens tips · ${category.label}`}
+            eyebrow={seasonal ? `Dagens tips · ${season.label}` : `Dagens tips · ${category.label}`}
             title={tip.title}
             titleAs="h2"
             action={<IconButton icon={X} size="sm" aria-label="Dölj dagens tips" onClick={onDismiss} />}
           >
             <div className="flex gap-3">
-              <span className="text-2xl leading-none" aria-hidden="true">
-                {category.emoji}
+              <span className="text-2xl leading-none text-gran" aria-hidden="true">
+                <Glyph emoji={category.emoji} />
               </span>
               <div className="min-w-0">
                 <p className="text-[0.9375rem] leading-relaxed text-ink-2">{tip.text}</p>

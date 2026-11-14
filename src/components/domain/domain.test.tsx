@@ -13,6 +13,11 @@ const bar: Pick<Food, 'portions' | 'density' | 'liquid'> = {
   liquid: false,
 }
 
+/** Nycklarna (emoji-tecknen) för de ikoner som ritas i ett element. */
+function glyphsIn(root: Element): string[] {
+  return Array.from(root.querySelectorAll('[data-glyph]'), (el) => el.getAttribute('data-glyph') ?? '')
+}
+
 describe('describeAmount', () => {
   it('upprepar aldrig vikten när portionen redan anger den', () => {
     expect(describeAmount(bar, 1, 'portion:st')).toBe('1 st (15 g)')
@@ -39,7 +44,7 @@ describe('FoodRow', () => {
 
   it('väljer emoji efter namnet när kategorin är grov', () => {
     render(<FoodRow name="Smörgås, grovt bröd med smör och ost" category="fardigratt" />)
-    expect(screen.getByText('🥪')).toBeInTheDocument()
+    expect(glyphsIn(document.body)).toContain('🥪')
   })
 })
 
@@ -84,7 +89,7 @@ describe('foodEmoji / CategoryIcon', () => {
   it('CategoryIcon använder namnet och kan läsa upp kategorin', () => {
     render(<CategoryIcon category="fardigratt" name="Räksmörgås" labelled />)
     const icon = screen.getByRole('img', { name: 'Färdigrätter' })
-    expect(icon).toHaveTextContent('🥪')
+    expect(glyphsIn(icon)).toContain('🥪')
   })
 })
 

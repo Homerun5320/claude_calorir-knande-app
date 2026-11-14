@@ -126,7 +126,7 @@ export default function CustomFoodPage() {
 /** Fältet "Portionens vikt" – dit flyttas fokus när en etikett per portion saknar vikten. */
 const BASIS_GRAMS_ID = 'custom-food-basis-grams'
 
-const CATEGORY_OPTIONS = FOOD_CATEGORIES.map((c) => ({ value: c, label: `${CATEGORY_META[c].emoji} ${CATEGORY_META[c].label}` })).sort((a, b) =>
+const CATEGORY_OPTIONS = FOOD_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_META[c].label })).sort((a, b) =>
   a.value === 'ovrigt' ? 1 : b.value === 'ovrigt' ? -1 : CATEGORY_META[a.value].label.localeCompare(CATEGORY_META[b.value].label, 'sv'),
 )
 

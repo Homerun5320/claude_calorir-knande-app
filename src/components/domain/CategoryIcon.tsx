@@ -8,6 +8,7 @@
  * `TINT_CLASSES` delas med `MealIcon` (och får gärna användas av andra komponenter).
  */
 import type { FoodCategory } from '../../types'
+import { Glyph } from '../icons/Glyph'
 
 /** Färgtoner från designsystemet som kan användas som bakgrundston. */
 export type Tint = 'gran' | 'lingon' | 'hjortron' | 'blabar' | 'mossa' | 'vinbar' | 'fjall' | 'sol' | 'neutral'
@@ -256,12 +257,14 @@ export function CategoryIcon({ category, size = 'md', emoji, name, labelled = fa
   const meta = CATEGORY_META[category ?? 'ovrigt'] ?? CATEGORY_META.ovrigt
   return (
     <span
-      className={`inline-grid shrink-0 select-none place-items-center leading-none ${ICON_SIZE_CLASSES[size]} ${TINT_CLASSES[meta.tint].soft} ${className}`}
+      className={`inline-grid shrink-0 select-none place-items-center leading-none ${ICON_SIZE_CLASSES[size]} ${TINT_CLASSES[meta.tint].soft} ${TINT_CLASSES[meta.tint].text} ${className}`}
       role={labelled ? 'img' : undefined}
       aria-label={labelled ? meta.label : undefined}
       aria-hidden={labelled ? undefined : true}
     >
-      <span className={EMOJI_CLASS}>{emoji ?? foodEmoji(name, category)}</span>
+      <span className={`${EMOJI_CLASS} inline-flex`}>
+        <Glyph emoji={emoji ?? foodEmoji(name, category)} />
+      </span>
     </span>
   )
 }

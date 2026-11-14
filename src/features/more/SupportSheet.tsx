@@ -3,6 +3,7 @@
  */
 import { ExternalLink as ExternalLinkIcon, HeartHandshake, Phone } from 'lucide-react'
 import { ExternalLink, Sheet, toneVars, type Tone } from '../../components/ui'
+import { Glyph } from '../../components/icons/Glyph'
 
 export interface SupportResource {
   id: string
@@ -54,8 +55,8 @@ export function SupportResourceList({ className = '' }: { className?: string }) 
       {SUPPORT_RESOURCES.map((r) => (
         <li key={r.id} style={toneVars(r.tone)} className="rounded-[1.25rem] bg-(--tone-soft) p-4">
           <div className="flex items-start gap-3">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface text-[1.375rem] leading-none">
-              {r.emoji}
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface text-[1.375rem] leading-none text-(--tone)">
+              <Glyph emoji={r.emoji} />
             </span>
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold leading-snug text-ink">{r.name}</h3>

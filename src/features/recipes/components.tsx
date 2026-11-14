@@ -18,6 +18,7 @@ import { useToday } from '../../hooks/useToday'
 import { useAddFood } from '../add/useAddFood'
 import { DEFAULT_RECIPE_EMOJI, TAG_LABELS, sortedTags } from './recipeLogic'
 import { servingNounFor } from './useRecipes'
+import { Glyph } from '../../components/icons/Glyph'
 
 // ---------------------------------------------------------------------------
 // Emoji och märkningar
@@ -36,12 +37,12 @@ export function RecipeEmoji({ emoji, size = 'md', className }: { emoji?: string;
     <span
       aria-hidden
       className={cx(
-        'grid shrink-0 select-none place-items-center bg-[radial-gradient(120%_120%_at_30%_20%,var(--lg-surface)_0%,var(--lg-surface-2)_70%)] leading-none ring-1 ring-inset ring-line/70',
+        'grid shrink-0 select-none place-items-center bg-[radial-gradient(120%_120%_at_30%_20%,var(--lg-surface)_0%,var(--lg-surface-2)_70%)] leading-none text-gran ring-1 ring-inset ring-line/70',
         EMOJI_SIZES[size],
         className,
       )}
     >
-      {emoji || DEFAULT_RECIPE_EMOJI}
+      <Glyph emoji={emoji || DEFAULT_RECIPE_EMOJI} />
     </span>
   )
 }

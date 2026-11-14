@@ -28,6 +28,7 @@ import { coverageSummary, coverageText, mainMealPlate, reliableReferences, weigh
 import { kostradMetText, usePeriodKostrad } from './KostradTab'
 import { makeRollingPeriod, REPORT_DAYS, type ReportDays } from './period'
 import { useInsights, type InsightsData } from './useInsights'
+import { Glyph } from '../../components/icons/Glyph'
 
 const DAY_OPTIONS = REPORT_DAYS.map((d) => ({ value: d, label: `${d} dagar` }))
 
@@ -206,7 +207,9 @@ function KostradSection({ data }: { data: InsightsData }) {
             <li key={r.id} className="flex items-start justify-between gap-3 py-2 break-inside-avoid">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-ink">
-                  <span aria-hidden="true">{r.emoji} </span>
+                  <span aria-hidden="true">
+                    <Glyph emoji={r.emoji} />{' '}
+                  </span>
                   {r.title}
                 </p>
                 {!mindful && !fewDays && <p className="text-xs text-ink-3 tabular-nums">{kostradProgressText(r)}</p>}
