@@ -1,0 +1,29 @@
+# Tillfällig kontroll: hämtar den publicerade webbappen från GitHubs egna servrar och skriver ut vad som svarar.
+name: Pages-kontroll
+on:
+  pull_request:
+    paths: ['.github/workflows/pages-check.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hämta sidan
+        run: |
+          B=https://homerun5320.github.io/claude_calorir-knande-app
+          for p in "/" "/index.html" "/icon.svg" "/favicon.svg" "/manifest.webmanifest" "/support/" "/sw.js"; do
+            echo "=== $p"
+            curl -s -o /tmp/body -D /tmp/head -w "status=%{http_code} typ=%{content_type} bytes=%{size_download}\n" "$B$p"
+            head -n 12 /tmp/head | grep -i -E "^(HTTP|server|content-type|x-github|location|cache-control|last-modified)" || true
+          done
+          echo "=== innehåll i /"
+          curl -s "$B/" | head -c 1500
+          echo
+          echo "=== huvudskriptet"
+          JS=$(curl -s "$B/" | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1)
+          echo "skript: $JS"
+          [ -n "$JS" ] && curl -s -o /dev/null -w "status=%{http_code} typ=%{content_type} bytes=%{size_download}\n" "$B/$JS"
+          echo "=== användarsajten"
+          curl -s -o /dev/null -w "status=%{http_code}\n" https://homerun5320.github.io/
