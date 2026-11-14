@@ -25,7 +25,7 @@
  *   när appen återfår fokus.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
+import { ACCEPT_TEST_PURCHASES, COMMERCE_MODE, LICENSE_PUBLIC_KEYS, OWNER_ONLY, TRIAL_DAYS, planById, type Plan, type PlanId } from '../config/commerce'
 import { KEY_ENTRY_BUILD, allowsLicenseKeyEntry, trialViaStore } from '../config/platform'
 import { isDemoData } from '../lib/demoFlag'
 import { verifyLicense, type LicenseCheck, type LicensePayload } from '../lib/license'
@@ -165,6 +165,10 @@ export function accessStatus(input: {
   profileReady?: boolean
 }): AccessStatus {
   const { now } = input
+  // Privat användning (VITE_OWNER_ONLY=1): alltid full åtkomst, ingen provperiod eller köpspärr.
+  if (OWNER_ONLY) {
+    return { kind: 'licensierad', plan: planById('livstid'), payload: { v: 1, id: 'privat', plan: 'livstid', iat: 0 }, test: false }
+  }
   const store = input.store ?? []
   let license = input.license
   const trialDays = input.trialDays ?? TRIAL_DAYS

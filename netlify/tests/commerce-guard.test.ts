@@ -284,6 +284,20 @@ describe('distribution och butiksbyggen', () => {
   })
 })
 
+describe('privat användning (VITE_OWNER_ONLY)', () => {
+  it('ger full åtkomst utan köp och får aldrig följa med i produktionsbyggen eller butiksbyggen', () => {
+    const flag = { VITE_OWNER_ONLY: '1' }
+    expect(checkCommerceBuild({ ...complete(), ...flag }, { netlifyContext: 'deploy-preview' }).errors).toEqual([])
+    expect(checkCommerceBuild({ ...complete(), ...flag }).errors).toEqual([])
+    expect(checkCommerceBuild({ ...complete(), ...flag }, { netlifyContext: 'production' }).errors).toEqual([expect.stringContaining('VITE_OWNER_ONLY=1')])
+    for (const distribution of ['play', 'appstore']) {
+      const store = { ...complete(), VITE_DISTRIBUTION: distribution, VITE_API_BASE: 'https://lagom.example', ...flag }
+      const { errors } = checkCommerceBuild(store, READY)
+      expect(errors.some((e) => e.includes('VITE_OWNER_ONLY=1'))).toBe(true)
+    }
+  })
+})
+
 describe('webbförsäljningen på eller av', () => {
   it('off utan länkar till appbutikerna ger en varning, ett felstavat värde stoppas', () => {
     expect(checkCommerceBuild({ ...complete(), VITE_WEB_SALES: 'off', VITE_APPSTORE_URL: 'https://apps.apple.com/se/app/lagom/id1' })).toEqual({
