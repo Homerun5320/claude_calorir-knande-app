@@ -55,6 +55,7 @@ import { RecipeEmoji } from './components'
 import { AmountSheet, IngredientRow, IngredientSearch, type IngredientSearchHandle, type PickerState } from './IngredientPicker'
 import { PasteIngredientsSheet } from './IngredientImport'
 import { requireAccess } from '../premium/requireAccess'
+import { Glyph } from '../../components/icons/Glyph'
 
 export default function RecipeEditorPage() {
   const { id } = useParams()
@@ -300,7 +301,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                 onClick={() => setEmojiOpen((o) => !o)}
                 aria-expanded={emojiOpen}
                 aria-controls="emoji-picker"
-                aria-label={`Välj emoji, nu ${draft.emoji}`}
+                aria-label="Välj ikon för receptet"
                 className="relative mt-6 shrink-0 rounded-[1.1rem] transition-transform active:scale-95"
               >
                 <RecipeEmoji emoji={draft.emoji} size="md" />
@@ -333,8 +334,8 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   className="overflow-hidden"
                 >
-                  <div role="radiogroup" aria-label="Emoji för receptet" className="grid grid-cols-6 gap-1.5 pt-4 sm:grid-cols-9">
-                    {RECIPE_EMOJIS.map((e) => {
+                  <div role="radiogroup" aria-label="Ikon för receptet" className="grid grid-cols-6 gap-1.5 pt-4 sm:grid-cols-9">
+                    {RECIPE_EMOJIS.map((e, index) => {
                       const selected = draft.emoji === e
                       return (
                         <button
@@ -342,7 +343,7 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                           type="button"
                           role="radio"
                           aria-checked={selected}
-                          aria-label={e}
+                          aria-label={`Ikon ${index + 1}`}
                           onClick={() => {
                             update('emoji', e)
                             setEmojiOpen(false)
@@ -352,7 +353,9 @@ function RecipeEditor({ existing }: { existing?: Recipe }) {
                             selected ? 'bg-gran-soft ring-2 ring-gran' : 'hover:bg-surface-2',
                           )}
                         >
-                          <span aria-hidden>{e}</span>
+                          <span aria-hidden className="text-gran">
+                            <Glyph emoji={e} />
+                          </span>
                         </button>
                       )
                     })}

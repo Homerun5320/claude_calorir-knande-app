@@ -39,6 +39,7 @@ import { storagePlace, trialViaStore } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { daysText, priceSummaryText } from '../premium/premiumLogic'
 import { usePriceSummaryText } from '../premium/useStorePrices'
+import { Glyph } from '../../components/icons/Glyph'
 import {
   DIET_OPTIONS,
   GOAL_CHOICES,
@@ -416,8 +417,8 @@ export function DietStep({ draft, onChange, focusOnMount, eyebrow }: StepProps) 
             onSelect={() => onChange({ diet: d.value })}
             title={
               <>
-                <span aria-hidden className="mr-1.5">
-                  {d.emoji}
+                <span aria-hidden className="mr-1.5 inline-block text-gran">
+                  <Glyph emoji={d.emoji} />
                 </span>
                 {d.label}
               </>

@@ -13,6 +13,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { useClock } from './hooks'
 import { formatHeaderDate, greetingFor, headerFoodDay, type HeaderFoodDay } from './todayLogic'
+import { Glyph } from '../../components/icons/Glyph'
 
 function FoodDayChip({ foodDay, onLandscape }: { foodDay: HeaderFoodDay; onLandscape: boolean }) {
   const { day, text } = foodDay
@@ -27,7 +28,7 @@ function FoodDayChip({ foodDay, onLandscape }: { foodDay: HeaderFoodDay; onLands
           : 'relative inline-flex min-h-9 max-w-full items-center gap-1.5 self-start rounded-full bg-sol-soft py-1 pr-2.5 pl-3 text-[0.8125rem] font-semibold text-ink ring-1 ring-sol/30 ring-inset after:absolute after:inset-x-0 after:-inset-y-1'
       }
     >
-      <span aria-hidden="true">{day.emoji}</span>
+      <Glyph emoji={day.emoji} />
       <span className="min-w-0 break-words">{text}</span>
       <ChevronRight className="size-3.5 shrink-0 opacity-70" strokeWidth={2.6} aria-hidden="true" />
     </Link>

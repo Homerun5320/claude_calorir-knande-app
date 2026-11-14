@@ -11,6 +11,7 @@
 import { isValidElement, type ComponentProps, type ComponentType, type ReactNode } from 'react'
 import { Link, type To } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
+import { Glyph, hasGlyph } from '../icons/Glyph'
 
 // ---------------------------------------------------------------------------
 // Delade hjälpare
@@ -37,6 +38,8 @@ export function renderIcon(icon: IconLike | undefined, className = 'size-5', str
     const Icon = icon
     return <Icon className={cx('shrink-0', className)} strokeWidth={strokeWidth} aria-hidden />
   }
+  // En emoji-nyckel (t.ex. från data) ritas som Lagoms egen ikon, aldrig som emoji-text.
+  if (typeof icon === 'string' && hasGlyph(icon)) return <Glyph emoji={icon} className={className} strokeWidth={strokeWidth} />
   return icon as ReactNode
 }
 

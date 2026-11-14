@@ -190,7 +190,7 @@ function ProfileForm({ profile, currentWeight }: { profile: Profile; currentWeig
             options={(Object.keys(ACTIVITY_LEVELS) as ActivityLevel[]).map((k) => ({ value: k, label: ACTIVITY_LEVELS[k].label }))}
             hint={draft.activityLevel ? `${ACTIVITY_LEVELS[draft.activityLevel].description}. Planerad träning loggas separat.` : undefined}
           />
-          <Select<DietType> label="Kost" value={draft.diet} onChange={(diet) => change({ diet })} options={DIET_OPTIONS.map((d) => ({ value: d.value, label: `${d.emoji} ${d.label}` }))} />
+          <Select<DietType> label="Kost" value={draft.diet} onChange={(diet) => change({ diet })} options={DIET_OPTIONS.map((d) => ({ value: d.value, label: d.label }))} />
         </div>
       </Card>
 

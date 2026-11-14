@@ -12,6 +12,7 @@ import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { SectionLink } from './SectionLink'
 import { KOSTRAD_SHORT_TITLE, kostradProgressText, kostradStatusLabel, kostradWeekDates, pickKostradHighlights } from './todayLogic'
+import { Glyph } from '../../components/icons/Glyph'
 
 const STATUS_TONE: Record<KostradStatus, 'mossa' | 'sol' | 'gran' | 'hjortron'> = {
   bra: 'mossa',
@@ -46,8 +47,8 @@ function KostradChip({ result, mindful }: { result: KostradResult; mindful: bool
         aria-label={result.title}
         valueText={mindful ? status : `${status}, ${progress}`}
       >
-        <span className="text-[1.25rem] leading-none" aria-hidden="true">
-          {result.emoji}
+        <span className="text-[1.25rem] leading-none text-gran" aria-hidden="true">
+          <Glyph emoji={result.emoji} />
         </span>
       </ProgressRing>
       <span className="mt-2 line-clamp-2 text-[0.8125rem] leading-tight font-semibold text-ink">{title}</span>

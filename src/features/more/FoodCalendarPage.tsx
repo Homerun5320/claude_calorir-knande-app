@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { Lightbulb, MapPin, Search, Sunrise, Sunset } from 'lucide-react'
 import { Badge, Card, ExternalLink, PageHeader, Sheet, cx } from '../../components/ui'
+import { Glyph } from '../../components/icons/Glyph'
 import { useToday } from '../../hooks/useToday'
 import { MONTHS, WEEKDAYS, WEEKDAYS_SHORT, capitalize, diffDays, formatDayLong, formatDayShort, fromISODate, weekdayIndex } from '../../lib/dates'
 import { seasonalProduce, sunTimes, SEASONS, swedishSeason } from '../../lib/season'
@@ -91,8 +92,8 @@ export default function FoodCalendarPage() {
                       ikonen hamnar då ovanför och beskrivningen visas hel. Vid normal text (kortet ≈ 20 rem) ändras inget. */}
                   <Card onClick={() => setOpen(d)} tone={d.weekly ? 'hjortron' : 'sol'} className="@container">
                     <div className="flex items-start gap-4 @max-[14rem]:flex-col @max-[14rem]:gap-3">
-                      <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-[1.25rem] bg-surface text-[2.25rem] leading-none shadow-card">
-                        {d.emoji}
+                      <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-[1.25rem] bg-surface text-[2.25rem] leading-none text-gran shadow-card">
+                        <Glyph emoji={d.emoji} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-1.5">
@@ -110,7 +111,7 @@ export default function FoodCalendarPage() {
           ) : (
             <Card variant="flat">
               <p className="text-[0.9375rem] leading-relaxed text-ink-2">
-                Ingen särskild matdag idag – en helt vanlig {WEEKDAYS[(fromISODate(today).getDay() + 6) % 7]}. {season.emoji} {season.tagline}.
+                Ingen särskild matdag idag – en helt vanlig {WEEKDAYS[(fromISODate(today).getDay() + 6) % 7]}. {season.tagline}.
               </p>
               {nextWeekly && (
                 <button
@@ -118,8 +119,8 @@ export default function FoodCalendarPage() {
                   onClick={() => setOpen(nextWeekly.day)}
                   className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-2xl bg-surface px-3 py-2 text-left shadow-card transition-colors hover:bg-surface-2"
                 >
-                  <span aria-hidden className="text-[1.5rem] leading-none">
-                    {nextWeekly.day.emoji}
+                  <span aria-hidden className="text-[1.5rem] leading-none text-gran">
+                    <Glyph emoji={nextWeekly.day.emoji} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[0.75rem] font-semibold text-ink-3">
@@ -149,8 +150,8 @@ export default function FoodCalendarPage() {
                     onClick={() => setOpen(d)}
                     className="flex min-h-[3.75rem] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-3"
                   >
-                    <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.375rem] leading-none">
-                      {d.emoji}
+                    <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.375rem] leading-none text-gran">
+                      <Glyph emoji={d.emoji} />
                     </span>
                     {/* Under 360 px hamnar nedräkningen under texten i stället för att klämma ihop namnet – och
                         bredare än så när ett långt ord i namnet ("Världslivsmedelsdagen") inte får plats bredvid. */}
@@ -192,8 +193,8 @@ export default function FoodCalendarPage() {
                       isToday ? 'bg-hjortron-soft ring-2 ring-inset ring-hjortron' : 'bg-surface hover:bg-surface-2',
                     )}
                   >
-                    <span aria-hidden className="text-[1.75rem] leading-none">
-                      {t.emoji}
+                    <span aria-hidden className="text-[1.75rem] leading-none text-gran">
+                      <Glyph emoji={t.emoji} />
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[0.75rem] font-semibold text-ink-3">{capitalize(WEEKDAYS[t.weekday])}</span>
@@ -219,7 +220,7 @@ export default function FoodCalendarPage() {
                   {g.items.map((p) => (
                     <li key={p.name}>
                       <Link to={foodSearchPath(p.name)} className={CHIP_LINK} aria-label={`Sök efter ${p.name}`}>
-                        <span aria-hidden>{p.emoji}</span>
+                        <Glyph emoji={p.emoji} />
                         {capitalize(p.name)}
                       </Link>
                     </li>
@@ -318,7 +319,7 @@ function FoodDaySheet({ day, today, onClose }: { day: FoodDay | null; today: str
     <Sheet
       open={day !== null}
       onClose={onClose}
-      title={d ? `${d.emoji} ${d.name}` : ''}
+      title={d ? d.name : ''}
       description={d ? `${capitalize(d.weekly ? `varje ${WEEKDAYS[(fromISODate(d.date).getDay() + 6) % 7]}` : dateText(d, today))} · ${foodDayCountdown(d, today)}` : undefined}
     >
       {d && (

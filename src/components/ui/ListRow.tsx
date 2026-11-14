@@ -11,6 +11,7 @@ import { Link, type To } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { cx, renderIcon, type IconLike } from './Button'
 import { toneVars, type Tone } from './Badge'
+import { Glyph, hasGlyph } from '../icons/Glyph'
 
 export interface ListRowProps {
   /** Ikon, emoji (sträng) eller eget element (t.ex. en avatar/bild). */
@@ -48,7 +49,7 @@ function Leading({ leading, tone }: { leading: IconLike; tone?: Tone }) {
         style={tone ? toneVars(tone) : undefined}
         className={cx('grid size-11 shrink-0 place-items-center rounded-2xl text-[1.375rem] leading-none', tone ? 'bg-(--tone-soft)' : 'bg-surface-2')}
       >
-        {leading}
+        {typeof leading === 'string' && hasGlyph(leading) ? <Glyph emoji={leading} className={tone ? 'text-(--tone)' : 'text-gran'} /> : leading}
       </span>
     )
   }

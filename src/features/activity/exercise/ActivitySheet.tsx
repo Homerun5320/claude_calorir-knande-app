@@ -32,6 +32,7 @@ import {
   type GroupFilter,
 } from '../activityLogic'
 import { requireAccess } from '../../premium/requireAccess'
+import { Glyph } from '../../../components/icons/Glyph'
 
 export interface ActivitySheetProps {
   open: boolean
@@ -319,7 +320,7 @@ function PickStep({ query, onQuery, group, onGroup, onPick, onCustom, weightKg, 
       <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 py-1.5" role="group" aria-label="Filtrera på grupp">
         {GROUP_FILTERS.map((g) => (
           <Chip key={g.value} size="sm" selected={group === g.value} tone="mossa" onClick={() => onGroup(g.value)}>
-            <span aria-hidden>{g.emoji}</span>
+            <Glyph emoji={g.emoji} />
             {g.label}
           </Chip>
         ))}
@@ -366,8 +367,8 @@ function ActivitySummary({ activity, met }: { activity: Activity; met: number })
   const intensity = metIntensity(met)
   return (
     <div className="flex items-start gap-3 rounded-2xl bg-surface-2 p-3">
-      <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-mossa-soft text-2xl">
-        {activity.emoji}
+      <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-mossa-soft text-2xl text-mossa">
+        <Glyph emoji={activity.emoji} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold leading-snug text-ink">{activity.name}</p>

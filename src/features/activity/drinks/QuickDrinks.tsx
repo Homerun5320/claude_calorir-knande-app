@@ -16,6 +16,7 @@ import { gramsFor } from '../../../lib/units'
 import { useProfileStore } from '../../../stores/profileStore'
 import type { Food, ISODate, UnitKey } from '../../../types'
 import { useAddFood } from '../../add/useAddFood'
+import { Glyph } from '../../../components/icons/Glyph'
 
 export interface QuickDrinkOption {
   /** Slug i Lagoms databas (utan 'lagom:'). */
@@ -124,8 +125,8 @@ export const QuickDrinks = memo(function QuickDrinks({ options, kind, date, mind
               'transition-[background-color,transform] duration-150 hover:bg-surface active:scale-[0.98]',
             )}
           >
-            <span aria-hidden className="mt-0.5 text-xl leading-none">
-              {item.option.emoji}
+            <span aria-hidden className="mt-0.5 text-xl leading-none text-gran">
+              <Glyph emoji={item.option.emoji} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[0.8125rem] font-semibold leading-tight text-ink [overflow-wrap:anywhere]">{item.option.label}</span>

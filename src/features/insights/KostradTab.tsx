@@ -9,6 +9,7 @@ import { evaluateKostrad, isAssessable, isUsable, kostradScore, tooFewDays, type
 import { KOSTRAD_STATUS, kostradProgressText, kostradScoreLabel } from './advice'
 import { InfoNote, SourceNote } from './ui'
 import type { InsightsData } from './useInsights'
+import { Glyph } from '../../components/icons/Glyph'
 
 /** Kostråden för perioden (delas med rapporten). */
 export function usePeriodKostrad(data: InsightsData): KostradResult[] {
@@ -128,8 +129,8 @@ function KostradCard({ result: r, mindful }: { result: KostradResult; mindful: b
   return (
     <article className="card h-full p-4" aria-label={r.title}>
       <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.35rem]" aria-hidden="true">
-          {r.emoji}
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.35rem] text-gran" aria-hidden="true">
+          <Glyph emoji={r.emoji} />
         </span>
         <div className="min-w-0 flex-1">
           {/* Får brytas: i smala fönster hamnar märket under rubriken i stället för utanför kortet. */}

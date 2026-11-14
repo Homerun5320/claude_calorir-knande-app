@@ -145,9 +145,9 @@ export default function MorePage() {
   const exerciseMin = useMemo(() => (exercise ?? []).reduce((s, e) => s + e.minutes, 0), [exercise])
   const foodDay = useMemo(() => {
     const todays = foodDayFor(today).find((d) => !d.weekly)
-    if (todays) return `${todays.emoji} ${todays.name} idag`
+    if (todays) return `${todays.name} idag`
     const next = upcomingFoodDays(today, 1)[0]
-    return next ? `${next.emoji} ${next.name} · ${foodDayCountdown(next, today).toLocaleLowerCase('sv-SE')}` : 'Svenska matdagar och säsong'
+    return next ? `${next.name} · ${foodDayCountdown(next, today).toLocaleLowerCase('sv-SE')}` : 'Svenska matdagar och säsong'
   }, [today])
 
   const items: HubItem[] = [

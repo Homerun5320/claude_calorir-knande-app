@@ -13,6 +13,7 @@ import { useDiaryStore } from '../../stores/diaryStore'
 import { useProfileStore } from '../../stores/profileStore'
 import type { ISODate } from '../../types'
 import { SectionLink } from './SectionLink'
+import { Glyph } from '../../components/icons/Glyph'
 
 export const FocusCard = memo(function FocusCard({ today, mindful }: { today: ISODate; mindful: boolean }) {
   const focusId = useProfileStore((s) => s.settings.weeklyFocus?.id)
@@ -40,8 +41,8 @@ export const FocusCard = memo(function FocusCard({ today, mindful }: { today: IS
       }
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.375rem] leading-none" aria-hidden="true">
-          {goal.emoji}
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-surface-2 text-[1.375rem] leading-none text-gran" aria-hidden="true">
+          <Glyph emoji={goal.emoji} />
         </span>
         <div className="min-w-0">
           <p className="font-display text-[1.125rem] leading-snug font-semibold tracking-tight text-ink">{goal.title}</p>
