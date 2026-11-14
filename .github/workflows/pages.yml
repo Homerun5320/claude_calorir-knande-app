@@ -40,6 +40,9 @@ jobs:
 
       - name: Bygg (dist/)
         run: npx vite build
+        env:
+          # Ägarens privata webbversion: full åtkomst, ingen provperiod eller köpspärr (src/config/commerce.ts).
+          VITE_OWNER_ONLY: '1'
 
       - name: Ladda upp bygget
         uses: actions/upload-pages-artifact@v4

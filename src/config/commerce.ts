@@ -96,6 +96,13 @@ export const COMMERCE_MODE: CommerceMode = env.VITE_COMMERCE_MODE === 'live' && 
  */
 export const ACCEPT_TEST_PURCHASES = envText('VITE_ACCEPT_TEST_PURCHASES') === '1'
 
+/**
+ * `VITE_OWNER_ONLY=1`: appen är bara till för ägaren (t.ex. den privata webbversionen på GitHub
+ * Pages) och ger alltid full åtkomst – ingen provperiod, ingen köpspärr. Avstängd som standard, och
+ * byggkontrollen (scripts/commerce-guard.ts) stoppar den i butiksbyggen och Netlifys produktionsbygge.
+ */
+export const OWNER_ONLY = envText('VITE_OWNER_ONLY') === '1'
+
 /** Stripe-köp på webben är möjliga här (inte i butiksapparna eller när webbförsäljningen är av). */
 export const WEB_CHECKOUT_ENABLED = sellsOnWeb()
 
