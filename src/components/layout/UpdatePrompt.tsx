@@ -5,13 +5,15 @@
  * - Letar efter en ny version varje timme och när appen blir synlig igen – bara när enheten är
  *   uppkopplad.
  * - När en ny version väntar visas en notis med "Uppdatera", som byter version och laddar om.
- *   Missar man notisen tas den nya versionen i bruk nästa gång appen startas.
+ *   Missar man notisen tas den nya versionen i bruk nästa gång appen startas. I ägarens privata
+ *   webbversion (`OWNER_ONLY`) uppdateras den direkt, utan notis.
  *
  * Laddas lat från AppShell och bara i webbversionen (inte i butiksapparna, där uppdateringar
  * kommer via App Store och Google Play). Renderar ingenting.
  */
 import { useEffect, useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { OWNER_ONLY } from '../../config/commerce'
 import { toast } from '../ui/toast'
 import { logError } from '../../lib/errorLog'
 
@@ -70,6 +72,12 @@ export default function UpdatePrompt() {
   useEffect(() => {
     if (!needRefresh || prompted.current) return
     prompted.current = true
+    // Ägarens privata webbversion (VITE_OWNER_ONLY): uppdatera direkt utan notis, så att en ny version aldrig blir
+    // liggande och vänta på att appen ska stängas. Sidan laddas om; det som skrivs sparas redan vid beforeunload.
+    if (OWNER_ONLY) {
+      void updateServiceWorker(true)
+      return
+    }
     toast('En ny version av Lagom finns', {
       action: {
         label: 'Uppdatera',
