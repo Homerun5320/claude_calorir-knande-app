@@ -58,6 +58,23 @@ const NUMBER_WORDS: Record<string, number> = {
 
 const HALF_WORDS = new Set(['halv', 'halvt', 'halva'])
 
+/** Nämnare som ord: "fem åttondelar" → 5/8. */
+const FRACTION_WORDS: Record<string, number> = {
+  tredjedel: 3,
+  tredjedelar: 3,
+  fjärdedel: 4,
+  fjärdedelar: 4,
+  kvart: 4,
+  femtedel: 5,
+  femtedelar: 5,
+  sjättedel: 6,
+  sjättedelar: 6,
+  åttondel: 8,
+  åttondelar: 8,
+  tiondel: 10,
+  tiondelar: 10,
+}
+
 /** "en och en halv", "två och en halv", "1 och en halv" → "1½", "2½" (innan texten delas på "och"). */
 const AND_A_HALF = /(^|[\s,+&;])(\d+|en|ett|två|tva|tre|fyra|fem|sex|sju|åtta|atta|nio|tio|elva|tolv)\s+och\s+(?:en\s+|ett\s+)?(?:halv|halvt|halva)(?=\s|$)/giu
 
@@ -275,7 +292,7 @@ const SIZE_WORDS: Record<string, ParsedQuantity['size']> = {
 }
 
 /** Tal i början: "1 1/2", "1/2", "1½", "½", "1,5", "100" – även direkt följt av enhet ("100g"). */
-const LEADING_NUMBER = /^(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+\s*[½¼¾⅓⅔]|[½¼¾⅓⅔]|\d+(?:[.,]\d+)?)(?=\s|$|\p{L})/u
+const LEADING_NUMBER = /^(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+\s*[½¼¾⅓⅔⅛⅜⅝⅞]|[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?)(?=\s|$|\p{L})/u
 
 /** Mängd med enhet sist i ledet ("mellanmjölk 2 dl"). */
 const TRAILING_QUANTITY = /\s+(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d*[½¼¾]|\d+(?:[.,]\d+)?)\s*(g|gram|hg|kg|ml|cl|dl|l|liter|msk|tsk|krm|st)$/iu
@@ -311,6 +328,8 @@ export function parseQuantity(segment: string): ParsedQuantity {
     if (Number.isFinite(value) && value > 0) {
       amount = value
       rest = rest.slice(num[0].length).trim()
+      // "5/8 delar av en pizza", "3/4 av pizzan": delar och "av en" hör till bråket, inte till namnet.
+      if (/[/½¼¾⅓⅔⅛⅜⅝⅞]/u.test(num[0])) rest = rest.replace(/^(?:delar?\s+)?(?:av\s+(?:(?:en|ett|hela)\s+)?)?/iu, '').trim()
     }
   }
 
@@ -329,6 +348,13 @@ export function parseQuantity(segment: string): ParsedQuantity {
     } else if (has(NUMBER_WORDS, words[0]) && words.length > 1) {
       amount = NUMBER_WORDS[words[0]]
       dropWords(1)
+      // "fem åttondelar pizza", "tre fjärdedelar": talord följt av en nämnare.
+      const denominatorWord = lower().split(' ')[0]
+      if (has(FRACTION_WORDS, denominatorWord) && lower().split(' ').length > 1) {
+        amount = amount / FRACTION_WORDS[denominatorWord]
+        dropWords(1)
+        rest = rest.replace(/^av\s+(?:(?:en|ett|hela)\s+)?/iu, '')
+      }
       // "två halva" – sällsynt, men blir rätt.
       const next = lower().split(' ')[0]
       if (HALF_WORDS.has(next) && lower().split(' ').length > 1) {
