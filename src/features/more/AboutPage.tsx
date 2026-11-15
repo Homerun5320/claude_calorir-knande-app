@@ -29,7 +29,7 @@ import { Button, Card, ExternalLink as TextLink, ListGroup, ListRow, PageHeader,
 import { LogoMark, Wordmark } from '../../components/layout/Logo'
 import { useProfileStore } from '../../stores/profileStore'
 import { SupportSheet } from './SupportSheet'
-import { SUPPORT_EMAIL, TRIAL_DAYS } from '../../config/commerce'
+import { OWNER_ONLY, SUPPORT_EMAIL, TRIAL_DAYS } from '../../config/commerce'
 import { allowsLicenseKeyEntry, isNativeApp, sellsOnWeb, storagePlace } from '../../config/platform'
 import { copyText, priceSummaryText } from '../premium/premiumLogic'
 import { clearErrorLog, formatErrorReport, readErrorLog } from '../../lib/errorLog'
@@ -64,8 +64,10 @@ export const CHOICES: readonly Choice[] = [
     icon: CircleSlash,
     tone: 'lingon',
     // Årslicensen är i butikerna en förbetald prenumeration som inte förnyas – "ingen prenumeration" vore fel där.
-    title: 'Prova först – ingen automatisk förnyelse',
-    text: `${TRIAL_DAYS} dagar gratis, sedan ${priceSummaryText()} – utan automatisk förnyelse. Ingen reklam och inga dolda avgifter; streckkodsläsaren och alla näringsämnen ingår.`,
+    title: OWNER_ONLY ? 'Ingen reklam och inga dolda avgifter' : 'Prova först – ingen automatisk förnyelse',
+    text: OWNER_ONLY
+      ? 'Streckkodsläsaren och alla näringsämnen ingår.'
+      : `${TRIAL_DAYS} dagar gratis, sedan ${priceSummaryText()} – utan automatisk förnyelse. Ingen reklam och inga dolda avgifter; streckkodsläsaren och alla näringsämnen ingår.`,
   },
   {
     icon: WifiOff,
@@ -403,7 +405,7 @@ export default function AboutPage() {
           </p>
           <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-2">
             Lagom är en svensk kalori- och näringsdagbok byggd på svenska livsmedel, svenska mått och de nordiska näringsrekommendationerna. Den
-            fungerar utan uppkoppling och all data stannar på din enhet. Prova gratis i {TRIAL_DAYS} dagar – sedan {priceSummaryText()}.
+            fungerar utan uppkoppling och all data stannar på din enhet. {!OWNER_ONLY && `Prova gratis i ${TRIAL_DAYS} dagar – sedan ${priceSummaryText()}.`}
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {!onboarded && <Button to="/valkommen">Kom igång</Button>}

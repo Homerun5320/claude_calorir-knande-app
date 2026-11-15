@@ -21,7 +21,7 @@ import { useState } from 'react'
 import { ArrowRight, Download, Sprout, UserRound } from 'lucide-react'
 import { Button, Card, PageHeader, Spinner, toast } from '../../components/ui'
 import { Confetti } from '../../components/signature'
-import { COMMERCE_MODE, PLANS, TRIAL_DAYS, type Plan } from '../../config/commerce'
+import { COMMERCE_MODE, OWNER_ONLY, PLANS, TRIAL_DAYS, type Plan } from '../../config/commerce'
 import { WEB_PURCHASES_BUILD, allowsLicenseKeyEntry, isInApp, offersLicenseRecovery, sellsOnWeb } from '../../config/platform'
 import { useAccess } from '../../hooks/useAccess'
 import { useLicenseStore } from '../../stores/licenseStore'
@@ -131,7 +131,7 @@ export default function PremiumPage() {
 
   return (
     <div className="px-4 pb-10">
-      <PageHeader back title="Lagom Premium" subtitle={`${TRIAL_DAYS} dagar gratis, sedan ett tydligt köp. Ingen reklam och ingen automatisk förnyelse.`} />
+      <PageHeader back title="Lagom Premium" subtitle={OWNER_ONLY ? 'Ingen reklam och ingen automatisk förnyelse.' : `${TRIAL_DAYS} dagar gratis, sedan ett tydligt köp. Ingen reklam och ingen automatisk förnyelse.`} />
       <Confetti fire={burst} fullscreen />
 
       <div className="flex flex-col gap-8">
