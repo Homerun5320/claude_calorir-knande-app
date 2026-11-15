@@ -51,6 +51,7 @@ import { useAccess } from '../../hooks/useAccess'
 import { premiumStatusLine } from '../premium/TrialBanner'
 import { overrideCount } from './settingsLogic'
 import { CLOUD_ENABLED } from '../../config/cloud'
+import { OWNER_ONLY } from '../../config/commerce'
 import { allowsLicenseKeyEntry } from '../../config/platform'
 import { isNative, platform } from '../../native'
 import { useCloudStore } from '../../stores/cloudStore'
@@ -113,7 +114,7 @@ export const SECTIONS: Record<SectionId, SectionMeta> = {
   licens: {
     title: 'Licens',
     // I iPhone-appen finns inga licensnycklar (alternativ A) – bara köp i appen och Återställ köp.
-    description: allowsLicenseKeyEntry() ? 'Provperiod, licensnyckel och köp.' : 'Provperiod, köp och Återställ köp.',
+    description: OWNER_ONLY ? 'Din licens.' : allowsLicenseKeyEntry() ? 'Provperiod, licensnyckel och köp.' : 'Provperiod, köp och Återställ köp.',
     icon: KeyRound,
     tone: 'sol',
     component: LicenseSection,
@@ -280,7 +281,7 @@ function SettingsIndex() {
         <ListGroup title="Om">
           <ListRow to="/om" leading={Info} title="Om Lagom" subtitle="Källor, licenser och integritet" />
           <ListRow to="/integritet" leading={ShieldCheck} leadingTone="gran" title="Integritetspolicy" subtitle="Vilken data som finns var – och dina rättigheter" />
-          <ListRow to="/villkor" leading={FileText} leadingTone="mossa" title="Köp- och användarvillkor" subtitle="Provperiod, licenser och användning" />
+          <ListRow to="/villkor" leading={FileText} leadingTone="mossa" title="Köp- och användarvillkor" subtitle={OWNER_ONLY ? 'Licenser och användning' : 'Provperiod, licenser och användning'} />
           <ListRow onClick={() => setSupport(true)} leading={HeartHandshake} leadingTone="vinbar" title="Stöd & hjälp" subtitle="1177, Frisk & Fri och Alkoholhjälpen" chevron />
         </ListGroup>
       </div>

@@ -6,6 +6,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, UserRound } from 'lucide-react'
 import { Button, confirmDialog, cx } from '../../components/ui'
+import { OWNER_ONLY } from '../../config/commerce'
 import { useDemoData } from '../../hooks/useDemoData'
 import { wipeAndReset } from '../settings/wipe'
 
@@ -34,8 +35,8 @@ export function DemoBanner({ className }: { className?: string }) {
         <div className="min-w-0">
           <p className="font-semibold text-ink">Du tittar på exempeldata</p>
           <p className="mt-0.5 text-[0.875rem] leading-snug text-ink-2">
-            Allt här är påhittat, så att du kan se hur Lagom fungerar – titta runt så mycket du vill. Din egen profil börjar tom, och provperioden startar
-            först när du skapar den.
+            Allt här är påhittat, så att du kan se hur Lagom fungerar – titta runt så mycket du vill. Din egen profil börjar tom.
+            {!OWNER_ONLY && ' Provperioden startar först när du skapar den.'}
           </p>
         </div>
       </div>

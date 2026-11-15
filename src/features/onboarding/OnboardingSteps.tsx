@@ -34,7 +34,7 @@ import { AboutFields, Note } from './AboutFields'
 import { ChoiceCard, ChoiceGroup } from './ChoiceCard'
 import { MacroSplitBar } from './MacroSplitBar'
 import { TargetsSummary } from './TargetsSummary'
-import { TRIAL_DAYS } from '../../config/commerce'
+import { OWNER_ONLY, TRIAL_DAYS } from '../../config/commerce'
 import { storagePlace, trialViaStore } from '../../config/platform'
 import { useAccess, type AccessStatus } from '../../hooks/useAccess'
 import { daysText, priceSummaryText } from '../premium/premiumLogic'
@@ -106,7 +106,7 @@ export const AFTER_TRIAL_TEXT = 'Efter provperioden kan du fortfarande se, expor
 
 /** Löftena i välkomststeget. `priceText`: priserna efter provperioden (se `usePriceSummaryText`). */
 function promises(priceText: string): ReadonlyArray<{ icon: LucideIcon; tone: Tone; title: string; text: string }> {
-  return [
+  const all: Array<{ icon: LucideIcon; tone: Tone; title: string; text: string }> = [
     { icon: Wheat, tone: 'hjortron', title: 'Svenska livsmedel och mått', text: 'Knäckebröd, falukorv och kanelbulle – i dl, msk och krm.' },
     {
       icon: Gift,
@@ -118,6 +118,8 @@ function promises(priceText: string): ReadonlyArray<{ icon: LucideIcon; tone: To
     },
     { icon: ShieldCheck, tone: 'gran', title: 'Din data stannar på din enhet', text: 'Inget konto och ingen spårning. Exportera eller radera allt när du vill.' },
   ]
+  // Ägarens privata version har ingen provperiod att nämna.
+  return OWNER_ONLY ? all.filter((p) => p.icon !== Gift) : all
 }
 
 export function WelcomeStep({ today }: { today: ISODate }) {

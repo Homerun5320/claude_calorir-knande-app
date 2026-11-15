@@ -42,7 +42,7 @@ import { dayNumberSince, formatElapsed, loggedDaysInLast } from './moreLogic'
 import { SupportSheet } from './SupportSheet'
 import { MILESTONES_PATH, useMilestones } from './useMilestoneCelebration'
 import { PremiumHubCard } from '../premium/TrialBanner'
-import { TRIAL_DAYS } from '../../config/commerce'
+import { OWNER_ONLY, TRIAL_DAYS } from '../../config/commerce'
 
 interface HubItem {
   id: string
@@ -259,7 +259,7 @@ export default function MorePage() {
         </nav>
 
         <p className="px-2 pt-2 text-center text-[0.8125rem] leading-relaxed text-ink-3">
-          {TRIAL_DAYS} dagar gratis, sedan ett tydligt köp utan automatisk förnyelse. Ingen reklam – och din data stannar på din enhet.
+          {OWNER_ONLY ? 'Ingen reklam – och din data stannar på din enhet.' : `${TRIAL_DAYS} dagar gratis, sedan ett tydligt köp utan automatisk förnyelse. Ingen reklam – och din data stannar på din enhet.`}
         </p>
       </div>
 
