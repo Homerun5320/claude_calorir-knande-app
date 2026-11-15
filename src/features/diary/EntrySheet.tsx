@@ -6,7 +6,7 @@
  * - Båda: måltid (chips), klockslag, anteckning, "Visa näringsvärden" (livsmedel), "Flytta till annan dag",
  *   "Kopiera till idag" och "Ta bort" (med Ångra).
  */
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRightLeft, Clock, Copy, CopyPlus, Info, Trash2 } from 'lucide-react'
 import { Button, Chip, NumberField, Sheet, TextField, cx, toast } from '../../components/ui'
@@ -26,6 +26,8 @@ import {
   normalizeTime,
   QUICK_EDIT_KEYS,
   quickNutrientsPatch,
+  scaleShare,
+  SHARE_CHOICES,
   targetPhrase,
   visibleMeals,
   withoutIdentity,
@@ -109,10 +111,21 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
     const n = entry.kind === 'quick' ? entry.nutrients : {}
     return { kcal: n.kcal, protein: n.protein, carbs: n.carbs, fat: n.fat }
   })
+  // Andel av postens sparade värden (1 = allt). Ingen är vald från början – tomt tills man väljer.
+  const [share, setShare] = useState<number | undefined>()
   const [moveTarget, setMoveTarget] = useState<Target>({
     date: entry.date === today ? addDays(today, 1) : today,
     meal: entry.meal,
   })
+
+  const shareLabelId = useId()
+  /** Räknar om energi och makron från postens sparade värden – flera val i rad ger aldrig dubbel räkning. */
+  const chooseShare = (next: number) => {
+    if (entry.kind !== 'quick') return
+    const n = scaleShare(entry.nutrients, next)
+    setShare(next)
+    setQuick({ kcal: n.kcal, protein: n.protein, carbs: n.carbs, fat: n.fat })
+  }
 
   const mealOptions = visibleMeals(meals as MealConfig[], { [entry.meal]: [entry] })
   const factor = energyUnit === 'kJ' ? KJ_PER_KCAL : 1
@@ -141,7 +154,7 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
     } else {
       const trimmed = name.trim()
       if (!trimmed) return
-      updateEntry(entry.date, entry.id, { ...common, name: trimmed, nutrients: quickNutrientsPatch(entry.nutrients, quick) })
+      updateEntry(entry.date, entry.id, { ...common, name: trimmed, nutrients: quickNutrientsPatch(share === undefined ? entry.nutrients : scaleShare(entry.nutrients, share), quick) })
     }
     onClose()
     // Ny måltid: raden flyttar – följ med den dit.
@@ -244,6 +257,37 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
           ) : (
             <div className="flex flex-col gap-4">
               <TextField label="Namn" value={name} onValueChange={setName} autoComplete="off" error={name.trim() ? undefined : 'Ge posten ett namn'} />
+              <div role="group" aria-labelledby={shareLabelId} className="flex flex-col gap-2">
+                <span id={shareLabelId} className="eyebrow">
+                  Hur mycket åt du av det?
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {SHARE_CHOICES.map((c) => (
+                    <Chip
+                      key={c.label}
+                      size="sm"
+                      selected={share !== undefined && Math.abs(share - c.share) < 1e-9}
+                      onClick={() => chooseShare(c.share)}
+                      aria-label={c.share === 1 ? 'Allt' : `${c.label} av posten`}
+                      className="min-w-12 justify-center"
+                    >
+                      {c.label}
+                    </Chip>
+                  ))}
+                </div>
+                <NumberField
+                  label="Egen andel"
+                  value={share === undefined ? undefined : Math.round(share * 1000) / 10}
+                  onChange={(v) => (v === undefined || v <= 0 ? setShare(undefined) : chooseShare(v / 100))}
+                  min={1}
+                  max={500}
+                  step={5}
+                  decimals={1}
+                  suffix="%"
+                  placeholder="t.ex. 62,5"
+                  hint="Räknas från de värden posten har nu. Spara för att ändra posten."
+                />
+              </div>
               {mindful ? (
                 <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink-2">
                   Energi och makron är dolda i medvetet läge. Du kan ändra dem när medvetet läge är avstängt.
@@ -259,7 +303,11 @@ function EntryEditor({ entry, open, onClose, today, meals, mindful, energyUnit }
                         key={key}
                         label={isEnergy ? `${QUICK_LABELS[key]} (${energyUnit})` : QUICK_LABELS[key]}
                         value={shownValue}
-                        onChange={(v) => setQuick((q) => ({ ...q, [key]: v === undefined ? undefined : isEnergy ? v / factor : v }))}
+                        onChange={(v) => {
+                          // Skrivs ett värde för hand gäller inte längre en vald andel.
+                          setShare(undefined)
+                          setQuick((q) => ({ ...q, [key]: v === undefined ? undefined : isEnergy ? v / factor : v }))
+                        }}
                         min={0}
                         max={isEnergy ? 20000 : 1000}
                         step={isEnergy ? 10 : 1}

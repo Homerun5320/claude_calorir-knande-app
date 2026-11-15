@@ -25,7 +25,7 @@ import { useFoodStore } from '../../stores/foodStore'
 import { useHydrated } from '../../stores/hydration'
 import { useProfileStore } from '../../stores/profileStore'
 import { useLicenseStore } from '../../stores/licenseStore'
-import { TRIAL_DAYS } from '../../config/commerce'
+import { OWNER_ONLY, TRIAL_DAYS } from '../../config/commerce'
 import { isInApp, trialViaStore } from '../../config/platform'
 import { useAccess } from '../../hooks/useAccess'
 import { startStoreTrial, type StoreTrialResult } from '../premium/premiumLogic'
@@ -315,7 +315,7 @@ function OnboardingFlow({ onLeaving }: { onLeaving: () => void }) {
       // (`finish`). Exempeldatan går att titta på men inte att logga i.
       await seedDemoData()
       save(null)
-      toast('Exempeldata är inlagd – titta runt så mycket du vill. Tryck på ”Börja med min egen profil” när du vill börja logga; då startar provperioden.', {
+      toast(OWNER_ONLY ? 'Exempeldata är inlagd – titta runt så mycket du vill. Tryck på ”Börja med min egen profil” när du vill börja logga.' : 'Exempeldata är inlagd – titta runt så mycket du vill. Tryck på ”Börja med min egen profil” när du vill börja logga; då startar provperioden.', {
         tone: 'success',
       })
       navigate('/', { replace: true })

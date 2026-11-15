@@ -145,6 +145,24 @@ describe('DiaryPage', () => {
     expect(useDiaryStore.getState().entries[today]?.length).toBe(1)
   })
 
+  it('en snabbregistrerad post kan sparas som en andel (⅝) och räknas från de ursprungliga värdena', async () => {
+    const today = todayISO()
+    useDiaryStore.getState().addEntry({ kind: 'quick', name: 'Kebabpizza', nutrients: { kcal: 1600, protein: 80, carbs: 160, fat: 80, fiber: 8 }, date: today, meal: 'lunch' })
+    renderAt('/dagbok')
+    fireEvent.click(await screen.findByRole('button', { name: /Ändra Kebabpizza/ }))
+    const sheet = await screen.findByRole('dialog', { name: 'Kebabpizza' })
+    // Ingen andel är vald från början.
+    expect(within(sheet).getAllByRole('button', { pressed: true })).not.toContainEqual(expect.objectContaining({ textContent: '⅝' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: '⅝ av posten' }))
+    // Ett val till räknas från originalet, inte från det redan nedskalade.
+    fireEvent.click(within(sheet).getByRole('button', { name: '½ av posten' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: '⅝ av posten' }))
+    expect(within(sheet).getByLabelText('Egen andel')).toHaveValue('62,5')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Spara' }))
+    const saved = useDiaryStore.getState().entries[today]![0]!
+    expect(saved.kind === 'quick' && saved.nutrients).toMatchObject({ kcal: 1000, protein: 50, carbs: 100, fat: 50, fiber: 5 })
+  })
+
   it('tömmer en måltid via menyn och kan ångra', async () => {
     const today = todayISO()
     const store = useDiaryStore.getState()

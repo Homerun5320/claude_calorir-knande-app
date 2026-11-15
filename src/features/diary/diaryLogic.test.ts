@@ -2,6 +2,7 @@ import type { DiaryEntry, ExerciseEntry, Food, FoodEntry, MealConfig, QuickEntry
 import { DEFAULT_MEALS } from '../../stores/profileStore'
 import { formatEnergy } from '../../lib/format'
 import {
+  scaleShare,
   addFoodHref,
   balanceNote,
   dayBalance,
@@ -321,5 +322,17 @@ describe('daySummaryText', () => {
     const empty = daySummaryText({ date: '2026-09-20', today: TODAY, meals: DEFAULT_MEALS, entries: [], complete: true })
     expect(empty).toContain('Inget loggat.')
     expect(empty).toContain('Dagen är markerad som klar')
+  })
+})
+
+describe('scaleShare', () => {
+  it('räknar en andel av alla värden: hela kcal, en decimal för övrigt, okänt förblir okänt', () => {
+    expect(scaleShare({ kcal: 1948, protein: 81.7, carbs: 143.5, fat: 112.7 }, 5 / 8)).toEqual({ kcal: 1218, protein: 51.1, carbs: 89.7, fat: 70.4 })
+    expect(scaleShare({ kcal: 100 }, 0.5)).toEqual({ kcal: 50 })
+    expect('protein' in scaleShare({ kcal: 100 }, 0.5)).toBe(false)
+  })
+  it('en ogiltig andel lämnar värdena som de är', () => {
+    expect(scaleShare({ kcal: 100 }, 0)).toEqual({ kcal: 100 })
+    expect(scaleShare({ kcal: 100 }, Number.NaN)).toEqual({ kcal: 100 })
   })
 })
