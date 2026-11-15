@@ -91,6 +91,7 @@ import { useBasketStore, type BasketItem } from './basketStore'
 import { AddRow, MealChips, RowList, useLeave } from './components'
 import { PortionSheet, type SheetAction } from './PortionSheet'
 import { QuickAddSheet } from './QuickAddSheet'
+import { DescribeMealSheet } from './DescribeMealSheet'
 import { BasketBar, BasketSheet } from './Basket'
 import { OnlineSearch } from './OnlineSearch'
 import { FreeTextCard, type FreeTextRow } from './FreeTextCard'
@@ -216,6 +217,7 @@ export default function AddFoodPage() {
   const { addFood, addMany, addTemplate } = useAddFood()
   const [picked, setPicked] = useState<Picked | null>(null)
   const [quickOpen, setQuickOpen] = useState(false)
+  const [describeOpen, setDescribeOpen] = useState(false)
   const [plateOpen, setPlateOpen] = useState(false)
   const openPlate = () => {
     if (requireAccess('mat')) setPlateOpen(true)
@@ -490,6 +492,9 @@ export default function AddFoodPage() {
               <Button variant="outline" size="sm" iconLeft={Plus} to={newFoodHref({ name: q, meal, date })}>
                 Skapa eget livsmedel
               </Button>
+              <Button variant="outline" size="sm" iconLeft={Sparkles} onClick={() => setDescribeOpen(true)}>
+                Beskriv måltiden
+              </Button>
               <Button variant="outline" size="sm" iconLeft={Zap} onClick={() => setQuickOpen(true)}>
                 Snabbregistrera
               </Button>
@@ -513,6 +518,7 @@ export default function AddFoodPage() {
           onDetails={details}
           onScan={goScan}
           onQuick={() => setQuickOpen(true)}
+          onDescribe={() => setDescribeOpen(true)}
           onPlate={openPlate}
           basketCount={basketCount}
           onToggleSuggestion={(food) => {
@@ -560,6 +566,7 @@ export default function AddFoodPage() {
         }}
       />
 
+      <DescribeMealSheet open={describeOpen} onClose={() => setDescribeOpen(false)} date={date} meal={meal} onAdded={() => setQuery('')} />
       <QuickAddSheet open={quickOpen} onClose={() => setQuickOpen(false)} date={date} meal={meal} initialName={q} onAdded={() => setQuery('')} />
 
       <PlateLogSheet open={plateOpen} onClose={() => setPlateOpen(false)} />
@@ -650,6 +657,7 @@ interface BrowseProps {
   onDetails: (food: Food) => void
   onScan: () => void
   onQuick: () => void
+  onDescribe: () => void
   onPlate: () => void
   basketCount: (id: string) => number
   onToggleSuggestion: (food: Food) => void
@@ -711,6 +719,14 @@ function Browse(props: BrowseProps) {
           tone="gran"
           onClick={props.onScan}
           className="col-span-2 sm:col-span-1"
+        />
+        <ActionTile
+          icon={Sparkles}
+          title="Beskriv måltiden"
+          text="Skriv vad du åt, få ett ungefärligt värde"
+          tone="gran"
+          onClick={props.onDescribe}
+          className="col-span-2 sm:col-span-3"
         />
         <ActionTile
           icon={Zap}

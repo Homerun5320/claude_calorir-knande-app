@@ -449,6 +449,21 @@ describe('Fritextloggning', () => {
     expect(screen.queryByRole('heading', { name: /^Lägg till \d+ saker?$/ })).not.toBeInTheDocument()
   })
 
+  it('"Beskriv måltiden" ger ett enda värde och lägger en post med namnet', async () => {
+    renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
+    fireEvent.click(screen.getByRole('button', { name: /Beskriv måltiden/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Beskriv måltiden' })
+    fireEvent.change(within(dialog).getByLabelText('Vad åt du?'), { target: { value: 'två ägg och en banan' } })
+    fireEvent.change(within(dialog).getByLabelText(/Namn på måltiden/), { target: { value: 'Söndagsfrukost' } })
+    // Ett ungefärligt värde, inte en lista att granska.
+    await within(dialog).findByText(/^ca \d+/, undefined, { timeout: 3000 })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Lägg till i / }))
+    await waitFor(() => expect(Object.values(useDiaryStore.getState().entries).flat()).toHaveLength(1))
+    const entry = Object.values(useDiaryStore.getState().entries).flat()[0]!
+    expect(entry).toMatchObject({ kind: 'quick', name: 'Söndagsfrukost', meal: 'frukost' })
+    expect(entry.kind === 'quick' && entry.nutrients.kcal).toBeGreaterThan(100)
+  })
+
   it('efter provperioden läggs inget i korgen', async () => {
     expireTrial()
     renderAt('/lagg-till?maltid=frukost&datum=2026-09-26')
