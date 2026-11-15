@@ -258,6 +258,34 @@ export function quickNutrientsPatch(existing: Nutrients, edits: Partial<Record<Q
   return out
 }
 
+/** Andelar att välja på för en snabbregistrerad post ("jag åt 5/8 av det"). */
+export const SHARE_CHOICES: ReadonlyArray<{ share: number; label: string }> = [
+  { share: 1 / 8, label: '⅛' },
+  { share: 1 / 4, label: '¼' },
+  { share: 3 / 8, label: '⅜' },
+  { share: 1 / 2, label: '½' },
+  { share: 5 / 8, label: '⅝' },
+  { share: 3 / 4, label: '¾' },
+  { share: 7 / 8, label: '⅞' },
+  { share: 1, label: 'Allt' },
+]
+
+/**
+ * Posten räknad för en andel av de sparade värdena: energi i hela kcal, övriga ämnen med en decimal.
+ * Okända ämnen förblir okända. En ogiltig andel (≤ 0 eller inte ett tal) ger oförändrade värden.
+ */
+export function scaleShare(existing: Nutrients, share: number): Nutrients {
+  if (!Number.isFinite(share) || share <= 0) return { ...existing }
+  const out: Nutrients = {}
+  for (const key of Object.keys(existing) as Array<keyof Nutrients>) {
+    const v = existing[key]
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    const scaled = v * share
+    out[key] = key === 'kcal' ? Math.round(scaled) : Math.round(scaled * 10) / 10
+  }
+  return out
+}
+
 /** 'HH:mm' eller undefined. Tom sträng och ogiltiga tider blir undefined. */
 export function normalizeTime(value: string | undefined): string | undefined {
   if (!value) return undefined
