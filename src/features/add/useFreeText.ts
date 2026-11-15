@@ -42,9 +42,10 @@ export function isFreeText(query: string): boolean {
  * Tolkade rader för söktexten, eller en tom lista när texten bara har ett led, när hela texten är
  * ett livsmedel ("Kaffe med mjölk") eller medan databasen laddas.
  */
-export function useFreeTextItems(query: string, meal: MealId): ParsedItem[] {
+export function useFreeTextItems(query: string, meal: MealId, opts: { single?: boolean } = {}): ParsedItem[] {
   const deferred = useDeferredValue(query)
-  const multi = isFreeText(deferred)
+  // `single`: "Beskriv måltiden" tolkar också en text med bara ett led ("havregrynsgröt med mjölk").
+  const multi = opts.single ? deferred.trim().length > 0 : isFreeText(deferred)
   const catalog = useBuiltinCatalog(multi)
   const customFoods = useFoodStore((s) => s.customFoods)
   const recipes = useFoodStore((s) => s.recipes)
@@ -67,6 +68,6 @@ export function useFreeTextItems(query: string, meal: MealId): ParsedItem[] {
         return u && isUsableUnit(food, u.lastUnit) && u.lastAmount > 0 ? { amount: u.lastAmount, unit: u.lastUnit } : undefined
       },
     })
-    return items.length > 1 ? items : EMPTY
-  }, [multi, catalog, userList, usage, favorites, meal, deferred])
+    return opts.single || items.length > 1 ? items : EMPTY
+  }, [multi, catalog, userList, usage, favorites, meal, deferred, opts.single])
 }
