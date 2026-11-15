@@ -176,12 +176,32 @@ export function unitStep(unit: UnitKey): number {
   return 0.5
 }
 
+/** Åttondelar med Unicode-tecken. */
+const EIGHTH_GLYPHS: ReadonlyArray<readonly [number, string]> = [
+  [1 / 8, '⅛'],
+  [0.25, '¼'],
+  [3 / 8, '⅜'],
+  [0.5, '½'],
+  [5 / 8, '⅝'],
+  [0.75, '¾'],
+  [7 / 8, '⅞'],
+]
+
+/**
+ * Delar av en portion ("5/8 av en pizza"): sifferknappsatsen på iPhone har inget snedstreck, så bråken finns som val.
+ * Bara för portionsenheter – 5/8 gram är ingen mängd.
+ */
+export function fractionChoices(unit: UnitKey): Array<{ amount: number; label: string }> {
+  if (!isPortionUnit(unit)) return []
+  return EIGHTH_GLYPHS.map(([amount, label]) => ({ amount, label }))
+}
+
 /** Mängd i välbekant form: 0,5 → "½", 1,5 → "1½", 2 → "2", 0,4 → "0,4". */
 export function formatFraction(value: number): string {
   if (!Number.isFinite(value)) return '–'
   const whole = Math.floor(value + 1e-9)
   const rest = value - whole
-  const glyph = Math.abs(rest - 0.25) < 1e-6 ? '¼' : Math.abs(rest - 0.5) < 1e-6 ? '½' : Math.abs(rest - 0.75) < 1e-6 ? '¾' : ''
+  const glyph = EIGHTH_GLYPHS.find(([v]) => Math.abs(rest - v) < 1e-6)?.[1] ?? ''
   if (glyph) return whole > 0 ? `${whole}${glyph}` : glyph
   return formatNumber(value, 2)
 }
@@ -355,6 +375,7 @@ export function PortionPicker({
   const formatEnergyIn = useEnergyFormatter()
   const unitsId = useId()
   const quickId = useId()
+  const fractionsId = useId()
 
   // Startvärdet räknas ut en gång – senare ändringar i användningsstatistiken ska inte hoppa i fältet.
   const [initial] = useState(() => initialSelection(food, { amount: initialAmount, unit: initialUnit, usage }))
@@ -414,6 +435,7 @@ export function PortionPicker({
   }
 
   const quick = quickChoices(unit)
+  const fractions = fractionChoices(unit)
   const suffix = amountSuffix(food, unit)
   const hint = amount !== undefined ? amountHint(food, amount, unit) : ''
   const rawHint = isRawUnit(unit) ? rawWeightHint(food, unit) : ''
@@ -470,6 +492,28 @@ export function PortionPicker({
           ))}
         </div>
       </div>
+
+      {fractions.length > 0 && (
+        <div role="group" aria-labelledby={fractionsId} className="flex flex-col items-center gap-2">
+          <span id={fractionsId} className="eyebrow">
+            Del av en portion
+          </span>
+          <div className="flex flex-wrap justify-center gap-2">
+            {fractions.map((q) => (
+              <Chip
+                key={q.label}
+                size="sm"
+                selected={amount !== undefined && Math.abs(amount - q.amount) < 1e-9}
+                onClick={() => setAmount(q.amount)}
+                aria-label={`${q.label} × ${unitLabel(food, unit)}`}
+                className="min-w-12 justify-center"
+              >
+                {q.label}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Enheter */}
       <div role="group" aria-labelledby={unitsId}>

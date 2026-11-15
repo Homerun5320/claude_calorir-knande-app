@@ -314,3 +314,14 @@ describe('resolveFreeText', () => {
     expect(resolveFreeText('   ', deps)).toEqual([])
   })
 })
+
+describe('bråk som mängd', () => {
+  it('läser "5/8 delar av en pizza" och åttondelar som ord', () => {
+    expect(parseQuantity('5/8 delar av en pizza')).toMatchObject({ amount: 0.625, name: 'pizza' })
+    expect(parseQuantity('5/8 pizza')).toMatchObject({ amount: 0.625, name: 'pizza' })
+    expect(parseQuantity('3/4 av pizzan')).toMatchObject({ amount: 0.75, name: 'pizzan' })
+    expect(parseQuantity('⅝ pizza')).toMatchObject({ amount: 0.625, name: 'pizza' })
+    expect(parseQuantity('fem åttondelar pizza')).toMatchObject({ amount: 0.625, name: 'pizza' })
+    expect(parseQuantity('tre fjärdedelar av en paj')).toMatchObject({ amount: 0.75, name: 'paj' })
+  })
+})

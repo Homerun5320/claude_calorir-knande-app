@@ -54,7 +54,7 @@ export function formatPercent(v: number | undefined, decimals = 0): string {
 }
 
 /** Unicode-bråk som går att skriva direkt ("1½ dl"). */
-const VULGAR_FRACTIONS: Record<string, number> = { '½': 1 / 2, '¼': 1 / 4, '¾': 3 / 4, '⅓': 1 / 3, '⅔': 2 / 3 }
+const VULGAR_FRACTIONS: Record<string, number> = { '½': 1 / 2, '¼': 1 / 4, '¾': 3 / 4, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 1 / 8, '⅜': 3 / 8, '⅝': 5 / 8, '⅞': 7 / 8 }
 
 function fraction(whole: number, numerator: string, denominator: string): number {
   const den = Number(denominator)
@@ -70,7 +70,7 @@ function parseUnsigned(s: string): number {
   m = s.match(/^(\d+) ?\/ ?(\d+)$/)
   if (m) return fraction(0, m[1], m[2])
   // Unicode-bråk, ev. med heltal före: "½", "1½", "1 ½"
-  m = s.match(/^(\d+)? ?([½¼¾⅓⅔])$/)
+  m = s.match(/^(\d+)? ?([½¼¾⅓⅔⅛⅜⅝⅞])$/)
   if (m) return Number(m[1] ?? 0) + VULGAR_FRACTIONS[m[2]]
   // Mellanslag är bara tillåtna som tusentalsavgränsare: "1 234,5", "12 000".
   let d = s

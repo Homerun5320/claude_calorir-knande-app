@@ -13,6 +13,7 @@ import {
   mindfulPortionLabel,
   portionNoun,
   quickChoices,
+  fractionChoices,
   unitChipLabel,
 } from '../../components/domain/PortionPicker'
 import { useFoodStore } from '../../stores/foodStore'
@@ -106,6 +107,8 @@ describe('snabbval och ord', () => {
   })
 
   it('formaterar bråk', () => {
+    expect(formatFraction(5 / 8)).toBe('⅝')
+    expect(formatFraction(1 + 3 / 8)).toBe('1⅜')
     expect(formatFraction(0.5)).toBe('½')
     expect(formatFraction(2.25)).toBe('2¼')
     expect(formatFraction(0.4)).toBe('0,4')
@@ -116,6 +119,22 @@ describe('snabbval och ord', () => {
     expect(mindfulPortionLabel(undefined)).toBe('Energivärde saknas')
     expect(mindfulPortionLabel(30)).toBe('Ett litet tilltugg')
     expect(mindfulPortionLabel(300)).toBe('En lagom portion')
+  })
+})
+
+describe('delar av en portion', () => {
+  it('ger åttondelarna för portioner men inte för gram och mått', () => {
+    expect(fractionChoices('portion:st').map((q) => q.label)).toEqual(['⅛', '¼', '⅜', '½', '⅝', '¾', '⅞'])
+    expect(fractionChoices('g')).toEqual([])
+    expect(fractionChoices('dl')).toEqual([])
+  })
+
+  it('ett tryck på ⅝ ger 0,625 portioner (iPhones sifferknappsats saknar snedstreck)', () => {
+    const onConfirm = vi.fn()
+    render(<PortionPicker food={bulle} onConfirm={onConfirm} confirmLabel="Lägg till i Fika" />)
+    fireEvent.click(screen.getByRole('button', { name: /^⅝ ×/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lägg till i Fika' }))
+    expect(onConfirm).toHaveBeenCalledWith(0.625, 'portion:st', 37.5)
   })
 })
 
