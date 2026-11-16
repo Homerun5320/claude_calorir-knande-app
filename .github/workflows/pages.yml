@@ -45,7 +45,7 @@ jobs:
           VITE_OWNER_ONLY: '1'
 
       - name: Ladda upp bygget
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
